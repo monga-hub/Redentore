@@ -4,6 +4,7 @@
 // camera deltas, pinch zoom and virtual keys instead.
 export class Input {
   private keys = new Set<string>();
+  private hits = new Set<string>(); // keys that went down since the last endFrame()
   buttons = 0; // bitmask from PointerEvent.buttons
   dx = 0; // accumulated mouse/drag delta since last consume()
   dy = 0;
@@ -14,6 +15,7 @@ export class Input {
   constructor(el: HTMLElement) {
     addEventListener('keydown', (e) => {
       this.keys.add(e.code);
+      if (!e.repeat) this.hits.add(e.code);
       if (e.code === 'Space') e.preventDefault();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -46,6 +48,15 @@ export class Input {
 
   down(...codes: string[]): boolean {
     return codes.some((c) => this.keys.has(c));
+  }
+
+  /** True once per physical key press (auto-repeat ignored), until endFrame(). */
+  pressed(code: string): boolean {
+    return this.hits.has(code);
+  }
+
+  endFrame(): void {
+    this.hits.clear();
   }
 
   consume(): { dx: number; dy: number; wheel: number } {

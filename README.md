@@ -17,7 +17,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: ogni area è raggiungibile dallo spawn
+npm run check    # verifica headless: ogni area è raggiungibile dallo spawn + sistema abilità
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -34,6 +34,8 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
+| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti) |
+| Esc | annulla il lancio in corso |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
 trascina sul resto dello schermo per la camera, pizzica per lo zoom, pulsante salto
@@ -75,6 +77,13 @@ src/
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
   ui/hud.ts                  nome dell'area corrente
+  ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,
+                             tooltip, errori, testo di combattimento); ui/icons.ts icone SVG
+  abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s, off-GCD,
+                             lanci, canalizzate, interruzione al movimento. Nessun DOM/three
+  abilities/forsaken.ts      le 8 abilità del Reietto (tabella `ABILITIES`, ordine `BAR`)
+  abilities/vfx.ts           particelle in pool (un draw call), anelli, colonna, fuoco fatuo
+                             e l'unica PointLight delle abilità, creata all'avvio
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
                              pergole; registra collider e aree
@@ -93,6 +102,7 @@ src/
     nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player
+scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sistema abilità
 ```
 
 ### Dove agganciarsi (navi successive)
@@ -103,7 +113,9 @@ scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del pl
   zona (`zone:<id>` nella scena). `level.areas` elenca le sotto-aree con rettangolo.
 - **Collisioni:** aggiungere box con `builder.box(...)`/`obox(...)`; mesh solo visive
   con `collide: false`. `npm run check` deve restare verde.
-- Debug in console: `window.level`, `window.player`, `window.cam`, `window.scene`
+- **Abilità:** aggiungere un oggetto `Ability` in `abilities/forsaken.ts` (o un altro kit)
+  e il suo id in `BAR`; l'icona va in `ui/icons.ts`.
+- Debug in console: `window.level`, `window.player`, `window.cam`, `window.scene`, `window.kit`
   (es. `player.respawn({x: 0, z: -100, yaw: 0})`).
 
 ### Note per dopo (fuori scope qui)

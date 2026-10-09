@@ -12,9 +12,11 @@ export class PlayerController {
   readonly pos = new THREE.Vector3(); // feet position
   private vy = 0;
   private grounded = true;
-  private facing = 0; // yaw, same convention as the camera (0 = facing -Z / north)
+  facing = 0; // yaw, same convention as the camera (0 = facing -Z / north)
+  speedMul = 1; // abilities: Velo spettrale
+  slowFall = false; // abilities: Caduta d'ossa
 
-  private world: World;
+  readonly world: World;
   private spawn: { x: number; z: number; yaw: number };
 
   constructor(world: World, spawn: { x: number; z: number; yaw: number }) {
@@ -30,13 +32,24 @@ export class PlayerController {
     this.facing = s.yaw;
   }
 
+  /** Blink up to `dist` m along the facing, stopping short of the first wall. Returns metres travelled. */
+  blink(dist: number): number {
+    const dx = -Math.sin(this.facing), dz = -Math.cos(this.facing), STEP = 0.2;
+    let d = 0;
+    while (d + STEP <= dist && !this.world.blocked(this.pos.x + dx * (d + STEP), this.pos.z + dz * (d + STEP), this.pos.y)) d += STEP;
+    this.pos.x += dx * d;
+    this.pos.z += dz * d;
+    this.grounded = false; // let gravity settle the feet if we blinked off a ledge
+    return d;
+  }
+
   /** `camYaw`: camera heading; movement is relative to it. `turnToCamera`: right mouse held. */
   update(dt: number, input: Input, camYaw: number, turnToCamera: boolean): void {
     let f = (input.down('KeyW', 'ArrowUp') ? 1 : 0) - (input.down('KeyS', 'ArrowDown') ? 1 : 0);
     let r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
     if (!f && !r) { f = -input.stickY; r = input.stickX; } // touch stick: analog, |v| <= 1
-    const speed = input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN;
+    const speed = (input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN) * this.speedMul;
 
     // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
     const sin = Math.sin(camYaw), cos = Math.cos(camYaw);
@@ -60,7 +73,8 @@ export class PlayerController {
     if (this.grounded && this.vy <= 0 && this.pos.y - ground < PLAYER.step + 0.05) {
       this.pos.y = ground; // stick to stairs going down, step up going up
     } else {
-      this.vy -= GRAVITY * dt;
+      this.vy -= GRAVITY * dt * (this.slowFall && this.vy < 0 ? 0.15 : 1);
+      if (this.slowFall) this.vy = Math.max(this.vy, -2);
       this.pos.y += this.vy * dt;
       this.grounded = this.pos.y <= ground;
       if (this.grounded) { this.pos.y = ground; this.vy = 0; }

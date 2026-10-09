@@ -22,7 +22,7 @@
       #zone.show { animation: zone 3.5s ease forwards; }
       @keyframes zone { 0% { opacity: 0 } 15% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
       #help {
-        position: fixed; left: 12px; bottom: 12px; padding: 8px 12px; pointer-events: none;
+        position: fixed; left: 12px; top: 12px; padding: 8px 12px; pointer-events: none;
         color: #eee; font: 13px/1.5 system-ui, sans-serif; background: rgba(0,0,0,.45); border-radius: 6px;
       }
       #help .touch { display: none; }
@@ -57,6 +57,101 @@
       #jump { right: calc(28px + env(safe-area-inset-right)); bottom: calc(36px + env(safe-area-inset-bottom)); width: 78px; height: 78px; }
       #jump.down { background: rgba(110,80,40,.7); transform: scale(.94); }
       #fullscreen { right: calc(12px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); width: 40px; height: 40px; opacity: .75; }
+
+      /* Action bar: WoW-style buttons, bronze frame, conic cooldown sweep on --p. */
+      .actionbar {
+        --s: min(46px, calc((100vw - 24px) / 12 - 4px));
+        position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%);
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        user-select: none; -webkit-user-select: none; touch-action: none;
+      }
+      .actionbar .bar {
+        display: grid; grid-template-columns: repeat(12, var(--s)); gap: 4px; padding: 5px;
+        background: linear-gradient(#2a2118, #120d09); border: 1px solid #6b5332; border-radius: 4px;
+        box-shadow: 0 0 0 1px #000, 0 4px 14px rgba(0,0,0,.7), inset 0 1px 0 rgba(243,226,176,.15);
+      }
+      .slot {
+        position: relative; width: var(--s); height: var(--s); padding: 0; overflow: hidden; cursor: pointer;
+        background: #0b0907; border: 1px solid #000; border-radius: 3px; outline: none;
+        box-shadow: inset 0 0 0 1px #8a6d3e, inset 0 0 6px #000; -webkit-tap-highlight-color: transparent;
+      }
+      .slot.empty { cursor: default; background: radial-gradient(#1c1610, #080605); }
+      .slot .icon, .slot .icon svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); display: block; }
+      .slot .sweep {
+        position: absolute; inset: 2px; pointer-events: none;
+        background: conic-gradient(rgba(0,0,0,.72) var(--p, 0%), transparent 0);
+      }
+      .slot::after { /* bevel + gloss over the icon */
+        content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 2px;
+        box-shadow: inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 3px rgba(212,175,95,.25);
+        background: linear-gradient(rgba(255,255,255,.12), transparent 45%);
+      }
+      .slot .key {
+        position: absolute; top: 1px; right: 3px; font: bold 11px/1 system-ui, sans-serif; color: #e8e8e8;
+        text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+      }
+      .slot .cd {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        font: bold calc(var(--s) * .38)/1 system-ui, sans-serif; color: #fff4c8; pointer-events: none;
+        text-shadow: 0 0 3px #000, 1px 1px 1px #000;
+      }
+      .slot.pressed { animation: press .12s; }
+      @keyframes press { 0% { filter: brightness(1.8); transform: scale(.94) } 100% { filter: none; transform: none } }
+      .slot.ready .icon { animation: ready .5s ease-out; }
+      @keyframes ready { 0% { filter: brightness(2.6) } 100% { filter: none } }
+      .slot.active, .slot.casting { box-shadow: inset 0 0 0 1px #8a6d3e, 0 0 6px 1px #ffd75e; border-color: #ffd75e; }
+      .slot.active::after { box-shadow: inset 0 0 0 2px #ffd75e, inset 0 0 10px rgba(255,215,94,.6); animation: proc 1.2s ease-in-out infinite alternate; }
+      @keyframes proc { from { opacity: .55 } to { opacity: 1 } }
+
+      .castbar {
+        position: relative; width: min(260px, 70vw); height: 16px; visibility: hidden; opacity: 0;
+        background: #0d0b08; border: 1px solid #000; box-shadow: 0 0 0 1px #8a6d3e, 0 2px 8px #000; border-radius: 2px;
+        transition: opacity .25s, visibility .25s;
+      }
+      .castbar.show { visibility: visible; opacity: 1; transition: none; }
+      .castbar .fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#ffe066, #c99a00); }
+      .castbar.channel .fill { background: linear-gradient(#7ddf64, #2f8f2a); }
+      .castbar.done .fill { background: linear-gradient(#8cff7a, #2fa82a); }
+      .castbar.fail .fill { background: linear-gradient(#ff5a4a, #9a1a10); }
+      .castbar span { position: absolute; top: 0; font: 11px/16px system-ui, sans-serif; color: #fff; text-shadow: 1px 1px 1px #000; }
+      .castbar .name { left: 0; right: 0; text-align: center; }
+      .castbar .time { right: 6px; }
+
+      .errors {
+        position: fixed; top: 22%; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0;
+        color: #ff2a1a; font: bold 17px Georgia, serif; text-shadow: 0 1px 2px #000, 0 0 6px #000;
+      }
+      .errors.show { animation: zone 2.2s ease forwards; }
+      .combat {
+        position: fixed; left: 50%; top: 42%; pointer-events: none; white-space: nowrap;
+        font: bold 22px Georgia, serif; text-shadow: 0 2px 3px #000, 0 0 8px #000;
+        animation: rise 1.6s ease-out forwards;
+      }
+      .combat.heal { color: #5cff4a; }
+      .combat.info { color: #d9b3ff; font-size: 18px; }
+      @keyframes rise { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7) } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.15) } 25% { transform: translate(-50%, -6px) scale(1) } 100% { opacity: 0; transform: translate(-50%, -70px) } }
+
+      .tooltip {
+        position: fixed; width: 260px; padding: 8px 10px; pointer-events: none; display: none;
+        background: rgba(8, 10, 24, .94); border: 1px solid #8a8fa8; border-radius: 4px; box-shadow: 0 0 0 1px #000;
+        color: #fff; font: 12px/1.4 system-ui, sans-serif;
+      }
+      .tooltip.show { display: block; }
+      .tooltip b { font-size: 14px; }
+      .tooltip .row { display: flex; justify-content: space-between; margin: 2px 0 4px; }
+      .tooltip p { margin: 0; color: #ffd100; }
+
+      /* Phones: two rows of six, bigger targets for thumbs. */
+      @media (max-width: 600px) {
+        .actionbar { --s: min(48px, calc((100vw - 24px) / 6 - 5px)); }
+        .actionbar .bar { grid-template-columns: repeat(6, var(--s)); }
+      }
+
+      /* Touch: keep the bar clear of the stick (bottom-left) and the jump button (bottom-right). */
+      body.touch .actionbar { --s: min(44px, calc((100vw - 330px) / 12 - 4px)); bottom: calc(10px + env(safe-area-inset-bottom)); }
+      @media (max-width: 600px) {
+        body.touch .actionbar { --s: min(46px, calc((100vw - 24px) / 6 - 5px)); bottom: calc(170px + env(safe-area-inset-bottom)); }
+      }
     </style>
   </head>
   <body>
@@ -64,9 +159,10 @@
     <div id="help">
       <span class="desk">
         <b>WASD</b> muovi · <b>Shift</b> cammina · <b>Spazio</b> salta · <b>Q/E</b> ruota camera<br />
-        <b>Trascina sx</b> orbita camera · <b>Trascina dx</b> gira personaggio · <b>Rotella</b> zoom · <b>Sx+Dx</b> avanti
+        <b>Trascina sx</b> orbita camera · <b>Trascina dx</b> gira personaggio · <b>Rotella</b> zoom · <b>Sx+Dx</b> avanti<br />
+        <b>1 … =</b> abilità (anche clic sui pulsanti) · <b>Esc</b> annulla il lancio
       </span>
-      <span class="touch"><b>Stick sx</b> muovi · <b>Trascina</b> camera · <b>Pizzica</b> zoom</span>
+      <span class="touch"><b>Stick sx</b> muovi · <b>Trascina</b> camera · <b>Pizzica</b> zoom · <b>Tocca</b> le abilità</span>
     </div>
     <div id="stick"><div id="knob"></div></div>
     <button id="jump" class="touch-btn" aria-label="Salta">

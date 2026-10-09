@@ -5,8 +5,11 @@
 // Tints sampled from the reference frames of the Redentore complex.
 
 export type RGB = [number, number, number];
+/** RGB plus height, stored in the texture's alpha. */
+export type RGBH = [number, number, number, number];
 /** u, v in [0,1); v = 0 is the bottom row (world-up on walls). */
 export type Painter = (u: number, v: number) => RGB;
+type AnyPainter = (u: number, v: number) => RGB | RGBH;
 
 // ---- maths ---------------------------------------------------------------
 
@@ -122,6 +125,57 @@ function brick(n: number, cols = 4, rows = 16): Painter {
     col = mul(col, 0.93 + 0.1 * hash(Math.floor(u * n), Math.floor(v * n), 23));
     const m = mul(mortar, 0.82 + 0.25 * fbm(u, v, 40, 40, 2, 24));
     return mix(mul(col, c.shade), m, c.joint);
+  };
+}
+
+/**
+ * Aged cloister brick: 8×32 bricks per tile, exact half bond so the shader can rebuild the
+ * grid and draw every world brick from a random cell of this pool (materials.ts, TRI_BRICK).
+ * Each cell is self-contained (joint centred on the cell edge) so shuffled cells meet in
+ * mortar. Alpha = height: 0 hole, ~0.2 mortar, ~0.45 chipped clay, ~0.9 brick face.
+ */
+function agedBrick(n: number): (u: number, v: number) => RGBH {
+  const cols = 8, rows = 32, cw = n / cols, ch = n / rows, jh = 2.2; // half joint, texels
+  const mortar = hex(0xc2b59b), burnt = hex(0x6e3b2a), pale = hex(0xdcb48c), hole = hex(0x2e221c);
+  return (u, v) => {
+    const y = v * rows, row = Math.floor(y), x = u * cols + (row & 1) * 0.5, cf = Math.floor(x);
+    const col = mod(cf, cols), id = hash(col, row, 7), r2 = hash(col, row, 8), r3 = hash(col, row, 9);
+    const lx = (x - cf) * cw, ly = (y - row) * ch;
+    // per-edge inset + hand-cut wobble: no two bricks share an outline
+    const wob = (vnoise(u, v, 128, 128, 91) - 0.5) * 2.2;
+    const l = lx - hash(col, row, 10) * 1.5 + wob, r = cw - lx - hash(col, row, 11) * 1.5 - wob;
+    const b = ly - hash(col, row, 12) * 1.2 + wob, t = ch - ly - hash(col, row, 13) * 1.2 - wob;
+    const d = Math.min(l, r, b, t);
+    // chips: noisy bites eaten from the arrises, a few bricks badly damaged
+    const chipK = r2 < 0.25 ? 9 + r2 * 40 : r2 * 7;
+    const eat = smooth(0.42, 0.78, fbm(u, v, 96, 96, 3, 14)) * chipK;
+    const corner = Math.min(Math.hypot(Math.min(l, r), Math.min(b, t)), 99) - r3 * r3 * 10;
+    const dd = Math.min(d - eat, corner);
+    const face = smooth(jh, jh + 1, dd), clay = smooth(jh, jh + 1, d) * (1 - face);
+    // mortar: weathered, eroded deeper in places
+    const ero = smooth(0.5, 0.75, fbm(u, v, 48, 48, 3, 15));
+    let m = mul(mortar, (0.8 + 0.22 * fbm(u, v, 64, 64, 2, 24)) * (1 - 0.3 * ero));
+    m = mul(m, 0.92 + 0.12 * hash(Math.floor(u * n), Math.floor(v * n), 16));
+    const mh = 0.22 - 0.12 * ero;
+    if (hash(col, row, 17) < 0.035) { // missing brick: a dark socket with crumbs
+      const g = fbm(u, v, 128, 128, 2, 18), inside = smooth(jh, jh + 3, d);
+      return [...mix(m, mul(hole, 0.8 + 0.5 * g), inside), mh * (1 - inside) + 0.05 * g];
+    }
+    let c = pick(BRICKS, id);
+    if (r3 > 0.9) c = mix(c, burnt, 0.55 + (r3 - 0.9) * 3); // clinkered headers
+    else if (r3 < 0.1) c = mix(c, pale, 0.45); // underfired, salmon
+    c = mul(c, 0.84 + 0.26 * hash(col, row, 19));
+    const mott = fbm(u, v, 32, 32, 4, 22);
+    c = mul(c, 0.82 + 0.3 * mott);
+    const pit = smooth(0.66, 0.8, fbm(u, v, 160, 160, 2, 25)); // pockmarks and spalls
+    c = mul(c, 1 - 0.25 * pit);
+    c = mul(c, 0.93 + 0.1 * hash(Math.floor(u * n), Math.floor(v * n), 23));
+    const e = (k: number) => 1 - smooth(jh, jh + 5, k);
+    const shade = 1 + 0.14 * e(t) + 0.06 * e(l) - 0.18 * e(b) - 0.08 * e(r);
+    const broken = mul(mix(c, hex(0x8a4a34), 0.4), 0.78 + 0.2 * mott); // fresh break, darker clay
+    const col3 = mix(mix(m, broken, clay), mul(c, shade), face);
+    const h = mh * (1 - clay - face) + (0.4 + 0.1 * mott) * clay + (0.82 + 0.14 * mott - 0.2 * pit) * face;
+    return [...col3, h];
   };
 }
 
@@ -259,10 +313,10 @@ function water(): Painter {
 }
 
 /** Painter and texel size per textured role. */
-export const PAINTERS: Record<string, { paint: Painter; size: number }> = {
+export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   stone: { paint: istria(0xe4ddcc, 2, 4, 512), size: 512 },
   stoneDark: { paint: istria(0xbdb3a1, 1, 2, 256), size: 256 },
-  brick: { paint: brick(512), size: 512 },
+  brick: { paint: agedBrick(1024), size: 1024 },
   plaster: { paint: plaster(0xb4553f, 0.64), size: 512 },
   mass: { paint: plaster(0xc4a57c, 0.66), size: 512 },
   roof: { paint: coppi(), size: 256 },
@@ -279,14 +333,14 @@ export const PAINTERS: Record<string, { paint: Painter; size: number }> = {
 };
 
 /** Rasterise a painter into sRGB RGBA bytes (row 0 = v 0). */
-export function rasterize(paint: Painter, size: number): Uint8Array {
+export function rasterize(paint: AnyPainter, size: number): Uint8Array {
   const out = new Uint8Array(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const c = paint((x + 0.5) / size, (y + 0.5) / size), i = (y * size + x) * 4;
     out[i] = clamp01(c[0]) * 255 + 0.5;
     out[i + 1] = clamp01(c[1]) * 255 + 0.5;
     out[i + 2] = clamp01(c[2]) * 255 + 0.5;
-    out[i + 3] = 255;
+    out[i + 3] = clamp01(c[3] ?? 1) * 255 + 0.5;
   }
   return out;
 }

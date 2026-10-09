@@ -1,34 +1,40 @@
 import * as THREE from 'three';
 import { CHURCH_FLOOR as F } from '../level/plan.ts';
+import type { LightSpot } from '../level/builder.ts';
 
 // Wall torches and braziers: small emissive props (no colliders, so `npm run check`
 // never sees them), a fixed pool of real point lights handed to the torches nearest
 // the player each frame, and rising sparks. Flames are HDR-bright so bloom makes them
 // glow; only POOL of them actually light the scene, which keeps the shader light
 // count constant (no recompiles) and the frame rate flat however many torches exist.
+// The zones add candles (flame only), hanging lamps and coloured window glows (light
+// only) through LevelBuilder.lights; they share the same flames and light pool.
 
 interface Emitter {
   x: number; y: number; z: number; // flame base
   nx: number; nz: number; // wall normal (0,0 for free-standing braziers)
-  big: boolean; // brazier
+  kind: 'torch' | 'brazier' | LightSpot['kind'];
+  color: number;
   phase: number;
 }
 
 const POOL = 8; // real PointLights
 const SPARKS = 5, BRAZIER_SPARKS = 14;
 const LIGHT_COLOR = 0xff8a3c;
+const FLAME = { torch: 1, brazier: 2.6, candle: 0.32, lamp: 0, glow: 0 }; // flame scale, 0 = none
+const POWER = { torch: 9, brazier: 26, candle: 0, lamp: 30, glow: 7 }; // pooled light intensity, 0 = never lit
 
 /** Torch on the wall face through (x, z), sticking out along the room-facing normal. */
 function wall(x: number, z: number, nx: number, nz: number, floor = 0): Emitter {
-  return { x: x + nx * 0.32, y: floor + 2.75, z: z + nz * 0.32, nx, nz, big: false, phase: 0 };
+  return { x: x + nx * 0.32, y: floor + 2.75, z: z + nz * 0.32, nx, nz, kind: 'torch', color: LIGHT_COLOR, phase: 0 };
 }
 
 function brazier(x: number, z: number, floor = 0): Emitter {
-  return { x, y: floor + 1.1, z, nx: 0, nz: 0, big: true, phase: 0 };
+  return { x, y: floor + 1.1, z, nx: 0, nz: 0, kind: 'brazier', color: LIGHT_COLOR, phase: 0 };
 }
 
 /** Placement, from the coordinate tables at the top of each zone file. */
-function layout(): Emitter[] {
+function layout(spots: LightSpot[]): Emitter[] {
   const P = F + 0.6; // presbytery and choir floor
   const e: Emitter[] = [];
   for (const s of [-1, 1]) {
@@ -64,6 +70,7 @@ function layout(): Emitter[] {
     wall(8, -160.7, 0, 1), wall(16, -160.7, 0, 1), // frantoio
   );
   for (const z of [-145, -154, -163]) e.push(wall(-21.7, z, 1, 0), wall(-9.3, z, -1, 0)); // androne
+  for (const s of spots) e.push({ ...s, nx: 0, nz: 0, color: s.color ?? LIGHT_COLOR, phase: 0 });
   e.forEach((t, i) => (t.phase = i * 12.9898));
   return e;
 }
@@ -90,7 +97,9 @@ export const DOT = softDot();
 
 export class Torches {
   readonly root = new THREE.Group();
-  private readonly em = layout();
+  private readonly em: Emitter[];
+  private readonly flames: number[]; // emitters drawing a flame
+  private readonly lit: number[]; // emitters competing for the light pool
   private readonly lights: THREE.PointLight[] = [];
   private readonly outer: THREE.InstancedMesh;
   private readonly core: THREE.InstancedMesh;
@@ -106,15 +115,18 @@ export class Torches {
   private readonly v = new THREE.Vector3();
   private readonly sc = new THREE.Vector3();
 
-  constructor() {
+  constructor(spots: LightSpot[] = []) {
     this.root.name = 'fx:torches';
+    this.em = layout(spots);
     const n = this.em.length;
-    this.order = [...Array(n).keys()];
+    this.flames = this.em.flatMap((e, i) => (FLAME[e.kind] ? [i] : []));
+    this.lit = this.em.flatMap((e, i) => (POWER[e.kind] ? [i] : []));
+    this.order = [...this.lit];
     this.dist = new Float32Array(n);
 
     // Hardware: wall torch = tilted haft + cup; brazier = stand, foot and bowl.
     const iron = new THREE.MeshStandardMaterial({ color: 0x2a2320, roughness: 0.55, metalness: 0.5 });
-    const torches = this.em.filter((t) => !t.big), braziers = this.em.filter((t) => t.big);
+    const torches = this.em.filter((t) => t.kind === 'torch'), braziers = this.em.filter((t) => t.kind === 'brazier');
     const haft = new THREE.CylinderGeometry(0.035, 0.025, 0.55, 6).translate(0, -0.3, 0);
     const cup = new THREE.CylinderGeometry(0.09, 0.05, 0.14, 8);
     const hafts = new THREE.InstancedMesh(haft, iron, torches.length);
@@ -143,8 +155,8 @@ export class Torches {
     // Flames: two additive cones (outer orange, inner gold core), HDR colours for bloom.
     const flameMat = (r: number, g: number, b: number) =>
       new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false });
-    this.outer = new THREE.InstancedMesh(new THREE.ConeGeometry(0.11, 0.42, 7).translate(0, 0.21, 0), flameMat(5, 1.3, 0.25), n);
-    this.core = new THREE.InstancedMesh(new THREE.ConeGeometry(0.06, 0.24, 6).translate(0, 0.12, 0), flameMat(9, 5.5, 1.6), n);
+    this.outer = new THREE.InstancedMesh(new THREE.ConeGeometry(0.11, 0.42, 7).translate(0, 0.21, 0), flameMat(5, 1.3, 0.25), this.flames.length);
+    this.core = new THREE.InstancedMesh(new THREE.ConeGeometry(0.06, 0.24, 6).translate(0, 0.12, 0), flameMat(9, 5.5, 1.6), this.flames.length);
     for (const im of [this.outer, this.core]) {
       im.frustumCulled = false; // instances span the whole site
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -159,7 +171,7 @@ export class Torches {
 
     // Sparks: one Points buffer for every emitter, fading through vertex colour.
     this.em.forEach((t, e) => {
-      for (let k = 0; k < (t.big ? BRAZIER_SPARKS : SPARKS); k++) this.spark.push({ e, age: Math.random() * 2, life: 0, vx: 0, vy: 0, vz: 0 });
+      for (let k = 0; k < (t.kind === 'brazier' ? BRAZIER_SPARKS : t.kind === 'torch' ? SPARKS : 0); k++) this.spark.push({ e, age: Math.random() * 2, life: 0, vx: 0, vy: 0, vz: 0 });
     });
     this.sparkPos = new Float32Array(this.spark.length * 3);
     this.sparkCol = new Float32Array(this.spark.length * 3);
@@ -175,15 +187,15 @@ export class Torches {
   update(t: number, dt: number, focus: THREE.Vector3): void {
     const { em, m, q, sc, v } = this;
     q.identity();
-    for (let i = 0; i < em.length; i++) {
-      const e = em[i], f = flicker(t, e.phase), s = e.big ? 2.6 : 1;
+    this.flames.forEach((i, k) => {
+      const e = em[i], f = flicker(t, e.phase), s = FLAME[e.kind];
       // Flames stretch and sway a little; height follows the flicker.
       m.compose(v.set(e.x, e.y, e.z), q, sc.set(s * (0.9 + 0.1 * f), s * (0.55 + 0.6 * f), s * (0.9 + 0.1 * f)));
-      this.outer.setMatrixAt(i, m);
+      this.outer.setMatrixAt(k, m);
       m.compose(v.set(e.x, e.y + 0.01, e.z), q, sc.set(s, s * (0.6 + 0.5 * f), s));
-      this.core.setMatrixAt(i, m);
-      this.dist[i] = Math.hypot(e.x - focus.x, e.y - focus.y, e.z - focus.z);
-    }
+      this.core.setMatrixAt(k, m);
+    });
+    for (const i of this.lit) this.dist[i] = Math.hypot(em[i].x - focus.x, em[i].y - focus.y, em[i].z - focus.z);
     this.outer.instanceMatrix.needsUpdate = this.core.instanceMatrix.needsUpdate = true;
 
     // Light pool: nearest POOL torches. Each fades out as it nears the distance of the
@@ -194,8 +206,9 @@ export class Torches {
       const l = this.lights[k], i = this.order[k];
       if (i === undefined) { l.intensity = 0; continue; }
       const e = em[i], w = Math.min(1, Math.max(0, (cut - this.dist[i]) / 4));
-      l.position.set(e.x + e.nx * 0.6, e.y + (e.big ? 0.5 : 0.3), e.z + e.nz * 0.6);
-      l.intensity = (e.big ? 26 : 9) * flicker(t, e.phase) * w;
+      l.position.set(e.x + e.nx * 0.6, e.y + (e.kind === 'brazier' ? 0.5 : e.kind === 'torch' ? 0.3 : 0), e.z + e.nz * 0.6);
+      l.color.setHex(e.color);
+      l.intensity = POWER[e.kind] * (e.kind === 'glow' ? 1 : flicker(t, e.phase)) * w;
     }
 
     // Sparks: rise with buoyancy and a little drift, cool from gold to dark red.
@@ -204,8 +217,9 @@ export class Torches {
       p.age += dt;
       if (p.age >= p.life) {
         p.age = 0;
-        p.life = 0.6 + Math.random() * (e.big ? 1.6 : 1.1);
-        const r = e.big ? 0.35 : 0.06;
+        const big = e.kind === 'brazier';
+        p.life = 0.6 + Math.random() * (big ? 1.6 : 1.1);
+        const r = big ? 0.35 : 0.06;
         this.sparkPos[o] = e.x + (Math.random() - 0.5) * r;
         this.sparkPos[o + 1] = e.y + 0.15;
         this.sparkPos[o + 2] = e.z + (Math.random() - 0.5) * r;

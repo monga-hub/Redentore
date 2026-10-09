@@ -51,6 +51,13 @@ export interface ArcadeOpts {
   upper?: string; // sides ('nesw') whose perimeter wall above the roof gets a marcapiano and windows
 }
 
+/** Extra flame or light for fx/torches.ts: candle flame (no light), hanging lamp, or steady coloured glow. */
+export interface LightSpot {
+  x: number; y: number; z: number;
+  kind: 'candle' | 'lamp' | 'glow';
+  color?: number; // glow only
+}
+
 interface BoxOpts {
   collide?: boolean; // default true
   visible?: boolean; // default true (false = invisible barrier)
@@ -67,6 +74,8 @@ export class LevelBuilder {
   readonly areas: Area[] = [];
   /** Meshes the third-person camera must not pass through. */
   readonly cameraBlockers: THREE.Object3D[] = [];
+  /** Candles, lamps and window glows placed by the zones; fx/torches.ts lights them. */
+  readonly lights: LightSpot[] = [];
   private current!: THREE.Group;
   private zoneId = '';
   private decorBatches = new Map<string, { zone: THREE.Group; role: Role; cam: boolean; geos: THREE.BufferGeometry[] }>();
@@ -544,13 +553,13 @@ function chamferBox(w: number, h: number, d: number, b: number): THREE.BufferGeo
 }
 
 /** Shape extruded `depth` thick, centred on z = 0, with a one-segment bevel. */
-function extrude(s: THREE.Shape, depth: number, bevel: number): THREE.BufferGeometry {
+export function extrude(s: THREE.Shape, depth: number, bevel: number): THREE.BufferGeometry {
   const d = depth - 2 * bevel;
   return new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 10 }).translate(0, 0, -d / 2);
 }
 
 /** Half annulus (an arch ring) between radii r0 and r1, springing at (cx, cy), `depth` thick. */
-function ring(cx: number, cy: number, r0: number, r1: number, depth: number): THREE.BufferGeometry {
+export function ring(cx: number, cy: number, r0: number, r1: number, depth: number): THREE.BufferGeometry {
   const s = new THREE.Shape().moveTo(cx + r1, cy).absarc(cx, cy, r1, 0, Math.PI, false).lineTo(cx - r0, cy).absarc(cx, cy, r0, Math.PI, 0, true).closePath();
   return extrude(s, depth, 0.03);
 }
@@ -559,7 +568,7 @@ function ring(cx: number, cy: number, r0: number, r1: number, depth: number): TH
  * Adds the aShape attribute chamferBox carries: height above `base`, total height H (default:
  * the geometry's own extent), 1 on bevel faces (normal tilted off the extrusion axis).
  */
-function shaped(g: THREE.BufferGeometry, base?: number, H?: number, bevels = true): THREE.BufferGeometry {
+export function shaped(g: THREE.BufferGeometry, base?: number, H?: number, bevels = true): THREE.BufferGeometry {
   g.computeBoundingBox();
   const lo = base ?? g.boundingBox!.min.y, hh = H ?? g.boundingBox!.max.y - lo;
   const pos = g.getAttribute('position'), nrm = g.getAttribute('normal'), a = new Float32Array(pos.count * 3);

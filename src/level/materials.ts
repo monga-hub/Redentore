@@ -18,6 +18,8 @@ interface Spec {
   peel?: number; // plaster: world-space scaling threshold (lower = more brick showing)
   shape?: boolean; // paint by form (aShape): banded macro blotches, local foot/top gradient, lit chamfers
   vcol?: boolean; // untextured, shaded by the geometry's baked vertex colours (props.ts crowns, bark)
+  metal?: number;
+  glow?: number; // emissive = tint * glow: accents that must still read in deep shadow
 }
 
 const SPECS = {
@@ -41,6 +43,9 @@ const SPECS = {
   wood: { tile: 1.5, rough: 0.8, macro: 0.1, shape: true }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
   glass: { tint: 0xa9cdd6, rough: 0.1 },
+  gold: { tint: 0xd09a3c, rough: 0.38, metal: 0.45, glow: 0.07 }, // church candlesticks, ribs, banner trim
+  cloth: { tint: 0x8c1622, rough: 0.92, glow: 0.04 }, // crimson carpet, banners, altar frontal
+  azure: { tint: 0x3a4f8c, rough: 0.85, glow: 0.16 }, // painted vault coffers and the inner dome
   player: { tint: 0xe0b040, rough: 0.6 },
 } satisfies Record<string, Spec>;
 
@@ -223,7 +228,8 @@ export function texture(role: string): THREE.DataTexture {
 
 function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
   const s: Spec = SPECS[role];
-  const m = new THREE.MeshStandardMaterial({ color: s.tint ?? 0xffffff, roughness: s.rough ?? 0.9, metalness: 0, side });
+  const m = new THREE.MeshStandardMaterial({ color: s.tint ?? 0xffffff, roughness: s.rough ?? 0.9, metalness: s.metal ?? 0, side });
+  if (s.glow) m.emissive.set(s.tint!).multiplyScalar(s.glow);
   if (role === 'glass') Object.assign(m, { transparent: true, opacity: 0.55 });
   if (role === 'water') Object.assign(m, { transparent: true, opacity: 0.85 });
   // white for geometry without colours (boxes, cones, discs)

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { LevelBuilder } from '../builder.ts';
 import { material } from '../materials.ts';
 import { CHURCH_FLOOR as F, Z } from '../plan.ts';
+import { buildChiesaInterior } from './chiesaInterno.ts';
 
 // Chiesa del Redentore (Palladio). Single nave with three side chapels per side,
 // domed crossing with apsidal arms, raised presbytery, friars' choir behind a
@@ -34,7 +35,7 @@ export function buildChiesa(b: LevelBuilder): void {
   for (const x of [-7.6, -3.2, 3.2, 7.6]) b.order(x, 0.7, 0.7, F, F + 20.5, 'stoneDark');
 
   // Nave + chapels.
-  const chapels = [-4.75, -14, -23.25].map((at) => ({ at, w: 6, h: 11, y0: F }));
+  const chapels = [-4.75, -14, -23.25].map((at) => ({ at, w: 6, h: 11, y0: F, arch: true }));
   for (const s of [-1, 1]) {
     b.wallZ(7.5 * s, 0, -29, { ...stone, h: F + 20, doors: chapels });
     b.wallZ(12.5 * s, 0, -29, { ...stone, h: F + 14 });
@@ -42,12 +43,12 @@ export function buildChiesa(b: LevelBuilder): void {
     b.box(7.5 * s, 13 * s, F + 14, F + 14.6, -29.5, 0, 'roof');
     hip(b, 7.8 * s, 13 * s, -29.5, 0, F + 14.6); // eave stops short of the nave's inner face
   }
-  b.box(-8, 8, F + 20, F + 20.8, -29, -0.5, 'stone');
+  for (const s of [-1, 1]) b.box(6.8 * s, 8 * s, F + 20, F + 20.8, -29, -0.5, 'stone'); // eaves strips: the barrel vault rises between them
   b.add(prism(17, 5, 29, 'roof'), 'roof').position.set(0, F + 20.8, -29);
 
   // Crossing: piers with apsidal arms east and west.
   for (const s of [-1, 1]) {
-    b.wallZ(8 * s, -29, -45, { ...stone, h: F + 20, doors: [{ at: CX, w: 7, h: 14, y0: F }] });
+    b.wallZ(8 * s, -29, -45, { ...stone, h: F + 20, doors: [{ at: CX, w: 7, h: 14, y0: F, arch: true }] });
     const r = 4.5, seg = 8;
     for (let k = 0; k < seg; k++) {
       const a0 = -Math.PI / 2 + (Math.PI * k) / seg, a1 = -Math.PI / 2 + (Math.PI * (k + 1)) / seg;
@@ -90,13 +91,15 @@ export function buildChiesa(b: LevelBuilder): void {
   b.box(-1.6, 1.6, F + 0.6, F + 1.6, -50.5, -49.3, 'stoneDark'); // high altar
   for (const x of [-5, -2.5, 0, 2.5, 5]) b.order(x, -53.5, 0.45, F + 0.6, F + 12, 'stoneDark');
   b.box(-7, 7, F + 12, F + 13, -54, -53, 'stoneDark', { collide: false });
-  b.box(-8, 8, F + 20, F + 20.8, Z.churchBack - 0.5, -45, 'stone');
+  for (const s of [-1, 1]) b.box(6.8 * s, 8 * s, F + 20, F + 20.8, Z.churchBack - 0.5, -45, 'stone');
   b.add(prism(17, 5, 15.5, 'roof'), 'roof').position.set(0, F + 20.8, Z.churchBack - 0.5);
 
   // Back door: landing + 15 steps down into the chiostro grande (ground 0).
   const sill = F + 0.6;
   b.box(-2, 2, 0, sill, -61.5, Z.churchBack - 0.5, 'stone');
   b.stairs('z', -1.5, 1.5, -66.75, -61.5, 0, sill, 15, 'stone');
+
+  buildChiesaInterior(b);
 }
 
 /** Hipped roof over the side band between x `a` and `b` (either sign), eaves at y. */

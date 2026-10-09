@@ -177,7 +177,7 @@ export class Atmosphere {
   private readonly moonOffset = MOON_DIR.clone().multiplyScalar(150);
   private readonly sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), skyMaterial());
   private readonly mist = new THREE.Mesh(new THREE.PlaneGeometry(700, 800).rotateX(-Math.PI / 2), mistMaterial());
-  private readonly torches = new Torches();
+  private readonly torches: Torches;
   private readonly dust: THREE.Points;
   private readonly dustMat: THREE.PointsMaterial;
   private readonly composer: EffectComposer;
@@ -196,6 +196,7 @@ export class Atmosphere {
     this.scene = scene;
     this.camera = camera;
     this.level = level;
+    this.torches = new Torches(level.lights);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;

@@ -57,7 +57,8 @@ src/
                              interni/esterni sfumati per area.
                              `?fx=low` (o fps bassi sostenuti) spegne ombre e post
   fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
-                             PointLight assegnate alle torce più vicine al player
+                             PointLight assegnate alle torce più vicine al player; candele,
+                             lampadari e bagliori colorati delle vetrate da `level.lights`
   core/physics.ts            collisioni: tutto è un box (anche ruotato); pavimenti e muri
                              con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
   core/input.ts              tastiera + mouse
@@ -75,6 +76,8 @@ src/
   level/zones/
     fondamenta.ts            acqua, suolo, fondamenta, sagrato + scalinata, calle
     chiesa.ts                navata, cappelle, crociera + cupola, presbiterio, coro
+    chiesaInterno.ts         interno in chiave WoW: volta a cassettoni, paraste, vetrate e
+                             fasci di luna, baldacchino, tappeto, stendardi, lampadari
     convento.ts              ingresso, cortile degli ulivi, chiostrino, corridoio, 3 chiostri
     orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est
     nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,

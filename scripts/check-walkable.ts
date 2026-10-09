@@ -50,6 +50,10 @@ while (queue.length) {
 }
 
 let failed = 0;
+// The church aisle stays open from the door to the foot of the high altar.
+for (const [x, z] of [[0, -2], [0, -20], [0, -37], [0, -48.5]]) {
+  if (Number.isNaN(feet[idx(toI(x), toJ(z))])) { failed++; console.log(`FAIL chiesa      aisle point (${x}, ${z}) unreachable`); }
+}
 const seen = new Set<string>();
 for (const a of level.areas) {
   let hit = 0;

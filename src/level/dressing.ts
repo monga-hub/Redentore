@@ -81,6 +81,7 @@ function dressChiesa(b: LevelBuilder): void {
 function candle(p: Props, x: number, y: number, z: number): void {
   p.rod(x, y, z, x, y + 0.45, z, 0.03, 'stoneDark');
   p.rod(x, y + 0.45, z, x, y + 0.6, z, 0.025, 'flower');
+  p.b.lights.push({ x, y: y + 0.6, z, kind: 'candle' });
 }
 
 // ---------------------------------------------------------------- convento

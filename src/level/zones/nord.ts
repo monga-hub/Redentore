@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { LevelBuilder } from '../builder.ts';
 import { material } from '../materials.ts';
 import { X, Z } from '../plan.ts';
+import { groundPatch } from '../ground.ts';
 
 // North transverse body (z -161..-151) with the central androne projecting both ways
 // (x -22..-9, z -168..-140), then the gardens and the lagoon front.
@@ -38,9 +39,12 @@ export function buildNord(b: LevelBuilder): void {
 
   b.zone('giardini');
   b.area('Giardino dei pitosfori', X.west, -22, Z.lagoonEdge, n);
-  b.floor(X.west, -22, Z.lagoonEdge, n, 'grass');
-  b.floor(-41, -22, -166, n, 'gravel', 0, 0.02);
-  b.floor(-33.5, -30.5, Z.lagoonEdge, -166, 'gravel', 0, 0.02);
+  groundPatch(b, X.west, X.east, Z.lagoonEdge, n, 'grass') // all three gardens
+    .paint(-41, -22, -166, n, 'gravel')
+    .paint(-33.5, -30.5, Z.lagoonEdge, -166, 'gravel')
+    .paint(-17.5, -13.5, -176, -168, 'gravel')
+    .paint(-22, 4, -177.5, -174.5, 'gravel')
+    .hole(-22, -9, -168, n); // androne floor
   b.wallZ(X.west, Z.lagoonEdge, n, { h: 3, role: 'brick' });
   for (const [x0, x1] of [[-40, -34], [-30, -23.5]]) {
     for (const [z0, z1] of [[-181, -175], [-172, -167]]) b.box(x0, x1, 0, 1.1, z0, z1, 'hedge', { camera: false });
@@ -50,14 +54,10 @@ export function buildNord(b: LevelBuilder): void {
   b.wallZ(-22, Z.lagoonEdge, -168, { h: 3, role: 'brick', doors: [{ at: -176, w: 2.5 }] });
 
   b.area('Giardino del pozzo', -22, 4, Z.lagoonEdge, n);
-  b.floor(-22, 4, Z.lagoonEdge, n, 'grass');
-  b.floor(-17.5, -13.5, -176, -168, 'gravel', 0, 0.02);
-  b.floor(-22, 4, -177.5, -174.5, 'gravel', 0, 0.02);
   b.column(-3, -176, 1, 0, 1, 'stoneDark'); // pozzo
   b.wallZ(4, Z.lagoonEdge, n, { h: 2.5, role: 'brick', doors: [{ at: -172, w: 2.5 }] });
 
   b.area('Prato nord-est', 4, X.east, Z.lagoonEdge, n);
-  b.floor(4, X.east, Z.lagoonEdge, n, 'grass');
   b.wallZ(X.east, Z.riva, -168, { h: 3, role: 'brick' });
 
   b.zone('laguna');

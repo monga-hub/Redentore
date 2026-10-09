@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { LevelBuilder } from './builder.ts';
 import { CHURCH_FLOOR as F } from './plan.ts';
+import { groundPatch } from './ground.ts';
 import { BASIN, PATHS_X, PATHS_Z } from './zones/orto.ts';
 import { Props, olive, fruitTree, cypress, shrub, vineCanopy, climber, walkPergola, pergolaPosts, bench, wellTop } from './props.ts';
 
@@ -98,10 +99,11 @@ function dressConvento(b: LevelBuilder): void {
   for (const [x, z] of [[-33.8, -46.8], [-25.2, -46.8], [-33.8, -50.2], [-25.2, -50.2]]) pot(p, x, z, 0.35);
 
   // Chiostro grande: lawn quartered by gravel walks through the well and to the church stairs.
-  b.floor(-14, 10, -83, -63, 'grass', 0, 0.03);
-  b.floor(2.5, 5.5, -83, -63, 'gravel', 0, 0.04);
-  b.floor(-14, 10, -76.5, -73.5, 'gravel', 0, 0.04);
-  b.floor(-1.5, 1.5, -73.5, -63, 'gravel', 0, 0.04);
+  const court = { lift: 0.03, skirt: true }; // over the cloister's paving, strays in the walk's joints
+  groundPatch(b, -14, 10, -83, -63, 'grass', court)
+    .paint(2.5, 5.5, -83, -63, 'gravel')
+    .paint(-14, 10, -76.5, -73.5, 'gravel')
+    .paint(-1.5, 1.5, -73.5, -63, 'gravel');
   wellTop(p, 4, -75, 0.9, 0.9, true);
   for (const [x, z] of [[-7.5, -69], [-7.5, -80], [8, -80], [8, -68.5]]) olive(p, x, z, p.rand(1, 1.15));
   for (const [x, z] of [[-13.2, -63.8], [9.2, -63.8], [-13.2, -82.2], [9.2, -82.2]]) shrub(p, x, z, 0.6, 'hedge', true);
@@ -109,10 +111,10 @@ function dressConvento(b: LevelBuilder): void {
   bench(p, 7.5, -72.6, 0);
 
   // Chiostro mediano and ovest: small lawns with an olive and box shrubs.
-  b.floor(-28.5, -19.5, -77.5, -58.5, 'grass', 0, 0.03);
+  groundPatch(b, -28.5, -19.5, -77.5, -58.5, 'grass', court);
   olive(p, -24, -68, 1.1);
   for (const [x, z] of [[-27.6, -59.4], [-20.4, -59.4], [-27.6, -76.6], [-20.4, -76.6]]) shrub(p, x, z, 0.5, 'hedge', true);
-  b.floor(-44.5, -39.5, -77.5, -62.5, 'grass', 0, 0.03);
+  groundPatch(b, -44.5, -39.5, -77.5, -62.5, 'grass', court);
   cypress(p, -42, -66, 6);
   cypress(p, -42, -74, 6);
   p.flush();

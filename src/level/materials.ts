@@ -203,7 +203,8 @@ const FRAG_BUMP = `#include <normal_fragment_maps>
 
 const maps = new Map<string, THREE.DataTexture>();
 
-function texture(role: string): THREE.DataTexture {
+/** Painted, mipmapped, repeating texture for a PAINTERS key (cached). */
+export function texture(role: string): THREE.DataTexture {
   const cached = maps.get(role);
   if (cached) return cached;
   const { paint, size } = PAINTERS[role];

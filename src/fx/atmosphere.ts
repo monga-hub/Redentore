@@ -219,8 +219,8 @@ export class Atmosphere {
       if (!(o instanceof THREE.Mesh)) return;
       const mat = o.material as THREE.Material;
       o.receiveShadow = true;
-      // Flat floor overlays and see-through glass/water only receive.
-      o.castShadow = !mat.transparent && !(o.geometry instanceof THREE.PlaneGeometry);
+      // Flat floor overlays, see-through glass/water and grass cards only receive.
+      o.castShadow = !mat.transparent && !(o.geometry instanceof THREE.PlaneGeometry) && o.userData.castShadow !== false;
     });
 
     // Motes: a box of points wrapped around the player; damp and pale outside, warm dust inside.

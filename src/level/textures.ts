@@ -236,14 +236,60 @@ function leaves(dark: number, light: number, g: number): Painter {
   };
 }
 
+/**
+ * Painted lawn: three flat tones (blue-green shade, olive mid, yellow-green light) cut at hard
+ * thresholds of a large noise, pushed around by directional brush strokes whose direction
+ * swaps between macro patches. No per-texel grain: the tufts (ground.ts) carry the detail.
+ */
 function grass(): Painter {
-  const a = hex(0x5a8038), b = hex(0x7ea64a), hi = hex(0xa9c76a);
+  const shade = hex(0x3b5236), midT = hex(0x5c7140), lit = hex(0x87924f);
   return (u, v) => {
-    let col = mix(a, b, smooth(0.3, 0.7, fbm(u, v, 4, 4, 4, 91)));
-    const blades = fbm(u, v, 96, 24, 2, 92);
-    col = mix(col, hi, smooth(0.62, 0.8, blades) * 0.6);
-    col = mul(col, 0.85 + 0.2 * fbm(u, v, 48, 48, 2, 93));
+    const dir = smooth(0.42, 0.58, fbm(u, v, 2, 2, 2, 94));
+    const strokes = fbm(u, v, 3, 18, 3, 92) * (1 - dir) + fbm(u, v, 18, 3, 3, 95) * dir;
+    const t = fbm(u, v, 3, 3, 3, 91) + (strokes - 0.5) * 0.45;
+    let col = mix(shade, midT, smooth(0.4, 0.43, t));
+    col = mix(col, lit, smooth(0.58, 0.61, t));
+    return mul(col, 0.94 + 0.12 * fbm(u, v, 6, 6, 2, 93)); // soft wash, not grain
+  };
+}
+
+/** Beaten earth between lawns and paths: three warm greys at hard thresholds, a few pebbles. */
+function dirt(): Painter {
+  const dark = hex(0x5c4532), midT = hex(0x7f6249), lit = hex(0x9e7f5e), peb = hex(0xa79a86);
+  return (u, v) => {
+    const t = fbm(u, v, 3, 3, 3, 141) + (fbm(u, v, 4, 16, 2, 142) - 0.5) * 0.35;
+    let col = mix(dark, midT, smooth(0.38, 0.41, t));
+    col = mix(col, lit, smooth(0.6, 0.63, t));
+    const c = voronoi(u, v, 24, 143);
+    if (c.id < 0.18) col = mix(col, mul(peb, 0.85 + c.id), 1 - smooth(0.18, 0.24, c.f1));
     return col;
+  };
+}
+
+/**
+ * Alpha card for a grass tuft: 9 tapering, curving blades fanned out from the base. Dark at
+ * the foot, light yellow-green at the tips (baked AO + light). RGB is filled everywhere so
+ * mipmaps don't bleed black into the blade edges.
+ */
+function tuft(): (u: number, v: number) => RGBH {
+  const foot = hex(0x34482f), tip = hex(0xa9b267), fill = hex(0x56693c);
+  const blades = Array.from({ length: 9 }, (_, i) => {
+    const xb = 0.3 + 0.4 * hash(i, 0, 151), lean = (xb - 0.5) * 1.3 + (hash(i, 1, 151) - 0.5) * 0.5;
+    return { xb, xt: xb + lean * 0.6, h: 0.62 + 0.38 * hash(i, 2, 151), w: 0.045 + 0.03 * hash(i, 3, 151), k: 0.8 + 0.35 * hash(i, 4, 151) };
+  });
+  return (u, v) => {
+    for (const b of blades) {
+      const t = v / b.h;
+      if (t >= 1) continue;
+      const cx = b.xb + (b.xt - b.xb) * t * t; // bends over towards the tip
+      const hw = b.w * Math.pow(1 - t, 0.75);
+      const dx = (u - cx) / hw;
+      if (Math.abs(dx) >= 1) continue;
+      const rib = dx > 0 ? 1.12 : 0.9; // painted midrib: one half lit, one in shade
+      const c = mul(mix(foot, tip, smooth(0, 0.95, v)), b.k * rib);
+      return [...c, 1];
+    }
+    return [...fill, 0];
   };
 }
 
@@ -295,7 +341,9 @@ export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   paving: { paint: trachite(512), size: 512 },
   ground: { paint: ground(), size: 256 },
   gravel: { paint: gravel(), size: 256 },
-  grass: { paint: grass(), size: 256 },
+  grass: { paint: grass(), size: 512 },
+  dirt: { paint: dirt(), size: 256 },
+  tuft: { paint: tuft(), size: 128 },
   soil: { paint: soil(), size: 256 },
   hedge: { paint: leaves(0x2f4f26, 0x6f9a48, 10), size: 256 },
   foliage: { paint: leaves(0x4a6338, 0x9fb27a, 8), size: 256 },

@@ -1,5 +1,6 @@
 import type { LevelBuilder } from '../builder.ts';
 import { X, Z } from '../plan.ts';
+import { groundPatch } from '../ground.ts';
 
 // Capuchin convent. Public route (dashed on the piantina): calle -> ingresso (west)
 // -> cortile degli ulivi -> chiostrino -> long corridor -> door in the separation
@@ -33,9 +34,9 @@ export function buildConvento(b: LevelBuilder): void {
   b.room(-26, -16, -21, -17, { h: 4.5, e: [{ at: -19, w: 2.6 }], w: [{ at: -19, w: 2.6 }], floor: 'paving' });
 
   b.area('Cortile degli ulivi', -37, -26, -43, -17);
-  b.floor(-37, -26, -43, -17, 'grass');
-  b.floor(-33.5, -30.5, -43, -17, 'gravel', 0, 0.02);
-  b.floor(-37, -26, -20.5, -17.5, 'gravel', 0, 0.02);
+  groundPatch(b, -37, -26, -43, -17, 'grass', { lift: 0.01 })
+    .paint(-33.5, -30.5, -43, -17, 'gravel')
+    .paint(-37, -26, -20.5, -17.5, 'gravel');
 
   b.area('Chiostrino', -37, -22, -54, -43);
   b.room(-37, -22, -54, -43, { h: 7, roof: false, role: 'brick', n: [{ at: -34 }], s: [{ at: -32 }], floor: 'paving' });

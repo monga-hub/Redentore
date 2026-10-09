@@ -5,6 +5,7 @@ import { buildConvento } from './zones/convento.ts';
 import { buildOrto } from './zones/orto.ts';
 import { buildNord } from './zones/nord.ts';
 import { dressLevel } from './dressing.ts';
+import { finishGround } from './ground.ts';
 
 export type Level = LevelBuilder;
 
@@ -24,5 +25,6 @@ export function buildLevel(): Level {
   buildOrto(b);
   buildNord(b);
   dressLevel(b); // vegetation, covered walks, furniture
+  finishGround(b); // ground masks, grass tufts, pebbles (needs the dressing's trunks and benches)
   return b;
 }

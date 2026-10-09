@@ -1,5 +1,6 @@
 import type { LevelBuilder } from '../builder.ts';
 import { X, Z } from '../plan.ts';
+import { groundPatch } from '../ground.ts';
 
 // Orto dei Frati: walled garden between the convent (south) and the north body.
 // Layout only (ground tints, raised beds, basin, walls); vegetation, the covered
@@ -19,17 +20,24 @@ export const PATHS_Z = [-125, -113];
 
 export function buildOrto(b: LevelBuilder): void {
   b.zone('orto');
-  b.floor(X.west, 19, Z.ortoNorth, Z.conventNorth, 'gravel');
+  // Gravel ground, lawns under the pergola, frutteto and uliveto, earth in the orti, paved cross on top.
+  const ground = groundPatch(b, X.west, 19, Z.ortoNorth, Z.conventNorth, 'gravel', { lift: 0.015 })
+    .paint(-46.5, -37.5, -150, -87, 'grass')
+    .paint(-35, -22, -138, -89, 'dirt')
+    .paint(-17.5, -9.5, -138, -89, 'dirt')
+    .paint(-5, 4, -150, -91, 'grass')
+    .paint(4, 18.7, -150.5, -86.5, 'grass')
+    .hole(-18, -9, -122, -113) // vasca
+    .hole(-5, 3, -91, Z.conventNorth); // serra
   b.wallZ(X.west, Z.ortoNorth, Z.conventNorth, { h: 4, role: 'brick' });
 
   b.area('Pergola delle viti', X.west, -37, Z.ortoNorth, Z.conventNorth);
-  b.floor(-46.5, -37.5, -150, -87, 'grass', 0, 0.02);
   b.pergola(-45.5, -38.5, -149, -88, true);
 
   // Brick-paved cross of paths (piantina: brown bands).
   b.area('Orti coltivati', -36, -9, -139, -88);
-  for (const x of PATHS_X) b.floor(x, x + 3, -149, -87, 'paving', 0, 0.03);
-  for (const z of PATHS_Z) b.floor(-37, 4, z, z + 3, 'paving', 0, 0.03);
+  for (const x of PATHS_X) ground.paint(x, x + 3, -149, -87, 'paving');
+  for (const z of PATHS_Z) ground.paint(-37, 4, z, z + 3, 'paving');
 
   const blocksX = [[-35, -22], [-17.5, -9.5]];
   const blocksZ = [[-138, -126], [-121, -114], [-109, -89]];
@@ -50,12 +58,10 @@ export function buildOrto(b: LevelBuilder): void {
   b.floor(x - r + 0.4, x + r - 0.4, z - r + 0.4, z + r - 0.4, 'water', 0, 0.4);
 
   b.area('Frutteto', -5, 4, -150, -91);
-  b.floor(-5, 4, -150, -91, 'grass', 0, 0.02);
   b.area('Apiario', -5, 4, -133, -127);
   for (let hx = -3.5; hx <= 2.6; hx += 1.5) b.box(hx - 0.3, hx + 0.3, 0, 0.7, -130.3, -129.7, 'wood');
 
   b.area('Uliveto', 4, 19, Z.ortoNorth, Z.conventNorth);
-  b.floor(4, 18.7, -150.5, -86.5, 'grass', 0, 0.02);
 
   b.area('Serra', -5, 3, -91, Z.conventNorth);
   b.room(-5, 3, -91, Z.conventNorth, { h: 3, role: 'glass', roofRole: 'glass', s: false, n: [{ at: -1, w: 2 }], floor: 'paving' });

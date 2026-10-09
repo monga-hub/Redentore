@@ -50,7 +50,12 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 
 ```
 src/
-  main.ts                    bootstrap: renderer, luci neutre, loop
+  main.ts                    bootstrap: renderer, loop
+  fx/atmosphere.ts           sole + ombre, hemisphere, nebbia, pulviscolo, post (bloom,
+                             grading "Scarlet", ACES); interni/esterni sfumati per area.
+                             `?fx=low` (o fps bassi sostenuti) spegne ombre e post
+  fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
+                             PointLight assegnate alle torce più vicine al player
   core/physics.ts            collisioni: tutto è un box (anche ruotato); pavimenti e muri
                              con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
   core/input.ts              tastiera + mouse
@@ -88,7 +93,7 @@ scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del pl
 
 ### Note per dopo (fuori scope qui)
 
-- Luci, nebbia e post-processing. La vegetazione è instanziata con un colore per
+- La vegetazione è instanziata con un colore per
   istanza che moltiplica il materiale del ruolo (`olive`, `flower`, `fruit`, …).
 - Prestazioni: ~530 mesh non unite + ~7000 istanze in poche InstancedMesh (~60 fps).
   Se servirà, unire la geometria statica per zona.

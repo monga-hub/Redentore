@@ -40,6 +40,7 @@ export function buildChiesa(b: LevelBuilder): void {
     b.wallZ(12.5 * s, 0, -29, { ...stone, h: F + 14 });
     for (const z of [-9.5, -18.5, -29]) b.wallX(z, 7.5 * s, 12.5 * s, { ...stone, h: F + 14 });
     b.box(7.5 * s, 13 * s, F + 14, F + 14.6, -29.5, 0, 'roof');
+    hip(b, 7.8 * s, 13 * s, -29.5, 0, F + 14.6); // eave stops short of the nave's inner face
   }
   b.box(-8, 8, F + 20, F + 20.8, -29, -0.5, 'stone');
   b.add(prism(17, 5, 29, 'roof'), 'roof').position.set(0, F + 20.8, -29);
@@ -56,6 +57,7 @@ export function buildChiesa(b: LevelBuilder): void {
       b.obox((p0x + p1x) / 2, (p0z + p1z) / 2, Math.hypot(dx, dz) + 0.4, 1, F, F + 14, Math.atan2(-dz, dx), 'stone');
     }
     b.box(8 * s, 13 * s, F + 14, F + 14.6, CX - 5.5, CX + 5.5, 'roof');
+    hip(b, 8 * s, 13 * s, CX - 5.5, CX + 5.5, F + 14.6);
   }
   // Ceiling ring around the drum opening, drum, dome, lantern.
   const ring = new THREE.Shape([new THREE.Vector2(-8.5, 28.5), new THREE.Vector2(8.5, 28.5), new THREE.Vector2(8.5, 45.5), new THREE.Vector2(-8.5, 45.5)]);
@@ -78,6 +80,7 @@ export function buildChiesa(b: LevelBuilder): void {
   for (const s of [-1, 1]) {
     b.wallZ(7.5 * s, -45, Z.churchBack, { ...stone, h: F + 20 });
     b.box(8 * s, 13 * s, F, F + 12, -45.5, Z.churchBack, 'stone'); // sacristies (closed)
+    hip(b, 8 * s, 13 * s, Z.churchBack, -45.5, F + 12); // the bell tower rises through its ridge
     b.column(10.5 * s, -48, 1.4, F + 12, F + 32, 'stone', false); // twin bell towers
     b.add(cone(1.8, 4, 'roof'), 'roof').position.set(10.5 * s, F + 34, -48);
   }
@@ -94,6 +97,11 @@ export function buildChiesa(b: LevelBuilder): void {
   const sill = F + 0.6;
   b.box(-2, 2, 0, sill, -61.5, Z.churchBack - 0.5, 'stone');
   b.stairs('z', -1.5, 1.5, -66.75, -61.5, 0, sill, 15, 'stone');
+}
+
+/** Hipped roof over the side band between x `a` and `b` (either sign), eaves at y. */
+function hip(lb: LevelBuilder, a: number, b: number, z0: number, z1: number, y: number): void {
+  lb.hipRoof(Math.min(a, b), Math.max(a, b), z0, z1, y);
 }
 
 /** Triangular prism (gable roof / pediment) of base `w`, height `h`, extruded `depth` along +z from its origin. */

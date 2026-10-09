@@ -72,6 +72,7 @@ export function buildOrto(b: LevelBuilder): void {
   b.area('Segreteria', 19, X.east, -112, -98);
   b.room(19, X.east, -112, -98, { h: 6, w: [{ at: -105 }], floor: 'paving' });
   b.box(19, X.east, 6.4, 9, -112, -98, 'mass', { collide: false });
+  b.hipRoof(19, X.east, -168, -54, 9);
 }
 
 /** Grid of raised beds (0.3 m, steppable) filling a block with 1.2 m walks between. */

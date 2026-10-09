@@ -23,9 +23,13 @@ export function buildFondamenta(b: LevelBuilder): void {
   // Neighbouring houses along the fondamenta (outside the complex).
   b.box(-60, X.west, -1.2, 11, -20, Z.sagrato, 'plaster');
   b.box(X.east, 60, -1.2, 11, -60, Z.sagrato, 'plaster');
+  b.hipRoof(-60, X.west, -20, Z.sagrato, 11);
+  b.hipRoof(X.east, 60, -60, Z.sagrato, 11);
   // Convent/houses flanking the church.
   b.box(X.west, -16, 0, 10, -17, Z.sagrato, 'plaster');
   b.box(13, X.east, 0, 10, -54, Z.sagrato, 'plaster');
+  b.hipRoof(X.west, -16, -17, Z.sagrato, 10);
+  b.hipRoof(13, X.east, -54, Z.sagrato, 10);
 
   b.zone('sagrato');
   b.area('Sagrato e scalinata', -13, 13, Z.facade, Z.sagrato);

@@ -6,7 +6,7 @@ import { PLAYER } from '../core/physics.ts';
 // skinned animation set. Loaded async; `root` stays empty until the GLB arrives.
 // The model faces +Z with feet at y = 0; the controller's yaw 0 faces -Z, so it is turned round.
 
-const URL = 'models/skeleton_rogue.glb'; // public/, relative to the page
+const URL = `${import.meta.env.BASE_URL}models/skeleton_rogue.glb`; // public/, under Vite's base
 const CLIPS = { idle: 'Idle', walk: 'Walking_A', run: 'Running_A', air: 'Jump_Idle' } as const;
 type State = keyof typeof CLIPS;
 const FADE = 0.2;

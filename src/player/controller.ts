@@ -33,8 +33,9 @@ export class PlayerController {
   /** `camYaw`: camera heading; movement is relative to it. `turnToCamera`: right mouse held. */
   update(dt: number, input: Input, camYaw: number, turnToCamera: boolean): void {
     let f = (input.down('KeyW', 'ArrowUp') ? 1 : 0) - (input.down('KeyS', 'ArrowDown') ? 1 : 0);
-    const r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
+    let r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
+    if (!f && !r) { f = -input.stickY; r = input.stickX; } // touch stick: analog, |v| <= 1
     const speed = input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN;
 
     // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
@@ -42,9 +43,10 @@ export class PlayerController {
     let mx = -sin * f + cos * r, mz = -cos * f - sin * r;
     const len = Math.hypot(mx, mz);
     if (len > 0) {
+      const k = Math.min(1, len) / len; // keys: unit length; stick: keeps its partial tilt
+      this.pos.x += mx * k * speed * dt;
+      this.pos.z += mz * k * speed * dt;
       mx /= len; mz /= len;
-      this.pos.x += mx * speed * dt;
-      this.pos.z += mz * speed * dt;
     }
     const want = turnToCamera ? camYaw : len > 0 ? Math.atan2(-mx, -mz) : this.facing;
     let d = want - this.facing;

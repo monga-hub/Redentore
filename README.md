@@ -15,7 +15,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 
 ```sh
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
 npm run check    # verifica headless: ogni area è raggiungibile dallo spawn
 ```
@@ -34,6 +34,16 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
+
+Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
+trascina sul resto dello schermo per la camera, pizzica per lo zoom, pulsante salto
+in basso a destra.
+
+## Deploy
+
+Push su `main` → GitHub Actions (`.github/workflows/deploy.yml`) builda e pubblica
+`dist/` su GitHub Pages: https://monga-hub.github.io/Redentore/ . Vite usa
+`base: '/Redentore/'`. Una tantum: in Settings → Pages scegliere "GitHub Actions" come sorgente.
 
 ## Scala e coordinate
 

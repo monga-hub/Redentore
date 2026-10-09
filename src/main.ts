@@ -5,6 +5,7 @@ import { Input } from './core/input.ts';
 import { PlayerController } from './player/controller.ts';
 import { ThirdPersonCamera } from './camera/thirdPersonCamera.ts';
 import { Hud } from './ui/hud.ts';
+import { TouchControls } from './ui/touch.ts';
 import { Atmosphere } from './fx/atmosphere.ts';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -18,6 +19,7 @@ const level = buildLevel();
 scene.add(level.root);
 
 const input = new Input(renderer.domElement);
+new TouchControls(renderer.domElement, input);
 const player = new PlayerController(level.world, SPAWN);
 scene.add(player.mesh);
 const cam = new ThirdPersonCamera(innerWidth / innerHeight, SPAWN.yaw, level.cameraBlockers);

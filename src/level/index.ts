@@ -26,5 +26,6 @@ export function buildLevel(): Level {
   buildNord(b);
   dressLevel(b); // vegetation, covered walks, furniture
   finishGround(b); // ground masks, grass tufts, pebbles (needs the dressing's trunks and benches)
+  b.flush(); // merge trims, arches and roofs per zone and role
   return b;
 }

@@ -15,27 +15,30 @@ import { groundPatch } from '../ground.ts';
 
 export function buildNord(b: LevelBuilder): void {
   b.zone('corpo-nord');
-  const n = Z.nordNorth, s = Z.ortoNorth, h = 7;
+  const n = Z.nordNorth, s = Z.ortoNorth, h = 7, trim = 4.4, arch = true;
 
   b.area('Cappella di meditazione', X.west, -39, n, s);
-  b.room(X.west, -39, n, s, { h, e: false, s: [{ at: -43 }], floor: 'paving' });
+  b.room(X.west, -39, n, s, { h, trim, e: false, s: [{ at: -43, arch }], floor: 'paving' });
   b.box(-45.5, -44.5, 0, 1, -157, -155, 'stoneDark'); // altar block
 
   b.area('Sale espositive (antiche officine)', -39, -30, n, s);
-  b.room(-39, -30, n, s, { h, e: false, w: [{ at: -156 }], s: [{ at: -34.5 }], n: [{ at: -34.5 }], floor: 'paving' });
+  b.room(-39, -30, n, s, { h, trim, e: false, w: [{ at: -156, arch }], s: [{ at: -34.5, arch }], n: [{ at: -34.5, arch }], floor: 'paving' });
 
   b.area('Caffè', -30, -22, n, s);
-  b.room(-30, -22, n, s, { h, e: false, w: [{ at: -156 }], s: [{ at: -26 }], n: [{ at: -26 }], floor: 'paving' });
+  b.room(-30, -22, n, s, { h, trim, e: false, w: [{ at: -156, arch }], s: [{ at: -26, arch }], n: [{ at: -26, arch }], floor: 'paving' });
 
   b.area('Androne di passaggio', -22, -9, -168, -140);
-  b.room(-22, -9, -168, -140, { h: 8, n: [{ at: -15.5, w: 4, h: 4 }], s: [{ at: -15.5, w: 4, h: 4 }], floor: 'paving' });
+  b.room(-22, -9, -168, -140, { h: 8, trim: 4.9, n: [{ at: -15.5, w: 4, h: 4, arch }], s: [{ at: -15.5, w: 4, h: 4, arch }], floor: 'paving' });
 
   b.area('Laboratori', -9, 5, n, s);
-  b.room(-9, 5, n, s, { h, w: false, e: false, s: [{ at: -2 }], n: [{ at: -2 }], floor: 'paving' });
+  b.room(-9, 5, n, s, { h, trim, w: false, e: false, s: [{ at: -2, arch }], n: [{ at: -2, arch }], floor: 'paving' });
 
   b.area('Frantoio e sala di smielatura', 5, 19, n, s);
-  b.room(5, 19, n, s, { h, w: [{ at: -156 }], s: [{ at: 12 }], floor: 'paving' });
+  b.room(5, 19, n, s, { h, trim, w: [{ at: -156, arch }], s: [{ at: 12, arch }], floor: 'paving' });
   b.box(10, 12, 0, 1.1, -158, -154, 'stoneDark'); // press placeholder
+  // One hipped roof over the transverse body, a taller one over the androne crossing it.
+  b.hipRoof(X.west, 19, n, s, h + 0.4);
+  b.hipRoof(-22, -9, -168, -140, 8.4);
 
   b.zone('giardini');
   b.area('Giardino dei pitosfori', X.west, -22, Z.lagoonEdge, n);
@@ -54,7 +57,7 @@ export function buildNord(b: LevelBuilder): void {
   b.wallZ(-22, Z.lagoonEdge, -168, { h: 3, role: 'brick', doors: [{ at: -176, w: 2.5 }] });
 
   b.area('Giardino del pozzo', -22, 4, Z.lagoonEdge, n);
-  b.column(-3, -176, 1, 0, 1, 'stoneDark'); // pozzo
+  b.well(-3, -176, 1, 1); // pozzo
   b.wallZ(4, Z.lagoonEdge, n, { h: 2.5, role: 'brick', doors: [{ at: -172, w: 2.5 }] });
 
   b.area('Prato nord-est', 4, X.east, Z.lagoonEdge, n);

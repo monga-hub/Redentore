@@ -12,6 +12,7 @@ export interface Door {
   w?: number; // width, default 2.4
   h?: number; // height, default 3.2
   y0?: number; // sill height, default = wall base
+  arch?: boolean; // round head: extruded lunette + ghiera under the lintel (visual, collider unchanged)
 }
 
 export interface WallOpts {
@@ -20,6 +21,7 @@ export interface WallOpts {
   t?: number; // thickness, default 0.6
   role?: Role;
   doors?: Door[];
+  trim?: boolean | number; // zoccolo + top cornice; a number also runs a marcapiano that high above the base
 }
 
 /** false = no wall on that side (a neighbour provides it); array = wall with these doors. */
@@ -32,6 +34,7 @@ export interface RoomOpts {
   roof?: boolean; // ceiling slab, default true
   roofRole?: Role;
   floor?: Role; // floor overlay tint
+  trim?: boolean | number; // see WallOpts
   n?: Side; s?: Side; e?: Side; w?: Side;
 }
 
@@ -39,6 +42,13 @@ export interface Area {
   zone: string;
   label: string;
   x0: number; x1: number; z0: number; z1: number;
+}
+
+export interface ArcadeOpts {
+  spacing?: number; // target bay, default 3.4
+  gaps?: [number, number][]; // parapet left open in the bays facing these points (doors, garden walks)
+  clear?: [number, number][]; // no pier within 1.9 m: one wide trabeated bay (stairs crossing the arcade)
+  upper?: string; // sides ('nesw') whose perimeter wall above the roof gets a marcapiano and windows
 }
 
 interface BoxOpts {
@@ -59,6 +69,7 @@ export class LevelBuilder {
   readonly cameraBlockers: THREE.Object3D[] = [];
   private current!: THREE.Group;
   private zoneId = '';
+  private decorBatches = new Map<string, { zone: THREE.Group; role: Role; cam: boolean; geos: THREE.BufferGeometry[] }>();
 
   zone(id: string): this {
     let g = this.zones.get(id);
@@ -129,29 +140,42 @@ export class LevelBuilder {
   }
 
   private wall(axis: 'x' | 'z', c: number, a0: number, a1: number, o: WallOpts): void {
-    const { h, y0 = 0, t = 0.6, role = 'mass', doors = [] } = o;
+    const { h, y0 = 0, t = 0.6, role = 'mass', doors = [], trim } = o;
     const lo = Math.min(a0, a1) - t / 2, hi = Math.max(a0, a1) + t / 2; // overlap corners
+    // wall frame: x along the wall, y up, z across it
+    const frame = axis === 'x' ? new THREE.Matrix4().makeTranslation(0, 0, c) : new THREE.Matrix4().makeRotationY(-Math.PI / 2).setPosition(c, 0, 0);
     const piece = (p0: number, p1: number, b: number, top: number) => {
       if (p1 - p0 < 1e-3 || top - b < 1e-3) return;
       if (axis === 'x') this.box(p0, p1, b, top, c - t / 2, c + t / 2, role);
       else this.box(c - t / 2, c + t / 2, b, top, p0, p1, role);
+      if (trim && b === y0 && top === h) this.part(frame, p0, p1, y0, y0 + 0.5, -t / 2 - 0.06, t / 2 + 0.06, 'stoneDark'); // zoccolo
     };
     let cur = lo;
     for (const d of [...doors].sort((p, q) => p.at - q.at)) {
       const w = d.w ?? 2.4, dy0 = d.y0 ?? y0, dy1 = dy0 + (d.h ?? 3.2);
-      const d0 = d.at - w / 2, d1 = d.at + w / 2;
+      const d0 = d.at - w / 2, d1 = d.at + w / 2, r = w / 2, spring = dy1 - r;
       piece(cur, d0, y0, h);
       piece(d0, d1, dy1, h); // lintel
       piece(d0, d1, y0, dy0); // sill
+      if (d.arch && spring >= dy0 + 1.5) {
+        const lunette = new THREE.Shape().moveTo(d0, dy1).lineTo(d0, spring).absarc(d.at, spring, r, Math.PI, 0, true).lineTo(d1, dy1).closePath();
+        this.decor(shaped(extrude(lunette, t, 0.03), y0, h - y0).applyMatrix4(frame), role);
+        this.decor(shaped(ring(d.at, spring, r - 0.05, r + 0.26, t + 0.14), y0, h - y0).applyMatrix4(frame), 'stoneDark');
+        this.part(frame, d.at - 0.18, d.at + 0.18, dy1 - 0.12, dy1 + 0.38, -t / 2 - 0.12, t / 2 + 0.12, 'stoneDark'); // keystone
+      }
       cur = d1;
     }
     piece(cur, hi, y0, h);
+    if (trim) {
+      this.part(frame, lo - 0.1, hi + 0.1, h - 0.28, h, -t / 2 - 0.14, t / 2 + 0.14, 'stoneDark'); // cornice
+      if (typeof trim === 'number') this.part(frame, lo - 0.05, hi + 0.05, y0 + trim, y0 + trim + 0.2, -t / 2 - 0.09, t / 2 + 0.09, 'stoneDark'); // marcapiano
+    }
   }
 
   /** Walled rectangle with optional ceiling; sides set to false are left to a neighbour. */
   room(x0: number, x1: number, z0: number, z1: number, o: RoomOpts): void {
     const { h, y0 = 0, role = 'plaster', roof = true } = o;
-    const wo = (doors: Door[]): WallOpts => ({ h, y0, role, doors });
+    const wo = (doors: Door[]): WallOpts => ({ h, y0, role, doors, trim: o.trim });
     if (o.n !== false) this.wallX(z0, x0, x1, wo(o.n ?? []));
     if (o.s !== false) this.wallX(z1, x0, x1, wo(o.s ?? []));
     if (o.w !== false) this.wallZ(x0, z0, z1, wo(o.w ?? []));
@@ -160,31 +184,185 @@ export class LevelBuilder {
     if (o.floor) this.floor(x0, x1, z0, z1, o.floor, y0, 0.02);
   }
 
-  /**
-   * Cloister walk: a roofed ring `depth` wide inside the rectangle, columns on the
-   * courtyard edge. Columns closer than 2.2 m to any `keepClear` point are skipped
-   * (doors, stair feet).
-   */
-  portico(x0: number, x1: number, z0: number, z1: number, depth: number, h: number, keepClear: [number, number][] = [], spacing = 3.4): void {
-    const ix0 = x0 + depth, ix1 = x1 - depth, iz0 = z0 + depth, iz1 = z1 - depth;
-    const posts = new Map<string, [number, number]>();
-    const edge = (ax: number, az: number, bx: number, bz: number) => {
-      const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / spacing));
-      for (let i = 0; i <= n; i++) {
-        const x = ax + ((bx - ax) * i) / n, z = az + ((bz - az) * i) / n;
-        posts.set(`${x.toFixed(2)},${z.toFixed(2)}`, [x, z]);
-      }
-    };
-    edge(ix0, iz0, ix1, iz0); edge(ix1, iz0, ix1, iz1); edge(ix1, iz1, ix0, iz1); edge(ix0, iz1, ix0, iz0);
-    for (const [x, z] of posts.values()) {
-      if (keepClear.some(([kx, kz]) => Math.hypot(x - kx, z - kz) < 2.2)) continue;
-      this.order(x, z, 0.3, 0, h, 'stoneDark');
+  /** Visual-only geometry (world space), merged per zone and role by flush(). `cam` = blocks the follow camera. */
+  decor(g: THREE.BufferGeometry, role: Role, cam = false): void {
+    const key = `${this.zoneId}|${role}|${cam}`;
+    let d = this.decorBatches.get(key);
+    if (!d) this.decorBatches.set(key, (d = { zone: this.current, role, cam, geos: [] }));
+    d.geos.push(g);
+  }
+
+  /** Visual-only chamfered box by extents in frame `m` (null = world), batched through decor(). */
+  part(m: THREE.Matrix4 | null, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, role: Role, cam = false): void {
+    const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
+    const g = chamferBox(w, h, d, Math.min(0.06, 0.25 * Math.min(w, h, d))).clone().translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    this.decor(m ? g.applyMatrix4(m) : g, role, cam);
+  }
+
+  /** Merges every decor() batch into one mesh per zone and role. Call once, after building. */
+  flush(): void {
+    for (const d of this.decorBatches.values()) {
+      const m = new THREE.Mesh(mergeGeometries(d.geos)!, material(d.role));
+      m.userData.role = d.role;
+      d.zone.add(m);
+      if (d.cam) this.cameraBlockers.push(m);
     }
-    // roof ring (4 slabs, no overlap)
-    this.box(x0, x1, h, h + 0.35, z0, iz0, 'roof');
-    this.box(x0, x1, h, h + 0.35, iz1, z1, 'roof');
-    this.box(x0, ix0, h, h + 0.35, iz0, iz1, 'roof');
-    this.box(ix1, x1, h, h + 0.35, iz0, iz1, 'roof');
+    this.decorBatches.clear();
+  }
+
+  private collider(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number): void {
+    this.world.add((x0 + x1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0) / 2, Math.abs(z1 - z0) / 2, y0, y1);
+  }
+
+  /**
+   * Cloister walk `depth` wide inside the rectangle, roofed at eave height `h`: on the courtyard
+   * edge, brick piers on a parapet carry round arches (extruded spandrel, stone ghiera, keystone);
+   * behind them exposed rafters under a boarded lean-to roof that oversails the courtyard with a
+   * row of coppi ends. Colliders: piers, parapets and the old flat roof ring; the rest is visual.
+   */
+  arcade(x0: number, x1: number, z0: number, z1: number, depth: number, h: number, o: ArcadeOpts = {}): void {
+    const { spacing = 3.4, gaps = [], clear = [], upper = '' } = o;
+    const T = 0.5, e = T / 2, K = 0.4, OV = 0.8, tw = 0.3 - depth; // spandrel, pitch, eave overhang, wall face
+    const ix0 = x0 + depth, ix1 = x1 - depth, iz0 = z0 + depth, iz1 = z1 - depth;
+    for (const [a, b, c, d] of [[x0, x1, z0, iz0], [x0, x1, iz1, z1], [x0, ix0, iz0, iz1], [ix1, x1, iz0, iz1]]) this.collider(a, b, h, h + 0.35, c, d);
+
+    // Each side in its own frame: s along the arcade from corner A, t across it towards the courtyard.
+    const sides = ([['n', ix0, iz0, 1, 0, ix1 - ix0], ['e', ix1, iz0, 0, 1, iz1 - iz0], ['s', ix1, iz1, -1, 0, ix1 - ix0], ['w', ix0, iz1, 0, -1, iz1 - iz0]] as const).map(([key, ax, az, ux, uz, L]) => {
+      const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(ux, 0, uz), new THREE.Vector3(0, 1, 0), new THREE.Vector3(-uz, 0, ux)).setPosition(ax, 0, az);
+      const local = ([x, z]: [number, number]) => [(x - ax) * ux + (z - az) * uz, (z - az) * ux - (x - ax) * uz];
+      const n = Math.max(1, Math.ceil(L / spacing - 0.25));
+      const piers: { s: number; r: number }[] = [];
+      for (let i = 0; i <= n; i++) {
+        const s = (L * i) / n, corner = i === 0 || i === n;
+        if (corner || !clear.some((p) => Math.hypot(local(p)[0] - s, local(p)[1]) < 1.9)) piers.push({ s, r: corner ? 0.45 : 0.35 });
+      }
+      const bays = piers.slice(1).map((p, j) => ({ a: piers[j].s, b: p.s, o0: piers[j].s + piers[j].r, o1: p.s - p.r, wide: p.s - piers[j].s > L / n + 0.01 }));
+      return { key, m, local, L, piers, bays };
+    });
+    const rMax = Math.max(...sides.flatMap((sd) => sd.bays.filter((b) => !b.wide).map((b) => (b.o1 - b.o0) / 2)));
+    const spring = Math.min(2.6, h - 0.55 - rMax), top = h - 0.2, lintel = h - 0.8;
+    const yr = h + 0.18, y = (t: number) => yr - K * t; // rafter underside, rising towards the wall
+    const tiles: THREE.Matrix4[] = [];
+
+    for (const { key, m, local, L, piers, bays } of sides) {
+      const put = (s0: number, s1: number, y0: number, y1: number, t0: number, t1: number, role: Role, cam = false) => this.part(m, s0, s1, y0, y1, t0, t1, role, cam);
+      const solid = (s0: number, s1: number, y0: number, y1: number, t0: number, t1: number) => {
+        const p = new THREE.Vector3(s0, 0, t0).applyMatrix4(m), q = new THREE.Vector3(s1, 0, t1).applyMatrix4(m);
+        this.collider(p.x, q.x, y0, y1, p.z, q.z);
+      };
+      for (const { s, r } of piers.slice(0, -1)) { // the far corner pier belongs to the next side
+        put(s - r, s + r, 0, spring - 0.28, -r, r, 'brick');
+        put(s - r - 0.09, s + r + 0.09, 0, 0.4, -r - 0.09, r + 0.09, 'stoneDark'); // plinth
+        put(s - r - 0.1, s + r + 0.1, spring - 0.28, spring, -r - 0.1, r + 0.1, 'stoneDark'); // impost
+        solid(s - r, s + r, 0, spring, -r, r);
+      }
+      // Spandrel wall: one extruded outline per side, arches cut along its bottom edge.
+      const sh = new THREE.Shape().moveTo(-e, spring).lineTo(-e, top).lineTo(L + e, top).lineTo(L + e, spring);
+      for (const b of [...bays].reverse()) {
+        sh.lineTo(b.o1, spring);
+        if (b.wide) sh.lineTo(b.o1, lintel).lineTo(b.o0, lintel).lineTo(b.o0, spring);
+        else sh.absarc((b.o0 + b.o1) / 2, spring, (b.o1 - b.o0) / 2, 0, Math.PI, false);
+      }
+      this.decor(shaped(extrude(sh.closePath(), T, 0.04), 0, h).applyMatrix4(m), 'plaster', true);
+      for (const b of bays) {
+        const c = (b.o0 + b.o1) / 2, r = (b.o1 - b.o0) / 2;
+        if (b.wide) put(b.o0 - 0.2, b.o1 + 0.2, lintel, lintel + 0.32, -e - 0.07, e + 0.07, 'stoneDark');
+        else {
+          this.decor(shaped(ring(c, spring, r - 0.06, r + 0.24, T + 0.14), 0, h).applyMatrix4(m), 'stoneDark');
+          put(c - 0.17, c + 0.17, spring + r - 0.1, spring + r + 0.36, -e - 0.12, e + 0.12, 'stoneDark'); // keystone
+        }
+        const open = b.wide || gaps.some((g) => {
+          const [gs, gt] = local(g);
+          return Math.abs(gt) < depth + 0.5 && gs > b.a - 1.2 && gs < b.b + 1.2;
+        });
+        if (open) continue;
+        put(b.o0, b.o1, 0, 0.7, -0.22, 0.22, 'brick'); // parapet
+        put(b.o0, b.o1, 0.7, 0.8, -0.29, 0.29, 'stoneDark'); // coping
+        solid(b.o0, b.o1, 0, 0.8, -0.22, 0.22);
+      }
+
+      // Roof: cornice, wall plate, rafters (jack rafters and a valley beam at the corners),
+      // boards and the coppi slab; plan = trapezoid mitred along the corner diagonals.
+      put(-e - 0.15, L + e + 0.15, top, h, -e - 0.16, e + 0.16, 'stoneDark');
+      put(-e, L + e, h, yr, -0.14, 0.14, 'wood');
+      put(tw, L - tw, y(tw) - 0.22, y(tw), tw, tw + 0.2, 'wood'); // ledger on the wall
+      for (let s = tw + 0.4; s < L - tw - 0.3; s += 0.8) {
+        const te = Math.min(OV, s, L - s);
+        if (te - tw > 0.5) this.decor(beam(new THREE.Vector3(s, y(tw) + 0.11, tw), new THREE.Vector3(s, y(te) + 0.11, te), 0.16, 0.22).applyMatrix4(m), 'wood');
+      }
+      this.decor(beam(new THREE.Vector3(OV, y(OV) + 0.11, OV), new THREE.Vector3(tw, y(tw) + 0.11, tw), 0.2, 0.24).applyMatrix4(m), 'wood');
+      const plan = (t0: number, t1: number): [number, number][] => [[t0, t0], [L - t0, t0], [L - t1, t1], [t1, t1]];
+      this.decor(slope(plan(tw, OV), yr + 0.28, K, 0.05).applyMatrix4(m), 'wood', true);
+      this.decor(slope(plan(tw, OV + 0.12), yr + 0.42, K, 0.14).applyMatrix4(m), 'roof', true);
+      const te = OV + 0.12, tilt = new THREE.Matrix4().makeRotationX(Math.atan(K));
+      for (let s = te + 0.15; s < L - te - 0.1; s += 0.3) tiles.push(m.clone().multiply(new THREE.Matrix4().makeTranslation(s, y(te - 0.2) + 0.42, te - 0.2)).multiply(tilt));
+
+      // Perimeter wall above the roof: marcapiano and a few deep round-headed windows.
+      if (!upper.includes(key)) continue;
+      const probe = new THREE.Vector3(L / 2, 0, tw - 0.3).applyMatrix4(m);
+      const wallTop = Math.max(0, ...this.world.boxes.filter((b) => Math.abs(probe.x - b.cx) <= b.hx && Math.abs(probe.z - b.cz) <= b.hz).map((b) => b.y1));
+      const band = y(tw) + 0.52;
+      put(tw, L - tw, band, band + 0.22, tw - 0.1, tw + 0.14, 'stoneDark');
+      const wy = band + 0.55, wh = Math.min(1.7, wallTop - 0.4 - wy), r = 0.42;
+      if (wh < 0.9) continue;
+      bays.forEach((b, j) => {
+        if (j % 2 === 0 || b.wide) return;
+        const c = (b.a + b.b) / 2, at = (g: THREE.BufferGeometry, d: number) => g.translate(0, 0, tw + d / 2).applyMatrix4(m);
+        const outline = (p: THREE.Path, rr: number, yb: number) => p.moveTo(c - rr, yb).lineTo(c + rr, yb).lineTo(c + rr, wy + wh - r).absarc(c, wy + wh - r, rr, 0, Math.PI, false).lineTo(c - rr, yb);
+        const frame = outline(new THREE.Shape(), r + 0.16, wy - 0.06) as THREE.Shape;
+        frame.holes.push(outline(new THREE.Path(), r, wy));
+        this.decor(at(shaped(extrude(outline(new THREE.Shape(), r + 0.02, wy) as THREE.Shape, 0.06, 0), 0, wallTop), 0.06), 'wood');
+        this.decor(at(shaped(extrude(frame, 0.24, 0.03), 0, wallTop), 0.24), 'stoneDark');
+        put(c - r - 0.28, c + r + 0.28, wy - 0.2, wy - 0.04, tw, tw + 0.32, 'stoneDark'); // sill
+      });
+    }
+    const coppi = new THREE.InstancedMesh(COPPO, material('roof'), tiles.length);
+    tiles.forEach((t, i) => coppi.setMatrixAt(i, t));
+    coppi.computeBoundingSphere();
+    this.add(coppi, 'roof');
+  }
+
+  /** Low chamfered stone curb framing a lawn (inside its edge, under step height, no collider). */
+  curb(x0: number, x1: number, z0: number, z1: number, w = 0.22, h = 0.14): void {
+    this.part(null, x0, x1, 0, h, z0, z0 + w, 'stoneDark');
+    this.part(null, x0, x1, 0, h, z1 - w, z1, 'stoneDark');
+    this.part(null, x0, x0 + w, 0, h, z0 + w, z1 - w, 'stoneDark');
+    this.part(null, x1 - w, x1, 0, h, z0 + w, z1 - w, 'stoneDark');
+  }
+
+  /** Well-head of radius r, rim top at h + 0.26: stepped base, drum, thick chamfered rim. Collider as column(). */
+  well(x: number, z: number, r: number, h: number, role: Role = 'stoneDark'): THREE.Mesh {
+    const p: THREE.Vector2[] = [];
+    for (const [px, py] of [[r + 0.25, 0], [r + 0.25, 0.12], [r + 0.19, 0.18], [r, 0.18], [r, h - 0.22], [r + 0.14, h - 0.22], [r + 0.22, h - 0.14], [r + 0.22, h + 0.18], [r + 0.14, h + 0.26], [r - 0.12, h + 0.26], [r - 0.2, h + 0.18], [r - 0.2, h], [0, h]]) {
+      p.push(new THREE.Vector2(px, py), new THREE.Vector2(px, py)); // doubled = hard creases
+    }
+    const m = new THREE.Mesh(new THREE.LatheGeometry(p.slice(1, -1), 14), material(role));
+    m.position.set(x, 0, z);
+    this.add(m, role);
+    this.world.add(x, z, r * 0.9, r * 0.9, 0, h);
+    return m;
+  }
+
+  /** Closed building volume: box, then zoccolo, marcapiano, eaves cornice and a hipped coppi roof. */
+  block(x0: number, x1: number, z0: number, z1: number, h: number, role: Role = 'mass'): void {
+    this.box(x0, x1, 0, h, z0, z1, role);
+    this.band(x0, x1, z0, z1, 0, 0.6, 0.08);
+    this.band(x0, x1, z0, z1, h * 0.5, h * 0.5 + 0.22, 0.1);
+    this.band(x0, x1, z0, z1, h - 0.35, h, 0.3);
+    this.hipRoof(x0, x1, z0, z1, h);
+  }
+
+  /** Visual ring of trim `out` proud of a rectangle's faces, from y0 to y1. */
+  band(x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, out: number, role: Role = 'stoneDark'): void {
+    this.part(null, x0 - out, x1 + out, y0, y1, z0 - out, z0 + out, role);
+    this.part(null, x0 - out, x1 + out, y0, y1, z1 - out, z1 + out, role);
+    this.part(null, x0 - out, x0 + out, y0, y1, z0 + out, z1 - out, role);
+    this.part(null, x1 - out, x1 + out, y0, y1, z0 + out, z1 - out, role);
+  }
+
+  /** Hipped roof over a rectangle, eaves at y overhanging by `ov`, pitch k (rise per run). Visual only. */
+  hipRoof(x0: number, x1: number, z0: number, z1: number, y: number, ov = 0.7, k = 0.45): void {
+    this.decor(hip(x0 - ov, x1 + ov, z0 - ov, z1 + ov, y, k), 'roof');
   }
 
   /** Cylinder with a square collider of matching footprint. */
@@ -364,3 +542,78 @@ function chamferBox(w: number, h: number, d: number, b: number): THREE.BufferGeo
   CHAMFERS.set(key, g);
   return g;
 }
+
+/** Shape extruded `depth` thick, centred on z = 0, with a one-segment bevel. */
+function extrude(s: THREE.Shape, depth: number, bevel: number): THREE.BufferGeometry {
+  const d = depth - 2 * bevel;
+  return new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 10 }).translate(0, 0, -d / 2);
+}
+
+/** Half annulus (an arch ring) between radii r0 and r1, springing at (cx, cy), `depth` thick. */
+function ring(cx: number, cy: number, r0: number, r1: number, depth: number): THREE.BufferGeometry {
+  const s = new THREE.Shape().moveTo(cx + r1, cy).absarc(cx, cy, r1, 0, Math.PI, false).lineTo(cx - r0, cy).absarc(cx, cy, r0, Math.PI, 0, true).closePath();
+  return extrude(s, depth, 0.03);
+}
+
+/**
+ * Adds the aShape attribute chamferBox carries: height above `base`, total height H (default:
+ * the geometry's own extent), 1 on bevel faces (normal tilted off the extrusion axis).
+ */
+function shaped(g: THREE.BufferGeometry, base?: number, H?: number, bevels = true): THREE.BufferGeometry {
+  g.computeBoundingBox();
+  const lo = base ?? g.boundingBox!.min.y, hh = H ?? g.boundingBox!.max.y - lo;
+  const pos = g.getAttribute('position'), nrm = g.getAttribute('normal'), a = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const nz = Math.abs(nrm.getZ(i));
+    a.set([pos.getY(i) - lo, hh, bevels && nz > 0.2 && nz < 0.95 ? 1 : 0], i * 3);
+  }
+  g.setAttribute('aShape', new THREE.BufferAttribute(a, 3));
+  g.clearGroups();
+  return g;
+}
+
+/** Chamfered beam w wide, h deep, from a to b (not vertical); its depth stays in the vertical plane. */
+function beam(a: THREE.Vector3, b: THREE.Vector3, w: number, h: number): THREE.BufferGeometry {
+  const x = b.clone().sub(a), len = x.length();
+  x.divideScalar(len);
+  const z = x.clone().cross(new THREE.Vector3(0, 1, 0)).normalize(), y = z.clone().cross(x);
+  const m = new THREE.Matrix4().makeBasis(x, y, z).setPosition(a.clone().add(b).multiplyScalar(0.5));
+  return chamferBox(len, h, w, Math.min(0.04, 0.2 * Math.min(w, h))).clone().applyMatrix4(m);
+}
+
+/** Inclined slab over a plan polygon of (x, z) points: top at y0 - k z, `th` thick (vertical). */
+function slope(pts: [number, number][], y0: number, k: number, th: number): THREE.BufferGeometry {
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z))), { depth: th, bevelEnabled: false });
+  const p = g.getAttribute('position');
+  for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i), y0 - th + k * p.getY(i) + p.getZ(i), -p.getY(i)); // (x, -z, up) -> (x, y, z), orientation kept
+  g.computeVertexNormals();
+  return shaped(g, undefined, undefined, false);
+}
+
+/** Hipped roof solid: eave rectangle at y with a 0.2 m fascia below it, ridge along the long side. */
+function hip(x0: number, x1: number, z0: number, z1: number, y: number, k: number): THREE.BufferGeometry {
+  const hh = Math.min(x1 - x0, z1 - z0) / 2, ry = y + k * hh, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const alongX = x1 - x0 >= z1 - z0;
+  const r0 = alongX ? [x0 + hh, ry, cz] : [cx, ry, z0 + hh], r1 = alongX ? [x1 - hh, ry, cz] : [cx, ry, z1 - hh];
+  const e = [[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]], f = e.map(([x, , z]) => [x, y - 0.2, z]);
+  const c = [cx, y, cz], pos: number[] = [];
+  const tri = (p: number[], q: number[], r: number[]) => { // convex solid: orient away from the centre
+    const u = q.map((v, i) => v - p[i]), v = r.map((w, i) => w - p[i]);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    if (n.reduce((acc, ni, i) => acc + ni * (p[i] + q[i] + r[i] - 3 * c[i]), 0) < 0) [q, r] = [r, q];
+    pos.push(...p, ...q, ...r);
+  };
+  const quad = (p: number[], q: number[], r: number[], s: number[]) => { tri(p, q, r); tri(p, r, s); };
+  for (let i = 0; i < 4; i++) quad(f[i], f[(i + 1) % 4], e[(i + 1) % 4], e[i]); // fascia
+  quad(f[0], f[1], f[2], f[3]); // soffit
+  if (alongX) { quad(e[0], e[1], r1, r0); quad(e[2], e[3], r0, r1); tri(e[3], e[0], r0); tri(e[1], e[2], r1); }
+  else { quad(e[3], e[0], r0, r1); quad(e[1], e[2], r1, r0); tri(e[0], e[1], r0); tri(e[2], e[3], r1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  g.computeVertexNormals();
+  return shaped(g, undefined, undefined, false);
+}
+
+/** Coppo end for the eaves: half cylinder lying along z, convex side up. */
+const COPPO = new THREE.CylinderGeometry(0.12, 0.12, 0.42, 8, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2);

@@ -4,8 +4,10 @@ import { PAINTERS, rasterize } from './textures.ts';
 // Stylized materials per semantic role. Every mesh's `userData.role` names the key it
 // was built with, so later passes can still find/swap them without touching the layout.
 // Textures are painted procedurally (textures.ts) and projected triplanar in world space:
-// the level is made of scaled unit boxes whose UVs would stretch, so world metres drive
+// the level is made of boxes of every size whose UVs would stretch, so world metres drive
 // the mapping instead and tiles stay the same size on every wall, floor and roof.
+// Generated geometry (builder.ts chamferBox, columns) carries an `aShape` attribute so
+// masonry roles can paint by form: dark mossy foot, lighter top, lit chamfers.
 
 interface Spec {
   tint?: number; // multiplies the painted albedo (default white); flat colour of untextured roles
@@ -14,16 +16,17 @@ interface Spec {
   grime?: boolean; // walls: darker, dirtier band near the ground
   macro?: number; // strength of large-scale world-space colour variation (breaks tiling)
   peel?: number; // plaster: world-space scaling threshold (lower = more brick showing)
+  shape?: boolean; // paint by form (aShape): banded macro blotches, local foot/top gradient, lit chamfers
 }
 
 const SPECS = {
-  stone: { tile: 2.4, rough: 0.82, grime: true, macro: 0.12 }, // pietra d'Istria (facade, church)
-  stoneDark: { tile: 2.4, rough: 0.78, grime: true, macro: 0.1 }, // columns, cornices, steps
-  plaster: { tile: 3.6, rough: 0.95, grime: true, macro: 0.15, peel: 0.6 }, // red intonaco of the calli and convent
-  brick: { tile: 2.88, rough: 0.9, grime: true, macro: 0.18 }, // cloister walls/arches: 36×9 cm bricks, shuffled per brick
-  mass: { tile: 3.6, rough: 0.95, grime: true, macro: 0.18, peel: 0.63 }, // inaccessible building volumes (ochre plaster)
-  roof: { tile: 1.6, rough: 0.75, macro: 0.2 }, // coppi
-  paving: { tile: 3.2, rough: 0.8, macro: 0.12 }, // trachite masegni
+  stone: { tile: 2.4, rough: 0.82, grime: true, macro: 0.12, shape: true }, // pietra d'Istria (facade, church)
+  stoneDark: { tile: 2.4, rough: 0.78, grime: true, macro: 0.1, shape: true }, // columns, cornices, steps
+  plaster: { tile: 3.6, rough: 0.95, grime: true, macro: 0.15, peel: 0.6, shape: true }, // red intonaco of the calli and convent
+  brick: { tile: 2.88, rough: 0.9, grime: true, macro: 0.18, shape: true }, // cloister walls/arches: 36×9 cm bricks, shuffled per brick
+  mass: { tile: 3.6, rough: 0.95, grime: true, macro: 0.18, peel: 0.63, shape: true }, // inaccessible building volumes (ochre plaster)
+  roof: { tile: 1.6, rough: 0.75, macro: 0.2, shape: true }, // coppi
+  paving: { tile: 3.2, rough: 0.8, macro: 0.12, shape: true }, // trachite masegni
   ground: { tile: 6, rough: 0.95, macro: 0.15 }, // base site slab
   gravel: { tile: 2, rough: 1, macro: 0.12 }, // garden paths
   grass: { tile: 3, rough: 1, macro: 0.2 },
@@ -34,7 +37,7 @@ const SPECS = {
   flower: { tint: 0xf4ece6, rough: 0.7 }, // near white: props tint each instance (roses, lilies, lavender)
   fruit: { tint: 0xf0e4d8, rough: 0.6 }, // likewise (grapes, apples, lemons)
   trunk: { tile: 1, rough: 0.95 },
-  wood: { tile: 1.5, rough: 0.8, macro: 0.1 }, // pergolas, pier, porticoes
+  wood: { tile: 1.5, rough: 0.8, macro: 0.1, shape: true }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
   glass: { tint: 0xa9cdd6, rough: 0.1 },
   player: { tint: 0xe0b040, rough: 0.6 },
@@ -43,8 +46,9 @@ const SPECS = {
 export type Role = keyof typeof SPECS;
 
 // World-space triplanar projection of `map`, plus large-scale colour drift and wall grime.
-const VERT_DECL = 'varying vec3 vTriPos;\nvarying vec3 vTriNrm;\n';
+const VERT_DECL = 'attribute vec3 aShape;\nvarying vec3 vShape;\nvarying vec3 vTriPos;\nvarying vec3 vTriNrm;\n';
 const VERT_BODY = `#include <project_vertex>
+vShape = aShape;
 #ifdef USE_INSTANCING
 vTriPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
 vTriNrm = mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal;
@@ -52,7 +56,8 @@ vTriNrm = mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal;
 vTriPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vTriNrm = mat3(modelMatrix) * objectNormal;
 #endif`;
-const FRAG_DECL = `varying vec3 vTriPos;
+const FRAG_DECL = `varying vec3 vShape;
+varying vec3 vTriPos;
 varying vec3 vTriNrm;
 uniform float uTile;
 uniform float uMacro;
@@ -107,7 +112,7 @@ const FRAG_MAP = `{
     float face = smoothstep(0.3, 0.6, bH);
     float pr = triNoise(wp * vec2(0.8, 1.2)) * 0.6 + triNoise(wp * 3.1 + 7.0) * 0.28 + triNoise(wp * 12.0) * 0.12;
     float cover = smoothstep(0.69, 0.71, pr), smear = smoothstep(0.55, 0.69, pr) * (1.0 - face);
-    vec3 lime = vec3(0.7, 0.65, 0.57) * (0.75 + 0.2 * triNoise(wp * 9.0) + 0.15 * triNoise(wp * 31.0));
+    vec3 lime = vec3(0.7, 0.65, 0.57) * (0.8 + 0.25 * triNoise(wp * 4.0));
     tex.rgb = mix(tex.rgb, lime, max(smear * 0.6, 0.0));
     tex.rgb *= 1.0 - 0.3 * smoothstep(0.65, 0.69, pr) * (1.0 - cover); // shadow under the render lip
     tex.rgb = mix(tex.rgb, lime, cover);
@@ -146,11 +151,41 @@ const FRAG_MAP = `{
   }
 #endif
   vec2 q = vTriPos.xz + vTriPos.y * 0.6;
+#ifdef TRI_SHAPE
+  {
+    // Painted, not photographed: value and warm/cool drift at ~10 m and ~3 m, then hard-edged
+    // blotches (sun-washed / damp) cut at sharp thresholds like brush strokes.
+    float k = uMacro / 0.15;
+    float m1 = triNoise(q * 0.09 + 31.0), m2 = triNoise(q * 0.33 + 5.0);
+    tex.rgb *= 1.0 + k * ((m1 - 0.5) * 0.45 + (m2 - 0.5) * 0.22);
+    tex.rgb *= mix(vec3(1.0), mix(vec3(0.94, 0.98, 1.05), vec3(1.06, 1.0, 0.9), m1), min(k, 1.0));
+    float m3 = triNoise(q * 0.45 + triNoise(q * 0.17 + 9.0) * 1.6 + 17.0);
+    float lum = dot(tex.rgb, vec3(0.3, 0.5, 0.2));
+    tex.rgb = mix(tex.rgb, mix(tex.rgb, vec3(lum) * vec3(1.05, 1.01, 0.94), 0.35) * 1.14, smoothstep(0.66, 0.68, m3) * min(k, 1.0) * 0.8);
+    tex.rgb *= 1.0 - 0.16 * min(k, 1.0) * (1.0 - smoothstep(0.3, 0.32, m3));
+    // Height inside the object, not world y: walls on the raised church floor, lintels and
+    // steps all get their own foot and top. Meshes without aShape fall back to world y.
+    float H = vShape.y, y = H > 0.0 ? vShape.x : vTriPos.y;
+    if (H > 0.0) tex.rgb *= mix(0.86, 1.08, smoothstep(0.0, H, y));
+#ifdef TRI_GRIME
+    float foot = (1.0 - smoothstep(0.0, H > 0.0 ? min(1.4, 0.5 * H) : 1.4, y)) * (1.0 - w.y);
+    float dry = smoothstep(0.48, 0.52, triNoise(vTriPos.xz * 0.9 + vTriPos.y * 1.5 + 41.0) + 0.35 * (1.0 - foot));
+    tex.rgb *= mix(vec3(1.0), mix(vec3(0.58, 0.66, 0.44), vec3(0.7, 0.68, 0.62), dry), foot); // moss patches, dust above
+#endif
+    // Chamfers: the painted arris of hand-painted kits. Warm and bright facing up, a light
+    // line on vertical arrises, dark facing down.
+    float up = clamp(n.y * 1.414, -1.0, 1.0);
+    vec3 lit = tex.rgb * vec3(1.36, 1.27, 1.1) + vec3(0.035, 0.028, 0.012);
+    tex.rgb = mix(tex.rgb, lit, vShape.z * clamp(0.35 + 0.65 * up, 0.0, 1.0));
+    tex.rgb *= 1.0 - vShape.z * 0.4 * clamp(-up, 0.0, 1.0);
+  }
+#else
   float m = triNoise(q * 0.13) * 0.65 + triNoise(q * 0.41) * 0.35;
   tex.rgb *= 1.0 + (m - 0.5) * 2.0 * uMacro;
 #ifdef TRI_GRIME
   float g = (1.0 - smoothstep(0.0, 1.4, vTriPos.y)) * (1.0 - w.y);
   tex.rgb *= mix(vec3(1.0), vec3(0.7, 0.68, 0.62), g);
+#endif
 #endif
   diffuseColor *= tex;
 }`;
@@ -195,6 +230,9 @@ function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
   if (s.grime) m.defines.TRI_GRIME = '';
   if (role === 'brick') m.defines.TRI_BRICK = '';
   if (s.peel) m.defines.TRI_PEEL = '';
+  if (s.shape) m.defines.TRI_SHAPE = '';
+  // aShape for meshes that lack it (props, floors): height 0 = fall back to world y.
+  Object.assign(m, { defaultAttributeValues: { aShape: [0, 0, 0] } });
   const peel = s.peel ?? 0;
   const tile = s.tile, macro = s.macro ?? 0;
   m.onBeforeCompile = shader => {

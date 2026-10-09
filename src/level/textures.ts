@@ -90,7 +90,7 @@ function bond(u: number, v: number, cols: number, rows: number, shift: (row: num
   const d = Math.min(l, r, b, t);
   const joint = 1 - smooth(jointPx * 0.5, jointPx * 0.5 + 1.2, d);
   const e = (k: number) => 1 - smooth(jointPx * 0.5, jointPx * 0.5 + bevelPx, k);
-  const shade = 1 + 0.16 * e(t) + 0.07 * e(l) - 0.2 * e(b) - 0.1 * e(r);
+  const shade = 1 + 0.24 * e(t) + 0.1 * e(l) - 0.28 * e(b) - 0.14 * e(r);
   return { id: hash(col, mod(row, rows), 7), col, row, joint, shade };
 }
 
@@ -103,10 +103,9 @@ function istria(base: number, cols: number, rows: number, n: number): Painter {
     const c = bond(u, v, cols, rows, r => hash(r, 0, 3) * 0.8 + 0.1, n, 3, 7);
     let col = mix(b, c.id < 0.5 ? cool : warm, Math.abs(c.id - 0.5) * 0.5);
     col = mul(col, 0.92 + c.id * 0.12);
-    col = mul(col, 0.9 + 0.18 * fbm(u, v, 6, 6, 4, 11));
+    col = mul(col, 0.9 + 0.18 * fbm(u, v, 3, 3, 2, 11));
     const streak = smooth(0.6, 0.85, fbm(u, v, 12, 2, 3, 13)); // vertical weathering
     col = mul(col, 1 - streak * 0.1);
-    col = mul(col, 0.96 + 0.08 * hash(Math.floor(u * n), Math.floor(v * n), 5)); // grain
     return mix(mul(col, c.shade), joint, c.joint);
   };
 }
@@ -140,7 +139,6 @@ function agedBrick(n: number): (u: number, v: number) => RGBH {
     // mortar: weathered, eroded deeper in places
     const ero = smooth(0.5, 0.75, fbm(u, v, 48, 48, 3, 15));
     let m = mul(mortar, (0.8 + 0.22 * fbm(u, v, 64, 64, 2, 24)) * (1 - 0.3 * ero));
-    m = mul(m, 0.92 + 0.12 * hash(Math.floor(u * n), Math.floor(v * n), 16));
     const mh = 0.22 - 0.12 * ero;
     if (hash(col, row, 17) < 0.035) { // missing brick: a dark socket with crumbs
       const g = fbm(u, v, 128, 128, 2, 18), inside = smooth(jh, jh + 3, d);
@@ -150,11 +148,10 @@ function agedBrick(n: number): (u: number, v: number) => RGBH {
     if (r3 > 0.9) c = mix(c, burnt, 0.55 + (r3 - 0.9) * 3); // clinkered headers
     else if (r3 < 0.1) c = mix(c, pale, 0.45); // underfired, salmon
     c = mul(c, 0.84 + 0.26 * hash(col, row, 19));
-    const mott = fbm(u, v, 32, 32, 4, 22);
+    const mott = fbm(u, v, 16, 16, 2, 22);
     c = mul(c, 0.82 + 0.3 * mott);
     const pit = smooth(0.66, 0.8, fbm(u, v, 160, 160, 2, 25)); // pockmarks and spalls
-    c = mul(c, 1 - 0.25 * pit);
-    c = mul(c, 0.93 + 0.1 * hash(Math.floor(u * n), Math.floor(v * n), 23));
+    c = mul(c, 1 - 0.12 * pit);
     const e = (k: number) => 1 - smooth(jh, jh + 5, k);
     const shade = 1 + 0.14 * e(t) + 0.06 * e(l) - 0.18 * e(b) - 0.08 * e(r);
     const broken = mul(mix(c, hex(0x8a4a34), 0.4), 0.78 + 0.2 * mott); // fresh break, darker clay
@@ -168,9 +165,9 @@ function agedBrick(n: number): (u: number, v: number) => RGBH {
 function plaster(base: number): Painter {
   const b = hex(base), lit = mix(b, hex(0xf2e2c8), 0.35), dark = mul(b, 0.72);
   return (u, v) => {
-    const wash = fbm(u, v, 3, 3, 5, 31);
-    let col = mix(dark, lit, smooth(0.25, 0.8, wash));
-    col = mul(col, 0.94 + 0.1 * fbm(u, v, 16, 16, 3, 32));
+    const wash = fbm(u, v, 3, 3, 3, 31);
+    let col = mix(dark, lit, 0.15 + 0.35 * smooth(0.42, 0.45, wash) + 0.35 * smooth(0.6, 0.63, wash) + 0.15 * wash);
+    col = mul(col, 0.95 + 0.08 * fbm(u, v, 8, 8, 2, 32));
     const drip = smooth(0.6, 0.85, fbm(u, v, 16, 2, 3, 33));
     return mul(col, 1 - drip * 0.15);
   };
@@ -182,10 +179,9 @@ function trachite(n: number): Painter {
   return (u, v) => {
     const c = bond(u, v, 3, 4, r => hash(r, 2, 41), n, 3.5, 6);
     let col = pick(pal, c.id);
-    col = mul(col, 0.85 + 0.3 * fbm(u, v, 8, 8, 4, 42));
+    col = mul(col, 0.85 + 0.3 * fbm(u, v, 4, 4, 2, 42));
     const worn = smooth(0.55, 0.75, fbm(u, v, 5, 5, 3, 43));
     col = mix(col, hex(0x8a877f), worn * 0.25);
-    col = mul(col, 0.88 + 0.24 * hash(Math.floor(u * n), Math.floor(v * n), 44));
     return mix(mul(col, c.shade), joint, c.joint);
   };
 }
@@ -201,7 +197,7 @@ function coppi(): Painter {
     let c = pick(pal, id);
     c = mul(c, 0.55 + 0.6 * Math.sin(Math.PI * fx) ** 0.6); // convex cross-section, dark valleys
     c = mul(c, 1 - 0.35 * smooth(0.82, 1, fy) + 0.12 * smooth(0.2, 0, fy)); // lip shadow / lit nose
-    c = mul(c, 0.9 + 0.2 * fbm(u, v, 16, 16, 3, 53));
+    c = mul(c, 0.9 + 0.2 * fbm(u, v, 8, 8, 2, 53));
     const moss = smooth(0.62, 0.78, fbm(u, v, 6, 6, 4, 54));
     return mix(c, lichen, moss * 0.55);
   };
@@ -216,7 +212,7 @@ function planks(base: number, cols: number): Painter {
     const rings = 0.5 + 0.5 * Math.sin((u * cols * 5 + g * 4 + c.id * 7) * Math.PI * 2);
     let col = mul(b, 0.8 + c.id * 0.35);
     col = mul(col, 0.82 + 0.18 * rings);
-    col = mul(col, 0.9 + 0.15 * fbm(u, v, 64, 4, 2, 63));
+    col = mul(col, 0.9 + 0.15 * fbm(u, v, 16, 2, 2, 63));
     return mix(mul(col, c.shade), seam, c.joint);
   };
 }

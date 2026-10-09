@@ -155,7 +155,7 @@ function dressOrto(b: LevelBuilder): void {
 
   // Orti: each raised bed (soil boxes from the skeleton) gets one crop in rows.
   const beds = b.zones.get('orto')!.children.filter((o) => o.userData.role === 'soil');
-  beds.forEach((bed, i) => crops(p, bed.position.x, bed.position.z, bed.scale.x, bed.scale.z, i % 5));
+  beds.forEach((bed, i) => crops(p, bed.position.x, bed.position.z, bed.userData.size[0], bed.userData.size[2], i % 5));
 
   // Vasca delle ninfee: pads and flowers on the water, box balls at the corners, benches.
   const { x: bx, z: bz } = BASIN, wy = 0.41;

@@ -45,9 +45,8 @@ interface BoxOpts {
   collide?: boolean; // default true
   visible?: boolean; // default true (false = invisible barrier)
   camera?: boolean; // blocks the follow camera; default = collide && visible
+  bevel?: number; // chamfer width, default min(12 cm, quarter of the smallest side)
 }
-
-const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 
 export class LevelBuilder {
   readonly root = new THREE.Group();
@@ -93,8 +92,9 @@ export class LevelBuilder {
   /** Box centred at (cx,cz), size w (local x) by d (local z), rotated `rot` rad about Y. */
   obox(cx: number, cz: number, w: number, d: number, y0: number, y1: number, rot: number, role: Role, o: BoxOpts = {}): THREE.Mesh {
     const { collide = true, visible = true } = o;
-    const mesh = new THREE.Mesh(UNIT_BOX, material(role));
-    mesh.scale.set(w, y1 - y0, d);
+    const h = y1 - y0, bevel = o.bevel ?? Math.min(0.12, 0.25 * Math.min(w, h, d));
+    const mesh = new THREE.Mesh(chamferBox(w, h, d, bevel), material(role));
+    mesh.userData.size = [w, h, d];
     mesh.position.set(cx, (y0 + y1) / 2, cz);
     mesh.rotation.y = rot;
     mesh.visible = visible;
@@ -219,8 +219,8 @@ export class LevelBuilder {
     for (let i = 0; i < n; i++) {
       const p0 = from + ((to - from) * i) / n, p1 = from + ((to - from) * (i + 1)) / n;
       const top = yLow + ((yHigh - yLow) * (i + 1)) / n;
-      if (axis === 'z') this.box(a0, a1, yLow, top, p0, p1, role, { camera: false });
-      else this.box(p0, p1, yLow, top, a0, a1, role, { camera: false });
+      if (axis === 'z') this.box(a0, a1, yLow, top, p0, p1, role, { camera: false, bevel: 0.03 });
+      else this.box(p0, p1, yLow, top, a0, a1, role, { camera: false, bevel: 0.03 });
     }
   }
 
@@ -304,6 +304,63 @@ function columnGeometry(r: number, h: number): THREE.BufferGeometry {
   const plinth = new THREE.BoxGeometry(2.6 * r, 0.45 * r, 2.6 * r).translate(0, 0.225 * r, 0);
   const abacus = new THREE.BoxGeometry(2.56 * r, 0.28 * r, 2.56 * r).translate(0, h - 0.14 * r, 0);
   g = mergeGeometries([plinth, lathe, abacus])!;
+  const pos = g.getAttribute('position'), shape = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) shape.set([pos.getY(i), h, 0], i * 3);
+  g.setAttribute('aShape', new THREE.BufferAttribute(shape, 3));
   COLUMNS.set(key, g);
+  return g;
+}
+
+const CHAMFERS = new Map<string, THREE.BufferGeometry>();
+
+/**
+ * Box w×h×d centred on the origin, every edge cut by a 45° chamfer `b` wide (one segment,
+ * 44 triangles, flat normals). Built per size and cached, so the bevel never stretches the
+ * way a scaled unit box would. aShape = (height above the base, total height, 1 on chamfer
+ * faces): the triplanar shader paints the foot, the top and the lit arrises from it.
+ */
+function chamferBox(w: number, h: number, d: number, b: number): THREE.BufferGeometry {
+  const key = [w, h, d, b].map((v) => v.toFixed(3)).join('|');
+  let g = CHAMFERS.get(key);
+  if (g) return g;
+  const a = [w / 2, h / 2, d / 2];
+  // vertex of corner s (signs) lying on the face normal to axis i
+  const P = (s: number[], i: number) => a.map((e, k) => s[k] * (k === i ? e : e - b));
+  const pos: number[] = [], shape: number[] = [];
+  const tri = (p: number[], q: number[], r: number[], edge: number) => {
+    // convex and centred: the face normal must point away from the origin
+    const u = q.map((v, k) => v - p[k]), v = r.map((x, k) => x - p[k]);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    if (n[0] * (p[0] + q[0] + r[0]) + n[1] * (p[1] + q[1] + r[1]) + n[2] * (p[2] + q[2] + r[2]) < 0) [q, r] = [r, q];
+    for (const c of [p, q, r]) { pos.push(...c); shape.push(c[1] + a[1], h, edge); }
+  };
+  const quad = (p: number[], q: number[], r: number[], s: number[], edge: number) => { tri(p, q, r, edge); tri(p, r, s, edge); };
+  const corner = (i: number, si: number, j: number, sj: number, k: number, sk: number) => {
+    const s = [0, 0, 0];
+    s[i] = si; s[j] = sj; s[k] = sk;
+    return s;
+  };
+  for (let i = 0; i < 3; i++) {
+    const j = (i + 1) % 3, k = (i + 2) % 3;
+    for (const si of [-1, 1]) {
+      // face
+      quad(P(corner(i, si, j, -1, k, -1), i), P(corner(i, si, j, 1, k, -1), i), P(corner(i, si, j, 1, k, 1), i), P(corner(i, si, j, -1, k, 1), i), 0);
+      // chamfer between this face and the j faces, running along k
+      for (const sj of [-1, 1]) {
+        const c0 = corner(i, si, j, sj, k, -1), c1 = corner(i, si, j, sj, k, 1);
+        quad(P(c0, i), P(c0, j), P(c1, j), P(c1, i), 1);
+      }
+    }
+  }
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+    const s = [sx, sy, sz];
+    tri(P(s, 0), P(s, 1), P(s, 2), 1);
+  }
+  g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2)); // triplanar: unused
+  g.setAttribute('aShape', new THREE.Float32BufferAttribute(shape, 3));
+  g.computeVertexNormals();
+  CHAMFERS.set(key, g);
   return g;
 }

@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { PLAYER, type World } from '../core/physics.ts';
 import type { Input } from '../core/input.ts';
-import { material } from '../level/materials.ts';
+import { ForsakenModel } from './forsaken.ts';
 
 const RUN = 6, WALK = 2.5, GRAVITY = 22, JUMP = 7, TURN = 12;
 
-/** Placeholder hero: capsule + nose, camera-relative WASD, gravity, jump, step-up. */
+/** Hero: Forsaken model over a capsule collider, camera-relative WASD, gravity, jump, step-up. */
 export class PlayerController {
   readonly mesh = new THREE.Group();
+  private model = new ForsakenModel();
   readonly pos = new THREE.Vector3(); // feet position
   private vy = 0;
   private grounded = true;
@@ -19,11 +20,7 @@ export class PlayerController {
   constructor(world: World, spawn: { x: number; z: number; yaw: number }) {
     this.world = world;
     this.spawn = spawn;
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(PLAYER.radius, PLAYER.height - 2 * PLAYER.radius, 4, 12), material('player'));
-    body.position.y = PLAYER.height / 2;
-    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.35), material('stoneDark'));
-    nose.position.set(0, 1.5, -0.4);
-    this.mesh.add(body, nose);
+    this.mesh.add(this.model.root);
     this.respawn(spawn);
   }
 
@@ -68,6 +65,8 @@ export class PlayerController {
     }
     if (this.pos.y < -10) this.respawn(this.spawn); // safety net, barriers should prevent it
 
+    const moved = dt > 0 ? Math.hypot(this.pos.x - this.mesh.position.x, this.pos.z - this.mesh.position.z) / dt : 0;
+    this.model.animate(dt, Math.min(moved, RUN * 1.5), this.grounded); // clamp: respawn teleports
     this.mesh.position.copy(this.pos);
     this.mesh.rotation.y = this.facing;
   }

@@ -59,7 +59,6 @@ export function buildNord(b: LevelBuilder): void {
   b.area('Prato nord-est', 4, X.east, Z.lagoonEdge, n);
   b.floor(4, X.east, Z.lagoonEdge, n, 'grass');
   b.wallZ(X.east, Z.riva, -168, { h: 3, role: 'brick' });
-  for (const [tx, tz] of [[10, -166], [16, -172], [22, -177], [9, -179]]) b.tree(tx, tz, 2, 4.5);
 
   b.zone('laguna');
   b.area('Riva sulla laguna', X.west, X.east, Z.riva, Z.lagoonEdge);

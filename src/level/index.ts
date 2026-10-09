@@ -4,6 +4,7 @@ import { buildChiesa } from './zones/chiesa.ts';
 import { buildConvento } from './zones/convento.ts';
 import { buildOrto } from './zones/orto.ts';
 import { buildNord } from './zones/nord.ts';
+import { dressLevel } from './dressing.ts';
 
 export type Level = LevelBuilder;
 
@@ -22,5 +23,6 @@ export function buildLevel(): Level {
   buildConvento(b);
   buildOrto(b);
   buildNord(b);
+  dressLevel(b); // vegetation, covered walks, furniture
   return b;
 }

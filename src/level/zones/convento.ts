@@ -36,7 +36,6 @@ export function buildConvento(b: LevelBuilder): void {
   b.floor(-37, -26, -43, -17, 'grass');
   b.floor(-33.5, -30.5, -43, -17, 'gravel', 0, 0.02);
   b.floor(-37, -26, -20.5, -17.5, 'gravel', 0, 0.02);
-  for (const x of [-35, -28.5]) for (const z of [-39, -34, -29, -24]) b.tree(x, z, 1.4, 3.6);
 
   b.area('Chiostrino', -37, -22, -54, -43);
   b.room(-37, -22, -54, -43, { h: 7, roof: false, role: 'brick', n: [{ at: -34 }], s: [{ at: -32 }], floor: 'paving' });

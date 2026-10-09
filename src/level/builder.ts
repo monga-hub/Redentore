@@ -208,15 +208,6 @@ export class LevelBuilder {
     }
   }
 
-  /** Greybox tree placeholder (trunk collides, crown does not). Vegetation proper is a later ship. */
-  tree(x: number, z: number, crown = 1.6, height = 4): void {
-    const trunk = Math.max(2.3, height * 0.55); // crown clears the player's head
-    this.column(x, z, 0.18, 0, trunk, 'trunk');
-    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(crown, 0), material('foliage'));
-    c.position.set(x, trunk + crown * 0.75, z);
-    this.add(c, 'foliage');
-  }
-
   /** Posts + beams pergola over a rectangle; beams sit at 2.6 m so the player walks under. */
   pergola(x0: number, x1: number, z0: number, z1: number, alongZ: boolean, spacing = 3): void {
     const len = alongZ ? z1 - z0 : x1 - x0;

@@ -59,9 +59,12 @@ src/
   ui/hud.ts                  nome dell'area corrente
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
-                             pergole, alberi segnaposto; registra collider e aree
-  level/materials.ts         palette greybox per ruolo semantico
-  level/index.ts             buildLevel(): assembla le zone sud → nord
+                             pergole; registra collider e aree
+  level/props.ts             prop stilizzati low-poly (ulivi, alberi da frutto, cipressi,
+                             arbusti, viti, pergole su percorsi, panche, pozzi) in InstancedMesh
+  level/dressing.ts          allestimento per zona: vegetazione, portici dell'orto, arredi
+  level/materials.ts         materiali stilizzati per ruolo semantico
+  level/index.ts             buildLevel(): assembla le zone sud → nord, poi dressLevel()
   level/zones/
     fondamenta.ts            acqua, suolo, fondamenta, sagrato + scalinata, calle
     chiesa.ts                navata, cappelle, crociera + cupola, presbiterio, coro
@@ -85,10 +88,10 @@ scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del pl
 
 ### Note per dopo (fuori scope qui)
 
-- Vegetazione vera (ulivi, viti, ninfee, siepi), arredi, materiali/texture, luci,
-  nebbia e post-processing: per ora solo tinte piatte e volumi segnaposto.
-- Prestazioni: ~660 mesh non unite (~60 fps). Se servirà, unire la geometria statica
-  per zona o usare InstancedMesh per alberi/colonne.
+- Luci, nebbia e post-processing. La vegetazione è instanziata con un colore per
+  istanza che moltiplica il materiale del ruolo (`olive`, `flower`, `fruit`, …).
+- Prestazioni: ~530 mesh non unite + ~7000 istanze in poche InstancedMesh (~60 fps).
+  Se servirà, unire la geometria statica per zona.
 - Interni non accessibili (masse grigie del convento, ala est) sono volumi chiusi.
 - Le barriere invisibili chiudono la fondamenta a ±60 m e la riva nord.
 

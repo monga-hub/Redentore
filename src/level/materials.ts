@@ -29,6 +29,9 @@ const SPECS = {
   soil: { tile: 2, rough: 1, macro: 0.15 }, // cultivated beds
   hedge: { tile: 1.6, rough: 0.9, macro: 0.15 },
   foliage: { tile: 2, rough: 0.9, macro: 0.15 },
+  olive: { tint: 0x8fa080, rough: 0.9 }, // silvery olive leaves, lavender, sage
+  flower: { tint: 0xf4ece6, rough: 0.7 }, // near white: props tint each instance (roses, lilies, lavender)
+  fruit: { tint: 0xf0e4d8, rough: 0.6 }, // likewise (grapes, apples, lemons)
   trunk: { tile: 1, rough: 0.95 },
   wood: { tile: 1.5, rough: 0.8, macro: 0.1 }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
@@ -41,8 +44,13 @@ export type Role = keyof typeof SPECS;
 // World-space triplanar projection of `map`, plus large-scale colour drift and wall grime.
 const VERT_DECL = 'varying vec3 vTriPos;\nvarying vec3 vTriNrm;\n';
 const VERT_BODY = `#include <project_vertex>
+#ifdef USE_INSTANCING
+vTriPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+vTriNrm = mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal;
+#else
 vTriPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-vTriNrm = mat3(modelMatrix) * objectNormal;`;
+vTriNrm = mat3(modelMatrix) * objectNormal;
+#endif`;
 const FRAG_DECL = `varying vec3 vTriPos;
 varying vec3 vTriNrm;
 uniform float uTile;

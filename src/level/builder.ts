@@ -451,7 +451,7 @@ export class LevelBuilder {
 const COLUMNS = new Map<string, THREE.BufferGeometry>();
 
 /** Tuscan column profile in units of the shaft radius r (base and capital r tall each), origin at the foot. */
-function columnGeometry(r: number, h: number): THREE.BufferGeometry {
+export function columnGeometry(r: number, h: number): THREE.BufferGeometry {
   const key = `${r}|${h}`;
   let g = COLUMNS.get(key);
   if (g) return g;

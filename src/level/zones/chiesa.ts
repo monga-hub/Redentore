@@ -3,6 +3,7 @@ import type { LevelBuilder } from '../builder.ts';
 import { material } from '../materials.ts';
 import { CHURCH_FLOOR as F, Z } from '../plan.ts';
 import { buildChiesaInterior } from './chiesaInterno.ts';
+import { buildFacciata } from './facciata.ts';
 
 // Chiesa del Redentore (Palladio). Single nave with three side chapels per side,
 // domed crossing with apsidal arms, raised presbytery, friars' choir behind a
@@ -27,12 +28,9 @@ export function buildChiesa(b: LevelBuilder): void {
   const stone = { y0: F, t: 1, role: 'stone' as const };
   b.box(-13, 13, 0, F, Z.churchBack, Z.facade, 'stone'); // podium / floor
 
-  // Facade: temple front over the main door, raised central attic, pediment.
-  b.wallX(Z.facade, -13, 13, { ...stone, h: F + 14, doors: [{ at: 0, w: 4, h: 8, y0: F }] });
-  b.box(-8.5, 8.5, F + 14, F + 22, -0.5, 0.5, 'stone');
-  b.box(-9.5, 9.5, F + 20.5, F + 22, -0.5, 1.3, 'stoneDark', { collide: false });
-  b.add(prism(19, 4.5, 1.8, 'stoneDark'), 'stoneDark').position.set(0, F + 22, -0.5);
-  for (const x of [-7.6, -3.2, 3.2, 7.6]) b.order(x, 0.7, 0.7, F, F + 20.5, 'stoneDark');
+  // Facade wall with the round-headed main door; the temple front is built in facciata.ts.
+  b.wallX(Z.facade, -13, 13, { ...stone, h: F + 14, doors: [{ at: 0, w: 4, h: 8, y0: F, arch: true }] });
+  buildFacciata(b);
 
   // Nave + chapels.
   const chapels = [-4.75, -14, -23.25].map((at) => ({ at, w: 6, h: 11, y0: F, arch: true }));
@@ -108,7 +106,7 @@ function hip(lb: LevelBuilder, a: number, b: number, z0: number, z1: number, y: 
 }
 
 /** Triangular prism (gable roof / pediment) of base `w`, height `h`, extruded `depth` along +z from its origin. */
-function prism(w: number, h: number, depth: number, role: 'roof' | 'stoneDark'): THREE.Mesh {
+function prism(w: number, h: number, depth: number, role: 'roof'): THREE.Mesh {
   const s = new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h)]);
   return new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }), material(role));
 }

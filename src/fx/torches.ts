@@ -42,7 +42,7 @@ function layout(spots: LightSpot[]): Emitter[] {
     for (const z of [-9.5, -18.5, -27.6]) e.push(wall(7 * s, z, -s, 0, F)); // nave piers
     for (const z of [-4.75, -14, -23.25]) e.push(wall(12 * s, z, -s, 0, F)); // chapel altars
     e.push(wall(4.5 * s, -0.5, 0, -1, F)); // inside the facade
-    e.push(wall(2.8 * s, 0.5, 0, 1, F)); // outside, flanking the main door
+    e.push(brazier(4 * s, 3.3, F)); // on the landing, before the giant pedestals
     for (const z of [-31, -43]) e.push(wall(7.5 * s, z, -s, 0, F)); // crossing piers
     e.push(wall(12.5 * s, -37, -s, 0, F)); // apse backs
     e.push(brazier(4 * s, -42.5, F)); // before the presbytery steps

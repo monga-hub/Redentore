@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { PLAYER, type World } from '../core/physics.ts';
 import type { Input } from '../core/input.ts';
-import { ForsakenModel } from './forsaken.ts';
+import { UndeadModel } from './undead.ts';
 
 const RUN = 6, WALK = 2.5, GRAVITY = 22, JUMP = 7, TURN = 12;
 
-/** Hero: Forsaken model over a capsule collider, camera-relative WASD, gravity, jump, step-up. */
+/** Hero: skinned undead model over a capsule collider, camera-relative WASD, gravity, jump, step-up. */
 export class PlayerController {
   readonly mesh = new THREE.Group();
-  private model = new ForsakenModel();
+  private model = new UndeadModel();
   readonly pos = new THREE.Vector3(); // feet position
   private vy = 0;
   private grounded = true;

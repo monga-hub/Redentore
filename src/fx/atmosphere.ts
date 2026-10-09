@@ -5,15 +5,18 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Level } from '../level/index.ts';
+import { Z } from '../level/plan.ts';
 import { Torches, DOT } from './torches.ts';
 
-// Lighting and mood on top of the dressed level: soft hazy Venetian daylight outside,
-// torch-lit "Scarlet" interiors (crimson shadows, gold highlights) inside. A single
-// `indoor` factor, eased from the HUD areas, blends fog, ambient, exposure and grading
-// so walking through a door feels like eyes adapting to the dark.
+// Lighting and mood on top of the dressed level: a full-moon night over the lagoon.
+// A cold moon is the only shadow-casting light; a starry sky dome with drifting clouds
+// carries the moon itself, damp blue fog thickens towards the lagoon and mist crawls
+// over the water. Torches and braziers stay as the only warm light. A single `indoor`
+// factor, eased from the HUD areas, blends fog, ambient, exposure and grading so walking
+// through a door feels like eyes adapting to the dark.
 //
-// Quality: `?fx=low` (or a sustained slow frame rate) drops the sun shadows and the
-// post chain; torches, fog and particles stay.
+// Quality: `?fx=low` (or a sustained slow frame rate) drops the moon shadows and the
+// post chain; sky, torches, fog and particles stay.
 
 /** 0 = open air, 1 = closed interior; covered cloister walks sit in between. */
 function indoorness(zone: string | undefined, label: string | undefined): number {
@@ -23,37 +26,140 @@ function indoorness(zone: string | undefined, label: string | undefined): number
   return 0;
 }
 
-// Outdoor -> indoor endpoints of everything the indoor factor drives.
-const SKY = new THREE.Color(0xb9cbd6);
-const FOG_OUT = new THREE.Color(0xc4c3b6), FOG_IN = new THREE.Color(0x1e0907);
-const MOOD = {
-  hemi: [1.15, 0.22],
-  fog: [0.0055, 0.024],
-  exposure: [0.95, 1.12],
-  warm: [0.15, 0.45],
-  vignette: [0.2, 0.55],
-  dust: [0.18, 0.55],
-} as const;
+// Low in the east-south-east: rakes the facade and throws long shadows across the sagrato.
+const MOON_DIR = new THREE.Vector3(0.75, 0.5, 0.35).normalize();
 
-// Split toning in linear HDR, before ACES: shadows towards crimson, highlights towards gold.
+// Outdoor -> indoor endpoints of everything the indoor factor drives.
+const FOG_OUT = new THREE.Color(0x1a2332), FOG_IN = new THREE.Color(0x0c0d11);
+const MOOD = {
+  hemi: [0.5, 0.15],
+  fog: [0.016, 0.028],
+  exposure: [1.0, 1.15],
+  cool: [0.7, 0.3],
+  vignette: [0.35, 0.55],
+  dust: [0.12, 0.45],
+} as const;
+const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
+const LAGOON_FOG = 0.02; // extra density at the riva
+
+const NOISE = /* glsl */ `
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; }
+    return v;
+  }`;
+
+// Sky dome around the camera: night gradient, stars, the moon (HDR, so bloom gives it
+// its glow) and fbm clouds that drift past and veil it, silver-lit near the moon.
+const skyMaterial = () => new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  uniforms: {
+    uTime: { value: 0 },
+    uMoonDir: { value: MOON_DIR },
+    uHorizon: { value: FOG_OUT.clone() },
+    uZenith: { value: new THREE.Color(0x03060f) },
+  },
+  vertexShader: /* glsl */ `
+    varying vec3 vDir;
+    void main() {
+      vDir = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform float uTime;
+    uniform vec3 uMoonDir, uHorizon, uZenith;
+    varying vec3 vDir;
+    ${NOISE}
+    void main() {
+      vec3 d = normalize(vDir);
+      float h = d.y;
+      vec3 c = mix(uHorizon, uZenith, pow(smoothstep(-0.02, 0.65, h), 0.55));
+
+      // Stars: one candidate per cell of a direction grid, faded towards the hazy horizon.
+      vec3 sp = d * 220.0, cell = floor(sp);
+      float r = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+      float star = step(0.9965, r) * smoothstep(0.5, 0.1, length(fract(sp) - 0.5)) * (0.5 + 0.5 * sin(uTime * 2.0 + r * 80.0));
+      c += star * smoothstep(0.08, 0.4, h) * vec3(0.7, 0.8, 1.0) * 1.4;
+
+      // Moon: oversized disc with soft limb and grey maria, plus a two-stage halo.
+      float cosA = dot(d, uMoonDir), ang = acos(clamp(cosA, -1.0, 1.0));
+      const float R = 0.042;
+      vec3 tu = normalize(cross(uMoonDir, vec3(0, 1, 0))), tv = cross(tu, uMoonDir);
+      vec2 mp = vec2(dot(d, tu), dot(d, tv)) / R;
+      float maria = smoothstep(0.45, 0.75, fbm(mp * 2.2 + 3.0));
+      float disc = smoothstep(R, R * 0.93, ang);
+      vec3 moon = vec3(1.0, 0.98, 0.92) * (2.4 - 1.1 * maria - 0.5 * dot(mp, mp)) * disc;
+      float halo = exp(-ang * 9.0) * 0.16 + exp(-ang * 35.0) * 0.35;
+      vec3 haloCol = vec3(0.55, 0.68, 0.9) * halo;
+
+      // Clouds on a virtual ceiling: drifting fbm, thinning towards the horizon.
+      vec2 cp = d.xz / (h + 0.18) * 1.4 + vec2(uTime * 0.012, uTime * 0.004);
+      float n = fbm(cp + 0.6 * fbm(cp * 0.5 - uTime * 0.003));
+      float cover = smoothstep(0.48, 0.82, n) * smoothstep(-0.02, 0.25, h);
+      float lit = exp(-ang * 4.0);
+      vec3 cloud = mix(vec3(0.05, 0.07, 0.11), vec3(0.42, 0.48, 0.6), lit) + vec3(0.6, 0.65, 0.75) * pow(lit, 6.0) * (1.0 - cover);
+
+      c = mix(c + moon + haloCol, cloud, cover * 0.88);
+      c += haloCol * cover * 0.6; // halo scatters through thin cloud
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+});
+
+// Low mist over the canal and the lagoon: a slow noise sheet just under quay level, so
+// it only shows where there is water. Fogged like everything else.
+const mistMaterial = () => new THREE.ShaderMaterial({
+  transparent: true,
+  depthWrite: false,
+  fog: true,
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uColor: { value: new THREE.Color(0x5b6d88) } }]),
+  vertexShader: /* glsl */ `
+    #include <fog_pars_vertex>
+    varying vec2 vXZ;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vXZ = wp.xz;
+      vec4 mvPosition = viewMatrix * wp;
+      gl_Position = projectionMatrix * mvPosition;
+      #include <fog_vertex>
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform float uTime;
+    uniform vec3 uColor;
+    varying vec2 vXZ;
+    #include <fog_pars_fragment>
+    ${NOISE}
+    void main() {
+      vec2 p = vXZ * 0.045;
+      float n = fbm(p + vec2(uTime * 0.02, -uTime * 0.012) + fbm(p * 0.7 - uTime * 0.01));
+      gl_FragColor = vec4(uColor, smoothstep(0.3, 0.75, n) * 0.7);
+      #include <fog_fragment>
+    }`,
+});
+
+// Night grade in linear HDR, before ACES: shadows and mids drift to moonlit blue and lose
+// some saturation (night vision); bright values keep their hue, so flames stay warm.
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uWarm: { value: 0 }, uVignette: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uCool: { value: 0 }, uVignette: { value: 0 } },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
-    uniform float uWarm, uVignette;
+    uniform float uCool, uVignette;
     varying vec2 vUv;
     const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
     void main() {
       vec4 t = texture2D(tDiffuse, vUv);
       vec3 c = t.rgb;
-      float l = dot(c, LUMA);
-      vec3 tint = mix(vec3(0.62, 0.16, 0.12), vec3(1.0, 0.74, 0.4), smoothstep(0.02, 0.7, l));
-      vec3 graded = c * tint / dot(tint, LUMA);
-      c = mix(c, mix(c, graded, 0.6), uWarm);
-      c = mix(vec3(dot(c, LUMA)), c, 1.0 + 0.15 * uWarm); // a touch richer
+      float l = dot(c, LUMA), k = uCool * (1.0 - smoothstep(0.25, 1.5, l));
+      vec3 night = l * vec3(0.62, 0.8, 1.22);
+      c = mix(c, mix(c, night, 0.55), k);
       vec2 d = vUv - 0.5;
       c *= clamp(1.0 - dot(d, d) * uVignette * 2.4, 0.0, 1.0);
       gl_FragColor = vec4(c, t.a);
@@ -66,9 +172,11 @@ export class Atmosphere {
   indoor = 0;
   private low = new URLSearchParams(location.search).get('fx') === 'low';
   private readonly fog = new THREE.FogExp2(FOG_OUT.getHex(), MOOD.fog[0]);
-  private readonly hemi = new THREE.HemisphereLight(0xc7dbe8, 0x6e5a48, MOOD.hemi[0]);
-  private readonly sun = new THREE.DirectionalLight(0xffe6c4, 2.6);
-  private readonly sunOffset = new THREE.Vector3(-55, 110, 75);
+  private readonly hemi = new THREE.HemisphereLight(0x5a74a0, 0x15130f, MOOD.hemi[0]);
+  private readonly moon = new THREE.DirectionalLight(0xa9c2f0, 2.4);
+  private readonly moonOffset = MOON_DIR.clone().multiplyScalar(150);
+  private readonly sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), skyMaterial());
+  private readonly mist = new THREE.Mesh(new THREE.PlaneGeometry(700, 800).rotateX(-Math.PI / 2), mistMaterial());
   private readonly torches = new Torches();
   private readonly dust: THREE.Points;
   private readonly dustMat: THREE.PointsMaterial;
@@ -91,18 +199,22 @@ export class Atmosphere {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
-    scene.background = SKY;
+    scene.background = FOG_OUT;
     scene.fog = this.fog;
-    scene.add(this.hemi, this.sun, this.sun.target, this.torches.root);
+    this.sky.renderOrder = -1;
+    this.sky.frustumCulled = false;
+    this.mist.position.set(0, -0.75, -80); // over the water plane (y -1.2), under the quays (y 0)
+    this.mist.renderOrder = 1;
+    scene.add(this.sky, this.mist, this.hemi, this.moon, this.moon.target, this.torches.root);
 
-    // Sun: soft afternoon from the south-west, shadow box following the player.
-    this.sun.castShadow = true;
-    const s = this.sun.shadow;
+    // Moon: crisp cold key light, shadow box following the player.
+    this.moon.castShadow = true;
+    const s = this.moon.shadow;
     s.mapSize.set(2048, 2048);
     Object.assign(s.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 10, far: 320 });
     s.bias = -0.0004;
     s.normalBias = 0.04;
-    s.radius = 3;
+    s.radius = 2;
     level.root.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
       const mat = o.material as THREE.Material;
@@ -111,20 +223,20 @@ export class Atmosphere {
       o.castShadow = !mat.transparent && !(o.geometry instanceof THREE.PlaneGeometry);
     });
 
-    // Dust motes: a box of points wrapped around the player, warm and soft.
+    // Motes: a box of points wrapped around the player; damp and pale outside, warm dust inside.
     const N = 900, pos = new Float32Array(N * 3);
     for (let i = 0; i < N * 3; i++) pos[i] = (Math.random() - 0.5) * (i % 3 === 1 ? 10 : 30);
     const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
-    this.dustMat = new THREE.PointsMaterial({ size: 0.045, map: DOT, color: 0xffd6a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: MOOD.dust[0] });
+    this.dustMat = new THREE.PointsMaterial({ size: 0.045, map: DOT, color: DUST_OUT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: MOOD.dust[0] });
     this.dust = new THREE.Points(geo, this.dustMat);
     this.dust.frustumCulled = false;
     scene.add(this.dust);
 
-    // Post: HDR scene (MSAA) -> bloom on the flames -> Scarlet grading -> ACES + sRGB.
+    // Post: HDR scene (MSAA) -> bloom on moon and flames -> night grading -> ACES + sRGB.
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
     this.composer = new EffectComposer(renderer, rt);
     this.composer.addPass(new RenderPass(scene, camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.55, 1.05));
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.8, 0.6, 1.0));
     this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
     this.setSize(innerWidth, innerHeight);
@@ -141,23 +253,30 @@ export class Atmosphere {
     const a = this.level.areaAt(focus.x, focus.z);
     this.indoor += (indoorness(a?.zone, a?.label) - this.indoor) * (1 - Math.exp(-dt * 1.8));
     const k = this.indoor;
+    // Damp lagoon air: fog thickens from the orto's north edge to the riva.
+    const lagoon = THREE.MathUtils.smoothstep(-focus.z, -Z.ortoNorth, -Z.riva);
 
     this.hemi.intensity = lerp(MOOD.hemi, k);
-    this.fog.density = lerp(MOOD.fog, k);
+    this.fog.density = lerp(MOOD.fog, k) + LAGOON_FOG * lagoon * (1 - k);
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
     this.renderer.toneMappingExposure = lerp(MOOD.exposure, k);
-    this.grade.uniforms.uWarm.value = lerp(MOOD.warm, k);
+    this.grade.uniforms.uCool.value = lerp(MOOD.cool, k);
     this.grade.uniforms.uVignette.value = lerp(MOOD.vignette, k);
     this.dustMat.opacity = lerp(MOOD.dust, k);
+    this.dustMat.color.lerpColors(DUST_OUT, DUST_IN, k);
+
+    this.sky.position.copy(this.camera.position);
+    (this.sky.material as THREE.ShaderMaterial).uniforms.uTime.value = this.t;
+    (this.mist.material as THREE.ShaderMaterial).uniforms.uTime.value = this.t;
 
     // ponytail: shadow box re-centres every frame without texel snapping; snap to the
     // shadow-map grid if the edge shimmer while walking ever bothers anyone.
-    this.sun.target.position.copy(focus);
-    this.sun.position.copy(focus).add(this.sunOffset);
+    this.moon.target.position.copy(focus);
+    this.moon.position.copy(focus).add(this.moonOffset);
 
     this.torches.update(this.t, dt, focus);
 
-    // Drift the dust and wrap it into the box around the player.
+    // Drift the motes and wrap them into the box around the player.
     const p = this.dust.geometry.attributes.position as THREE.BufferAttribute, arr = p.array as Float32Array;
     for (let i = 0; i < arr.length; i += 3) {
       arr[i] = wrap(arr[i] + Math.sin(this.t * 0.3 + i) * 0.05 * dt - focus.x, 30) + focus.x;
@@ -179,7 +298,7 @@ export class Atmosphere {
 
   private degrade(why: string): void {
     this.low = true;
-    this.sun.castShadow = false; // light state change recompiles programs without shadows
+    this.moon.castShadow = false; // light state change recompiles programs without shadows
     console.info(`[fx] low quality: ${why}`);
   }
 }

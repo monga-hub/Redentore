@@ -51,8 +51,10 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 ```
 src/
   main.ts                    bootstrap: renderer, loop
-  fx/atmosphere.ts           sole + ombre, hemisphere, nebbia, pulviscolo, post (bloom,
-                             grading "Scarlet", ACES); interni/esterni sfumati per area.
+  fx/atmosphere.ts           notte di luna piena: cielo (stelle, luna, nuvole), luna +
+                             ombre, hemisphere, nebbia (più fitta verso la laguna), foschia
+                             sull'acqua, pulviscolo, post (bloom, grading notturno, ACES);
+                             interni/esterni sfumati per area.
                              `?fx=low` (o fps bassi sostenuti) spegne ombre e post
   fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
                              PointLight assegnate alle torce più vicine al player

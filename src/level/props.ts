@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { LevelBuilder } from './builder.ts';
-import { material, type Role } from './materials.ts';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { material, leafMaterial, type Role } from './materials.ts';
 
 // Stylised low-poly props (vegetation, furniture). Every repeated piece goes through
 // Props, which batches it into one InstancedMesh per (geometry, role) and zone, so a
@@ -15,6 +16,86 @@ const BLOB = new THREE.IcosahedronGeometry(1, 1);
 const GEM = new THREE.IcosahedronGeometry(1, 0);
 const CONE = new THREE.ConeGeometry(1, 1, 7).translate(0, 0.5, 0);
 const DISC = new THREE.CylinderGeometry(1, 1, 1, 9).translate(0, 0.5, 0);
+
+// Crowns are painted, not textured: light and AO baked into vertex colours (warm lit top,
+// cool dark underside, darker in the crevices between lumps), outline broken by displacement.
+// Normals stay the undisplaced sphere's ("foliage normals"), so the mass shades soft and round.
+const LIT: [number, number, number] = [1.16, 1.12, 0.92], SHADE: [number, number, number] = [0.58, 0.64, 0.72];
+function crownShade(y: number, k: number, out: number[]): void {
+  const t = Math.min(1, Math.max(0, (y + 1) / 2)), g = t * t * (3 - 2 * t);
+  for (let c = 0; c < 3; c++) out.push((SHADE[c] + (LIT[c] - SHADE[c]) * g) * k);
+}
+
+/** Lumpy smooth sphere: a few random lobes pushed out, ripples between. */
+function leafyMass(seed: number): THREE.BufferGeometry {
+  const r = rng(seed);
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 2).deleteAttribute('normal').deleteAttribute('uv'));
+  const lobes = Array.from({ length: 5 }, () => new THREE.Vector3(r() - 0.5, r() - 0.3, r() - 0.5).normalize());
+  const pos = g.getAttribute('position'), n = new THREE.Vector3(), col: number[] = [], nrm: number[] = [];
+  const ph = [r() * 6, r() * 6, r() * 6];
+  for (let i = 0; i < pos.count; i++) {
+    n.fromBufferAttribute(pos, i).normalize();
+    let lump = 0;
+    for (const l of lobes) lump += Math.pow(Math.max(0, n.dot(l)), 5);
+    const rip = Math.sin(n.x * 7 + ph[0]) * Math.sin(n.y * 6 + ph[1]) * Math.sin(n.z * 7 + ph[2]);
+    const d = 0.86 + 0.26 * Math.min(1, lump) + 0.07 * rip;
+    pos.setXYZ(i, n.x * d, n.y * d, n.z * d);
+    nrm.push(n.x, n.y, n.z);
+    crownShade(n.y, 0.72 + 0.32 * (d - 0.79) / 0.4 + 0.08 * r(), col);
+  }
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+const LEAFY = [11, 23, 37, 51].map(leafyMass);
+
+/** Leaf cards scattered over the unit sphere, roughly tangent, tilted at random so the crown's edge frays. */
+const CARDS = (() => {
+  const r = rng(97), N = 40, pos: number[] = [], nrm: number[] = [], uv: number[] = [], col: number[] = [], idx: number[] = [];
+  const n = new THREE.Vector3(), t = new THREE.Vector3(), b = new THREE.Vector3(), q = new THREE.Quaternion(), v = new THREE.Vector3();
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (2 * (i + 0.5)) / N, a = i * 2.39996; // fibonacci sphere
+    n.set(Math.cos(a) * Math.sqrt(1 - y * y), y, Math.sin(a) * Math.sqrt(1 - y * y));
+    t.set(0, 1, 0).cross(n);
+    if (t.lengthSq() < 1e-4) t.set(1, 0, 0);
+    t.normalize().applyQuaternion(q.setFromAxisAngle(n, r() * 6.28));
+    b.crossVectors(n, t);
+    const tilt = (r() - 0.5) * 1.4, size = 0.6 + 0.3 * r(), c = n.clone().multiplyScalar(0.84 + 0.14 * r());
+    q.setFromAxisAngle(t, tilt);
+    const bb = b.clone().applyQuaternion(q);
+    const base = i * 4;
+    for (const [du, dv] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+      v.copy(c).addScaledVector(t, (du - 0.5) * size).addScaledVector(bb, (dv - 0.5) * size);
+      pos.push(v.x, v.y, v.z);
+      const vn = v.clone().normalize();
+      nrm.push(vn.x, vn.y, vn.z);
+      uv.push(du, dv);
+      crownShade(vn.y, 0.85 + 0.15 * Math.min(1, v.length()), col);
+    }
+    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+})();
+
+/** Bark: darker at the foot, ridged in value around the girth (painted fissures, no texture). */
+const BARK = (() => {
+  const g = new THREE.CylinderGeometry(1, 1, 1, 8, 3), pos = g.getAttribute('position'), r = rng(5), col: number[] = [];
+  const ridge = Array.from({ length: 9 }, () => 0.78 + 0.34 * r());
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i) + 0.5, seg = Math.round(((Math.atan2(pos.getZ(i), pos.getX(i)) / (Math.PI * 2)) + 1) * 8) % 8;
+    const k = ridge[seg] * (0.62 + 0.42 * y) * (0.92 + 0.16 * r());
+    col.push(k * 1.02, k, k * 0.96);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+})();
+const LEAF_ROLES = new Set<Role>(['foliage', 'hedge', 'olive']);
 
 /** Deterministic PRNG (mulberry32) so the garden looks the same on every load. */
 export function rng(seed: number): () => number {
@@ -67,15 +148,26 @@ export class Props {
     _d.set(bx - ax, by - ay, bz - az);
     const len = _d.length();
     _q.setFromUnitVectors(UP, _d.divideScalar(len));
-    this.push(smooth ? CYL_HI : CYL, role, _m.compose(_p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), _q, _s.set(r, len, r)));
+    this.push(role === 'trunk' ? BARK : smooth ? CYL_HI : CYL, role, _m.compose(_p.set((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), _q, _s.set(r, len, r)));
   }
 
   box(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, role: Role, ry = 0, tint?: THREE.ColorRepresentation): void {
     this.put(BOX, role, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.abs(x1 - x0), y1 - y0, Math.abs(z1 - z0), 0, ry, 0, tint);
   }
 
+  /** Ellipsoid; leaf roles get a lumpy, vertex-shaded mass instead of a plain sphere. */
   blob(x: number, y: number, z: number, rx: number, ry: number, rz: number, role: Role, tint?: THREE.ColorRepresentation, faceted = false): void {
-    this.put(faceted ? GEM : BLOB, role, x, y, z, rx, ry, rz, this.r() * 0.6, this.r() * 6.28, this.r() * 0.6, tint);
+    const geo = faceted ? GEM : LEAF_ROLES.has(role) ? LEAFY[Math.floor(this.r() * LEAFY.length)] : BLOB;
+    this.put(geo, role, x, y, z, rx, ry, rz, this.r() * 0.6, this.r() * 6.28, this.r() * 0.6, tint);
+  }
+
+  /** Leafy clump: a blob for the dark inner mass plus a shell of leaf cards that frays its outline. */
+  crown(x: number, y: number, z: number, rx: number, ry: number, rz: number, role: Role, tint?: THREE.ColorRepresentation): void {
+    const c = new THREE.Color(tint ?? 0xffffff);
+    const mass = LEAFY[Math.floor(this.r() * LEAFY.length)];
+    this.put(mass, role, x, y, z, rx * 0.8, ry * 0.8, rz * 0.8, this.rand(-0.15, 0.15), this.r() * 6.28, this.rand(-0.15, 0.15), c.clone().multiplyScalar(0.82));
+    // ponytail: upright yaw only, so the cards' baked top light stays on top
+    this.put(CARDS, role, x, y, z, rx, ry, rz, 0, this.r() * 6.28, 0, c);
   }
 
   cone(x: number, y: number, z: number, r: number, h: number, role: Role, tint?: THREE.ColorRepresentation): void {
@@ -89,8 +181,9 @@ export class Props {
   /** Builds one InstancedMesh per batch into the builder's current zone and resets. */
   flush(): void {
     for (const { geo, role, m, c } of this.batches.values()) {
-      const im = new THREE.InstancedMesh(geo, material(role), m.length);
+      const im = new THREE.InstancedMesh(geo, geo === CARDS ? leafMaterial(role) : material(role), m.length);
       m.forEach((mx, i) => { im.setMatrixAt(i, mx); im.setColorAt(i, c[i]); });
+      if (geo === CARDS) im.userData.castShadow = false; // alpha cards would cast square shadows; the mass casts
       im.computeBoundingSphere();
       im.computeBoundingBox();
       this.b.add(im, role);
@@ -122,8 +215,8 @@ export function olive(p: Props, x: number, z: number, s = 1): void {
     p.rod(fx, fy - 0.1, fz, ex, ey, ez, 0.13 * s, 'trunk');
     // two or three overlapping clumps per arm
     for (let k = 0; k < 3; k++) {
-      const cr = p.rand(0.75, 1.1) * s;
-      p.blob(ex + p.rand(-0.6, 0.6) * s, ey + 0.35 * s + p.rand(-0.15, 0.4) * s, ez + p.rand(-0.6, 0.6) * s, cr * 1.15, cr * 0.62, cr * 1.15, 'olive', p.vary(0.2));
+      const cr = p.rand(0.75, 1.1) * s, dy = p.rand(-0.15, 0.4);
+      p.crown(ex + p.rand(-0.6, 0.6) * s, ey + (0.35 + dy) * s, ez + p.rand(-0.6, 0.6) * s, cr * 1.15, cr * 0.66, cr * 1.15, 'olive', p.vary(0.2).multiplyScalar(0.86 + 0.3 * dy));
     }
   }
   p.b.world.add(x, z, 0.22 * s, 0.22 * s, 0, 2.2);
@@ -135,9 +228,9 @@ export function fruitTree(p: Props, x: number, z: number, fruit: THREE.ColorRepr
   p.rod(x, 0, z, x + p.rand(-0.1, 0.1), top, z + p.rand(-0.1, 0.1), 0.14 * s, 'trunk');
   for (let k = 0; k < 4; k++) {
     const a = (k / 4) * Math.PI * 2 + p.r();
-    p.blob(x + Math.cos(a) * 0.7 * s, top + 0.75 * s + p.rand(-0.2, 0.3), z + Math.sin(a) * 0.7 * s, 0.95 * s, 0.8 * s, 0.95 * s, 'foliage', p.vary());
+    p.crown(x + Math.cos(a) * 0.7 * s, top + 0.75 * s + p.rand(-0.2, 0.3), z + Math.sin(a) * 0.7 * s, 0.95 * s, 0.8 * s, 0.95 * s, 'foliage', p.vary().multiplyScalar(0.88));
   }
-  p.blob(x, top + 1.35 * s, z, 0.9 * s, 0.75 * s, 0.9 * s, 'foliage', p.vary());
+  p.crown(x, top + 1.35 * s, z, 0.9 * s, 0.75 * s, 0.9 * s, 'foliage', p.vary().multiplyScalar(1.06));
   for (let k = 0; k < 9; k++) {
     const a = p.r() * Math.PI * 2, rr = p.rand(0.9, 1.45) * s;
     p.blob(x + Math.cos(a) * rr, top + p.rand(0.4, 1.4) * s, z + Math.sin(a) * rr, 0.11, 0.11, 0.11, 'fruit', fruit, true);
@@ -145,13 +238,13 @@ export function fruitTree(p: Props, x: number, z: number, fruit: THREE.ColorRepr
   p.b.world.add(x, z, 0.16 * s, 0.16 * s, 0, 2.2);
 }
 
-/** Italian cypress: stacked tapering blobs. */
+/** Italian cypress: stacked tapering clumps, darker at the foot. */
 export function cypress(p: Props, x: number, z: number, h = 7): void {
   p.rod(x, 0, z, x, 0.8, z, 0.15, 'trunk');
   const n = 5;
   for (let i = 0; i < n; i++) {
     const t = i / (n - 1), r = 0.85 * (1 - t * 0.75);
-    p.put(BLOB, 'hedge', x, 0.9 + t * (h - 1.6), z, r, h / n * 0.8, r, 0, p.r() * 6.28, 0, p.vary(0.1)); // upright, no tilt
+    p.crown(x, 0.9 + t * (h - 1.6), z, r, h / n * 0.8, r, 'hedge', p.vary(0.1).multiplyScalar(0.8 + 0.3 * t));
   }
   p.cone(x, h - 1.2, z, 0.35, 1.4, 'hedge');
   p.b.world.add(x, z, 0.45, 0.45, 0, 2);
@@ -159,19 +252,19 @@ export function cypress(p: Props, x: number, z: number, h = 7): void {
 
 /** Rounded shrub (pittosporum, box, lavender); `solid` adds a collider. */
 export function shrub(p: Props, x: number, z: number, r: number, role: Role = 'hedge', solid = false, y = 0): void {
-  p.blob(x, y + r * 0.55, z, r, r * 0.75, r, role, p.vary());
-  p.blob(x + r * 0.35, y + r * 0.85, z - r * 0.2, r * 0.6, r * 0.5, r * 0.6, role, p.vary());
+  p.crown(x, y + r * 0.55, z, r, r * 0.75, r, role, p.vary().multiplyScalar(0.92));
+  p.crown(x + r * 0.35, y + r * 0.85, z - r * 0.2, r * 0.6, r * 0.5, r * 0.6, role, p.vary().multiplyScalar(1.05));
   if (solid) p.b.world.add(x, z, r * 0.7, r * 0.7, y, y + r * 1.2);
 }
 
 /** Leaves, twigs and hanging fruit clusters lying over a pergola roof rectangle at height y. */
 export function vineCanopy(p: Props, x0: number, x1: number, z0: number, z1: number, y: number, bunch: THREE.ColorRepresentation, flowers = false): void {
   const area = Math.abs((x1 - x0) * (z1 - z0));
-  const n = Math.round(area * 0.75);
+  const n = Math.round(area * 0.55); // leaf cards fill out each clump, so fewer of them
   for (let i = 0; i < n; i++) {
     if (p.r() < 0.12) continue; // light gaps
     const x = p.rand(x0, x1), z = p.rand(z0, z1), r = p.rand(0.55, 0.95);
-    p.blob(x, y + p.rand(0.05, 0.3), z, r, r * 0.38, r, 'foliage', p.vary(0.24));
+    p.crown(x, y + p.rand(0.05, 0.3), z, r, r * 0.42, r, 'foliage', p.vary(0.24));
   }
   // drooping fringe along the long edges
   const alongZ = Math.abs(z1 - z0) > Math.abs(x1 - x0);
@@ -180,7 +273,7 @@ export function vineCanopy(p: Props, x0: number, x1: number, z0: number, z1: num
     for (const side of [0, 1]) {
       const x = alongZ ? (side ? x1 : x0) : Math.min(x0, x1) + t;
       const z = alongZ ? Math.min(z0, z1) + t : side ? z1 : z0;
-      p.blob(x, y - 0.25, z, 0.35, p.rand(0.35, 0.6), 0.35, 'foliage', p.vary(0.2));
+      p.crown(x, y - 0.25, z, 0.35, p.rand(0.35, 0.6), 0.35, 'foliage', p.vary(0.2).multiplyScalar(0.85));
     }
   }
   for (let i = 0; i < area / 3; i++) {

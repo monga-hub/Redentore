@@ -89,11 +89,11 @@ function dressConvento(b: LevelBuilder): void {
   b.zone('convento');
   const p = new Props(b, 23);
 
-  // Cortile degli ulivi: two rows of old olives along the gravel walk, benches between.
-  for (const x of [-35, -28.5]) for (const z of [-39, -34, -29, -24]) olive(p, x + p.rand(-0.3, 0.3), z + p.rand(-0.3, 0.3), p.rand(0.9, 1.1));
+  // Cortile degli ulivi: three old olives, staggered so the court reads open; each shades a bench or a corner.
+  for (const [x, z, s] of [[-35.4, -29, 1.15], [-28.2, -39.5, 1.05], [-28.6, -24, 0.9]]) olive(p, x, z, s);
   bench(p, -34.2, -31.5, -E);
   bench(p, -29.8, -36.5, E);
-  for (const x of [-36.3, -26.7]) for (let z = -42; z <= -22; z += 2.5) shrub(p, x, z, 0.45, 'olive'); // sage along the walls
+  for (const x of [-36.3, -26.7]) for (let z = -42; z <= -22; z += 3.4) if (p.r() < 0.75) shrub(p, x, z + p.rand(-0.4, 0.4), 0.45, 'olive'); // sage along the walls
 
   wellTop(p, -29.5, -48.5, 0.7, 0.9, false); // chiostrino
   for (const [x, z] of [[-33.8, -46.8], [-25.2, -46.8], [-33.8, -50.2], [-25.2, -50.2]]) pot(p, x, z, 0.35);
@@ -105,7 +105,8 @@ function dressConvento(b: LevelBuilder): void {
     .paint(-14, 10, -76.5, -73.5, 'gravel')
     .paint(-1.5, 1.5, -73.5, -63, 'gravel');
   wellTop(p, 4, -75, 0.9, 0.9, true);
-  for (const [x, z] of [[-7.5, -69], [-7.5, -80], [8, -80], [8, -68.5]]) olive(p, x, z, p.rand(1, 1.15));
+  olive(p, -7.5, -69, 1.2); // two olives, off-diagonal, so the lawn and the well read
+  olive(p, 8, -80.5, 0.95);
   for (const [x, z] of [[-13.2, -63.8], [9.2, -63.8], [-13.2, -82.2], [9.2, -82.2]]) shrub(p, x, z, 0.6, 'hedge', true);
   bench(p, -3.5, -77.3, Math.PI);
   bench(p, 7.5, -72.6, 0);
@@ -171,13 +172,13 @@ function dressOrto(b: LevelBuilder): void {
   bench(p, -16.8, -117.5, -E);
   bench(p, -10.2, -117.5, E);
 
-  // Frutteto: two rows of fruit trees, clear of the covered walks and the apiary.
+  // Frutteto: two aligned rows of fruit trees 7 m apart, clear of the covered walks and the apiary.
   const fruits = [0xc8402e, 0xe8c840, 0xe88a3a];
   let k = 0;
-  for (let tz = -147; tz <= -93; tz += 4.5) {
+  for (let tz = -146; tz <= -93; tz += 7) {
     if (tz > -134.5 && tz < -125.5) continue;
     if (PATHS_Z.some((z) => tz > z - 1.6 && tz < z + 4.6)) continue;
-    for (const tx of [-3, 1.5]) fruitTree(p, tx + p.rand(-0.3, 0.3), tz + p.rand(-0.3, 0.3), fruits[k++ % 3], p.rand(0.9, 1.1));
+    for (const tx of [-2.8, 1.6]) fruitTree(p, tx + p.rand(-0.15, 0.15), tz + p.rand(-0.15, 0.15), fruits[k++ % 3], p.rand(0.9, 1.1));
   }
   // Lavender hedge along the frutteto's west edge (low, walk-through).
   for (let z = -149.5; z <= -92; z += 0.8) {
@@ -194,11 +195,12 @@ function dressOrto(b: LevelBuilder): void {
   }
   for (const x of [-4, 3.2]) for (const z of [-132.4, -127.6]) shrub(p, x, z, 0.4, 'olive');
 
-  // Uliveto: loose grid of olives, cypresses against the east wing.
-  for (const tx of [6.5, 10.5, 14.5]) {
-    for (let tz = -147; tz <= -89; tz += 4.5) olive(p, tx + p.rand(-0.6, 0.6), tz + p.rand(-0.6, 0.6), p.rand(0.95, 1.25));
+  // Uliveto: quincunx of olives on a 7.5 m pitch (two staggered rows), a few missing as in
+  // an old grove; cypresses against the east wing.
+  for (const [tx, z0] of [[7.5, -146], [13.5, -142.25]]) {
+    for (let tz = z0; tz <= -89; tz += 7.5) if (p.r() > 0.12) olive(p, tx + p.rand(-0.3, 0.3), tz + p.rand(-0.3, 0.3), p.rand(1, 1.25));
   }
-  for (const z of [-96, -120, -134, -146]) cypress(p, 17.9, z, p.rand(6.5, 8));
+  for (const z of [-100, -124, -144]) cypress(p, 17.9, z, p.rand(6.5, 8));
 
   // Serra: potting benches inside, wooden glazing bars outside.
   for (const [x0, x1] of [[-4.6, -3.6], [1.7, 2.6]]) {
@@ -254,7 +256,7 @@ function dressGiardini(b: LevelBuilder): void {
   for (const [x0, x1] of [[-40, -34], [-30, -23.5]]) {
     for (const [z0, z1] of [[-181, -175], [-172, -167]]) {
       for (let x = x0 + 0.5; x <= x1 - 0.4; x += 1.1) for (let z = z0 + 0.5; z <= z1 - 0.4; z += 1.1) {
-        p.blob(x, 1.1, z, 0.75, 0.45, 0.75, 'hedge', p.vary(0.2));
+        p.crown(x, 1.1, z, 0.75, 0.45, 0.75, 'hedge', p.vary(0.2));
       }
     }
   }

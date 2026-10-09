@@ -217,22 +217,26 @@ function planks(base: number, cols: number): Painter {
   };
 }
 
-function bark(): Painter {
-  const b = hex(0x6a5240), dark = hex(0x3b2c22);
+/**
+ * Alpha card for tree crowns: a spray of pointed leaves fanned out from the centre, each with
+ * a lit and a shaded half. Near-neutral values: the role tint and the crown's vertex colours
+ * give the hue, so one card serves olives, fruit trees, hedges and vines.
+ */
+function leafCard(): (u: number, v: number) => RGBH {
+  const leaves = Array.from({ length: 13 }, (_, i) => {
+    const a = (i / 13) * Math.PI * 2 + (hash(i, 0, 161) - 0.5) * 0.8, r = 0.04 + 0.14 * hash(i, 1, 161);
+    const dir = a + (hash(i, 2, 161) - 0.5) * 0.9;
+    return { x: 0.5 + Math.cos(a) * r, y: 0.5 + Math.sin(a) * r, c: Math.cos(dir), s: Math.sin(dir), len: 0.2 + 0.11 * hash(i, 3, 161), w: 0.055 + 0.03 * hash(i, 4, 161), k: 0.78 + 0.3 * hash(i, 5, 161) };
+  }).reverse(); // first hit = drawn last = on top
   return (u, v) => {
-    const f = fbm(u, v, 16, 3, 4, 71);
-    return mix(mul(b, 0.85 + 0.35 * fbm(u, v, 8, 8, 3, 72)), dark, smooth(0.45, 0.62, f) * 0.8);
-  };
-}
-
-/** Leafy clumps: cellular blobs, lit centres, dark gaps. */
-function leaves(dark: number, light: number, g: number): Painter {
-  const d = hex(dark), l = hex(light);
-  return (u, v) => {
-    const c = voronoi(u, v, g, 81);
-    const lit = clamp01(0.5 - c.oy * 0.9 + c.ox * 0.3) * (1 - smooth(0.2, 0.55, c.f1));
-    const col = mix(d, l, 0.25 + 0.55 * lit + 0.2 * c.id);
-    return mul(col, 0.65 + 0.35 * smooth(0, 0.25, c.f2 - c.f1));
+    for (const l of leaves) {
+      const dx = u - l.x, dy = v - l.y;
+      const s = (dx * l.c + dy * l.s) / l.len, t = (dy * l.c - dx * l.s) / l.w;
+      if (s <= 0 || s >= 1 || Math.abs(t) >= Math.pow(Math.sin(Math.PI * s), 0.7)) continue;
+      const k = l.k * (0.78 + 0.22 * s) * (t > 0 ? 1.1 : 0.88); // painted midrib, darker at the stalk
+      return [Math.min(1, k * 0.86), Math.min(1, k * 0.9), Math.min(1, k * 0.8), 1];
+    }
+    return [0.6, 0.62, 0.55, 0];
   };
 }
 
@@ -345,9 +349,7 @@ export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   dirt: { paint: dirt(), size: 256 },
   tuft: { paint: tuft(), size: 128 },
   soil: { paint: soil(), size: 256 },
-  hedge: { paint: leaves(0x2f4f26, 0x6f9a48, 10), size: 256 },
-  foliage: { paint: leaves(0x4a6338, 0x9fb27a, 8), size: 256 },
-  trunk: { paint: bark(), size: 128 },
+  leafCard: { paint: leafCard(), size: 128 },
   wood: { paint: planks(0x8a6040, 5), size: 256 },
   water: { paint: water(), size: 256 },
 };

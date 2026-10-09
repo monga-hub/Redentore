@@ -17,6 +17,7 @@ interface Spec {
   macro?: number; // strength of large-scale world-space colour variation (breaks tiling)
   peel?: number; // plaster: world-space scaling threshold (lower = more brick showing)
   shape?: boolean; // paint by form (aShape): banded macro blotches, local foot/top gradient, lit chamfers
+  vcol?: boolean; // untextured, shaded by the geometry's baked vertex colours (props.ts crowns, bark)
 }
 
 const SPECS = {
@@ -31,12 +32,12 @@ const SPECS = {
   gravel: { tile: 2, rough: 1, macro: 0.12 }, // garden paths
   grass: { tile: 3, rough: 1, macro: 0.2 },
   soil: { tile: 2, rough: 1, macro: 0.15 }, // cultivated beds
-  hedge: { tile: 1.6, rough: 0.9, macro: 0.15 },
-  foliage: { tile: 2, rough: 0.9, macro: 0.15 },
-  olive: { tint: 0x8fa080, rough: 0.9 }, // silvery olive leaves, lavender, sage
+  hedge: { tint: 0x557d40, rough: 0.9, vcol: true }, // box, cypress, pittosporum
+  foliage: { tint: 0x77985a, rough: 0.9, vcol: true }, // fruit trees, vines, crops
+  olive: { tint: 0x93a585, rough: 0.9, vcol: true }, // silvery olive leaves, lavender, sage
   flower: { tint: 0xf4ece6, rough: 0.7 }, // near white: props tint each instance (roses, lilies, lavender)
   fruit: { tint: 0xf0e4d8, rough: 0.6 }, // likewise (grapes, apples, lemons)
-  trunk: { tile: 1, rough: 0.95 },
+  trunk: { tint: 0x6e5846, rough: 0.95, vcol: true },
   wood: { tile: 1.5, rough: 0.8, macro: 0.1, shape: true }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
   glass: { tint: 0xa9cdd6, rough: 0.1 },
@@ -225,6 +226,9 @@ function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: s.tint ?? 0xffffff, roughness: s.rough ?? 0.9, metalness: 0, side });
   if (role === 'glass') Object.assign(m, { transparent: true, opacity: 0.55 });
   if (role === 'water') Object.assign(m, { transparent: true, opacity: 0.85 });
+  // white for geometry without colours (boxes, cones, discs)
+  if (s.vcol) Object.assign(m, { vertexColors: true, defaultAttributeValues: { color: [1, 1, 1] } });
+  if (s.vcol && role !== 'trunk') m.emissive.set(s.tint!).multiplyScalar(LEAF_GLOW);
   if (!s.tile) return m;
   m.map = texture(role);
   m.defines = {};
@@ -250,6 +254,27 @@ function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
 }
 
 const cache = new Map<string, THREE.Material>();
+// Light through the leaves: a crown's shaded side never goes black against the night sky.
+const LEAF_GLOW = 0.06;
+
+/** Alpha-tested leaf cards in a role's tint, lit with the crown's sphere normals from both sides. */
+export function leafMaterial(role: Role): THREE.Material {
+  const key = role + ':leaf';
+  let m = cache.get(key);
+  if (!m) {
+    const map = texture('leafCard');
+    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+    const s: Spec = SPECS[role];
+    const lm = new THREE.MeshStandardMaterial({ color: s.tint ?? 0xffffff, map, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: s.rough ?? 0.9, metalness: 0 });
+    lm.emissive.set(s.tint ?? 0xffffff).multiplyScalar(LEAF_GLOW);
+    lm.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);');
+    };
+    lm.customProgramCacheKey = () => 'leaf';
+    cache.set(key, (m = lm));
+  }
+  return m;
+}
 
 /** Shared material for a role; `doubleSide` for shells seen from inside (dome, drum). */
 export function material(role: Role, doubleSide = false): THREE.Material {

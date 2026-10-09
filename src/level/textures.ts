@@ -21,7 +21,6 @@ export function hash(x: number, y: number, s = 0): number {
 }
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
-const fract = (a: number) => a - Math.floor(a);
 const clamp01 = (a: number) => Math.min(1, Math.max(0, a));
 export const smooth = (e0: number, e1: number, x: number) => {
   const t = clamp01((x - e0) / (e1 - e0));
@@ -114,20 +113,6 @@ function istria(base: number, cols: number, rows: number, n: number): Painter {
 
 const BRICKS = [0xc98a5e, 0xb86b4a, 0xd4a072, 0xa85a3f, 0xc47c56, 0xbf7350, 0xd9b083].map(hex);
 
-/** Venetian brick (mattoni a vista), half-bond; `n` texels per tile. */
-function brick(n: number, cols = 4, rows = 16): Painter {
-  const mortar = hex(0xcfc3aa), burnt = hex(0x7d4632);
-  return (u, v) => {
-    const c = bond(u, v, cols, rows, r => (r & 1) * 0.5 + (hash(r, 1, 9) - 0.5) * 0.08, n, 4, 5);
-    let col = pick(BRICKS, c.id);
-    if (hash(c.col, c.row, 21) > 0.93) col = mix(col, burnt, 0.6);
-    col = mul(col, 0.86 + 0.24 * fbm(u, v, 24, 24, 3, 22));
-    col = mul(col, 0.93 + 0.1 * hash(Math.floor(u * n), Math.floor(v * n), 23));
-    const m = mul(mortar, 0.82 + 0.25 * fbm(u, v, 40, 40, 2, 24));
-    return mix(mul(col, c.shade), m, c.joint);
-  };
-}
-
 /**
  * Aged cloister brick: 8×32 bricks per tile, exact half bond so the shader can rebuild the
  * grid and draw every world brick from a random cell of this pool (materials.ts, TRI_BRICK).
@@ -179,24 +164,15 @@ function agedBrick(n: number): (u: number, v: number) => RGBH {
   };
 }
 
-/** Intonaco: washed, mottled plaster scaling off in patches to show the brick (scrostato). */
-function plaster(base: number, peel: number): Painter {
+/** Intonaco: washed, mottled plaster. Scaling patches are cut in world space (materials.ts, TRI_PEEL). */
+function plaster(base: number): Painter {
   const b = hex(base), lit = mix(b, hex(0xf2e2c8), 0.35), dark = mul(b, 0.72);
-  const under = brick(512 / 3); // tile = 3 brick tiles
   return (u, v) => {
     const wash = fbm(u, v, 3, 3, 5, 31);
     let col = mix(dark, lit, smooth(0.25, 0.8, wash));
     col = mul(col, 0.94 + 0.1 * fbm(u, v, 16, 16, 3, 32));
     const drip = smooth(0.6, 0.85, fbm(u, v, 16, 2, 3, 33));
-    col = mul(col, 1 - drip * 0.15);
-    const p = fbm(u, v, 5, 5, 5, 34);
-    if (p > peel) {
-      const inner = under(fract(u * 3), fract(v * 3));
-      const rim = smooth(peel, peel + 0.025, p);
-      return mix(mul(lit, 1.12), mul(inner, 0.85 + 0.15 * rim), rim); // bright broken edge, then brick
-    }
-    const shadow = smooth(peel - 0.04, peel, p); // plaster lip casts a soft dark line
-    return mul(col, 1 - shadow * 0.25);
+    return mul(col, 1 - drip * 0.15);
   };
 }
 
@@ -317,8 +293,8 @@ export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   stone: { paint: istria(0xe4ddcc, 2, 4, 512), size: 512 },
   stoneDark: { paint: istria(0xbdb3a1, 1, 2, 256), size: 256 },
   brick: { paint: agedBrick(1024), size: 1024 },
-  plaster: { paint: plaster(0xb4553f, 0.64), size: 512 },
-  mass: { paint: plaster(0xc4a57c, 0.66), size: 512 },
+  plaster: { paint: plaster(0xb4553f), size: 512 },
+  mass: { paint: plaster(0xc4a57c), size: 512 },
   roof: { paint: coppi(), size: 256 },
   paving: { paint: trachite(512), size: 512 },
   ground: { paint: ground(), size: 256 },

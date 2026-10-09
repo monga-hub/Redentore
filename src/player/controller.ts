@@ -1,0 +1,74 @@
+import * as THREE from 'three';
+import { PLAYER, type World } from '../core/physics.ts';
+import type { Input } from '../core/input.ts';
+import { material } from '../level/materials.ts';
+
+const RUN = 6, WALK = 2.5, GRAVITY = 22, JUMP = 7, TURN = 12;
+
+/** Placeholder hero: capsule + nose, camera-relative WASD, gravity, jump, step-up. */
+export class PlayerController {
+  readonly mesh = new THREE.Group();
+  readonly pos = new THREE.Vector3(); // feet position
+  private vy = 0;
+  private grounded = true;
+  private facing = 0; // yaw, same convention as the camera (0 = facing -Z / north)
+
+  private world: World;
+  private spawn: { x: number; z: number; yaw: number };
+
+  constructor(world: World, spawn: { x: number; z: number; yaw: number }) {
+    this.world = world;
+    this.spawn = spawn;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(PLAYER.radius, PLAYER.height - 2 * PLAYER.radius, 4, 12), material('player'));
+    body.position.y = PLAYER.height / 2;
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.35), material('stoneDark'));
+    nose.position.set(0, 1.5, -0.4);
+    this.mesh.add(body, nose);
+    this.respawn(spawn);
+  }
+
+  respawn(s: { x: number; z: number; yaw: number }): void {
+    this.pos.set(s.x, this.world.standHeight(s.x, s.z), s.z);
+    this.vy = 0;
+    this.facing = s.yaw;
+  }
+
+  /** `camYaw`: camera heading; movement is relative to it. `turnToCamera`: right mouse held. */
+  update(dt: number, input: Input, camYaw: number, turnToCamera: boolean): void {
+    let f = (input.down('KeyW', 'ArrowUp') ? 1 : 0) - (input.down('KeyS', 'ArrowDown') ? 1 : 0);
+    const r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
+    if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
+    const speed = input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN;
+
+    // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
+    const sin = Math.sin(camYaw), cos = Math.cos(camYaw);
+    let mx = -sin * f + cos * r, mz = -cos * f - sin * r;
+    const len = Math.hypot(mx, mz);
+    if (len > 0) {
+      mx /= len; mz /= len;
+      this.pos.x += mx * speed * dt;
+      this.pos.z += mz * speed * dt;
+    }
+    const want = turnToCamera ? camYaw : len > 0 ? Math.atan2(-mx, -mz) : this.facing;
+    let d = want - this.facing;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.facing += d * Math.min(1, TURN * dt);
+
+    this.world.resolve(this.pos, this.pos.y);
+
+    if (this.grounded && input.down('Space')) { this.vy = JUMP; this.grounded = false; }
+    const ground = this.world.groundAt(this.pos.x, this.pos.z, this.pos.y);
+    if (this.grounded && this.vy <= 0 && this.pos.y - ground < PLAYER.step + 0.05) {
+      this.pos.y = ground; // stick to stairs going down, step up going up
+    } else {
+      this.vy -= GRAVITY * dt;
+      this.pos.y += this.vy * dt;
+      this.grounded = this.pos.y <= ground;
+      if (this.grounded) { this.pos.y = ground; this.vy = 0; }
+    }
+    if (this.pos.y < -10) this.respawn(this.spawn); // safety net, barriers should prevent it
+
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y = this.facing;
+  }
+}

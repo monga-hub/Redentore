@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redentore Dungeon</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #222; font-family: Georgia, serif; }
+      canvas { display: block; touch-action: none; }
+      #zone {
+        position: fixed; top: 12%; left: 0; right: 0; text-align: center; pointer-events: none;
+        color: #f3e2b0; font-size: 30px; letter-spacing: 1px; text-shadow: 0 2px 4px #000, 0 0 12px #000;
+        opacity: 0;
+      }
+      #zone.show { animation: zone 3.5s ease forwards; }
+      @keyframes zone { 0% { opacity: 0 } 15% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
+      #help {
+        position: fixed; left: 12px; bottom: 12px; padding: 8px 12px; pointer-events: none;
+        color: #eee; font: 13px/1.5 system-ui, sans-serif; background: rgba(0,0,0,.45); border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="zone"></div>
+    <div id="help">
+      <b>WASD</b> muovi · <b>Shift</b> cammina · <b>Spazio</b> salta · <b>Q/E</b> ruota camera<br />
+      <b>Trascina sx</b> orbita camera · <b>Trascina dx</b> gira personaggio · <b>Rotella</b> zoom · <b>Sx+Dx</b> avanti
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

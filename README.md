@@ -8,6 +8,90 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
 - v1: solo esplorazione (niente nemici/boss).
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
+Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile
+dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
+
+## Avvio
+
+```sh
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # typecheck (tsc) + bundle in dist/
+npm run check    # verifica headless: ogni area è raggiungibile dallo spawn
+```
+
+Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
+
+## Controlli
+
+| Input | Azione |
+|---|---|
+| W A S D / frecce | muovi (relativo alla camera) |
+| Shift | cammina (default: corsa) |
+| Spazio | salta |
+| trascina tasto sinistro | orbita la camera |
+| trascina tasto destro | orbita e gira il personaggio verso la camera |
+| sinistro + destro | avanti |
+| rotella | zoom |
+| Q / E | ruota la camera |
+
+## Scala e coordinate
+
+- **1 unità = 1 metro.** +X = est, +Y = alto, −Z = nord (laguna), +Z = sud
+  (Fondamenta). Origine = centro della facciata della chiesa, quota fondamenta.
+- Calibrazione: corpo della chiesa (navata + cappelle) ≈ 26 m di larghezza, fronte
+  del tempio ≈ 20 m → ≈ 0,12 m per pixel della piantina a 1500 px di larghezza.
+  Tutto il resto è posizionato con lo stesso fattore e arrotondato al mezzo metro.
+- Pavimento della chiesa a +2,4 m (12 gradini da 0,2 m). Complesso ≈ 75 × 206 m.
+- Dettagli e quote di riferimento in `src/level/plan.ts`; ogni file di zona ha in
+  testa la tabella delle sue coordinate.
+
+## Struttura del codice
+
+```
+src/
+  main.ts                    bootstrap: renderer, luci neutre, loop
+  core/physics.ts            collisioni: tutto è un box (anche ruotato); pavimenti e muri
+                             con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
+  core/input.ts              tastiera + mouse
+  player/controller.ts       personaggio segnaposto, WASD, gravità, salto
+  camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
+  ui/hud.ts                  nome dell'area corrente
+  level/plan.ts              scala, assi, quote principali, spawn
+  level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
+                             pergole, alberi segnaposto; registra collider e aree
+  level/materials.ts         palette greybox per ruolo semantico
+  level/index.ts             buildLevel(): assembla le zone sud → nord
+  level/zones/
+    fondamenta.ts            acqua, suolo, fondamenta, sagrato + scalinata, calle
+    chiesa.ts                navata, cappelle, crociera + cupola, presbiterio, coro
+    convento.ts              ingresso, cortile degli ulivi, chiostrino, corridoio, 3 chiostri
+    orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est
+    nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
+                             frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
+scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player
+```
+
+### Dove agganciarsi (navi successive)
+
+- **Materiali:** ogni mesh ha `userData.role` (`stone`, `brick`, `plaster`, `paving`,
+  `grass`, …). Sostituire i materiali in `materials.ts` o attraversare la scena per ruolo.
+- **Props/ambienti per zona:** `level.zones.get('orto')` ecc. è il `THREE.Group` della
+  zona (`zone:<id>` nella scena). `level.areas` elenca le sotto-aree con rettangolo.
+- **Collisioni:** aggiungere box con `builder.box(...)`/`obox(...)`; mesh solo visive
+  con `collide: false`. `npm run check` deve restare verde.
+- Debug in console: `window.level`, `window.player`, `window.cam`, `window.scene`
+  (es. `player.respawn({x: 0, z: -100, yaw: 0})`).
+
+### Note per dopo (fuori scope qui)
+
+- Vegetazione vera (ulivi, viti, ninfee, siepi), arredi, materiali/texture, luci,
+  nebbia e post-processing: per ora solo tinte piatte e volumi segnaposto.
+- Prestazioni: ~660 mesh non unite (~60 fps). Se servirà, unire la geometria statica
+  per zona o usare InstancedMesh per alberi/colonne.
+- Interni non accessibili (masse grigie del convento, ala est) sono volumi chiusi.
+- Le barriere invisibili chiudono la fondamenta a ±60 m e la riva nord.
+
 ## Materiale di reference
 
 - `reference/piantina.jpg` — piantina illustrata del complesso (nord in basso a

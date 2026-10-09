@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../core/physics.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { material, type Role } from './materials.ts';
 
 // SCALE: 1 unit = 1 metre. Axes: +X = east, +Y = up, -Z = north (lagoon), +Z = south
@@ -177,7 +178,7 @@ export class LevelBuilder {
     edge(ix0, iz0, ix1, iz0); edge(ix1, iz0, ix1, iz1); edge(ix1, iz1, ix0, iz1); edge(ix0, iz1, ix0, iz0);
     for (const [x, z] of posts.values()) {
       if (keepClear.some(([kx, kz]) => Math.hypot(x - kx, z - kz) < 2.2)) continue;
-      this.column(x, z, 0.3, 0, h, 'stoneDark');
+      this.order(x, z, 0.3, 0, h, 'stoneDark');
     }
     // roof ring (4 slabs, no overlap)
     this.box(x0, x1, h, h + 0.35, z0, iz0, 'roof');
@@ -192,6 +193,21 @@ export class LevelBuilder {
     m.position.set(x, (y0 + y1) / 2, z);
     this.add(m, role);
     if (collide) this.world.add(x, z, r * 0.9, r * 0.9, y0, y1);
+    return m;
+  }
+
+  /**
+   * Tuscan column of shaft radius r standing on y0, abacus top flush with y1: square plinth
+   * + torus base, shaft with entasis, astragal, echinus and square abacus. One merged mesh;
+   * the geometry is shared between columns of the same size. Colliders: the plinth (low
+   * enough to step onto) and the shaft.
+   */
+  order(x: number, z: number, r: number, y0: number, y1: number, role: Role): THREE.Mesh {
+    const m = new THREE.Mesh(columnGeometry(r, y1 - y0), material(role));
+    m.position.set(x, y0, z);
+    this.add(m, role);
+    this.world.add(x, z, 1.3 * r, 1.3 * r, y0, y0 + 0.45 * r);
+    this.world.add(x, z, r, r, y0, y1);
     return m;
   }
 
@@ -243,4 +259,51 @@ export class LevelBuilder {
     }
     return best;
   }
+}
+
+const COLUMNS = new Map<string, THREE.BufferGeometry>();
+
+/** Tuscan column profile in units of the shaft radius r (base and capital r tall each), origin at the foot. */
+function columnGeometry(r: number, h: number): THREE.BufferGeometry {
+  const key = `${r}|${h}`;
+  let g = COLUMNS.get(key);
+  if (g) return g;
+  const p: THREE.Vector2[] = [];
+  const pt = (x: number, y: number) => p.push(new THREE.Vector2(x * r, y));
+  const edge = () => p.push(p[p.length - 1].clone()); // duplicated point = hard crease in the lathe normals
+  const arc = (cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, n: number) => {
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + ((a1 - a0) * i) / n;
+      pt(cx + rx * Math.cos(a), cy + ry * Math.sin(a));
+    }
+  };
+  const hp = Math.PI / 2;
+  // Base: torus on the plinth, fillet.
+  arc(1.08, 0.625 * r, 0.175, 0.175 * r, -hp, hp, 6);
+  edge();
+  pt(1.04, 0.8 * r); edge();
+  pt(1.04, 0.88 * r); // apophyge: short flare into the shaft
+  // Shaft: straight lower third, then entasis tapering to 0.84 r under the astragal.
+  const s0 = r, s1 = h - r;
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    pt(1 - 0.16 * Math.pow(Math.max(0, (t - 1 / 3) / (2 / 3)), 1.4), s0 + (s1 - s0) * t);
+  }
+  edge();
+  // Capital: astragal bead, neck, fillet, echinus (cushion under the abacus).
+  arc(0.86, h - 0.925 * r, 0.075, 0.075 * r, -hp, hp, 4);
+  edge();
+  pt(0.86, h - 0.85 * r); edge();
+  pt(0.86, h - 0.62 * r); edge();
+  pt(0.92, h - 0.62 * r); edge();
+  pt(0.92, h - 0.58 * r);
+  arc(0.92, h - 0.28 * r, 0.3, 0.3 * r, -hp, 0, 5);
+  edge();
+  pt(0, h - 0.28 * r); // hidden lid under the abacus
+  const lathe = new THREE.LatheGeometry(p, 16);
+  const plinth = new THREE.BoxGeometry(2.6 * r, 0.45 * r, 2.6 * r).translate(0, 0.225 * r, 0);
+  const abacus = new THREE.BoxGeometry(2.56 * r, 0.28 * r, 2.56 * r).translate(0, h - 0.14 * r, 0);
+  g = mergeGeometries([plinth, lathe, abacus])!;
+  COLUMNS.set(key, g);
+  return g;
 }

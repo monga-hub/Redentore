@@ -31,7 +31,7 @@ export function buildChiesa(b: LevelBuilder): void {
   b.box(-8.5, 8.5, F + 14, F + 22, -0.5, 0.5, 'stone');
   b.box(-9.5, 9.5, F + 20.5, F + 22, -0.5, 1.3, 'stoneDark', { collide: false });
   b.add(prism(19, 4.5, 1.8, 'stoneDark'), 'stoneDark').position.set(0, F + 22, -0.5);
-  for (const x of [-7.6, -3.2, 3.2, 7.6]) b.column(x, 0.7, 0.7, F, F + 20.5, 'stoneDark');
+  for (const x of [-7.6, -3.2, 3.2, 7.6]) b.order(x, 0.7, 0.7, F, F + 20.5, 'stoneDark');
 
   // Nave + chapels.
   const chapels = [-4.75, -14, -23.25].map((at) => ({ at, w: 6, h: 11, y0: F }));
@@ -85,7 +85,7 @@ export function buildChiesa(b: LevelBuilder): void {
   b.stairs('z', -7, 7, -45, -46.2, F, F + 0.6, 3, 'stone');
   b.box(-7, 7, F, F + 0.6, -46.2, Z.churchBack + 0.5, 'stone');
   b.box(-1.6, 1.6, F + 0.6, F + 1.6, -50.5, -49.3, 'stoneDark'); // high altar
-  for (const x of [-5, -2.5, 0, 2.5, 5]) b.column(x, -53.5, 0.45, F + 0.6, F + 12, 'stoneDark');
+  for (const x of [-5, -2.5, 0, 2.5, 5]) b.order(x, -53.5, 0.45, F + 0.6, F + 12, 'stoneDark');
   b.box(-7, 7, F + 12, F + 13, -54, -53, 'stoneDark', { collide: false });
   b.box(-8, 8, F + 20, F + 20.8, Z.churchBack - 0.5, -45, 'stone');
   b.add(prism(17, 5, 15.5, 'roof'), 'roof').position.set(0, F + 20.8, Z.churchBack - 0.5);

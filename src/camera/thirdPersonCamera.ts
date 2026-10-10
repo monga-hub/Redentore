@@ -14,7 +14,8 @@ export class ThirdPersonCamera {
   readonly camera: THREE.PerspectiveCamera;
   yaw: number;
   pitch = 0.3;
-  private dist = 7;
+  private dist = 7; // wanted distance (wheel / pinch)
+  private zoom = 7; // eased towards dist, so zoom steps glide instead of jumping
   private shown = 7; // smoothed, collision-limited distance
   private ray = new THREE.Raycaster();
   private target = new THREE.Vector3();
@@ -29,23 +30,26 @@ export class ThirdPersonCamera {
   }
 
   update(dt: number, input: Input, feet: THREE.Vector3): void {
-    const { dx, dy, wheel } = input.consume();
+    const { dx, dy, wheel, zoom } = input.consume();
     this.yaw -= dx * SENS; // deltas only accumulate while a button is held
     this.pitch = THREE.MathUtils.clamp(this.pitch + dy * SENS, MIN_PITCH, MAX_PITCH);
     if (input.down('KeyQ')) this.yaw += 2 * dt;
     if (input.down('KeyE')) this.yaw -= 2 * dt;
-    this.dist = THREE.MathUtils.clamp(this.dist * (1 + wheel * 0.12), MIN_DIST, MAX_DIST);
+    this.dist = THREE.MathUtils.clamp(this.dist * (1 + wheel * 0.12) * zoom, MIN_DIST, MAX_DIST);
+    const was = this.zoom;
+    this.zoom = THREE.MathUtils.damp(this.zoom, this.dist, 14, dt);
 
     this.target.set(feet.x, feet.y + EYE, feet.z);
     const cp = Math.cos(this.pitch);
     this.dir.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), Math.cos(this.yaw) * cp);
 
     this.ray.set(this.target, this.dir);
-    this.ray.far = this.dist;
+    this.ray.far = this.zoom;
     const hit = this.ray.intersectObjects(this.blockers, false)[0];
-    const limit = hit ? Math.max(0.3, hit.distance - 0.3) : this.dist;
-    // snap in instantly when blocked, ease back out
-    this.shown = limit < this.shown ? limit : THREE.MathUtils.damp(this.shown, limit, 6, dt);
+    const limit = hit ? Math.max(0.3, hit.distance - 0.3) : this.zoom;
+    // snap in instantly when blocked, ease back out once clear; an unblocked boom just follows the (already eased) zoom
+    const free = this.shown >= was - 1e-3;
+    this.shown = limit < this.shown || free ? limit : THREE.MathUtils.damp(this.shown, limit, 6, dt);
 
     this.camera.position.copy(this.target).addScaledVector(this.dir, this.shown);
     this.camera.lookAt(this.target);

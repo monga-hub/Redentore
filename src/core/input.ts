@@ -9,6 +9,7 @@ export class Input {
   dx = 0; // accumulated mouse/drag delta since last consume()
   dy = 0;
   wheel = 0;
+  zoom = 1; // pinch: camera distance multiplier accumulated since last consume()
   stickX = 0; // virtual joystick, -1..1 (right / down positive)
   stickY = 0;
 
@@ -59,9 +60,10 @@ export class Input {
     this.hits.clear();
   }
 
-  consume(): { dx: number; dy: number; wheel: number } {
-    const r = { dx: this.dx, dy: this.dy, wheel: this.wheel };
+  consume(): { dx: number; dy: number; wheel: number; zoom: number } {
+    const r = { dx: this.dx, dy: this.dy, wheel: this.wheel, zoom: this.zoom };
     this.dx = this.dy = this.wheel = 0;
+    this.zoom = 1;
     return r;
   }
 }

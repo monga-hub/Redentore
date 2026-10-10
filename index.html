@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#222" />
+    <!-- Revalidate this page; hashed bundles can cache forever. src/ui/version.ts catches what slips through. -->
+    <meta http-equiv="Cache-Control" content="no-cache" />
     <title>Redentore Dungeon</title>
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #222; font-family: Georgia, serif; }
@@ -216,6 +218,22 @@
       body.touch .slot.ring.down { border-color: #f3e2b0; filter: brightness(1.25); }
       body.touch .tooltip { width: 230px; font-size: 11px; }
       body.touch .tooltip b { font-size: 13px; }
+
+      /* Build id and new-version prompt (src/ui/version.ts). */
+      #version {
+        position: fixed; left: calc(4px + env(safe-area-inset-left)); bottom: calc(2px + env(safe-area-inset-bottom));
+        pointer-events: none; color: #f3e2b0; opacity: .35; font: 9px/1 system-ui, sans-serif; text-shadow: 0 1px 1px #000;
+      }
+      #update {
+        position: fixed; z-index: 10; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%);
+        display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; white-space: nowrap;
+        background: linear-gradient(rgba(34,25,16,.95), rgba(10,7,5,.95)); border: 1px solid #c9a45c; border-radius: 6px;
+        box-shadow: 0 0 0 1px #000, 0 4px 14px rgba(0,0,0,.7); color: #f3e2b0; font: 14px Georgia, serif;
+      }
+      #update button {
+        padding: 5px 12px; cursor: pointer; color: #120d09; font: bold 13px Georgia, serif;
+        background: linear-gradient(#f3e2b0, #c9a45c); border: 1px solid #000; border-radius: 4px;
+      }
     </style>
   </head>
   <body>

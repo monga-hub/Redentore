@@ -17,6 +17,9 @@ import { FRIAR } from './enemies/brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
 import { Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
+import { checkVersion } from './ui/version.ts';
+
+await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));

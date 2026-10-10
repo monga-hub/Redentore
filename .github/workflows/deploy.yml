@@ -24,7 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - run: npm run build # also writes dist/version.json (vite.config.ts), read by the startup check
+      - run: cat dist/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

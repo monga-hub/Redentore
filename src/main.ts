@@ -10,8 +10,11 @@ import { Atmosphere } from './fx/atmosphere.ts';
 import { Forsaken } from './abilities/forsaken.ts';
 import { ActionBar } from './ui/actionBar.ts';
 import { PlayerStats } from './player/stats.ts';
+import { Targeting } from './ui/target.ts';
 import { Friars } from './enemies/friars.ts';
 import { Priests } from './enemies/priests.ts';
+import { FRIAR } from './enemies/brain.ts';
+import { PRIEST } from './enemies/caster.ts';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -44,6 +47,10 @@ const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars h
 scene.add(friars.root);
 const priests = new Priests(level.world, kit.vfx, playerStats, level.areas); // undead priests casting in the cloisters
 scene.add(priests.root);
+const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, [ // click/tap an enemy, Tab for the nearest
+  { name: 'Frate non-morto', max: FRIAR.hp, height: 1.75, all: friars.all, ready: () => friars.root.children.length > 0 },
+  { name: 'Prete non-morto', max: PRIEST.hp, height: 1.85, all: priests.all, ready: () => priests.root.children.length > 0 },
+]);
 kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
 const pressed = (code: string) => input.pressed(code);
 
@@ -55,7 +62,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests });
+Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -68,6 +75,7 @@ renderer.setAnimationLoop(() => {
   friars.update(dt, player.pos);
   priests.update(dt, player.pos);
   cam.update(dt, input, player.pos);
+  targeting.update(dt, player.pos);
   hud.setArea(level.areaAt(player.pos.x, player.pos.z)?.label);
   hud.setStats(playerStats);
   fx.update(dt, player.pos);

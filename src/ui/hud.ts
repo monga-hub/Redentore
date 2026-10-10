@@ -39,7 +39,7 @@ export class Hud {
 }
 
 /** One resource bar: instant fill, a trailing "lag" fill that eases down after a hit, and `cur / max`. */
-class Bar {
+export class Bar {
   private fill: HTMLElement;
   private lag: HTMLElement;
   private text: HTMLElement;

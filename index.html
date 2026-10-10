@@ -36,6 +36,10 @@
         background: linear-gradient(rgba(34,25,16,.88), rgba(10,7,5,.88)); border: 1px solid #6b5332; border-left: 0;
         border-radius: 0 6px 6px 0; box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.6);
       }
+      /* Target frame (src/ui/target.ts): beside the player's, hostile red name, health only. */
+      #unit #target { width: 150px; margin-left: 10px; padding: 4px 8px 6px; border-left: 1px solid #6b5332; border-radius: 6px; }
+      #unit #target[hidden] { display: none; }
+      #unit #target .name { color: #ff7a5c; }
       #unit .name { color: #f3e2b0; font: bold 13px/16px Georgia, serif; text-shadow: 0 1px 2px #000; }
       .res {
         position: relative; height: 14px; margin-top: 3px; overflow: hidden; border-radius: 2px;
@@ -56,19 +60,10 @@
       .res.hp.low .fill { animation: lowhp .7s ease-in-out infinite alternate; }
       @keyframes lowhp { to { filter: brightness(1.7) } }
 
-      #help {
-        position: fixed; left: 12px; top: 88px; padding: 8px 12px; pointer-events: none;
-        color: #eee; font: 13px/1.5 system-ui, sans-serif; background: rgba(0,0,0,.45); border-radius: 6px;
-      }
-      #help .touch { display: none; }
-
       /* Touch controls (src/ui/touch.ts): only on touch devices. The bottom centre is
          left free for the ability bar. */
       #stick, #jump, #fullscreen { display: none; }
-      body.touch #help { left: calc(10px + env(safe-area-inset-left)); top: calc(12px + 72px * var(--k) + env(safe-area-inset-top)); bottom: auto; font-size: 11px; padding: 5px 9px; }
       body.touch #unit { transform: scale(var(--k)); transform-origin: 0 0; }
-      body.touch #help .desk { display: none; }
-      body.touch #help .touch { display: inline; }
       body.touch #stick, body.touch #jump, body.touch #fullscreen { display: block; }
       #stick {
         position: fixed; width: calc(120px * var(--k)); height: calc(120px * var(--k)); transform: translate(-50%, -50%); pointer-events: none;
@@ -216,14 +211,7 @@
     <div id="unit">
       <div class="portrait"></div>
       <div class="frame"><div class="name">Risorto</div><div class="res hp"></div><div class="res mp"></div></div>
-    </div>
-    <div id="help">
-      <span class="desk">
-        <b>WASD</b> muovi · <b>Shift</b> cammina · <b>Spazio</b> salta · <b>Q/E</b> ruota camera<br />
-        <b>Trascina sx</b> orbita camera · <b>Trascina dx</b> gira personaggio · <b>Rotella</b> zoom · <b>Sx+Dx</b> avanti<br />
-        <b>1 … =</b> abilità (anche clic sui pulsanti) · <b>Esc</b> annulla il lancio
-      </span>
-      <span class="touch"><b>Stick sx</b> muovi · <b>Trascina</b> camera · <b>Pizzica</b> zoom · <b>Tocca</b> le abilità · <b>Tieni premuto</b> per la descrizione</span>
+      <div id="target" class="frame" hidden><div class="name"></div><div class="res hp"></div></div>
     </div>
     <div id="stick"><div id="knob"></div></div>
     <button id="jump" class="touch-btn ring" aria-label="Salta" style="--a: 180deg; --r: 192px; --d: 48px">

@@ -2,7 +2,7 @@
 // whole group, chase and swing the hoe (melee only), evade home at full health if dragged too
 // far. Pure math on the collision World, no three.js, so `npm run check` drives it in Node
 // (scripts/check-enemies.ts). friars.ts puts models on top.
-import type { World } from '../core/physics.ts';
+import { PLAYER, type World } from '../core/physics.ts';
 
 export const FRIAR = {
   hp: 60,
@@ -91,7 +91,9 @@ export function walk(f: Mob, x: number, z: number, speed: number, stop: number, 
   if (s > 0) {
     f.x += (dx / d) * s;
     f.z += (dz / d) * s;
-    world.resolve(f, f.y, r);
+    // A body wider than the player overhangs the steps ahead while its feet are read at its
+    // centre: let it push past what its rim reaches on a stair (½ slope). The boss (1.1 m) on the presbytery steps.
+    world.resolve(f, f.y + (r - PLAYER.radius) * 0.5, r);
   }
   const g = world.groundAt(f.x, f.z, f.y);
   if (g > -Infinity) f.y = g; // beds and kerbs are within step height; no jumping

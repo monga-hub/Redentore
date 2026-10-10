@@ -7,7 +7,7 @@
 import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { CHEST, Quest } from '../src/quest/progress.ts';
+import { CHEST, CHOIR_DOOR, Quest } from '../src/quest/progress.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
 {
@@ -84,6 +84,8 @@ for (const a of level.areas) {
   else console.log(`ok   ${a.zone.padEnd(11)} ${a.label} (${shut ? 'locked' : `${hit} cells`})`);
 }
 
+if (quest.checkpoint() !== SPAWN) fail('quest      a death before the choir door is open should wake on the fondamenta');
+
 // The portone alone (what the boss's death opens) joins the fondamenta to the nave.
 quest.win();
 const portone = flood();
@@ -96,6 +98,8 @@ for (const g of quest.gates) if (g.needs === 'key') quest.open(g);
 const won = flood();
 console.log('-- every gate open');
 for (const [x, z] of [[0, -2], [0, -20], [0, -37], [0, -48.5]]) if (!at(won, x, z)) fail(`chiesa      aisle point (${x}, ${z}) unreachable`);
+if (quest.checkpoint() !== CHOIR_DOOR) fail('quest      with the choir door open a death should wake at the choir door');
+if (!at(won, CHOIR_DOOR.x, CHOIR_DOOR.z) || world.blocked(CHOIR_DOOR.x, CHOIR_DOOR.z, world.standHeight(CHOIR_DOOR.x, CHOIR_DOOR.z))) fail('quest      the choir-door checkpoint is not open ground');
 for (const a of level.areas) if (!cells(won, a)) fail(`${a.zone.padEnd(11)} ${a.label} unreachable`);
 let reached = 0;
 for (let n = 0; n < won.length; n++) if (!Number.isNaN(won[n])) reached++;

@@ -5,7 +5,7 @@ import type { World } from '../core/physics.ts';
 import type { Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
-import { killAll } from './caster.ts';
+import { killAll, wipe } from './caster.ts';
 
 // Frati non-morti: KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) re-dressed as a friar —
 // the wizard hat swapped for a procedural cowl, the robe dyed habit-brown, eyes turned
@@ -245,6 +245,11 @@ export class Friars {
   /** The boss has fallen: every friar drops dead for good. */
   killAll(): void {
     killAll(this.all);
+  }
+
+  /** The player died: whoever was fighting evades home at full health. */
+  wipe(): void {
+    wipe(this.all);
   }
 
   /** Damage every friar for which `inside(x, z)` holds (abilities). */

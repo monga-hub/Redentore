@@ -6,7 +6,7 @@ import type { Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
 import { barMat, ownMaterials } from './friars.ts';
 
 // Preti non-morti: the same KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) as the friars,
@@ -305,6 +305,12 @@ export class Priests {
   /** The boss has fallen: every caster drops dead for good. */
   killAll(): void {
     killAll(this.all);
+  }
+
+  /** The player died: whoever was fighting, the boss too, evades home at full health; bolts in flight fizzle. */
+  wipe(): void {
+    wipe(this.all);
+    this.bolts.length = 0;
   }
 
   /** AI, spells and animation. `player`: feet position. Bolts that land hit the player's stats. */

@@ -43,12 +43,6 @@ const hud = new Hud();
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
 const kit = new Forsaken(player, playerStats); // abilities on 1..0 - =
-playerStats.onDeath = () => { // ponytail: back to the crypt at full health; a death screen can come with enemies
-  kit.system.cancel();
-  player.respawn(SPAWN);
-  playerStats.revive();
-  kit.system.notices.push({ kind: 'error', text: 'Sei caduto. Ti risvegli nella cripta.' });
-};
 scene.add(kit.vfx.root);
 const bar = new ActionBar(kit.system);
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
@@ -61,6 +55,15 @@ const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.ca
   { name: 'Sacerdote non-morto', max: SACERDOTE.hp, height: 2.5, all: priests.all.filter((f) => f.kind === SACERDOTE), ready: () => priests.root.children.length > 0 },
   { name: 'Il Reverendissimo', max: REVERENDISSIMO.hp, height: 4.6, all: [priests.boss], ready: () => priests.root.children.length > 0 },
 ]);
+playerStats.onDeath = () => { // ponytail: wake at the last checkpoint at full health; a death screen can come later
+  kit.system.cancel();
+  friars.wipe(); // a wipe: whoever was fighting, the boss too, evades home at full health
+  priests.wipe();
+  const at = quest.checkpoint();
+  player.respawn(at);
+  playerStats.revive();
+  kit.system.notices.push({ kind: 'error', text: at === SPAWN ? 'Sei caduto. Ti risvegli sulla fondamenta.' : 'Sei caduto. Ti risvegli alla porta del coro.' });
+};
 kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
 kit.foes = () => [...friars.all, ...priests.all];

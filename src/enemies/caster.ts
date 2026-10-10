@@ -49,16 +49,23 @@ export const SACERDOTE: CasterKind = {
   melee: { reach: 2, hit: 2.8, windup: 0.55, swing: 1.2, cooldown: 2.2, damage: 60 },
 };
 
-/** Il Reverendissimo: the boss under the dome. Huge, slow, hits hard, and a nova to run out of. */
+/**
+ * Il Reverendissimo: the boss under the dome. Huge and slow, hits hard, and a nova to run out of.
+ * Tuned against the player's 1280 hp and ~18 dps in melee (bone slash, plague, wisp): about a
+ * minute to kill; ~19 dps from the staff if the novas are dodged, ~30 if they are eaten, which
+ * the potion and Velo spettrale cover only just.
+ */
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
-  hp: 1500, // ~45-60 s
+  hp: 1100,
   aggro: 15, leash: 60, blind: 15,
   range: 22, keep: 0,
-  speed: 3, walk: 6, cast: 2.2, cooldown: 3.5, bolt: 11, life: 5, damage: 80,
+  speed: 3, walk: 6, cast: 2.2, cooldown: 4, bolt: 11, life: 5, damage: 55,
   radius: 1.1,
-  melee: { reach: 3, hit: 4, windup: 0.8, swing: 1.6, cooldown: 2.8, damage: 90 },
-  nova: { every: 13, cast: 2.4, radius: 7, damage: 220 },
+  margin: 1.6, // m kept from BOSS_BOUNDS' edges: its 1.1 m bulk clears pews, columns and the pilasters at |x| 6.58
+  // reach + radius stops it ~2 m from the player, inside the bone slash's 2.6 m
+  melee: { reach: 1.5, hit: 3.5, windup: 0.8, swing: 1.6, cooldown: 3.2, damage: 60 },
+  nova: { every: 15, cast: 2.6, radius: 6, damage: 160 },
 };
 const LOS_EVERY = 0.25; // s: tracing a ray through the cloister costs ~0.2 ms
 const CHEST = 1.1; // m above the feet: where bolts leave the staff and strike the player
@@ -170,6 +177,15 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
  */
 export const CHURCH = { x0: -12.5, x1: 12.5, z0: -60, z1: 0 };
 export const BOSS_AT = { x: 0, z: -37 }; // crossing centre (zones/chiesa.ts CX)
+/**
+ * The boss's floor: the crossing and the top of the presbytery steps, between the pews
+ * (z -26.7, level/dressing.ts) and the baldacchino's columns and candelabra (z -47.9,
+ * zones/chiesaInterno.ts), nave faces at x ±7.5. It walks in straight lines, and chasing a
+ * player into the pews, a side chapel or round the high altar used to wedge its 1.1 m bulk on a
+ * pew end or between two columns, out of sight, until it evaded at full health mid-fight.
+ * From the edge of its floor it still sees, and bolts, most of the church.
+ */
+export const BOSS_BOUNDS = { x0: -7, x1: 7, z0: -47.5, z1: -27 };
 export function spawnChurch(world: World): { all: Priest[]; boss: Priest } {
   const S = Math.PI; // facing +Z, down the nave towards the door
   const groups: [number, number, number][][] = [
@@ -178,7 +194,7 @@ export function spawnChurch(world: World): { all: Priest[]; boss: Priest } {
     [[BOSS_AT.x, BOSS_AT.z, S]],
   ];
   const kinds = [[SACERDOTE], [SACERDOTE], [REVERENDISSIMO]];
-  const all = spawnPriests(world, groups, groups.map(() => CHURCH), kinds).flat();
+  const all = spawnPriests(world, groups, [CHURCH, CHURCH, BOSS_BOUNDS], kinds).flat();
   return { all, boss: all[all.length - 1] };
 }
 
@@ -188,6 +204,18 @@ export function killAll(fs: { state: string; hp: number; t: number }[]): void {
     if (f.state === 'dead') continue;
     f.hp = 0;
     f.state = 'dead';
+    f.t = 0;
+  }
+}
+
+/**
+ * The player died: every mob still fighting gives up and evades home at full health (a wipe),
+ * instead of chasing towards the respawn. Friars and casters alike; the praying/hoeing and the dead stay put.
+ */
+export function wipe(fs: { state: string; t: number }[]): void {
+  for (const f of fs) {
+    if (f.state === 'dead' || f.state === 'pray' || f.state === 'hoe' || f.state === 'evade') continue;
+    f.state = 'evade';
     f.t = 0;
   }
 }

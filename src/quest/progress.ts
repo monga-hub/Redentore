@@ -5,7 +5,7 @@
 // choir door into the church and kills the Reverendissimo; then the main portone swings open
 // onto the fondamenta. quest/view.ts draws the gates, the chest and the prompts.
 import type { Box, World } from '../core/physics.ts';
-import { CHURCH_FLOOR as F } from '../level/plan.ts';
+import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 
 export type Need = 'key' | 'boss';
 
@@ -34,6 +34,12 @@ export const GATES: GateSpec[] = [
 
 /** The chest with the key, at the far end of the pontile (zones/nord.ts: x -38..-32, z -194..-186, deck at 0). */
 export const CHEST = { x: -35, z: -192.6, y: 0, w: 1.1, d: 0.7, h: 0.75 };
+
+/**
+ * On the landing outside the choir door (zones/chiesa.ts, F + 0.6), facing in: 3 m above the
+ * chiostro grande, out of reach of its priests (they aggro and cast only within 2.5 m of their level).
+ */
+export const CHOIR_DOOR = { x: 0, z: -61, yaw: Math.PI } as const;
 
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
@@ -78,6 +84,14 @@ export class Quest {
     if (this.bossDead) return;
     this.bossDead = true;
     for (const g of this.gates) if (g.needs === 'boss') this.open(g);
+  }
+
+  /**
+   * Where a fallen player wakes: at the choir door once it is open, so a boss attempt
+   * is a short walk away instead of the whole route again; on the fondamenta before that.
+   */
+  checkpoint(): { x: number; z: number; yaw: number } {
+    return this.gates.find((g) => g.id === 'coro')!.open ? CHOIR_DOOR : SPAWN;
   }
 
   /** The nearest thing to interact with around the player's feet `p`, if any. */

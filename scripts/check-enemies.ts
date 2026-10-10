@@ -7,8 +7,9 @@
 import { buildLevel } from '../src/level/index.ts';
 import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
+import { CHOIR_DOOR } from '../src/quest/progress.ts';
 import { FRIAR, GROUPS, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -196,6 +197,40 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   }
   if (Math.hypot(boss.x, boss.z + 37) > 0.1) fail('the boss is not under the dome');
   if (SACERDOTE.hp <= PRIEST.hp || REVERENDISSIMO.hp <= SACERDOTE.hp) fail('hp should rise priest < sacerdote < boss');
+
+  // The player kites the boss round the church: into the pews, an apse, round the high
+  // altar. It keeps to the crossing and the presbytery steps (BOSS_BOUNDS) and fights on from
+  // their edge. It used to walk straight at the player, wedge on a pew end, the steps or between
+  // two columns, out of sight, and evade at full health after REVERENDISSIMO.blind s: the
+  // mid-fight reset. (Out of its sight, in the choir or a side chapel, it still leashes after
+  // REVERENDISSIMO.blind s, as if the player had left the church.)
+  for (const f of all) if (f !== boss) f.state = 'dead';
+  const bolts: Bolt[] = [];
+  const pl: Target = { x: 0, y: 0, z: 0 };
+  let magic = 0;
+  for (const [x, z, y] of [[0, -14, 0], [6.4, -20, 0], [3.6, -22, 1], [10.5, -37, 0], [-6.2, -36, 0], [5, -51, 0.6]]) {
+    pl.x = x; pl.z = z; pl.y = 2.4 + y; // nave aisle, side aisle, up on a pew, an apse, crossing, by the high altar
+    Object.assign(boss, { x: boss.home.x, y: 2.4, z: boss.home.z, hp: REVERENDISSIMO.hp - 100, state: 'chase', blind: 0, cd: 0 }); // pulled under the dome
+    const hp = boss.hp;
+    for (let t = 0; t < REVERENDISSIMO.blind + 10; t += 1 / 60) {
+      casterThink(boss, pl, level.world, 1 / 60, bolts);
+      magic += fly(bolts, pl, 1 / 60);
+    }
+    if (boss.state === 'evade' || boss.state === 'pray' || boss.hp !== hp) fail(`boss: reset (${boss.state}, ${boss.hp} hp) with the player at (${x}, ${z})`);
+    if (level.world.blocked(boss.x, boss.z, boss.y, boss.kind.radius)) fail('boss: inside a wall');
+  }
+  if (!magic) fail('boss: no bolt reached the kiting player');
+
+  // A death wakes the player at the choir door: no cloister priest below can pull them there.
+  const door = { ...CHOIR_DOOR, y: level.world.standHeight(CHOIR_DOOR.x, CHOIR_DOOR.z) };
+  for (const f of spawnPriests(level.world, cloisterPlan(level.world, level.areas).flatMap((c) => c.groups), []).flat()) {
+    if (Math.hypot(f.x - door.x, f.z - door.z) < f.kind.aggro && Math.abs(f.y - door.y) < 2.5) fail(`checkpoint: in reach of the priest at (${f.x}, ${f.z})`);
+  }
+
+  // The player dies: a wipe sends the boss home at full health, and only then.
+  wipe([boss]);
+  for (let t = 0; t < 30; t += 1 / 60) casterThink(boss, { x: 0, y: 0, z: 15 }, level.world, 1 / 60, bolts);
+  if (boss.state !== 'pray' || boss.hp !== REVERENDISSIMO.hp || Math.hypot(boss.x - boss.home.x, boss.z - boss.home.z) > 0.1) fail(`boss: wipe left it ${boss.state} at ${boss.hp} hp`);
 }
 
 {

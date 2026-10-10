@@ -1,12 +1,14 @@
 // Headless friar AI check (`npm run check`): hoeing spots sit on the orto beds and off the
 // paths, aggro pulls the whole group, melee swings land on a cooldown, leash evades home at
 // full health, death and respawn. Then the same for the cloister priests, plus line of sight,
-// spell cooldowns, magic bolts and backpedalling inside their cloister.
+// spell cooldowns, magic bolts and backpedalling inside their cloister. Then the church: two
+// sacerdoti with two priests each and the Reverendissimo, magic plus melee, the boss's nova,
+// and everyone dropping dead for good when the boss falls.
 import { buildLevel } from '../src/level/index.ts';
 import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
 import { FRIAR, GROUPS, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
-import { PRIEST, cloisterPlan, fly, hurt as casterHurt, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, hurt as casterHurt, killAll, spawnChurch, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -161,4 +163,63 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   tick(PRIEST.respawn + 1);
   want(e, 'pray', 'respawned');
   console.log(`priests ok (${magic} magic damage over ${casts} casts)`);
+}
+
+// ---------------------------------------------------------------- the church (sacerdoti, boss)
+{
+  const level = buildLevel();
+  const { all, boss } = spawnChurch(level.world);
+  const count = (k: unknown) => all.filter((f) => f.kind === k).length;
+  if (count(SACERDOTE) !== 2 || count(PRIEST) !== 4 || count(REVERENDISSIMO) !== 1 || boss.kind !== REVERENDISSIMO) fail('church: want 2 sacerdoti, 4 priests and the boss');
+  for (const g of new Set(all.map((f) => f.mates))) {
+    if (g.length !== 1 && (g.length !== 3 || g.filter((f) => f.kind === SACERDOTE).length !== 1)) fail('church: a sacerdote leads two priests');
+  }
+  for (const f of all) {
+    const at = `church spot (${f.x}, ${f.z})`;
+    if (f.y < 2.3) fail(`${at} not on the church floor (y ${f.y})`);
+    if (level.world.blocked(f.x, f.z, f.y, f.kind.radius)) fail(`${at} inside a wall`);
+  }
+  if (Math.hypot(boss.x, boss.z + 37) > 0.1) fail('the boss is not under the dome');
+  if (SACERDOTE.hp <= PRIEST.hp || REVERENDISSIMO.hp <= SACERDOTE.hp) fail('hp should rise priest < sacerdote < boss');
+}
+
+{
+  const fl = new World();
+  fl.add(0, 0, 100, 100, -1, 0);
+  const box = { x0: -40, x1: 40, z0: -40, z1: 40 };
+  const [sac] = spawnPriests(fl, [[[0, 0, 0]]], [box], [[SACERDOTE]])[0];
+  const pl: Target = { x: 0, y: 0, z: -12 };
+  const bolts: Bolt[] = [];
+  let melee = 0, magic = 0;
+  const tick = (f: Priest, s: number, each?: () => void) => {
+    for (let t = 0; t < s; t += 1 / 60) {
+      melee += casterThink(f, pl, fl, 1 / 60, bolts);
+      magic += fly(bolts, pl, 1 / 60);
+      each?.();
+    }
+  };
+  tick(sac, 4); // in sight at range: it casts
+  if (!magic) fail('sacerdote: no bolt landed at range');
+  if (magic % SACERDOTE.damage) fail(`sacerdote: odd magic damage ${magic}`);
+  tick(sac, 8, () => { pl.x = sac.x; pl.z = sac.z - 1.5; }); // toe to toe
+  if (!melee) fail('sacerdote: no melee hit landed up close');
+  if (melee % SACERDOTE.melee!.damage) fail(`sacerdote: odd melee damage ${melee}`);
+
+  const [boss] = spawnPriests(fl, [[[20, 20, 0]]], [box], [[REVERENDISSIMO]])[0];
+  const n = REVERENDISSIMO.nova!;
+  pl.x = 20; pl.z = 17;
+  let novas = 0, was = boss.state;
+  melee = 0;
+  tick(boss, n.every + n.cast + 2, () => { if (boss.state === 'nova' && was !== 'nova') novas++; was = boss.state; });
+  if (!novas) fail('boss: no nova in melee range');
+  if (melee < n.damage) fail(`boss: the nova did not land (${melee} melee damage)`);
+
+  // The boss falls: everyone dies and stays dead.
+  const crowd = [sac, ...spawnGroups(fl, [[[5, 5, 0]]])[0]];
+  casterHurt(boss, boss.hp);
+  if (boss.state !== 'dead') fail('boss: lethal hit did not kill');
+  killAll(crowd);
+  for (let t = 0; t < PRIEST.respawn + FRIAR.respawn; t += 0.5) { casterThink(sac, pl, fl, 0.5, bolts); think(crowd[1] as Friar, pl, fl, 0.5); }
+  if (crowd.some((f) => f.state !== 'dead')) fail('killAll: someone got up again');
+  console.log(`church ok (sacerdote ${magic} magic + melee, boss nova ${n.damage})`);
 }

@@ -7,7 +7,13 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
 - Terza persona, controlli WASD.
 - Nemici: frati non-morti che zappano l'orto (solo mischia) e preti non-morti che pregano
   nei chiostri a gruppi di 3 (1 gruppo nei chiostri piccoli, 2 nel mediano, 3 nel grande) e
-  lanciano dardi d'ombra a distanza, indietreggiando se ti avvicini; niente boss.
+  lanciano dardi d'ombra a distanza, indietreggiando se ti avvicini. In chiesa due sacerdoti
+  (bianco e viola, magia + mischia) con due preti ciascuno — a capo della navata e dietro l'altare —
+  e il boss, il Reverendissimo, sotto la cupola (magia, mischia, nova d'ombra da cui scappare).
+- Progressione: il portone della chiesa è sbarrato. Dalla calle si attraversa il convento e l'orto
+  fino al pontile sulla laguna, dove un baule custodisce la chiave delle grate del chiostro grande;
+  dal chiostro si entra in chiesa dalla porta del coro. Morto il Reverendissimo, tutti i nemici
+  cadono e il portone si apre sulla fondamenta.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile
@@ -19,7 +25,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: ogni area è raggiungibile dallo spawn + sistema abilità + IA di frati e preti
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti e boss
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -38,6 +44,7 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 | Q / E | ruota la camera |
 | 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti); 9 = pozione |
 | Esc | annulla il lancio in corso |
+| F | interagisci (apri baule, grate, porte); su touch tocca il riquadro che appare |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
 trascina sul resto dello schermo per la camera, pizzica per lo zoom; a destra le
@@ -95,11 +102,16 @@ src/
                              nell'orto. Nessuna dipendenza da three
   enemies/friars.ts          modello (KayKit Skeleton Mage con cappuccio e zappa), animazioni,
                              barra vita; danni al player via `PlayerStats.takeDamage`
-  enemies/caster.ts          IA dei preti caster (preghiera, aggro con linea di vista, lancio
+  enemies/caster.ts          IA dei preti caster (anche sacerdoti e Reverendissimo: `CasterKind` con mischia
+                             e nova; spawn della chiesa, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
                              con cooldown, dardi a ricerca, indietreggiare restando nel
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
   enemies/priests.ts         stesso Skeleton Mage vestito da prete (cappuccio a punta, stola,
-                             bastone col cristallo), animazioni, VFX dei dardi d'ombra
+                             bastone col cristallo), da sacerdote e da Reverendissimo (mitra);
+                             animazioni, VFX dei dardi d'ombra e della nova
+  quest/progress.ts          stato della progressione: grate e porte (collider rimovibili), baule
+                             con la chiave, prompt di interazione, vittoria. Nessuna dipendenza da three
+  quest/view.ts              grate e battenti animati, baule, prompt "F", barra del boss, banner di vittoria
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
                              pergole; registra collider e aree
@@ -117,7 +129,7 @@ src/
     orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est
     nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
-scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player
+scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest
 scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sistema abilità
 ```
 
@@ -131,7 +143,7 @@ scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sis
   con `collide: false`. `npm run check` deve restare verde.
 - **Abilità:** aggiungere un oggetto `Ability` in `abilities/forsaken.ts` (o un altro kit)
   e il suo id in `BAR`; l'icona va in `ui/icons.ts`.
-- Debug in console: `window.level`, `window.player`, `window.cam`, `window.scene`, `window.kit`
+- Debug in console: `window.level`, `window.player`, `window.cam`, `window.scene`, `window.kit`, `window.quest`
   (es. `player.respawn({x: 0, z: -100, yaw: 0})`).
 
 ### Note per dopo (fuori scope qui)

@@ -6,17 +6,18 @@ import type { Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, cloisterPlan, fly, hurt, spawnPriests, think, type Bolt, type CasterState, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, hurt, killAll, spawnChurch, spawnPriests, think, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
 import { barMat, ownMaterials } from './friars.ts';
 
 // Preti non-morti: the same KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) as the friars,
 // re-dressed darker so they read apart at a glance — a tall pointed hood, a gold-edged stole,
 // the robe dyed near-black violet, violet eyes and a staff with a shadow crystal. They pray
 // in the cloisters in threes and throw homing shadow bolts; the AI lives in caster.ts.
+// The church's sacerdoti are the same mage, taller, in a white robe under a violet hood and
+// cape; the Reverendissimo is a giant one in white and violet with a gold-banded mitre.
 
 const URL = `${import.meta.env.BASE_URL}models/skeleton_mage.glb`;
-const HEIGHT = 1.85; // m, hood tip
-const CLIPS: Record<CasterState, string> = { pray: 'Idle', chase: 'Idle_Combat', cast: 'Spellcasting', evade: 'Running_B', dead: 'Death_A' };
+const CLIPS: Record<CasterState, string> = { pray: 'Idle', chase: 'Idle_Combat', cast: 'Spellcasting', swing: '2H_Melee_Attack_Chop', nova: 'Spellcast_Summon', evade: 'Running_B', dead: 'Death_A' };
 const STEP: Record<-1 | 1, string> = { [-1]: 'Walking_Backwards', 1: 'Walking_A' };
 const SHOOT = 'Spellcast_Shoot', RISE = 'Skeletons_Awaken_Standing';
 const FADE = 0.2;
@@ -24,12 +25,21 @@ const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 };
 const FAR = 40; // m: praying priests farther than this skip their animation (they barely move)
 
-const CLOTH = 0x1d1424, TRIM = 0xb48a3c, EYES = 0xb05cff;
+const TRIM = 0xb48a3c;
 const SHADOW = 0x8a3cff, CORE = 0xa45cff, SMOKE = 0x1a0b26;
+
+/** How one kind of caster is dressed. `robe`: GLSL tint the mage's red robe is dyed to (times its luminance). */
+interface Look { height: number; cloth: number; eyes: number; robe: string; mitre?: boolean }
+const LOOKS = new Map<CasterKind, Look>([
+  [PRIEST, { height: 1.85, cloth: 0x1d1424, eyes: 0xb05cff, robe: 'vec3(0.42, 0.3, 0.55)' }],
+  [SACERDOTE, { height: 2.5, cloth: 0x4a1f78, eyes: 0xd27bff, robe: 'vec3(1.9, 1.85, 1.8)' }],
+  [REVERENDISSIMO, { height: 4.6, cloth: 0x5a2390, eyes: 0xff5ce1, robe: 'vec3(2, 1.95, 1.9)', mitre: true }],
+]);
 
 interface Template {
   scene: THREE.Group;
   clips: THREE.AnimationClip[];
+  height: number;
 }
 
 /** One priest's model, animation and nameplate bar. */
@@ -47,8 +57,10 @@ class View {
   private bar = new THREE.Group();
   private fill: THREE.Sprite;
   private sparks = 0;
+  private height: number;
 
   constructor(t: Template) {
+    this.height = t.height;
     const model = cloneSkinned(t.scene) as THREE.Group;
     this.mats = ownMaterials(model);
     this.tip = model.getObjectByName('staffTip')!;
@@ -65,7 +77,7 @@ class View {
     this.fill.scale.set(BAR_W, 0.006, 1);
     this.fill.renderOrder = 1;
     this.bar.add(bg, this.fill);
-    this.bar.position.y = HEIGHT + 0.35;
+    this.bar.position.y = t.height + 0.35;
     this.root.add(this.bar);
   }
 
@@ -85,13 +97,14 @@ class View {
       this.state = f.state;
       if (from === 'dead') this.play(RISE, true); // respawn: claw up before praying
       else if (from === 'cast' && f.state === 'chase' && f.cd > 1) this.play(SHOOT, true); // released, not interrupted
+      else if (f.state === 'swing') this.play(CLIPS.swing, true, this.actions.get(CLIPS.swing)!.getClip().duration / f.kind.melee!.swing);
       else this.once = false;
     }
     if (this.once && !this.current!.isRunning()) this.once = false;
-    if (!this.once) this.play(f.state === 'chase' && f.move ? STEP[f.move] : CLIPS[f.state]);
+    if (!this.once) this.play(f.state === 'chase' && f.move ? STEP[f.move] : CLIPS[f.state], false, f.state === 'chase' && f.move === 1 ? f.kind.speed / 2 : 1);
 
-    // Casting: the crystal swells and shadow motes spiral into it.
-    const p = f.state === 'cast' ? Math.min(f.t / PRIEST.cast, 1) : 0;
+    // Casting: the crystal swells and shadow motes spiral into it (a nova draws them in too).
+    const p = f.state === 'cast' ? Math.min(f.t / f.kind.cast, 1) : f.state === 'nova' ? Math.min(f.t / f.kind.nova!.cast, 1) : 0;
     this.tip.scale.setScalar(1 + p * 1.2);
     if (p > 0) {
       this.sparks += dt * (25 + p * 60);
@@ -109,22 +122,22 @@ class View {
     let sink = 0;
     if (f.state === 'dead') sink = THREE.MathUtils.clamp((f.t - SINK.after) / SINK.time, 0, 1);
     this.root.visible = sink < 1;
-    this.root.position.set(f.x, f.y - sink * SINK.depth, f.z);
+    this.root.position.set(f.x, f.y - sink * SINK.depth * (this.height / 1.85), f.z);
     this.root.rotation.y = f.yaw;
 
-    const r = f.hp / PRIEST.hp;
+    const r = f.hp / f.kind.hp;
     this.bar.visible = f.state !== 'dead' && (f.state !== 'pray' || r < 1);
     this.fill.scale.x = BAR_W * Math.max(r, 1e-3);
     this.fill.center.x = 0.5 / Math.max(r, 1e-3);
   }
 
-  private play(name: string, once = false): void {
+  private play(name: string, once = false, rate = 1): void {
     if (name === this.clip && !once) return;
     const next = this.actions.get(name)!;
     next.reset();
     next.setLoop(once || name === CLIPS.dead ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
     next.clampWhenFinished = true;
-    next.timeScale = name === STEP[1] ? PRIEST.speed / 2 : name === SHOOT ? 1.4 : 1;
+    next.timeScale = name === SHOOT ? 1.4 : rate;
     if (name === CLIPS.pray && !this.clip) next.time = Math.random() * next.getClip().duration; // not in lockstep
     next.play();
     if (this.current && this.current !== next) next.crossFadeFrom(this.current, FADE, false);
@@ -134,8 +147,8 @@ class View {
   }
 }
 
-/** Re-dress the mage once as a priest; every priest is a clone of this. */
-function dress(scene: THREE.Group): void {
+/** Re-dress a copy of the mage for one kind of caster; every caster of that kind is a clone of this. */
+function dress(scene: THREE.Group, look: Look): void {
   scene.rotation.y = Math.PI; // the model faces +Z, the game's yaw 0 faces -Z
   const hat = scene.getObjectByName('Skeleton_Mage_Hat')!;
   const head = hat.parent!;
@@ -144,7 +157,7 @@ function dress(scene: THREE.Group): void {
 
   const skull = new THREE.Box3().setFromObject(scene.getObjectByName('Skeleton_Mage_Skull')!);
   const size = skull.getSize(new THREE.Vector3()), c = skull.getCenter(new THREE.Vector3());
-  const cloth = new THREE.MeshStandardMaterial({ color: CLOTH, roughness: 0.9, side: THREE.DoubleSide });
+  const cloth = new THREE.MeshStandardMaterial({ color: look.cloth, roughness: 0.9, side: THREE.DoubleSide });
   const gold = new THREE.MeshStandardMaterial({ color: TRIM, roughness: 0.45, metalness: 0.8 });
   // Hood: a deep cowl with the face cut out (the face looks along -Z here, see friars.ts)
   // drawn up into a tall point that leans back: a silhouette no friar has.
@@ -159,6 +172,20 @@ function dress(scene: THREE.Group): void {
   const hem = new THREE.Mesh(new THREE.TorusGeometry(r * 0.78, r * 0.06, 6, 24, Math.PI * 2 - 1.1), gold); // gold edge round the face
   hem.position.set(c.x, c.y + size.y * 0.06, c.z - r * 0.55);
   hem.rotation.z = Math.PI / 2 + 0.55;
+  if (look.mitre) {
+    // A bishop's mitre instead of the point: a tall white cap, flattened front to back, gold-banded.
+    const white = new THREE.MeshStandardMaterial({ color: 0xece6da, roughness: 0.7 });
+    (point as THREE.Mesh).geometry = new THREE.CylinderGeometry(r * 0.1, r * 0.6, r * 1.8, 4, 1);
+    point.material = white;
+    point.rotation.set(0, Math.PI / 4, 0);
+    point.scale.set(1, 1, 0.6);
+    point.position.set(c.x, c.y + size.y * 0.5 + r * 1.05, c.z + r * 0.4); // sits on the crown, clear of the face
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.53, r * 0.57, r * 0.2, 4, 1), gold);
+    band.rotation.y = Math.PI / 4;
+    band.scale.set(1, 1, 0.62);
+    band.position.set(c.x, c.y + size.y * 0.5 + r * 0.25, c.z + r * 0.4);
+    hood.add(band);
+  }
   hood.add(cowl, point, hem);
   head.attach(hood);
   // Shoulder cape and a stole: two gold-edged bands hanging down the chest.
@@ -197,33 +224,42 @@ function dress(scene: THREE.Group): void {
   hand.attach(staff);
   staff.rotation.set(0, 0, Math.PI / 2); // upright along the slot's -X, which points up while idle and casting
 
+  const own = new Map<THREE.Material, THREE.MeshStandardMaterial>(); // the copies share the mage's materials
   scene.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
     o.castShadow = o.material !== glow;
     o.frustumCulled = false; // skinned: bind-pose bounds don't follow the animation
     const m = o.material as THREE.MeshStandardMaterial;
-    if (m.name === 'Glow') { m.color.setHex(EYES); m.emissive.setHex(EYES); }
-    if (m.name === 'skeleton') dye(m);
+    if (m.name !== 'Glow' && m.name !== 'skeleton') return;
+    if (!own.has(m)) {
+      const c = m.clone();
+      if (m.name === 'Glow') { c.color.setHex(look.eyes); c.emissive.setHex(look.eyes); }
+      else dye(c, look.robe);
+      own.set(m, c);
+    }
+    o.material = own.get(m)!;
   });
 
-  scene.scale.setScalar(HEIGHT / top);
+  scene.scale.setScalar(look.height / top);
 }
 
-/** The mage's reds turn a near-black violet cassock (shader dye, the robe shares the bone atlas). */
-function dye(m: THREE.MeshStandardMaterial): void {
+/** The mage's reds turn the kind's cassock colour (shader dye, the robe shares the bone atlas). */
+function dye(m: THREE.MeshStandardMaterial, robe: string): void {
   m.onBeforeCompile = (s) => {
     s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
 	float redness = smoothstep(0.06, 0.2, diffuseColor.r - max(diffuseColor.g, diffuseColor.b));
-	vec3 cassock = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(0.42, 0.3, 0.55);
+	vec3 cassock = min(vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * ${robe}, vec3(0.92));
 	diffuseColor.rgb = mix(diffuseColor.rgb, cassock, redness);`);
   };
-  m.customProgramCacheKey = () => 'priest-cassock';
+  m.customProgramCacheKey = () => `cassock-${robe}`;
 }
 
-/** Every priest in the cloisters: brains, models, shadow bolts, combat glue. */
+/** Every priest in the cloisters and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
 export class Priests {
   readonly root = new THREE.Group();
   readonly all: Priest[];
+  readonly boss: Priest; // il Reverendissimo
+  private ring: THREE.Mesh; // the boss's nova telegraph on the floor
   private views: View[] = [];
   private bolts: Bolt[] = [];
   private spent: Bolt[] = [];
@@ -240,21 +276,41 @@ export class Priests {
     this.vfx = vfx;
     this.stats = stats;
     const plan = cloisterPlan(world, areas);
-    this.all = spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.area))).flat();
+    const church = spawnChurch(world);
+    this.boss = church.boss;
+    this.all = [...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.area))).flat(), ...church.all];
+    this.ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(SHADOW).multiplyScalar(2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
+    );
+    this.ring.visible = false;
     new GLTFLoader().load(URL, (gltf) => {
-      dress(gltf.scene);
-      const t = { scene: gltf.scene, clips: gltf.animations };
-      this.views = this.all.map(() => new View(t));
+      const templates = new Map<CasterKind, Template>();
+      for (const [kind, look] of LOOKS) {
+        const scene = cloneSkinned(gltf.scene) as THREE.Group;
+        dress(scene, look);
+        templates.set(kind, { scene, clips: gltf.animations, height: look.height });
+      }
+      this.views = this.all.map((f) => new View(templates.get(f.kind)!));
       for (const v of this.views) this.root.add(v.root);
+      this.root.add(this.ring); // after the models: main.ts reads an empty root as "not loaded yet"
     }, undefined, (e) => console.error('priest model failed to load', e));
+  }
+
+  /** The boss has fallen: every caster drops dead for good. */
+  killAll(): void {
+    killAll(this.all);
   }
 
   /** AI, spells and animation. `player`: feet position. Bolts that land hit the player's stats. */
   update(dt: number, player: Target): void {
     if (!this.views.length) return;
+    let dmg = 0;
     this.all.forEach((f, i) => {
-      const n = this.bolts.length;
-      think(f, player, this.world, dt, this.bolts);
+      const n = this.bolts.length, was = f.state;
+      const hit = think(f, player, this.world, dt, this.bolts);
+      dmg += hit;
+      if (was === 'nova' && f.state !== 'nova') this.nova(f, hit > 0);
       if (this.bolts.length === n) return;
       // A new bolt leaves from the caster's crystal, with a flare.
       const b = this.bolts[n];
@@ -263,7 +319,7 @@ export class Priests {
       this.vfx.burst(b.x, b.y, b.z, 14, 0.15, { life: 0.4, size: 0.1, color: SHADOW, hdr: 3, drag: 4 }, 2);
     });
     separate(this.all, this.world);
-    const dmg = fly(this.bolts, player, dt, this.spent);
+    dmg += fly(this.bolts, player, dt, this.spent);
     for (const b of this.spent) {
       if (!b.hit) { this.vfx.burst(b.x, b.y, b.z, 10, 0.2, { life: 0.5, size: 0.1, color: SHADOW, hdr: 2, drag: 3 }, 0.8); continue; }
       this.vfx.burst(b.x, b.y, b.z, 26, 0.3, { life: 0.6, size: 0.12, color: SHADOW, hdr: 3, drag: 3 }, 2.4);
@@ -271,6 +327,7 @@ export class Priests {
       this.vfx.pulse(b.x, b.y, b.z, SHADOW, 25);
     }
     this.drawBolts(dt);
+    this.drawRing();
     this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, f.state === 'pray' && Math.hypot(f.x - player.x, f.z - player.z) > FAR));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
@@ -286,11 +343,33 @@ export class Priests {
       o.visible = !!b;
       if (!b) return;
       o.position.set(b.x, b.y, b.z);
-      o.scale.setScalar(1 + Math.sin(b.t * 30) * 0.15);
+      o.scale.setScalar((1 + Math.sin(b.t * 30) * 0.15) * Math.sqrt(b.dmg / PRIEST.damage)); // the boss's are fat
       // Trail: bright motes and a wisp of dark smoke streaming behind.
       for (let n = 0; n < 2; n++) this.vfx.puff({ x: b.x + (Math.random() - 0.5) * 0.15, y: b.y + (Math.random() - 0.5) * 0.15, z: b.z + (Math.random() - 0.5) * 0.15, life: 0.35, size: 0.14, color: SHADOW, hdr: 2.6, grow: 0.3 });
       if (Math.random() < dt * 30) this.vfx.puff({ x: b.x, y: b.y, z: b.z, vy: 0.3, life: 0.6, size: 0.18, color: SMOKE, alpha: 0.6, normal: true, grow: 2 });
     });
+  }
+
+  /** The nova's floor ring grows in while the boss channels it. */
+  private drawRing(): void {
+    const f = this.boss;
+    this.ring.visible = f.state === 'nova';
+    if (!this.ring.visible) return;
+    const p = Math.min(f.t / f.kind.nova!.cast, 1), r = f.kind.nova!.radius;
+    this.ring.position.set(f.x, f.y + 0.05, f.z);
+    this.ring.scale.setScalar(r * (0.25 + 0.75 * p));
+    (this.ring.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.65 * p;
+  }
+
+  /** The nova goes off: a ring of shadow rushing out to its radius. */
+  private nova(f: Priest, hit: boolean): void {
+    const r = f.kind.nova!.radius;
+    for (let k = 0; k < 90; k++) {
+      const a = (k / 90) * Math.PI * 2, s = r * 2.4;
+      this.vfx.puff({ x: f.x + Math.cos(a) * 0.8, y: f.y + 0.4, z: f.z + Math.sin(a) * 0.8, vx: Math.cos(a) * s, vy: 0.6, vz: Math.sin(a) * s, life: 0.45, size: 0.35, color: SHADOW, hdr: 3, drag: 1.2 });
+    }
+    this.vfx.burst(f.x, f.y + 1.5, f.z, 30, 1.5, { life: 1.1, size: 0.6, color: SMOKE, alpha: 0.7, normal: true, grow: 2, drag: 2, vy: 0.8 }, 2);
+    this.vfx.pulse(f.x, f.y + 2, f.z, SHADOW, hit ? 60 : 40);
   }
 
   /** Damage every priest for which `inside(x, z)` holds (abilities). */

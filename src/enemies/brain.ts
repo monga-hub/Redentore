@@ -31,6 +31,7 @@ export interface Friar {
   t: number; // s in the current state
   cd: number; // swing cooldown left
   struck: boolean; // this swing already resolved
+  once?: boolean; // dies for good: no respawn (set when the boss falls, see caster.ts killAll)
   home: { x: number; z: number; yaw: number };
   mates: Friar[]; // the hoeing group, pulled together
 }
@@ -85,14 +86,14 @@ export function face(f: Mob, yaw: number, dt: number): void {
 }
 
 /** Walk towards (x,z), stopping `stop` m short. Returns the distance left. */
-export function walk(f: Mob, x: number, z: number, speed: number, stop: number, world: World, dt: number): number {
+export function walk(f: Mob, x: number, z: number, speed: number, stop: number, world: World, dt: number, r = FRIAR.radius): number {
   const dx = x - f.x, dz = z - f.z, d = Math.hypot(dx, dz);
   if (d > 1e-3) face(f, Math.atan2(-dx, -dz), dt);
   const s = Math.min(speed * dt, d - stop);
   if (s > 0) {
     f.x += (dx / d) * s;
     f.z += (dz / d) * s;
-    world.resolve(f, f.y, FRIAR.radius);
+    world.resolve(f, f.y, r);
   }
   const g = world.groundAt(f.x, f.z, f.y);
   if (g > -Infinity) f.y = g; // beds and kerbs are within step height; no jumping
@@ -127,7 +128,7 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
       if (walk(f, f.home.x, f.home.z, FRIAR.walk, 0, world, dt) < 0.05) enter(f, 'hoe');
       return 0;
     case 'dead':
-      if (f.t >= FRIAR.respawn) {
+      if (f.t >= FRIAR.respawn && !f.once) {
         f.x = f.home.x; f.z = f.home.z; f.yaw = f.home.yaw;
         f.y = feet(world, f.x, f.z);
         f.hp = FRIAR.hp;

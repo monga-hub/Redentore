@@ -1,12 +1,24 @@
 // Undead priest AI, WoW caster-mob style: stand in prayer in a cloister until the player comes
 // into sight, pull the group, then cast shadow bolts from range on a cooldown, backpedalling
 // when the player closes in, never leaving their cloister; evade home at full health if the
-// player gets away. Pure math on the collision World like brain.ts (friars), whose movement
+// player gets away. The church's sacerdoti and the Reverendissimo are the same brain with a
+// bigger `CasterKind`: they also swing their staff in melee, and the boss channels a shadow
+// nova around itself. Pure math on the collision World like brain.ts (friars), whose movement
 // helpers it shares; priests.ts puts models and spell effects on top.
 import type { World } from '../core/physics.ts';
 import { face, feet, walk, type Target } from './brain.ts';
 
-export const PRIEST = {
+export interface CasterKind {
+  hp: number; aggro: number; leash: number; blind: number; range: number; keep: number; backoff: number;
+  speed: number; back: number; walk: number; cast: number; cooldown: number; bolt: number; life: number;
+  damage: number; radius: number; respawn: number; margin: number;
+  /** Staff swing when the player is in reach (sacerdoti, boss): rooted for `swing` s, lands at `windup` if still within `hit`. */
+  melee?: { reach: number; hit: number; windup: number; swing: number; cooldown: number; damage: number };
+  /** Boss only: every `every` s in melee range, channel `cast` s, then hit everything within `radius`. */
+  nova?: { every: number; cast: number; radius: number; damage: number };
+}
+
+export const PRIEST: CasterKind = {
   hp: 50, // casters are squishy: five bone slashes
   aggro: 12, // m, and in line of sight
   leash: 26, // m between the player and the priest's spot before it gives up and evades
@@ -26,20 +38,48 @@ export const PRIEST = {
   respawn: 60,
   margin: 0.8, // m kept from the cloister's walls
 };
+
+/** Sacerdote: a tall white-and-violet high priest leading two priests in the church. Stands its ground. */
+export const SACERDOTE: CasterKind = {
+  ...PRIEST,
+  hp: 260, // ~10 s of the player's full rotation
+  aggro: 13, leash: 40, blind: 10,
+  range: 18, keep: 0, // never backpedals: walks into melee
+  speed: 3.4, cast: 1.8, cooldown: 3.2, damage: 45,
+  radius: 0.55,
+  melee: { reach: 2, hit: 2.8, windup: 0.55, swing: 1.2, cooldown: 2.2, damage: 60 },
+};
+
+/** Il Reverendissimo: the boss under the dome. Huge, slow, hits hard, and a nova to run out of. */
+export const REVERENDISSIMO: CasterKind = {
+  ...PRIEST,
+  hp: 1500, // ~45-60 s
+  aggro: 15, leash: 60, blind: 15,
+  range: 22, keep: 0,
+  speed: 3, walk: 6, cast: 2.2, cooldown: 3.5, bolt: 11, life: 5, damage: 80,
+  radius: 1.1,
+  melee: { reach: 3, hit: 4, windup: 0.8, swing: 1.6, cooldown: 2.8, damage: 90 },
+  nova: { every: 13, cast: 2.4, radius: 7, damage: 220 },
+};
 const LOS_EVERY = 0.25; // s: tracing a ray through the cloister costs ~0.2 ms
 const CHEST = 1.1; // m above the feet: where bolts leave the staff and strike the player
 
-export type CasterState = 'pray' | 'chase' | 'cast' | 'evade' | 'dead';
+export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'evade' | 'dead';
 
 export interface Bounds { x0: number; x1: number; z0: number; z1: number }
 
 export interface Priest {
+  kind: CasterKind;
   x: number; y: number; z: number;
   yaw: number; // 0 faces -Z
   hp: number;
   state: CasterState;
   t: number; // s in the current state
   cd: number; // cast cooldown left
+  melee: number; // swing cooldown left
+  nova: number; // s until the next nova (boss)
+  struck: boolean; // this swing or nova already resolved
+  once?: boolean; // dies for good: no respawn (the church, everyone after the boss falls)
   backoff: number; // backpedal budget left until the next cast
   blind: number; // s pulled without line of sight
   los: { ok: boolean; t: number }; // line of sight to the player, re-traced every LOS_EVERY s
@@ -51,6 +91,7 @@ export interface Priest {
 
 export interface Bolt {
   x: number; y: number; z: number;
+  dmg: number; speed: number; life: number; // from the caster's kind
   t: number;
   hit: boolean; // struck the player (set by fly, for the impact effect)
 }
@@ -104,20 +145,53 @@ export function cloisterPlan(world: World, areas: (Bounds & { label: string })[]
   return cloisters.map((area) => ({ area, groups: cloisterSpots(world, area, groupsFor(size(area), largest)) }));
 }
 
-export function spawnPriests(world: World, groups: [number, number, number][][], bounds: Bounds[]): Priest[][] {
+/** Groups of casters; `kinds[i][k]` (default PRIEST) is the k-th member of group i. */
+export function spawnPriests(world: World, groups: [number, number, number][][], bounds: Bounds[], kinds: CasterKind[][] = []): Priest[][] {
   return groups.map((g, i) => {
     const mates: Priest[] = [];
-    for (const [x, z, yaw] of g) {
-      mates.push({ x, y: feet(world, x, z), z, yaw, hp: PRIEST.hp, state: 'pray', t: 0, cd: 0, backoff: PRIEST.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates });
-    }
+    g.forEach(([x, z, yaw], k) => {
+      const kind = kinds[i]?.[k] ?? PRIEST;
+      mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false, backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates });
+    });
     return mates;
   });
+}
+
+/**
+ * The church: a sacerdote and two priests at the head of the nave and another trio behind the
+ * high altar, the Reverendissimo alone under the dome. All of them die for good.
+ */
+export const CHURCH = { x0: -12.5, x1: 12.5, z0: -60, z1: 0 };
+export const BOSS_AT = { x: 0, z: -37 }; // crossing centre (zones/chiesa.ts CX)
+export function spawnChurch(world: World): { all: Priest[]; boss: Priest } {
+  const S = Math.PI; // facing +Z, down the nave towards the door
+  const groups: [number, number, number][][] = [
+    [[0, -6, S], [-2.6, -7.5, S], [2.6, -7.5, S]], // head of the nave
+    [[0, -52.2, S], [-4.3, -52, S], [4.3, -52, S]], // behind the high altar (z -50.5..-49.3), between baldachin and colonnade
+    [[BOSS_AT.x, BOSS_AT.z, S]],
+  ];
+  const kinds = [[SACERDOTE], [SACERDOTE], [REVERENDISSIMO]];
+  const all = spawnPriests(world, groups, groups.map(() => CHURCH), kinds).flat();
+  for (const f of all) f.once = true;
+  return { all, boss: all[all.length - 1] };
+}
+
+/** Everyone drops dead at once and stays down (the boss's fall). */
+export function killAll(fs: { state: string; hp: number; t: number; once?: boolean }[]): void {
+  for (const f of fs) {
+    f.once = true;
+    if (f.state === 'dead') continue;
+    f.hp = 0;
+    f.state = 'dead';
+    f.t = 0;
+  }
 }
 
 function enter(f: Priest, s: CasterState): void {
   f.state = s;
   f.t = 0;
   f.move = 0;
+  f.struck = false;
 }
 
 /** Aggro: the priest and every praying mate turn on the player. */
@@ -140,65 +214,93 @@ function look(f: Priest, p: Target, world: World, dt: number): boolean {
 
 /** Walk towards (x,z) without leaving the cloister. */
 function go(f: Priest, x: number, z: number, speed: number, stop: number, world: World, dt: number): void {
-  const b = f.bounds, m = PRIEST.margin;
-  walk(f, Math.min(Math.max(x, b.x0 + m), b.x1 - m), Math.min(Math.max(z, b.z0 + m), b.z1 - m), speed, stop, world, dt);
+  const b = f.bounds, m = f.kind.margin;
+  walk(f, Math.min(Math.max(x, b.x0 + m), b.x1 - m), Math.min(Math.max(z, b.z0 + m), b.z1 - m), speed, stop, world, dt, f.kind.radius);
 }
 
-/** Advance one priest by `dt`; a finished cast pushes its bolt onto `bolts`. */
-export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[]): void {
+/**
+ * Advance one priest by `dt`; a finished cast pushes its bolt onto `bolts`. Returns the melee
+ * (swing or nova) damage it lands on the player this frame.
+ */
+export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[]): number {
+  const K = f.kind;
   f.t += dt;
   f.cd = Math.max(0, f.cd - dt);
+  f.melee = Math.max(0, f.melee - dt);
+  if (K.nova && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.nova -= dt;
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
   const toPlayer = Math.atan2(f.x - p.x, f.z - p.z);
+  const reach = K.melee ? K.melee.reach + K.radius : 0;
 
   switch (f.state) {
     case 'pray':
       face(f, f.home.yaw, dt);
-      if (dist < PRIEST.aggro && level && look(f, p, world, dt)) pull(f);
-      return;
+      if (dist < K.aggro && level && look(f, p, world, dt)) pull(f);
+      return 0;
     case 'chase': {
-      const seen = level && dist <= PRIEST.range && look(f, p, world, dt);
+      const seen = level && dist <= K.range && look(f, p, world, dt);
       f.blind = seen ? 0 : f.blind + dt;
-      if (Math.hypot(p.x - f.home.x, p.z - f.home.z) > PRIEST.leash || f.blind > PRIEST.blind) { enter(f, 'evade'); return; }
+      if (Math.hypot(p.x - f.home.x, p.z - f.home.z) > K.leash || f.blind > K.blind) { enter(f, 'evade'); return 0; }
       f.move = 0;
-      if (dist < PRIEST.keep && f.backoff > 0) {
+      if (K.nova && f.nova <= 0 && dist < K.nova.radius && level) { enter(f, 'nova'); return 0; }
+      if (K.melee && dist <= reach && level) {
+        if (f.melee === 0) { enter(f, 'swing'); f.melee = K.melee.cooldown; }
+        else face(f, toPlayer, dt);
+        return 0;
+      }
+      if (dist < K.keep && f.backoff > 0) {
         // Backpedal straight away from the player, still facing them.
         f.backoff -= dt;
         const x = f.x, z = f.z;
-        go(f, f.x + ((f.x - p.x) / Math.max(dist, 0.1)) * 2, f.z + ((f.z - p.z) / Math.max(dist, 0.1)) * 2, PRIEST.back, 0, world, dt);
-        if (Math.hypot(f.x - x, f.z - z) > PRIEST.back * dt * 0.3) f.move = -1;
+        go(f, f.x + ((f.x - p.x) / Math.max(dist, 0.1)) * 2, f.z + ((f.z - p.z) / Math.max(dist, 0.1)) * 2, K.back, 0, world, dt);
+        if (Math.hypot(f.x - x, f.z - z) > K.back * dt * 0.3) f.move = -1;
         else f.backoff = 0; // cornered against the cloister's edge: stand and cast
         f.yaw = toPlayer;
-      } else if (!seen) {
-        go(f, p.x, p.z, PRIEST.speed, 0, world, dt);
+      } else if (!seen || (K.melee && f.cd > 0)) {
+        go(f, p.x, p.z, K.speed, K.melee ? reach * 0.8 : 0, world, dt); // melee kinds close in between casts
         f.move = 1;
       } else if (f.cd === 0) enter(f, 'cast');
       else face(f, toPlayer, dt);
-      return;
+      return 0;
     }
     case 'cast':
       face(f, toPlayer, dt);
-      if (!level || !look(f, p, world, dt)) { enter(f, 'chase'); f.cd = 0.5; return; } // interrupted
-      if (f.t < PRIEST.cast) return;
-      bolts.push({ x: f.x - Math.sin(f.yaw) * 0.5, y: f.y + CHEST + 0.4, z: f.z - Math.cos(f.yaw) * 0.5, t: 0, hit: false });
-      f.cd = PRIEST.cooldown;
-      f.backoff = PRIEST.backoff;
+      if (!level || !look(f, p, world, dt)) { enter(f, 'chase'); f.cd = 0.5; return 0; } // interrupted
+      if (f.t < K.cast) return 0;
+      bolts.push({ x: f.x - Math.sin(f.yaw) * 0.5, y: f.y + CHEST + 0.4, z: f.z - Math.cos(f.yaw) * 0.5, t: 0, hit: false, dmg: K.damage, speed: K.bolt, life: K.life });
+      f.cd = K.cooldown;
+      f.backoff = K.backoff;
       enter(f, 'chase');
-      return;
+      return 0;
+    case 'swing': {
+      const m = K.melee!;
+      face(f, toPlayer, dt * 0.5); // tracks a little, can be sidestepped
+      if (f.t >= m.swing) enter(f, 'chase');
+      if (f.struck || f.t < m.windup) return 0;
+      f.struck = true;
+      return dist <= m.hit + K.radius && level ? m.damage : 0;
+    }
+    case 'nova': {
+      const n = K.nova!;
+      if (f.t < n.cast) return 0;
+      f.nova = n.every;
+      enter(f, 'chase');
+      return dist <= n.radius && level ? n.damage : 0;
+    }
     case 'evade':
-      f.hp = PRIEST.hp;
-      walk(f, f.home.x, f.home.z, PRIEST.walk, 0, world, dt);
+      f.hp = K.hp;
+      walk(f, f.home.x, f.home.z, K.walk, 0, world, dt, K.radius);
       f.move = 1;
-      if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) enter(f, 'pray');
-      return;
+      if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
+      return 0;
     case 'dead':
-      if (f.t >= PRIEST.respawn) {
+      if (f.t >= K.respawn && !f.once) {
         f.x = f.home.x; f.z = f.home.z; f.yaw = f.home.yaw;
         f.y = feet(world, f.x, f.z);
-        f.hp = PRIEST.hp;
+        f.hp = K.hp;
         enter(f, 'pray');
       }
-      return;
+      return 0;
   }
 }
 
@@ -214,9 +316,9 @@ export function fly(bolts: Bolt[], p: Target, dt: number, spent: Bolt[] = []): n
     const b = bolts[i];
     b.t += dt;
     const dx = p.x - b.x, dy = p.y + CHEST - b.y, dz = p.z - b.z, d = Math.hypot(dx, dy, dz);
-    const s = PRIEST.bolt * dt;
-    if (d <= Math.max(s, 0.4)) { b.hit = true; dmg += PRIEST.damage; }
-    else if (b.t < PRIEST.life) { b.x += (dx / d) * s; b.y += (dy / d) * s; b.z += (dz / d) * s; continue; }
+    const s = b.speed * dt;
+    if (d <= Math.max(s, 0.4)) { b.hit = true; dmg += b.dmg; }
+    else if (b.t < b.life) { b.x += (dx / d) * s; b.y += (dy / d) * s; b.z += (dz / d) * s; continue; }
     spent.push(b);
     bolts.splice(i, 1);
   }

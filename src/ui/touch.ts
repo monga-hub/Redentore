@@ -1,7 +1,7 @@
 import type { Input } from '../core/input.ts';
 
-const STICK_R = 56; // px, knob travel from the stick centre
-const DEAD = 0.12; // stick dead zone, fraction of STICK_R
+const STICK_TRAVEL = 0.47; // knob travel from the stick centre, fraction of the stick's size (scaled by --k in index.html)
+const DEAD = 0.12; // stick dead zone, fraction of the knob travel
 const LOOK = 1.4; // finger px -> mouse px, so a thumb swipe turns as far as a mouse drag
 const STICK_ZONE = 0.4; // touches starting in the left 40% of the screen drive the stick
 
@@ -15,6 +15,7 @@ export class TouchControls {
   private stickId = -1;
   private ox = 0; // stick centre
   private oy = 0;
+  private r = 1; // px knob travel, measured at touch-down
   private look = new Map<number, { x: number; y: number }>();
   private pinch = 0; // last two-finger distance, 0 = not pinching
 
@@ -35,6 +36,7 @@ export class TouchControls {
         this.stickId = e.pointerId;
         this.ox = e.clientX;
         this.oy = e.clientY;
+        this.r = this.base.offsetWidth * STICK_TRAVEL;
         this.base.style.left = `${e.clientX}px`;
         this.base.style.top = `${e.clientY}px`;
         this.base.classList.add('active');
@@ -99,11 +101,12 @@ export class TouchControls {
   private moveStick(x: number, y: number): void {
     let dx = x - this.ox, dy = y - this.oy;
     const d = Math.hypot(dx, dy);
-    if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+    const r = this.r;
+    if (d > r) { dx *= r / d; dy *= r / d; }
     this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
     // rescale past the dead zone so the first bit of real tilt isn't lost
-    const m = Math.min(d, STICK_R) / STICK_R;
-    const k = m > DEAD ? (m - DEAD) / (1 - DEAD) / (m * STICK_R) : 0;
+    const m = Math.min(d, r) / r;
+    const k = m > DEAD ? (m - DEAD) / (1 - DEAD) / (m * r) : 0;
     this.input.stickX = dx * k;
     this.input.stickY = dy * k;
   }

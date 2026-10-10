@@ -7,6 +7,8 @@ import { ICONS } from './icons.ts';
 // in index.html; per frame it only writes values that changed.
 // On touch devices the same buttons turn round and fan out bottom-right, Albion-style:
 // one big button in the corner, an inner arc and an outer arc of smaller ones (RING).
+// There a quick tap casts on release and a press held for HOLD ms shows the tooltip
+// instead, until the finger lifts.
 
 /** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px]. */
 const RING: Record<number, [number, number, number]> = {
@@ -24,6 +26,8 @@ interface Slot<C extends Caster> {
   text: string;
   wasCd: boolean;
 }
+
+const HOLD = 450; // ms
 
 const secs = (t: number) => (t >= 60 ? `${Math.ceil(t / 60)}m` : t >= 3 ? `${Math.ceil(t)}` : t.toFixed(1));
 const num = (t: number) => t.toLocaleString('it', { maximumFractionDigits: 1 });
@@ -60,10 +64,25 @@ export class ActionBar<C extends Caster> {
       }
       s.el.tabIndex = -1; // keys belong to the game, not to focus navigation
       s.key.textContent = code.replace('Digit', '').replace('Minus', '-').replace('Equal', '=');
+      let hold = 0, held = false;
       s.el.addEventListener('pointerdown', (e) => {
         e.preventDefault(); // no focus, no text selection, no double-tap zoom
-        if (sys.tryCast(i)) this.press(s);
+        if (e.pointerType === 'touch' && a) {
+          held = false;
+          s.el.classList.add('down');
+          hold = window.setTimeout(() => { held = true; this.showTip(s.el, a); }, HOLD);
+        } else if (sys.tryCast(i)) this.press(s);
       });
+      const lift = (cast: boolean) => (e: PointerEvent) => {
+        if (e.pointerType !== 'touch' || !s.el.classList.contains('down')) return;
+        clearTimeout(hold);
+        s.el.classList.remove('down');
+        this.tip.classList.remove('show');
+        if (cast && !held && sys.tryCast(i)) this.press(s);
+      };
+      s.el.addEventListener('pointerup', lift(true));
+      s.el.addEventListener('pointercancel', lift(false));
+      s.el.addEventListener('contextmenu', (e) => e.preventDefault()); // Android long-press menu
       if (a) {
         s.el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') this.showTip(s.el, a); });
         s.el.addEventListener('pointerleave', () => this.tip.classList.remove('show'));
@@ -141,10 +160,13 @@ export class ActionBar<C extends Caster> {
     this.tip.innerHTML = `<b></b>${a.mana ? `<div class="row"><span>${a.mana} mana</span></div>` : ''}<div class="row"><span>${cast}</span><span>Recupero ${cd}</span></div><p></p>`;
     this.tip.querySelector('b')!.textContent = a.name;
     this.tip.querySelector('p')!.textContent = a.desc;
-    const r = anchor.getBoundingClientRect();
-    this.tip.style.left = `${Math.min(r.left, innerWidth - 280)}px`;
-    this.tip.style.bottom = `${innerHeight - r.top + 8}px`;
-    this.tip.classList.add('show');
+    const r = anchor.getBoundingClientRect(), t = this.tip;
+    t.classList.add('show');
+    // above the button, kept on screen; if there's no room above (high ring buttons on a short phone), beside it on the left
+    const w = t.offsetWidth, h = t.offsetHeight;
+    const above = r.top - h - 8 >= 8;
+    t.style.left = `${Math.max(8, Math.min(above ? r.left : r.left - w - 8, innerWidth - w - 8))}px`;
+    t.style.top = `${above ? r.top - h - 8 : Math.max(8, Math.min(r.top, innerHeight - h - 8))}px`;
   }
 }
 

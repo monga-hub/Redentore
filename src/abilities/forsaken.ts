@@ -271,6 +271,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: `Un fendente di schegge d'ossa davanti a te: ${MELEE_DAMAGE} danni a tutti i nemici entro ${num(MELEE_RANGE)} m.`,
     fire(k) {
       const p = k.player.pos, f = k.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), v = k.vfx;
+      k.player.attack();
       k.hurt?.((x, z) => {
         const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
         return d < MELEE_RANGE && (d < 0.6 || (dx * fx + dz * fz) / d > MELEE_ARC);

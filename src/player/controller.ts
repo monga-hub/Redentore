@@ -31,6 +31,11 @@ export class PlayerController {
     this.facing = s.yaw;
   }
 
+  /** Main-attack swing on the model; movement carries on underneath. */
+  attack(): void {
+    this.model.attack();
+  }
+
   /** Blink up to `dist` m along the facing, stopping short of the first wall. Returns metres travelled. */
   blink(dist: number): number {
     const dx = -Math.sin(this.facing), dz = -Math.cos(this.facing), STEP = 0.2;

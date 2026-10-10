@@ -37,6 +37,9 @@ export interface Friar {
 
 export interface Target { x: number; y: number; z: number }
 
+/** What the shared movement helpers below need; friars and priests (caster.ts) both fit. */
+export interface Mob extends Target { yaw: number; state: string }
+
 /**
  * Hoeing spots on the earth walks between the raised beds of the orti (see zones/orto.ts
  * `beds`: blocks x -35..-22 and -17.5..-9.5, a 1.2 m walk at x -28.5 and between the bed rows),
@@ -63,7 +66,7 @@ export function spawnGroups(world: World, groups = GROUPS): Friar[][] {
 }
 
 /** Standing height at (x,z), stepping up onto low beds and kerbs. */
-const feet = (world: World, x: number, z: number) => world.groundAt(x, z, world.standHeight(x, z));
+export const feet = (world: World, x: number, z: number) => world.groundAt(x, z, world.standHeight(x, z));
 
 function enter(f: Friar, s: State): void {
   f.state = s;
@@ -76,13 +79,13 @@ export function pull(f: Friar): void {
   for (const m of f.mates) if (m.state === 'hoe') enter(m, 'chase');
 }
 
-function face(f: Friar, yaw: number, dt: number): void {
+export function face(f: Mob, yaw: number, dt: number): void {
   const d = Math.atan2(Math.sin(yaw - f.yaw), Math.cos(yaw - f.yaw));
   f.yaw += d * Math.min(1, TURN * dt);
 }
 
 /** Walk towards (x,z), stopping `stop` m short. Returns the distance left. */
-function walk(f: Friar, x: number, z: number, speed: number, stop: number, world: World, dt: number): number {
+export function walk(f: Mob, x: number, z: number, speed: number, stop: number, world: World, dt: number): number {
   const dx = x - f.x, dz = z - f.z, d = Math.hypot(dx, dz);
   if (d > 1e-3) face(f, Math.atan2(-dx, -dz), dt);
   const s = Math.min(speed * dt, d - stop);
@@ -144,8 +147,8 @@ export function hurt(f: Friar, n: number): boolean {
   return true;
 }
 
-/** Keep the living friars from stacking on one another (pairwise, a dozen at most). */
-export function separate(friars: Friar[], world: World): void {
+/** Keep the living mobs of one kind from stacking on one another (pairwise, a few dozen at most). */
+export function separate(friars: Mob[], world: World): void {
   const min = FRIAR.radius * 2;
   for (let i = 0; i < friars.length; i++) {
     const a = friars[i];

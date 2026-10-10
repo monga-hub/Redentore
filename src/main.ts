@@ -11,6 +11,7 @@ import { Forsaken } from './abilities/forsaken.ts';
 import { ActionBar } from './ui/actionBar.ts';
 import { PlayerStats } from './player/stats.ts';
 import { Friars } from './enemies/friars.ts';
+import { Priests } from './enemies/priests.ts';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -41,7 +42,9 @@ scene.add(kit.vfx.root);
 const bar = new ActionBar(kit.system);
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
 scene.add(friars.root);
-kit.hurt = (inside, n) => friars.hurtWhere(inside, n);
+const priests = new Priests(level.world, kit.vfx, playerStats, level.areas); // undead priests casting in the cloisters
+scene.add(priests.root);
+kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
 const pressed = (code: string) => input.pressed(code);
 
 addEventListener('resize', () => {
@@ -52,7 +55,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars });
+Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -63,6 +66,7 @@ renderer.setAnimationLoop(() => {
   kit.update(dt, pressed); // before the player moves: casts see last frame's motion
   player.update(dt, input, cam.yaw, (input.buttons & 2) !== 0);
   friars.update(dt, player.pos);
+  priests.update(dt, player.pos);
   cam.update(dt, input, player.pos);
   hud.setArea(level.areaAt(player.pos.x, player.pos.z)?.label);
   hud.setStats(playerStats);

@@ -46,22 +46,8 @@ class View {
 
   constructor(t: Template) {
     const model = cloneSkinned(t.scene) as THREE.Group;
-    // Own materials per friar so a hit flash only lights this one; programs stay shared.
-    const own = new Map<THREE.Material, THREE.MeshStandardMaterial>();
-    model.traverse((o) => {
-      if (o.name === 'hoeBlade') this.blade = o;
-      if (!(o instanceof THREE.Mesh)) return;
-      const m = o.material as THREE.MeshStandardMaterial;
-      if (m.name === 'Glow') return; // eyes: shared, never flashed
-      if (!own.has(m)) {
-        const c = m.clone(); // clone() drops shader hooks: carry the dye over
-        c.onBeforeCompile = m.onBeforeCompile;
-        c.customProgramCacheKey = m.customProgramCacheKey;
-        own.set(m, c);
-        this.mats.push(c);
-      }
-      o.material = own.get(m)!;
-    });
+    this.mats = ownMaterials(model);
+    this.blade = model.getObjectByName('hoeBlade')!;
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
     for (const c of new Set(Object.values(CLIPS)).add('Skeletons_Awaken_Standing')) {
@@ -131,7 +117,25 @@ class View {
   }
 }
 
-function barMat(color: number): THREE.SpriteMaterial {
+/** Give a skinned clone its own materials so a hit flash only lights this one; programs stay shared. */
+export function ownMaterials(model: THREE.Object3D): THREE.MeshStandardMaterial[] {
+  const own = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+  model.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const m = o.material as THREE.MeshStandardMaterial;
+    if (m.name === 'Glow' || m.userData.shared) return; // eyes and glows: shared, never flashed
+    if (!own.has(m)) {
+      const c = m.clone(); // clone() drops shader hooks: carry the dye over
+      c.onBeforeCompile = m.onBeforeCompile;
+      c.customProgramCacheKey = m.customProgramCacheKey;
+      own.set(m, c);
+    }
+    o.material = own.get(m)!;
+  });
+  return [...own.values()];
+}
+
+export function barMat(color: number): THREE.SpriteMaterial {
   return new THREE.SpriteMaterial({ color, fog: false, toneMapped: false, sizeAttenuation: false });
 }
 

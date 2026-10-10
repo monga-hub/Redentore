@@ -34,12 +34,16 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti) |
+| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti); 9 = pozione |
 | Esc | annulla il lancio in corso |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
-trascina sul resto dello schermo per la camera, pizzica per lo zoom, pulsante salto
-in basso a destra.
+trascina sul resto dello schermo per la camera, pizzica per lo zoom; a destra le
+abilità diventano tasti tondi a ventaglio attorno all'angolo (stile action-RPG mobile),
+con salto e pozione tra i tasti piccoli.
+
+In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,
+anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
 ## Deploy
 

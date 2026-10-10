@@ -58,4 +58,11 @@ export const ICONS: Record<string, string> = {
     <path d="M18 54 V24 a14 14 0 0 1 28 0 V54 z" fill="#3b4a40" stroke="#bfe8cc" stroke-width="2"/>
     <path d="M32 26 v18 M26 32 l6 -6 6 6 M27 40 h10" stroke="#58ff9a" stroke-width="3" fill="none"/>
     <path d="M10 56 h44" stroke="#58ff9a" stroke-width="2" opacity=".6"/>`),
+  // corked vial of green grave-sap
+  potion: icon('potion', '#2a6a3a', '#04120a', `
+    <path d="M27 10 h10 v5 h-10 z" fill="#8a6a44" stroke="#e6d2a8" stroke-width="1.5"/>
+    <path d="M28 15 v9 C18 28 14 36 16 44 C18 52 25 56 32 56 C39 56 46 52 48 44 C50 36 46 28 36 24 V15 z" fill="#123a1c" stroke="#d8ffe4" stroke-width="2"/>
+    <path d="M19 40 C24 37 40 43 45 39 C46 47 40 53 32 53 C24 53 18 48 19 40 z" fill="#58ff9a" opacity=".85"/>
+    <circle cx="27" cy="45" r="2" fill="#d8ffe4"/><circle cx="36" cy="48" r="1.4" fill="#d8ffe4"/>
+    <path d="M22 32 q2 -4 6 -5" stroke="#fff" stroke-width="2" fill="none" opacity=".6"/>`),
 };

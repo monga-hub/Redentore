@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { PlayerController } from '../player/controller.ts';
+import type { PlayerStats } from '../player/stats.ts';
 import { AbilitySystem, type Ability } from './system.ts';
 import { Vfx, type Puff } from './vfx.ts';
 
-// The Forsaken kit: eight abilities that read without enemies (movement, light, VFX).
+// The Forsaken kit: eight abilities plus a potion that read without enemies (movement, light, VFX).
 // Names are our own; flavour after the undead racials and shadow/plague classes.
 
 const VIOLET = 0xa45cff, SHADOW = 0x1a0f24, PLAGUE = 0x7dff3a, BILE = 0x1f2e0c, WISP = 0x8dffe0;
@@ -21,6 +22,7 @@ export class Forsaken {
   readonly vfx = new Vfx();
   readonly system: AbilitySystem<Forsaken>;
   readonly player: PlayerController;
+  readonly stats: PlayerStats;
   veil = 0; // s left
   fall = 0;
   wisp = 0;
@@ -33,10 +35,12 @@ export class Forsaken {
 
   readonly spawn: { x: number; z: number; yaw: number };
 
-  constructor(player: PlayerController, spawn: { x: number; z: number; yaw: number }) {
+  constructor(player: PlayerController, spawn: { x: number; z: number; yaw: number }, stats: PlayerStats) {
     this.player = player;
     this.spawn = spawn;
+    this.stats = stats;
     this.system = new AbilitySystem(ABILITIES, BAR, this);
+    this.system.pool = stats;
     this.system.onStart = (a) => { if (a.id !== 'veil' && !a.offGcd && this.veil > 0) this.endVeil(); };
   }
 
@@ -163,7 +167,7 @@ const smoke = (color: number, size: number, alpha: number): Omit<Puff, 'x' | 'y'
 
 export const ABILITIES: Ability<Forsaken>[] = [
   {
-    id: 'step', name: "Passo d'ombra", icon: 'step', cooldown: 12,
+    id: 'step', name: "Passo d'ombra", icon: 'step', cooldown: 12, mana: 40,
     desc: "Ti dissolvi nell'ombra e riappari fino a 8 m più avanti. I muri ti fermano.",
     fire(k) {
       const a = chest(k), v = k.vfx;
@@ -180,7 +184,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20,
+    id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20, mana: 80,
     desc: 'Getta davanti a te una nube pestilenziale che ristagna per 8 s.',
     fire(k) {
       k.plague();
@@ -189,7 +193,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: 1.5,
+    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: 1.5, mana: 60,
     desc: 'Evoca un fuoco fatuo che ti segue per 60 s e rischiara il buio.',
     during(k, _p, dt) {
       const p = k.player.pos, f = k.player.facing, v = k.vfx;
@@ -224,7 +228,8 @@ export const ABILITIES: Ability<Forsaken>[] = [
       const a = chest(k);
       k.vfx.burst(a.x, a.y, a.z, 24, 0.6, { life: 0.8, size: 0.12, color: BLOOD, hdr: 2.6, drag: 2, vy: 1 }, 0.8);
       k.vfx.pulse(a.x, a.y, a.z, BLOOD, 18);
-      k.system.notices.push({ kind: 'heal', text: '+7% salute' });
+      const h = k.stats.heal(k.stats.hpMax * 0.07);
+      k.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
     },
   },
   {
@@ -239,7 +244,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'veil', name: 'Velo spettrale', icon: 'veil', cooldown: 30,
+    id: 'veil', name: 'Velo spettrale', icon: 'veil', cooldown: 30, mana: 50,
     desc: "Per 10 s diventi un'ombra semitrasparente e ti muovi il 30% più veloce. Usare un'altra abilità lo dissolve.",
     fire(k) {
       k.veil = 10;
@@ -251,7 +256,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     active: (k) => k.veil > 0,
   },
   {
-    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 15,
+    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 15, mana: 30,
     desc: 'Per 6 s ali di fumo rallentano la tua caduta: salta da cori e tetti senza paura.',
     fire(k) {
       k.fall = 6;
@@ -293,7 +298,18 @@ export const ABILITIES: Ability<Forsaken>[] = [
       if (!ok) k.vfx.column.visible = false;
     },
   },
+  {
+    id: 'potion', name: 'Fiala di linfa tombale', icon: 'potion', cooldown: 30, offGcd: true,
+    desc: 'Fuori dal tempo di recupero globale. Ripristina il 30% della salute e il 30% del mana.',
+    fire(k) {
+      const s = k.stats, h = s.heal(s.hpMax * 0.3);
+      s.restoreMana(s.manaMax * 0.3);
+      const a = chest(k);
+      k.vfx.burst(a.x, a.y, a.z, 24, 0.4, { life: 0.8, size: 0.09, color: GRAVE, hdr: 2.4, vy: 1.2, drag: 2 }, 1);
+      k.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
+    },
+  },
 ];
 
-/** Slot order on the bar; 9 0 - = stay free for later items. */
-export const BAR: (string | null)[] = ['step', 'plague', 'wisp', 'feast', 'will', 'veil', 'fall', 'hearth', null, null, null, null];
+/** Slot order on the bar; 0 - = stay free for later items. */
+export const BAR: (string | null)[] = ['step', 'plague', 'wisp', 'feast', 'will', 'veil', 'fall', 'hearth', 'potion', null, null, null];

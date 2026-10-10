@@ -1,6 +1,7 @@
 // Headless ability-system check (`npm run check`): GCD, off-GCD, cooldowns, one cast per
-// key press, cast completion and movement interrupts, channel ticks.
+// key press, cast completion and movement interrupts, channel ticks, mana costs, player stats.
 import { AbilitySystem, GCD, type Ability } from '../src/abilities/system.ts';
+import { PlayerStats } from '../src/player/stats.ts';
 
 const fired: string[] = [];
 const ab = (id: string, extra: Partial<Ability> = {}): Ability =>
@@ -46,4 +47,29 @@ step(3);
 eq([], 'movement interrupts a cast');
 if (sys.cooldown(sys.slots[3]!) !== 0) throw new Error('interrupted cast must not start its cooldown');
 if (!sys.notices.some((n) => n.kind === 'fail')) throw new Error('interrupt not reported');
+
+// Mana: costs are paid when the cooldown starts; short of mana nothing fires.
+const stats = new PlayerStats(100, 50);
+const pay = new AbilitySystem([ab('m', { mana: 30, cooldown: 0, offGcd: true }), ab('mc', { mana: 30, cast: 1 })], ['m', 'mc'], ctx);
+pay.pool = stats;
+const mana = (want: number, why: string) => { if (stats.mana !== want) throw new Error(`${why}: mana ${stats.mana} want ${want}`); };
+fired.length = 0;
+pay.tryCast(0);
+mana(20, 'instant pays');
+pay.tryCast(0);
+eq(['m'], 'not enough mana blocks the cast');
+if (!pay.notices.some((n) => n.text === 'Mana insufficiente.')) throw new Error('no mana error');
+stats.update(10);
+mana(45, 'regen');
+pay.tryCast(1);
+mana(45, 'cast-time ability pays when the bar fills, not on press');
+for (let t = 0; t < 1.1; t += 0.1) pay.update(0.1, () => false);
+eq(['m', 'mc'], 'cast with mana fires');
+mana(15, 'cast pays');
+
+// Health: clamps, death fires once, the dead don't heal.
+let deaths = 0;
+stats.onDeath = () => deaths++;
+if (stats.takeDamage(30) !== 30 || stats.heal(50) !== 30) throw new Error('damage/heal clamp');
+if (stats.takeDamage(500) !== 100 || stats.takeDamage(5) !== 0 || !stats.dead || deaths !== 1 || stats.heal(10) !== 0) throw new Error('death');
 console.log('abilities ok');

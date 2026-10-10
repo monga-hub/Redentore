@@ -5,6 +5,15 @@ import { ICONS } from './icons.ts';
 // (a conic-gradient driven by one CSS variable), remaining seconds, key label, click/tap
 // to cast, tooltip, cast bar, red error line and floating combat text. Plain DOM, styled
 // in index.html; per frame it only writes values that changed.
+// On touch devices the same buttons turn round and fan out bottom-right, Albion-style:
+// one big button in the corner, an inner arc and an outer arc of smaller ones (RING).
+
+/** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px]. */
+const RING: Record<number, [number, number, number]> = {
+  0: [0, 0, 92], // the big one, in the corner
+  1: [95, 118, 58], 2: [125, 118, 58], 5: [155, 118, 58], 6: [185, 118, 58],
+  3: [92, 192, 48], 4: [114, 192, 48], 7: [136, 192, 48], 8: [158, 192, 48], // + jump at 180 (index.html)
+};
 
 interface Slot<C extends Caster> {
   el: HTMLElement;
@@ -44,6 +53,11 @@ export class ActionBar<C extends Caster> {
       s.el.innerHTML = a ? `<div class="icon">${ICONS[a.icon] ?? ''}</div><div class="sweep"></div>` : '';
       s.el.classList.toggle('empty', !a);
       s.el.append(s.cd, s.key);
+      const ring = RING[i];
+      if (ring) {
+        s.el.classList.add('ring');
+        s.el.style.cssText = `--a:${ring[0]}deg;--r:${ring[1]}px;--d:${ring[2]}px`;
+      }
       s.el.tabIndex = -1; // keys belong to the game, not to focus navigation
       s.key.textContent = code.replace('Digit', '').replace('Minus', '-').replace('Equal', '=');
       s.el.addEventListener('pointerdown', (e) => {
@@ -81,6 +95,7 @@ export class ActionBar<C extends Caster> {
       s.wasCd = cd > 0;
       s.el.classList.toggle('active', !!a.active?.(sys.ctx));
       s.el.classList.toggle('casting', sys.casting?.ability === a);
+      s.el.classList.toggle('oom', !sys.affordable(a));
     });
 
     for (const n of sys.notices) {
@@ -123,7 +138,7 @@ export class ActionBar<C extends Caster> {
   private showTip(anchor: HTMLElement, a: Ability<C>): void {
     const cast = a.channel ? 'Canalizzata' : a.cast ? `Lancio ${num(a.cast)} s` : 'Istantanea';
     const cd = a.cooldown >= 60 ? `${num(a.cooldown / 60)} min` : `${num(a.cooldown)} s`;
-    this.tip.innerHTML = `<b></b><div class="row"><span>${cast}</span><span>Recupero ${cd}</span></div><p></p>`;
+    this.tip.innerHTML = `<b></b>${a.mana ? `<div class="row"><span>${a.mana} mana</span></div>` : ''}<div class="row"><span>${cast}</span><span>Recupero ${cd}</span></div><p></p>`;
     this.tip.querySelector('b')!.textContent = a.name;
     this.tip.querySelector('p')!.textContent = a.desc;
     const r = anchor.getBoundingClientRect();

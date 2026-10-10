@@ -19,6 +19,7 @@ export interface Ability<C extends Caster = Caster> {
   cast?: number; // cast time in s; absent = instant
   channel?: { duration: number; tick: number };
   offGcd?: boolean;
+  mana?: number; // cost, paid when the cooldown starts (instant/channel: on press; cast: when the bar fills)
   /** Instant: on press. Cast: when the bar fills. Channel: on every tick (`tick` counts from 1). */
   fire(ctx: C, tick: number): void;
   /** Every frame while casting or channelling; `p` is progress 0..1. */
@@ -46,6 +47,8 @@ export class AbilitySystem<C extends Caster = Caster> {
   notices: Notice[] = [];
   /** Called before any ability starts (Velo spettrale drops when another ability is used). */
   onStart?: (a: Ability<C>) => void;
+  /** Mana pool abilities with a `mana` cost draw from (player/stats.ts). Absent = free. */
+  pool?: { mana: number; spendMana(n: number): boolean };
   readonly slots: (Ability<C> | undefined)[];
   private cds = new Map<string, number>();
   private moving = false;
@@ -73,15 +76,16 @@ export class AbilitySystem<C extends Caster = Caster> {
     if (!a.offGcd && this.gcd > 0) return false; // WoW stays silent on the GCD
     if (this.casting && !a.offGcd) return this.fail("Un'altra azione è in corso.");
     if ((a.cast || a.channel) && this.moving) return this.fail('Non puoi farlo mentre ti muovi.');
+    if (!this.affordable(a)) return this.fail('Mana insufficiente.');
 
     this.onStart?.(a);
     if (!a.offGcd) this.gcd = GCD;
     if (a.cast || a.channel) {
       const total = a.cast ?? a.channel!.duration;
       this.casting = { ability: a, t: 0, total, channel: !a.cast, ticks: 0 };
-      if (a.channel) this.cds.set(a.id, a.cooldown); // channels start their cooldown at once
+      if (a.channel) this.start(a); // channels start their cooldown at once
     } else {
-      this.cds.set(a.id, a.cooldown);
+      this.start(a);
       a.fire(this.ctx, 0);
     }
     return true;
@@ -112,8 +116,9 @@ export class AbilitySystem<C extends Caster = Caster> {
           while (c.ticks < due) a.fire(this.ctx, ++c.ticks);
         }
         if (c.t >= c.total) {
-          if (!c.channel) { this.cds.set(a.id, a.cooldown); a.fire(this.ctx, 0); }
-          this.stop(true);
+          if (c.channel) this.stop(true);
+          else if (!this.affordable(a)) { this.stop(false); this.fail('Mana insufficiente.'); }
+          else { this.start(a); a.fire(this.ctx, 0); this.stop(true); }
         }
       }
     }
@@ -124,6 +129,15 @@ export class AbilitySystem<C extends Caster = Caster> {
   /** Interrupt whatever is being cast (e.g. Esc). */
   cancel(): void {
     if (this.casting) this.stop(false);
+  }
+
+  affordable(a: Ability<C>): boolean {
+    return !a.mana || !this.pool || this.pool.mana >= a.mana;
+  }
+
+  private start(a: Ability<C>): void {
+    this.cds.set(a.id, a.cooldown);
+    if (a.mana) this.pool?.spendMana(a.mana);
   }
 
   private stop(ok: boolean): void {

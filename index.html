@@ -134,6 +134,16 @@
       .slot.active, .slot.casting { box-shadow: inset 0 0 0 1px #8a6d3e, 0 0 6px 1px #ffd75e; border-color: #ffd75e; }
       .slot.active::after { box-shadow: inset 0 0 0 2px #ffd75e, inset 0 0 10px rgba(255,215,94,.6); animation: proc 1.2s ease-in-out infinite alternate; }
       @keyframes proc { from { opacity: .55 } to { opacity: 1 } }
+      /* Charge bar: a half-ring over the main button, filled by stroke-dasharray (actionBar.ts). */
+      .slot.main { overflow: visible; }
+      .slot.main .icon, .slot.main .sweep { overflow: hidden; border-radius: inherit; }
+      .slot .charge { position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); overflow: visible; pointer-events: none; }
+      .charge path { fill: none; stroke: rgba(0,0,0,.75); stroke-width: 7; stroke-linecap: round; }
+      .charge .fill { stroke-width: 4.5; stroke-dasharray: 0 100; transition: stroke-dasharray .25s; }
+      .charge.full .fill { filter: drop-shadow(0 0 3px #ff3b2f); animation: proc .6s ease-in-out infinite alternate; }
+      .slot.locked .icon { filter: grayscale(1) brightness(.35); }
+      .slot.special:not(.locked) { border-color: #ff5a3a; box-shadow: inset 0 0 0 1px #8a6d3e, 0 0 8px 2px #ff5a3a; }
+      .slot.special:not(.locked)::after { animation: proc .8s ease-in-out infinite alternate; }
 
       .castbar {
         position: relative; width: min(260px, 70vw); height: 16px; visibility: hidden; opacity: 0;
@@ -162,6 +172,7 @@
       .combat.heal { color: #5cff4a; }
       .combat.dmg { color: #ff3b2f; top: 36%; }
       .combat.info { color: #d9b3ff; font-size: 18px; }
+      .combat.fury { color: #ff5a3a; font-size: 20px; }
       @keyframes rise { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.7) } 12% { opacity: 1; transform: translate(-50%, 0) scale(1.15) } 25% { transform: translate(-50%, -6px) scale(1) } 100% { opacity: 0; transform: translate(-50%, -70px) } }
 
       .tooltip {
@@ -201,6 +212,7 @@
       }
       body.touch .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 4px rgba(212,175,95,.3); }
       body.touch .slot.ring.active, body.touch .slot.ring.casting { border-color: #ffd75e; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ffd75e; }
+      body.touch .slot.ring.special:not(.locked) { border-color: #ff5a3a; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ff5a3a; }
       body.touch .slot.ring.down { border-color: #f3e2b0; filter: brightness(1.25); }
       body.touch .tooltip { width: 230px; font-size: 11px; }
       body.touch .tooltip b { font-size: 13px; }

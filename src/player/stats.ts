@@ -3,10 +3,14 @@
 // exercises it in Node. Also exposed as `window.playerStats` (see main.ts).
 
 const MANA_REGEN = 2.5; // mana/s, always on
+export const VEIL_CUT = 0.5; // Velo spettrale: share of incoming damage it takes off
 
 export class PlayerStats {
   hp: number;
   mana: number;
+  /** s left of Velo spettrale (incoming damage × VEIL_CUT off) and of total immunity. */
+  veil = 0;
+  immune = 0;
   /** Called once when health reaches 0. */
   onDeath?: () => void;
 
@@ -24,8 +28,8 @@ export class PlayerStats {
 
   /** Returns the damage actually taken. */
   takeDamage(n: number): number {
-    if (this.dead || !(n > 0)) return 0;
-    const d = Math.min(n, this.hp);
+    if (this.dead || !(n > 0) || this.immune > 0) return 0;
+    const d = Math.min(this.veil > 0 ? n * (1 - VEIL_CUT) : n, this.hp);
     this.hp -= d;
     if (this.dead) this.onDeath?.();
     return d;
@@ -58,6 +62,8 @@ export class PlayerStats {
   }
 
   update(dt: number): void {
+    this.veil = Math.max(0, this.veil - dt);
+    this.immune = Math.max(0, this.immune - dt);
     if (!this.dead) this.restoreMana(MANA_REGEN * dt);
   }
 }

@@ -129,8 +129,8 @@ export class Vfx {
   private smoke = new Cloud(THREE.NormalBlending);
   /** The one light abilities may use (Fuoco fatuo, flashes). Intensity 0 when idle. */
   readonly light = new THREE.PointLight(0x66ffcc, 0, 14, 1.6);
-  readonly wave = groundRing(0.9, 1); // Volontà del Risorto shock wave
-  readonly runes = groundRing(0.55, 1.4); // Ritorno alla cripta circle
+  readonly wave = groundRing(0.9, 1); // Lamento della cripta shock wave
+  readonly runes = groundRing(0.55, 1.4); // Patto della tomba circle
   readonly column = new THREE.Mesh(
     new THREE.CylinderGeometry(0.7, 0.9, 14, 24, 1, true).translate(0, 7, 0),
     new THREE.MeshBasicMaterial({ color: new THREE.Color(0x58ff9a).multiplyScalar(2.2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }),

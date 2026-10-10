@@ -1,18 +1,22 @@
 import * as THREE from 'three';
 import type { PlayerController } from '../player/controller.ts';
-import type { PlayerStats } from '../player/stats.ts';
+import { VEIL_CUT, type PlayerStats } from '../player/stats.ts';
+import type { Mob } from '../ui/target.ts';
 import { AbilitySystem, type Ability } from './system.ts';
 import { Vfx, type Puff } from './vfx.ts';
 
-// The Forsaken kit: eight abilities plus a potion that read without enemies (movement, light, VFX).
-// Names are our own; flavour after the undead racials and shadow/plague classes.
+// The Forsaken kit: six abilities and a potion, plus three specials that unlock when the charge
+// bar fills (system.ts). Names are our own; flavour after the undead racials and shadow/plague classes.
 
 const VIOLET = 0xa45cff, SHADOW = 0x1a0f24, PLAGUE = 0x7dff3a, BILE = 0x1f2e0c, WISP = 0x8dffe0;
-const BLOOD = 0xff2a3a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a, BONE = 0xefe6d2;
+const GOLD = 0xffc85a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a, BONE = 0xefe6d2;
 
 const PLAGUE_DPS = 12, STEP_DAMAGE = 25, WISP_DPS = 15;
 const MELEE_DAMAGE = 10, MELEE_RANGE = 2.6, MELEE_ARC = Math.cos(1.1); // ~125° cone in front
 const WISP_RADIUS = 1.6, WISP_MOVING = 0.6; // m, m/s: the wisp only scorches while it drifts
+const VEIL_TIME = 5;
+const STRIKE_DAMAGE = 50, STRIKE_RANGE = 30, STRIKE_ARC = 0.5; // no target: nearest foe within ~120° in front
+const NOVA_DAMAGE = 20, NOVA_RADIUS = 6, WARD_TIME = 5;
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 /** Emit `rate`/s on average this frame. */
@@ -27,7 +31,6 @@ export class Forsaken {
   readonly system: AbilitySystem<Forsaken>;
   readonly player: PlayerController;
   readonly stats: PlayerStats;
-  veil = 0; // s left
   wisp = 0;
   private clouds: Cloud[] = [];
   private hidden = 0; // Passo d'ombra: model hidden for a blink
@@ -35,18 +38,18 @@ export class Forsaken {
   private columnT = -1;
   private time = 0;
   private wispVel = new THREE.Vector3();
-  /** Damage dealer, wired to the enemies by main.ts: hurts whatever stands where `inside` holds. */
-  hurt?: (inside: (x: number, z: number) => boolean, n: number) => void;
+  private ghost = false;
+  /** Damage dealer, wired to the enemies by main.ts: hurts every enemy for which `inside` holds. */
+  hurt?: (inside: (x: number, z: number, mob: Mob) => boolean, n: number) => void;
+  /** Wired by main.ts: the selected target, and every enemy. */
+  aimed?: () => Mob | undefined;
+  foes?: () => Iterable<Mob>;
 
-  readonly spawn: { x: number; z: number; yaw: number };
-
-  constructor(player: PlayerController, spawn: { x: number; z: number; yaw: number }, stats: PlayerStats) {
+  constructor(player: PlayerController, stats: PlayerStats) {
     this.player = player;
-    this.spawn = spawn;
     this.stats = stats;
     this.system = new AbilitySystem(ABILITIES, BAR, this);
     this.system.pool = stats;
-    this.system.onStart = (a) => { if (a.id !== 'veil' && (!a.offGcd || a.id === 'fall') && this.veil > 0) this.endVeil(); };
   }
 
   update(dt: number, pressed: (code: string) => boolean): void {
@@ -56,9 +59,26 @@ export class Forsaken {
 
     if (this.hidden > 0 && (this.hidden -= dt) <= 0) this.player.mesh.visible = true;
 
-    if (this.veil > 0) {
+    const veiled = this.stats.veil > 0;
+    if (veiled !== this.ghost) this.setGhost((this.ghost = veiled));
+    if (veiled) {
       every(30, dt, () => v.puff({ x: p.x + rnd(-0.3, 0.3), y: p.y + rnd(0.1, 1.7), z: p.z + rnd(-0.3, 0.3), vy: 0.3, life: 1.1, size: 0.18, grow: 0.2, color: GHOST, hdr: 1.4, alpha: 0.6 }));
-      if ((this.veil -= dt) <= 0) this.endVeil();
+      every(18, dt, () => { // a thin shroud circling the body
+        const a = this.time * 5 + rnd(0, Math.PI * 2);
+        v.puff({ x: p.x + Math.cos(a) * 0.7, y: p.y + rnd(0.2, 1.6), z: p.z + Math.sin(a) * 0.7, vx: -Math.sin(a) * 1.4, vz: Math.cos(a) * 1.4, life: 0.7, size: 0.1, color: GHOST, hdr: 2, drag: 1 });
+      });
+    }
+
+    const r = v.runes; // Patto della tomba: a gold rune circle and a rising glow while immune
+    r.visible = this.stats.immune > 0;
+    if (r.visible) {
+      r.position.set(p.x, p.y + 0.04, p.z);
+      r.rotation.y += dt * 1.2;
+      r.material.color.setHex(GOLD).multiplyScalar(1.5 + Math.sin(this.time * 6) * 0.5 + (this.stats.immune < 1 ? -1 : 0));
+      every(40, dt, () => {
+        const a = rnd(0, Math.PI * 2), d = rnd(0.6, 1.3);
+        v.puff({ x: p.x + Math.cos(a) * d, y: p.y + 0.1, z: p.z + Math.sin(a) * d, vy: rnd(1.5, 3), life: 0.9, size: 0.07, color: GOLD, hdr: 2.6 });
+      });
     }
 
     for (const c of this.clouds) {
@@ -124,8 +144,9 @@ export class Forsaken {
     this.vfx.wave.visible = true;
   }
 
-  startColumn(x: number, y: number, z: number): void {
+  startColumn(x: number, y: number, z: number, color: number): void {
     const c = this.vfx.column;
+    c.material.color.setHex(color).multiplyScalar(2.2);
     c.position.set(x, y, z);
     c.scale.setScalar(1);
     c.visible = true;
@@ -155,10 +176,17 @@ export class Forsaken {
     });
   }
 
-  private endVeil(): void {
-    this.veil = 0;
-    this.player.speedMul = 1;
-    this.setGhost(false);
+  /** Colpo singolo's mark: the selected target, else the nearest foe in front. */
+  strikeTarget(): Mob | undefined {
+    const p = this.player.pos, f = this.player.facing, fx = -Math.sin(f), fz = -Math.cos(f);
+    const t = this.aimed?.();
+    if (t && t.state !== 'dead') return t;
+    let best: Mob | undefined, bestD = STRIKE_RANGE;
+    for (const m of this.foes?.() ?? []) {
+      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
+      if (m.state !== 'dead' && d < bestD && (d < 1 || (dx * fx + dz * fz) / d > STRIKE_ARC)) { bestD = d; best = m; }
+    }
+    return best;
   }
 }
 
@@ -176,7 +204,7 @@ const smoke = (color: number, size: number, alpha: number): Omit<Puff, 'x' | 'y'
 
 export const ABILITIES: Ability<Forsaken>[] = [
   {
-    id: 'step', name: "Passo d'ombra", icon: 'step', cooldown: 12, mana: 40,
+    id: 'step', name: "Passo d'ombra", icon: 'step', cooldown: 12, mana: 40, charge: 10,
     desc: `Ti dissolvi nell'ombra e riappari fino a 8 m più avanti, infliggendo ${STEP_DAMAGE} danni a chi attraversi. I muri ti fermano.`,
     fire(k) {
       const a = chest(k), v = k.vfx;
@@ -194,7 +222,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20, mana: 80,
+    id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20, mana: 80, charge: 10,
     desc: `Getta davanti a te una nube pestilenziale che ristagna per 8 s e corrode chi vi resta dentro (${PLAGUE_DPS} danni al secondo).`,
     fire(k) {
       k.plague();
@@ -203,7 +231,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: 1.5, mana: 60,
+    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: 1.5, mana: 60, charge: 10,
     desc: `Evoca un fuoco fatuo che ti segue per 60 s e rischiara il buio. Mentre si sposta brucia chi sfiora (${WISP_DPS} danni al secondo entro ${WISP_RADIUS} m).`,
     during(k, _p, dt) {
       const p = k.player.pos, f = k.player.facing, v = k.vfx;
@@ -224,50 +252,19 @@ export const ABILITIES: Ability<Forsaken>[] = [
     active: (k) => k.wisp > 0,
   },
   {
-    id: 'feast', name: 'Banchetto macabro', icon: 'feast', cooldown: 120, channel: { duration: 10, tick: 2 },
-    desc: 'Per 10 s ti nutri dei resti e recuperi il 7% della salute ogni 2 s. Muoverti la interrompe.',
-    during(k, _p, dt) {
-      const p = k.player.pos, v = k.vfx;
-      every(40, dt, () => {
-        const a = rnd(0, Math.PI * 2), r = rnd(0.5, 0.8), up = rnd(0.6, 1.2);
-        // tangential + upward start: the pool's straight-line motion reads as a rising spiral
-        v.puff({ x: p.x + Math.cos(a) * r, y: p.y + rnd(0, 0.4), z: p.z + Math.sin(a) * r, vx: -Math.sin(a) * 1.2 - Math.cos(a) * 0.3, vy: up, vz: Math.cos(a) * 1.2 - Math.sin(a) * 0.3, life: 1.2, size: 0.11, color: BLOOD, hdr: 1.8, drag: 0.8 });
-      });
-    },
+    id: 'veil', name: 'Velo spettrale', icon: 'veil', cooldown: 30, mana: 50, charge: 10,
+    desc: `Per ${VEIL_TIME} s diventi un'ombra sfuggente: i colpi ti attraversano e subisci il ${VEIL_CUT * 100}% di danni in meno.`,
     fire(k) {
-      const a = chest(k);
-      k.vfx.burst(a.x, a.y, a.z, 24, 0.6, { life: 0.8, size: 0.12, color: BLOOD, hdr: 2.6, drag: 2, vy: 1 }, 0.8);
-      k.vfx.pulse(a.x, a.y, a.z, BLOOD, 18);
-      const h = k.stats.heal(k.stats.hpMax * 0.07);
-      k.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
-    },
-  },
-  {
-    id: 'will', name: 'Volontà del Risorto', icon: 'will', cooldown: 120, offGcd: true,
-    desc: 'Fuori dal tempo di recupero globale. Spezza paura, charme e sonno: la tua volontà è tua.',
-    fire(k) {
-      const p = k.player.pos;
-      k.startWave();
-      k.vfx.burst(p.x, p.y + 0.9, p.z, 50, 0.6, { life: 1, size: 0.1, color: VIOLET, hdr: 3, vy: 1.5, drag: 1.5 }, 1.8);
-      k.vfx.pulse(p.x, p.y + 1, p.z, VIOLET, 45);
-      k.system.notices.push({ kind: 'info', text: 'Immune a paura e charme' });
-    },
-  },
-  {
-    id: 'veil', name: 'Velo spettrale', icon: 'veil', cooldown: 30, mana: 50,
-    desc: "Per 10 s diventi un'ombra semitrasparente e ti muovi il 30% più veloce. Usare un'altra abilità lo dissolve.",
-    fire(k) {
-      k.veil = 10;
-      k.player.speedMul = 1.3;
-      k.setGhost(true);
+      k.stats.veil = VEIL_TIME;
       const a = chest(k);
       k.vfx.burst(a.x, a.y, a.z, 40, 0.7, { life: 1, size: 0.14, color: GHOST, hdr: 2, drag: 2 }, 1.2);
+      k.vfx.pulse(a.x, a.y, a.z, GHOST, 25);
     },
-    active: (k) => k.veil > 0,
+    active: (k) => k.stats.veil > 0,
   },
   {
     // The main attack: off the GCD so the 1 s recovery is the real swing rate, WoW auto-attack style.
-    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 1, offGcd: true,
+    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 1, offGcd: true, charge: 3,
     desc: `Un fendente di schegge d'ossa davanti a te: ${MELEE_DAMAGE} danni a tutti i nemici entro ${num(MELEE_RANGE)} m.`,
     fire(k) {
       const p = k.player.pos, f = k.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), v = k.vfx;
@@ -284,37 +281,56 @@ export const ABILITIES: Ability<Forsaken>[] = [
       v.burst(p.x + fx * 1.6, p.y + 0.9, p.z + fz * 1.6, 10, 0.5, smoke(SHADOW, 0.35, 0.5), 0.8);
     },
   },
+  // Specials: locked until the charge bar around Caduta d'ossa is full; using one empties it.
   {
-    id: 'hearth', name: 'Ritorno alla cripta', icon: 'hearth', cooldown: 60, cast: 10,
-    desc: 'Lancio di 10 s: un cerchio di rune ti riporta al punto di partenza. Muoverti lo interrompe.',
-    during(k, p, dt) {
-      const f = k.player.pos, v = k.vfx;
-      v.runes.visible = true;
-      v.runes.position.set(f.x, f.y + 0.04, f.z);
-      v.runes.rotation.y += dt * 0.6;
-      v.runes.material.color.setHex(GRAVE).multiplyScalar(0.3 + p * 2.5);
-      every(10 + p * 70, dt, () => {
-        const a = rnd(0, Math.PI * 2), r = rnd(0.6, 1.4);
-        v.puff({ x: f.x + Math.cos(a) * r, y: f.y + 0.1, z: f.z + Math.sin(a) * r, vy: rnd(1, 2.5 + p * 3), life: 1.2, size: 0.07, color: GRAVE, hdr: 2.4 });
-      });
-      v.column.visible = p > 0.85; // the beam gathers over the last 1.5 s
-      v.column.position.set(f.x, f.y, f.z);
-      v.column.scale.setScalar(1);
-      v.column.material.opacity = (p - 0.85) / 0.15;
+    id: 'strike', name: 'Sentenza del sepolcro', icon: 'strike', cooldown: 0, special: true,
+    desc: `Speciale (barra della furia piena). Una lancia d'ossa e ombra trafigge il bersaglio per ${STRIKE_DAMAGE} danni; senza bersaglio, il nemico più vicino davanti a te (entro ${STRIKE_RANGE} m).`,
+    check(k) {
+      const m = k.strikeTarget(), p = k.player.pos;
+      if (!m) return 'Nessun bersaglio.';
+      if (Math.hypot(m.x - p.x, m.z - p.z) > STRIKE_RANGE) return 'Bersaglio fuori portata.';
     },
     fire(k) {
+      const m = k.strikeTarget()!, a = chest(k), v = k.vfx;
+      k.player.attack();
+      k.hurt?.((_x, _z, mob) => mob === m, STRIKE_DAMAGE);
+      const b = { x: m.x, y: m.y + 1.1, z: m.z }, d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+      for (let s = 0; s <= d; s += 0.2) { // the spear's trail
+        const t = s / Math.max(d, 1e-3);
+        v.puff({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t, life: rnd(0.3, 0.6), size: 0.14, grow: 0.3, color: t > 0.5 ? BONE : VIOLET, hdr: 2.4, drag: 2 });
+      }
+      v.burst(b.x, b.y, b.z, 40, 0.3, { life: 0.8, size: 0.12, color: BONE, hdr: 3, drag: 3 }, 3);
+      v.burst(b.x, b.y, b.z, 24, 0.5, smoke(SHADOW, 0.5, 0.7), 1.2);
+      k.startColumn(m.x, m.y, m.z, VIOLET);
+      v.pulse(b.x, b.y, b.z, VIOLET, 50);
+    },
+  },
+  {
+    id: 'nova', name: 'Lamento della cripta', icon: 'nova', cooldown: 0, special: true,
+    desc: `Speciale (barra della furia piena). Un'onda di schegge d'ossa esplode da te: ${NOVA_DAMAGE} danni a tutti i nemici entro ${NOVA_RADIUS} m.`,
+    fire(k) {
+      const p = k.player.pos, v = k.vfx;
+      k.hurt?.((x, z) => Math.hypot(x - p.x, z - p.z) < NOVA_RADIUS, NOVA_DAMAGE);
+      k.startWave();
+      for (let i = 0; i < 64; i++) { // shards flung flat along the ground, reaching the radius
+        const a = (i / 64) * Math.PI * 2 + rnd(-0.05, 0.05), sp = rnd(7, 10);
+        v.puff({ x: p.x + Math.cos(a) * 0.4, y: p.y + rnd(0.3, 1.2), z: p.z + Math.sin(a) * 0.4, vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, life: 0.6, size: rnd(0.09, 0.14), color: BONE, hdr: 2.4, drag: 2 });
+      }
+      v.burst(p.x, p.y + 0.9, p.z, 50, 0.6, { life: 1, size: 0.1, color: VIOLET, hdr: 3, vy: 1.5, drag: 1.5 }, 1.8);
+      v.pulse(p.x, p.y + 1, p.z, VIOLET, 60);
+    },
+  },
+  {
+    id: 'ward', name: 'Patto della tomba', icon: 'ward', cooldown: 0, special: true, offGcd: true,
+    desc: `Speciale (barra della furia piena), fuori dal tempo di recupero globale. Per ${WARD_TIME} s nessun colpo può ferirti.`,
+    fire(k) {
+      k.stats.immune = WARD_TIME;
       const a = chest(k);
-      k.vfx.burst(a.x, a.y, a.z, 40, 0.6, { life: 1, size: 0.1, color: GRAVE, hdr: 3, vy: 2, drag: 1.5 }, 2);
-      k.player.respawn(k.spawn);
-      const b = chest(k);
-      k.startColumn(b.x, b.y - 1, b.z);
-      k.vfx.burst(b.x, b.y, b.z, 40, 0.6, { life: 1.1, size: 0.1, color: GRAVE, hdr: 3, drag: 1.5 }, 2.5);
-      k.vfx.pulse(b.x, b.y + 1, b.z, GRAVE, 40);
+      k.vfx.burst(a.x, a.y, a.z, 50, 0.6, { life: 1, size: 0.1, color: GOLD, hdr: 3, vy: 1.2, drag: 1.5 }, 1.6);
+      k.vfx.pulse(a.x, a.y, a.z, GOLD, 45);
+      k.system.notices.push({ kind: 'info', text: 'Immune a ogni danno' });
     },
-    end(k, ok) {
-      k.vfx.runes.visible = false;
-      if (!ok) k.vfx.column.visible = false;
-    },
+    active: (k) => k.stats.immune > 0,
   },
   {
     id: 'potion', name: 'Fiala di linfa tombale', icon: 'potion', cooldown: 30, offGcd: true,
@@ -330,4 +346,4 @@ export const ABILITIES: Ability<Forsaken>[] = [
 ];
 
 /** Slot order on the bar; 0 - = stay free for later items. */
-export const BAR: (string | null)[] = ['fall', 'plague', 'wisp', 'feast', 'will', 'veil', 'step', 'hearth', 'potion', null, null, null];
+export const BAR: (string | null)[] = ['fall', 'plague', 'wisp', 'strike', 'nova', 'veil', 'step', 'ward', 'potion', null, null, null];

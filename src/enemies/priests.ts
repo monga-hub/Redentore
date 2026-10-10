@@ -378,9 +378,9 @@ export class Priests {
   }
 
   /** Damage every priest for which `inside(x, z)` holds (abilities). */
-  hurtWhere(inside: (x: number, z: number) => boolean, n: number): void {
+  hurtWhere(inside: (x: number, z: number, f: Priest) => boolean, n: number): void {
     this.all.forEach((f, i) => {
-      if (f.state === 'dead' || !inside(f.x, f.z)) return;
+      if (f.state === 'dead' || !inside(f.x, f.z, f)) return;
       const killed = hurt(f, n);
       if (n >= 1 || killed) this.views[i]?.hit();
       if (killed) this.vfx.burst(f.x, f.y + 1, f.z, 30, 0.4, { life: 1.2, size: 0.12, color: SHADOW, hdr: 2, drag: 1.5, vy: 0.8 }, 1.4);

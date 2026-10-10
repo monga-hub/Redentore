@@ -13,7 +13,6 @@ export class PlayerController {
   private vy = 0;
   private grounded = true;
   facing = 0; // yaw, same convention as the camera (0 = facing -Z / north)
-  speedMul = 1; // abilities: Velo spettrale
 
   readonly world: World;
   private spawn: { x: number; z: number; yaw: number };
@@ -53,7 +52,7 @@ export class PlayerController {
     let r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
     if (!f && !r) { f = -input.stickY; r = input.stickX; } // touch stick: analog, |v| <= 1
-    const speed = (input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN) * this.speedMul;
+    const speed = (input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN);
 
     // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
     const sin = Math.sin(camYaw), cos = Math.cos(camYaw);

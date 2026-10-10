@@ -39,7 +39,7 @@ const cam = new ThirdPersonCamera(innerWidth / innerHeight, SPAWN.yaw, level.cam
 const hud = new Hud();
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
-const kit = new Forsaken(player, SPAWN, playerStats); // abilities on 1..0 - =
+const kit = new Forsaken(player, playerStats); // abilities on 1..0 - =
 playerStats.onDeath = () => { // ponytail: back to the crypt at full health; a death screen can come with enemies
   kit.system.cancel();
   player.respawn(SPAWN);
@@ -59,6 +59,8 @@ const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.ca
   { name: 'Il Reverendissimo', max: REVERENDISSIMO.hp, height: 4.6, all: [priests.boss], ready: () => priests.root.children.length > 0 },
 ]);
 kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
+kit.aimed = () => targeting.target?.mob;
+kit.foes = () => [...friars.all, ...priests.all];
 kit.system.notices.push({ kind: 'info', text: 'Il portone della chiesa è sbarrato: entra nel convento dalla calle' });
 const pressed = (code: string) => input.pressed(code);
 

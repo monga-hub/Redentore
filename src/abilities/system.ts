@@ -4,6 +4,7 @@
 
 export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
 export const GCD = 1.5;
+export const CHARGE_MAX = 100;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
 export interface Caster {
@@ -20,6 +21,10 @@ export interface Ability<C extends Caster = Caster> {
   channel?: { duration: number; tick: number };
   offGcd?: boolean;
   mana?: number; // cost, paid when the cooldown starts (instant/channel: on press; cast: when the bar fills)
+  charge?: number; // added to the charge bar when the cooldown starts
+  special?: boolean; // needs a full charge bar and empties it
+  /** Why it can't be used right now (e.g. no target), checked on press; nothing is spent. */
+  check?(ctx: C): string | undefined;
   /** Instant: on press. Cast: when the bar fills. Channel: on every tick (`tick` counts from 1). */
   fire(ctx: C, tick: number): void;
   /** Every frame while casting or channelling; `p` is progress 0..1. */
@@ -45,8 +50,8 @@ export class AbilitySystem<C extends Caster = Caster> {
   casting: Casting<C> | null = null;
   /** UI feedback since the last drain: error messages, combat text, cast bar outcomes. */
   notices: Notice[] = [];
-  /** Called before any ability starts (Velo spettrale drops when another ability is used). */
-  onStart?: (a: Ability<C>) => void;
+  /** 0..CHARGE_MAX: every cast fills it by its `charge`, a special spends it all. */
+  charge = 0;
   /** Mana pool abilities with a `mana` cost draw from (player/stats.ts). Absent = free. */
   pool?: { mana: number; spendMana(n: number): boolean };
   readonly slots: (Ability<C> | undefined)[];
@@ -77,8 +82,10 @@ export class AbilitySystem<C extends Caster = Caster> {
     if (this.casting && !a.offGcd) return this.fail("Un'altra azione è in corso.");
     if ((a.cast || a.channel) && this.moving) return this.fail('Non puoi farlo mentre ti muovi.');
     if (!this.affordable(a)) return this.fail('Mana insufficiente.');
+    if (!this.charged(a)) return this.fail('La barra della furia non è piena.');
+    const why = a.check?.(this.ctx);
+    if (why) return this.fail(why);
 
-    this.onStart?.(a);
     if (!a.offGcd) this.gcd = GCD;
     if (a.cast || a.channel) {
       const total = a.cast ?? a.channel!.duration;
@@ -135,9 +142,15 @@ export class AbilitySystem<C extends Caster = Caster> {
     return !a.mana || !this.pool || this.pool.mana >= a.mana;
   }
 
+  /** Specials wait for a full charge bar. */
+  charged(a: Ability<C>): boolean {
+    return !a.special || this.charge >= CHARGE_MAX;
+  }
+
   private start(a: Ability<C>): void {
     this.cds.set(a.id, a.cooldown);
     if (a.mana) this.pool?.spendMana(a.mana);
+    this.charge = a.special ? 0 : Math.min(CHARGE_MAX, this.charge + (a.charge ?? 0));
   }
 
   private stop(ok: boolean): void {

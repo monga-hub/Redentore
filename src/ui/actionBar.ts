@@ -1,4 +1,4 @@
-import { GCD, KEYS, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
+import { CHARGE_MAX, GCD, KEYS, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { ICONS } from './icons.ts';
 
 // WoW-style action bar overlay: 12 square buttons on 1..0 - =, clockwise cooldown sweep
@@ -9,6 +9,8 @@ import { ICONS } from './icons.ts';
 // one big button in the corner, an inner arc and an outer arc of smaller ones (RING).
 // There a quick tap casts on release and a press held for HOLD ms shows the tooltip
 // instead, until the finger lifts.
+// A half-ring over the main button (slot 0, the big one on touch) shows the charge bar,
+// green → yellow → red when full; until then the specials stay greyed out.
 
 /** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px]. */
 const RING: Record<number, [number, number, number]> = {
@@ -42,6 +44,8 @@ export class ActionBar<C extends Caster> {
   private tip = el('div', 'tooltip');
   private slots: Slot<C>[] = [];
   private castHold = 0; // s the finished/interrupted cast bar stays up
+  private gauge?: SVGElement;
+  private charge = -1;
   private sys: AbilitySystem<C>;
 
   constructor(sys: AbilitySystem<C>) {
@@ -57,6 +61,12 @@ export class ActionBar<C extends Caster> {
       s.el.innerHTML = a ? `<div class="icon">${ICONS[a.icon] ?? ''}</div><div class="sweep"></div>` : '';
       s.el.classList.toggle('empty', !a);
       s.el.append(s.cd, s.key);
+      if (i === 0) {
+        s.el.classList.add('main');
+        s.el.insertAdjacentHTML('beforeend', '<svg class="charge" viewBox="0 0 100 100"><path d="M6 50 A44 44 0 0 1 94 50"/><path class="fill" pathLength="100" d="M6 50 A44 44 0 0 1 94 50"/></svg>');
+        this.gauge = s.el.querySelector('.charge')!;
+      }
+      s.el.classList.toggle('special', !!a?.special);
       const ring = RING[i];
       if (ring) {
         s.el.classList.add('ring');
@@ -100,6 +110,14 @@ export class ActionBar<C extends Caster> {
 
   render(dt: number, pressed: (code: string) => boolean): void {
     const sys = this.sys;
+    if (sys.charge !== this.charge && this.gauge) {
+      const full = sys.charge >= CHARGE_MAX, f = this.gauge.lastElementChild as SVGElement;
+      if (full && this.charge >= 0) this.float('Furia piena!', 'fury');
+      this.charge = sys.charge;
+      f.style.strokeDasharray = `${(sys.charge / CHARGE_MAX) * 100} 100`;
+      f.style.stroke = `hsl(${120 * (1 - sys.charge / CHARGE_MAX)} 90% 52%)`;
+      this.gauge.classList.toggle('full', full);
+    }
     this.slots.forEach((s, i) => {
       const a = s.ability;
       if (!a) return;
@@ -115,6 +133,7 @@ export class ActionBar<C extends Caster> {
       s.el.classList.toggle('active', !!a.active?.(sys.ctx));
       s.el.classList.toggle('casting', sys.casting?.ability === a);
       s.el.classList.toggle('oom', !sys.affordable(a));
+      if (a.special) s.el.classList.toggle('locked', !sys.charged(a));
     });
 
     for (const n of sys.notices) {

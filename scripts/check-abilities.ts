@@ -1,6 +1,7 @@
 // Headless ability-system check (`npm run check`): GCD, off-GCD, cooldowns, one cast per
-// key press, cast completion and movement interrupts, channel ticks, mana costs, player stats.
-import { AbilitySystem, GCD, type Ability } from '../src/abilities/system.ts';
+// key press, cast completion and movement interrupts, channel ticks, mana costs, charge bar and
+// specials, player stats (Velo spettrale, immunity).
+import { AbilitySystem, CHARGE_MAX, GCD, type Ability } from '../src/abilities/system.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 
 const fired: string[] = [];
@@ -67,9 +68,32 @@ for (let t = 0; t < 1.1; t += 0.1) pay.update(0.1, () => false);
 eq(['m', 'mc'], 'cast with mana fires');
 mana(15, 'cast pays');
 
+// Charge: casts fill it, specials wait for it full, refuse on a failed check without spending it, then empty it.
+let aim = false;
+const fury = new AbilitySystem([ab('hit', { charge: 40, cooldown: 0, offGcd: true }), ab('sp', { special: true, cooldown: 0, offGcd: true, check: () => (aim ? undefined : 'Nessun bersaglio.') })], ['hit', 'sp'], ctx);
+fired.length = 0;
+fury.tryCast(1);
+eq([], 'special locked while the bar is not full');
+for (let i = 0; i < 3; i++) fury.tryCast(0);
+if (fury.charge !== CHARGE_MAX) throw new Error(`charge ${fury.charge}: must fill and clamp`);
+fury.tryCast(1);
+if (fury.charge !== CHARGE_MAX || fired.includes('sp')) throw new Error('failed check must not fire or spend the charge');
+aim = true;
+fury.tryCast(1);
+if (fury.charge !== 0 || !fired.includes('sp')) throw new Error('special fires and empties the bar');
+
 // Health: clamps, death fires once, the dead don't heal.
 let deaths = 0;
 stats.onDeath = () => deaths++;
 if (stats.takeDamage(30) !== 30 || stats.heal(50) !== 30) throw new Error('damage/heal clamp');
 if (stats.takeDamage(500) !== 100 || stats.takeDamage(5) !== 0 || !stats.dead || deaths !== 1 || stats.heal(10) !== 0) throw new Error('death');
+
+// Velo spettrale halves damage, immunity takes none, both wear off.
+const tank = new PlayerStats(1000, 0);
+tank.veil = 5;
+if (tank.takeDamage(100) !== 50) throw new Error('veil halves damage');
+tank.immune = 5;
+if (tank.takeDamage(100) !== 0) throw new Error('immune takes no damage');
+tank.update(5);
+if (tank.takeDamage(100) !== 100) throw new Error('buffs expire');
 console.log('abilities ok');

@@ -28,21 +28,6 @@ export const ICONS: Record<string, string> = {
     <path d="M32 12 C40 20 46 28 44 38 C42 47 36 52 32 52 C26 52 20 46 21 37 C22 30 27 26 28 18 C30 22 31 24 32 12 Z" fill="#8dffe0" opacity=".35"/>
     <circle cx="32" cy="38" r="9" fill="#d8fff5" stroke="#8dffe0" stroke-width="2"/>
     <path d="M14 50 q6 -6 4 -14 M50 50 q-6 -6 -4 -14" stroke="#8dffe0" stroke-width="2" fill="none" opacity=".7"/>`),
-  // gnawed bone over a blood drop
-  feast: icon('feast', '#8a1420', '#1a0306', `
-    <path d="M30 8 C40 18 44 26 44 32 a12 12 0 0 1-24 0 C20 26 24 18 30 8 Z" fill="#5a0a12" stroke="#ff6b78" stroke-width="2"/>
-    <g transform="rotate(-35 32 40)">
-      <rect x="18" y="37" width="28" height="6" rx="3" fill="#efe6d2"/>
-      <circle cx="17" cy="37" r="4" fill="#efe6d2"/><circle cx="17" cy="43" r="4" fill="#efe6d2"/>
-      <circle cx="47" cy="37" r="4" fill="#efe6d2"/><circle cx="47" cy="43" r="4" fill="#efe6d2"/>
-    </g>`),
-  // skull with a breaking chain
-  will: icon('will', '#5d2a9a', '#0e0518', `
-    <path d="M20 30 a12 13 0 0 1 24 0 v6 l-3 3 v6 h-18 v-6 l-3 -3 z" fill="#e9e1f5" stroke="#c48bff" stroke-width="1.5"/>
-    <ellipse cx="27" cy="31" rx="3.5" ry="4" fill="#2a1240"/><ellipse cx="37" cy="31" rx="3.5" ry="4" fill="#2a1240"/>
-    <path d="M32 36 l-2 4 h4 z" fill="#2a1240"/>
-    <path d="M28 45 v-3 M32 45 v-3 M36 45 v-3" stroke="#2a1240" stroke-width="1.5"/>
-    <path d="M6 54 l8 -4 M58 54 l-8 -4 M16 49 l4 -2 M48 49 l-4 -2" stroke="#c48bff" stroke-width="3"/>`),
   // translucent ghost
   veil: icon('veil', '#4a6aa0', '#081020', `
     <path d="M18 54 V30 a14 14 0 0 1 28 0 V54 l-5 -5 -4 5 -5 -5 -5 5 -4 -5 z" fill="#dbe8ff" fill-opacity=".45" stroke="#e8f0ff" stroke-width="2"/>
@@ -53,11 +38,22 @@ export const ICONS: Record<string, string> = {
     <path d="M12 48 C20 26 36 14 54 12 C40 20 28 32 22 50 Z" fill="#efe6d2" fill-opacity=".85" stroke="#fff6e0" stroke-width="1.5"/>
     <path d="M18 44 l-6 2 M24 34 l-7 -1 M32 25 l-5 -5 M42 18 l-2 -6" stroke="#efe6d2" stroke-width="3"/>
     <path d="M30 54 C36 40 46 30 58 26" stroke="#a45cff" stroke-width="2" fill="none" opacity=".7"/>`),
-  // tombstone with a glowing rune
-  hearth: icon('hearth', '#1f7a45', '#03140a', `
-    <path d="M18 54 V24 a14 14 0 0 1 28 0 V54 z" fill="#3b4a40" stroke="#bfe8cc" stroke-width="2"/>
-    <path d="M32 26 v18 M26 32 l6 -6 6 6 M27 40 h10" stroke="#58ff9a" stroke-width="3" fill="none"/>
-    <path d="M10 56 h44" stroke="#58ff9a" stroke-width="2" opacity=".6"/>`),
+  // bone spear piercing a violet sigil
+  strike: icon('strike', '#7a2a9a', '#10041a', `
+    <circle cx="40" cy="24" r="12" fill="none" stroke="#c48bff" stroke-width="2" opacity=".8"/>
+    <path d="M10 54 L46 18" stroke="#efe6d2" stroke-width="5"/>
+    <path d="M46 18 l10 -10 -3 13 z" fill="#fff6e0" stroke="#fff6e0" stroke-width="1.5"/>
+    <path d="M14 46 l-6 -2 M18 42 l-2 -6 M10 50 l-4 4" stroke="#a45cff" stroke-width="2.5"/>`),
+  // shards bursting out of a ring
+  nova: icon('nova', '#5d2a9a', '#0e0518', `
+    <circle cx="32" cy="32" r="9" fill="#2a1240" stroke="#e9e1f5" stroke-width="2"/>
+    <circle cx="32" cy="32" r="18" fill="none" stroke="#c48bff" stroke-width="2" opacity=".7"/>
+    <path d="M32 6 v8 M32 50 v8 M6 32 h8 M50 32 h8 M14 14 l6 6 M44 44 l6 6 M50 14 l-6 6 M14 50 l6 -6" stroke="#efe6d2" stroke-width="3.5"/>`),
+  // gilded tombstone shield
+  ward: icon('ward', '#9a6a1a', '#1a0e02', `
+    <path d="M32 8 L52 16 V32 C52 44 43 52 32 57 C21 52 12 44 12 32 V16 Z" fill="#3a2a10" stroke="#ffe2a0" stroke-width="2.5"/>
+    <path d="M32 18 v26 M24 26 h16" stroke="#ffc85a" stroke-width="4"/>
+    <path d="M6 58 q26 -8 52 0" stroke="#ffc85a" stroke-width="2" fill="none" opacity=".6"/>`),
   // corked vial of green grave-sap
   potion: icon('potion', '#2a6a3a', '#04120a', `
     <path d="M27 10 h10 v5 h-10 z" fill="#8a6a44" stroke="#e6d2a8" stroke-width="1.5"/>

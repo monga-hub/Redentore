@@ -48,11 +48,11 @@ export const ICONS: Record<string, string> = {
     <path d="M18 54 V30 a14 14 0 0 1 28 0 V54 l-5 -5 -4 5 -5 -5 -5 5 -4 -5 z" fill="#dbe8ff" fill-opacity=".45" stroke="#e8f0ff" stroke-width="2"/>
     <ellipse cx="27" cy="31" rx="3" ry="4" fill="#0b1630"/><ellipse cx="37" cy="31" rx="3" ry="4" fill="#0b1630"/>
     <path d="M8 22 q6 4 2 10 M56 22 q-6 4 -2 10" stroke="#9fc4ff" stroke-width="2" fill="none" opacity=".7"/>`),
-  // falling feather in ash
-  fall: icon('fall', '#4c4c58', '#0c0c10', `
-    <path d="M44 10 C30 14 20 28 20 44 L16 54 M20 44 C34 42 44 30 44 10" fill="#2a2a32" stroke="#e4e2ea" stroke-width="2"/>
-    <path d="M24 38 l8 -2 M27 31 l8 -3 M31 24 l7 -4" stroke="#e4e2ea" stroke-width="1.5"/>
-    <circle cx="48" cy="34" r="1.5" fill="#bbb"/><circle cx="42" cy="46" r="1.2" fill="#bbb"/><circle cx="12" cy="26" r="1.4" fill="#bbb"/>`),
+  // crescent slash of bone shards
+  fall: icon('fall', '#6a5a48', '#0e0b08', `
+    <path d="M12 48 C20 26 36 14 54 12 C40 20 28 32 22 50 Z" fill="#efe6d2" fill-opacity=".85" stroke="#fff6e0" stroke-width="1.5"/>
+    <path d="M18 44 l-6 2 M24 34 l-7 -1 M32 25 l-5 -5 M42 18 l-2 -6" stroke="#efe6d2" stroke-width="3"/>
+    <path d="M30 54 C36 40 46 30 58 26" stroke="#a45cff" stroke-width="2" fill="none" opacity=".7"/>`),
   // tombstone with a glowing rune
   hearth: icon('hearth', '#1f7a45', '#03140a', `
     <path d="M18 54 V24 a14 14 0 0 1 28 0 V54 z" fill="#3b4a40" stroke="#bfe8cc" stroke-width="2"/>

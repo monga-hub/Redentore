@@ -8,9 +8,11 @@ import { Vfx, type Puff } from './vfx.ts';
 // Names are our own; flavour after the undead racials and shadow/plague classes.
 
 const VIOLET = 0xa45cff, SHADOW = 0x1a0f24, PLAGUE = 0x7dff3a, BILE = 0x1f2e0c, WISP = 0x8dffe0;
-const BLOOD = 0xff2a3a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a;
+const BLOOD = 0xff2a3a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a, BONE = 0xefe6d2;
 
-const PLAGUE_DPS = 12, STEP_DAMAGE = 25;
+const PLAGUE_DPS = 12, STEP_DAMAGE = 25, WISP_DPS = 15;
+const MELEE_DAMAGE = 10, MELEE_RANGE = 2.6, MELEE_ARC = Math.cos(1.1); // ~125° cone in front
+const WISP_RADIUS = 1.6, WISP_MOVING = 0.6; // m, m/s: the wisp only scorches while it drifts
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 /** Emit `rate`/s on average this frame. */
@@ -26,7 +28,6 @@ export class Forsaken {
   readonly player: PlayerController;
   readonly stats: PlayerStats;
   veil = 0; // s left
-  fall = 0;
   wisp = 0;
   private clouds: Cloud[] = [];
   private hidden = 0; // Passo d'ombra: model hidden for a blink
@@ -45,7 +46,7 @@ export class Forsaken {
     this.stats = stats;
     this.system = new AbilitySystem(ABILITIES, BAR, this);
     this.system.pool = stats;
-    this.system.onStart = (a) => { if (a.id !== 'veil' && !a.offGcd && this.veil > 0) this.endVeil(); };
+    this.system.onStart = (a) => { if (a.id !== 'veil' && (!a.offGcd || a.id === 'fall') && this.veil > 0) this.endVeil(); };
   }
 
   update(dt: number, pressed: (code: string) => boolean): void {
@@ -58,19 +59,6 @@ export class Forsaken {
     if (this.veil > 0) {
       every(30, dt, () => v.puff({ x: p.x + rnd(-0.3, 0.3), y: p.y + rnd(0.1, 1.7), z: p.z + rnd(-0.3, 0.3), vy: 0.3, life: 1.1, size: 0.18, grow: 0.2, color: GHOST, hdr: 1.4, alpha: 0.6 }));
       if ((this.veil -= dt) <= 0) this.endVeil();
-    }
-
-    if (this.fall > 0) {
-      // Smoke wings off the shoulders and drifting ash.
-      const f = this.player.facing, rx = Math.cos(f), rz = -Math.sin(f);
-      for (const s of [-1, 1]) {
-        every(28, dt, () => {
-          const k = rnd(0.2, 1);
-          v.puff({ x: p.x + rx * s * k * 0.9, y: p.y + 1.5 + k * 0.35, z: p.z + rz * s * k * 0.9, vx: rx * s * 0.6, vy: 0.25, vz: rz * s * 0.6, life: 0.9, size: 0.45, grow: 1.6, color: SHADOW, alpha: 0.55, normal: true });
-        });
-      }
-      every(12, dt, () => v.puff({ x: p.x + rnd(-0.8, 0.8), y: p.y + rnd(1.2, 2.2), z: p.z + rnd(-0.8, 0.8), vy: -0.4, life: 2.2, size: 0.06, color: 0x8a8a8a, hdr: 0.6, drag: 0.5 }));
-      if ((this.fall -= dt) <= 0) this.player.slowFall = false;
     }
 
     for (const c of this.clouds) {
@@ -97,6 +85,14 @@ export class Forsaken {
       this.wispVel.set(tx - w.x, ty - w.y, tz - w.z).multiplyScalar(4);
       w.addScaledVector(this.wispVel, Math.min(dt, 0.1));
       every(40, dt, () => v.puff({ x: w.x + rnd(-0.05, 0.05), y: w.y + rnd(-0.05, 0.05), z: w.z + rnd(-0.05, 0.05), vy: 0.25, life: 0.8, size: 0.09, color: WISP, hdr: 2.5 }));
+      if (this.wispVel.length() > WISP_MOVING) {
+        // On the move it sheds a scorching trail: everything it brushes past burns.
+        this.hurt?.((x, z) => Math.hypot(x - w.x, z - w.z) < WISP_RADIUS, WISP_DPS * dt);
+        every(50, dt, () => {
+          const a = rnd(0, Math.PI * 2), d = rnd(0.2, WISP_RADIUS * 0.6);
+          v.puff({ x: w.x + Math.cos(a) * d, y: w.y + rnd(-0.6, 0.2), z: w.z + Math.sin(a) * d, vy: -0.2, life: 0.6, size: 0.06, color: WISP, hdr: 2, drag: 1.5 });
+        });
+      }
       if ((this.wisp -= dt) <= 0) {
         v.wisp.visible = false;
         v.burst(w.x, w.y, w.z, 30, 0.2, { life: 0.9, size: 0.08, color: WISP, hdr: 3, drag: 2 }, 1.5);
@@ -173,6 +169,7 @@ const segDist = (x: number, z: number, ax: number, az: number, bx: number, bz: n
   return Math.hypot(x - ax - dx * t, z - az - dz * t);
 };
 
+const num = (n: number) => n.toLocaleString('it');
 const chest = (k: Forsaken) => ({ x: k.player.pos.x, y: k.player.pos.y + 1, z: k.player.pos.z });
 const smoke = (color: number, size: number, alpha: number): Omit<Puff, 'x' | 'y' | 'z'> =>
   ({ life: 1.1, size, grow: 2, color, alpha, normal: true, drag: 3 });
@@ -207,7 +204,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: 1.5, mana: 60,
-    desc: 'Evoca un fuoco fatuo che ti segue per 60 s e rischiara il buio.',
+    desc: `Evoca un fuoco fatuo che ti segue per 60 s e rischiara il buio. Mentre si sposta brucia chi sfiora (${WISP_DPS} danni al secondo entro ${WISP_RADIUS} m).`,
     during(k, _p, dt) {
       const p = k.player.pos, f = k.player.facing, v = k.vfx;
       const hx = p.x - Math.sin(f) * 0.5, hz = p.z - Math.cos(f) * 0.5;
@@ -269,15 +266,22 @@ export const ABILITIES: Ability<Forsaken>[] = [
     active: (k) => k.veil > 0,
   },
   {
-    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 15, mana: 30,
-    desc: 'Per 6 s ali di fumo rallentano la tua caduta: salta da cori e tetti senza paura.',
+    // The main attack: off the GCD so the 1 s recovery is the real swing rate, WoW auto-attack style.
+    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 1, offGcd: true,
+    desc: `Un fendente di schegge d'ossa davanti a te: ${MELEE_DAMAGE} danni a tutti i nemici entro ${num(MELEE_RANGE)} m.`,
     fire(k) {
-      k.fall = 6;
-      k.player.slowFall = true;
-      const a = chest(k);
-      k.vfx.burst(a.x, a.y + 0.5, a.z, 24, 0.5, smoke(SHADOW, 0.5, 0.6), 1.5);
+      const p = k.player.pos, f = k.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), v = k.vfx;
+      k.hurt?.((x, z) => {
+        const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+        return d < MELEE_RANGE && (d < 0.6 || (dx * fx + dz * fz) / d > MELEE_ARC);
+      }, MELEE_DAMAGE);
+      // A crescent of bone shards swept right to left, then a puff of grave dust at the tip.
+      for (let s = -1; s <= 1; s += 0.08) {
+        const g = f - s * 1.1, dx = -Math.sin(g), dz = -Math.cos(g), r = rnd(1.1, MELEE_RANGE - 0.3);
+        v.puff({ x: p.x + dx * r, y: p.y + 1 + s * 0.25, z: p.z + dz * r, vx: dx * 2.5, vy: rnd(-0.3, 0.3), vz: dz * 2.5, life: rnd(0.25, 0.4), size: rnd(0.08, 0.13), color: BONE, hdr: 2.2, drag: 5 });
+      }
+      v.burst(p.x + fx * 1.6, p.y + 0.9, p.z + fz * 1.6, 10, 0.5, smoke(SHADOW, 0.35, 0.5), 0.8);
     },
-    active: (k) => k.fall > 0,
   },
   {
     id: 'hearth', name: 'Ritorno alla cripta', icon: 'hearth', cooldown: 60, cast: 10,
@@ -325,4 +329,4 @@ export const ABILITIES: Ability<Forsaken>[] = [
 ];
 
 /** Slot order on the bar; 0 - = stay free for later items. */
-export const BAR: (string | null)[] = ['step', 'plague', 'wisp', 'feast', 'will', 'veil', 'fall', 'hearth', 'potion', null, null, null];
+export const BAR: (string | null)[] = ['fall', 'plague', 'wisp', 'feast', 'will', 'veil', 'step', 'hearth', 'potion', null, null, null];

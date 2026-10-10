@@ -14,7 +14,6 @@ export class PlayerController {
   private grounded = true;
   facing = 0; // yaw, same convention as the camera (0 = facing -Z / north)
   speedMul = 1; // abilities: Velo spettrale
-  slowFall = false; // abilities: Caduta d'ossa
 
   readonly world: World;
   private spawn: { x: number; z: number; yaw: number };
@@ -73,8 +72,7 @@ export class PlayerController {
     if (this.grounded && this.vy <= 0 && this.pos.y - ground < PLAYER.step + 0.05) {
       this.pos.y = ground; // stick to stairs going down, step up going up
     } else {
-      this.vy -= GRAVITY * dt * (this.slowFall && this.vy < 0 ? 0.15 : 1);
-      if (this.slowFall) this.vy = Math.max(this.vy, -2);
+      this.vy -= GRAVITY * dt;
       this.pos.y += this.vy * dt;
       this.grounded = this.pos.y <= ground;
       if (this.grounded) { this.pos.y = ground; this.vy = 0; }

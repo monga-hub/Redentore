@@ -80,7 +80,7 @@ fury.tryCast(1);
 if (fury.charge !== CHARGE_MAX || fired.includes('sp')) throw new Error('failed check must not fire or spend the charge');
 aim = true;
 fury.tryCast(1);
-if (fury.charge !== 0 || !fired.includes('sp')) throw new Error('special fires and empties the bar');
+if ((fury.charge as number) !== 0 || !fired.includes('sp')) throw new Error('special fires and empties the bar');
 
 // Health: clamps, death fires once, the dead don't heal.
 let deaths = 0;

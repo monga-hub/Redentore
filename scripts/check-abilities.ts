@@ -3,6 +3,7 @@
 // specials, player stats (Velo spettrale, immunity).
 import { AbilitySystem, CHARGE_MAX, GCD, type Ability } from '../src/abilities/system.ts';
 import { PlayerStats } from '../src/player/stats.ts';
+import { plagueSpot } from '../src/abilities/forsaken.ts';
 
 const fired: string[] = [];
 const ab = (id: string, extra: Partial<Ability> = {}): Ability =>
@@ -96,4 +97,16 @@ tank.immune = 5;
 if (tank.takeDamage(100) !== 0) throw new Error('immune takes no damage');
 tank.update(5);
 if (tank.takeDamage(100) !== 100) throw new Error('buffs expire');
+// Nube di peste lands on the enemy, never on the caster: target, else nearest foe in reach, else ahead.
+const at = { x: 0, y: 0, z: 0 }, mob = (x: number, z: number, state = 'idle') => ({ x, y: 1, z, hp: 10, state });
+const spot = (want: { x: number; z: number }, got: { x: number; z: number }, why: string) => {
+  if (Math.hypot(got.x - want.x, got.z - want.z) > 1e-6) throw new Error(`${why}: cloud at ${got.x},${got.z} want ${want.x},${want.z}`);
+};
+const near = mob(3, 0), far = mob(-8, 0), aimedMob = mob(0, 10);
+spot(aimedMob, plagueSpot(at, 0, aimedMob, [near, far, aimedMob]), 'selected target wins');
+spot(near, plagueSpot(at, 0, mob(0, 50), [far, near]), 'out-of-reach target falls back to nearest foe');
+spot(near, plagueSpot(at, 0, mob(0, 5, 'dead'), [far, near]), 'dead target falls back to nearest foe');
+spot(far, plagueSpot(at, 0, undefined, [mob(1, 0, 'dead'), far]), 'dead foes ignored');
+const ahead = plagueSpot(at, 0, undefined, [mob(0, 100)]);
+if (ahead.z > -4 || Math.abs(ahead.x) > 1e-6) throw new Error(`no foe in reach: cloud must land well ahead (-Z), got ${ahead.x},${ahead.z}`);
 console.log('abilities ok');

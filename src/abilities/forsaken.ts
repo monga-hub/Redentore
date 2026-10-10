@@ -12,6 +12,7 @@ const VIOLET = 0xa45cff, SHADOW = 0x1a0f24, PLAGUE = 0x7dff3a, BILE = 0x1f2e0c, 
 const GOLD = 0xffc85a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a, BONE = 0xefe6d2;
 
 const PLAGUE_DPS = 12, STEP_DAMAGE = 25, WISP_DPS = 15;
+const PLAGUE_RADIUS = 2.2, PLAGUE_RANGE = 20, PLAGUE_REACH = 6; // m: cloud size, reach for a foe, throw with none
 const MELEE_DAMAGE = 10, MELEE_RANGE = 2.6, MELEE_ARC = Math.cos(1.1); // ~125° cone in front
 const WISP_RADIUS = 1.6, WISP_MOVING = 0.6; // m, m/s: the wisp only scorches while it drifts
 const VEIL_TIME = 5;
@@ -83,8 +84,8 @@ export class Forsaken {
 
     for (const c of this.clouds) {
       c.t -= dt;
-      this.hurt?.((x, z) => Math.hypot(x - c.x, z - c.z) < 2.2, PLAGUE_DPS * dt);
-      const r = 2.2 * Math.min(1, (8 - c.t) * 2); // swells in over half a second
+      this.hurt?.((x, z) => Math.hypot(x - c.x, z - c.z) < PLAGUE_RADIUS, PLAGUE_DPS * dt);
+      const r = PLAGUE_RADIUS * Math.min(1, (8 - c.t) * 2); // swells in over half a second
       every(60, dt, () => {
         const a = rnd(0, Math.PI * 2), d = Math.sqrt(Math.random()) * r;
         v.puff({ x: c.x + Math.cos(a) * d, y: c.y + rnd(0, 0.5), z: c.z + Math.sin(a) * d, vy: rnd(0.2, 0.7), life: rnd(1.4, 2.2), size: rnd(0.1, 0.2), color: PLAGUE, hdr: 2.2, drag: 0.4 });
@@ -154,9 +155,9 @@ export class Forsaken {
   }
 
   plague(): void {
-    const p = this.player.pos, f = this.player.facing;
-    const x = p.x - Math.sin(f) * 3.5, z = p.z - Math.cos(f) * 3.5, g = this.player.world.groundAt(x, z, p.y + 1.5);
-    this.clouds.push({ x, y: g > -Infinity ? g : p.y, z, t: 8 }); // settles on stairs and ledges
+    const { x, y, z } = plagueSpot(this.player.pos, this.player.facing, this.aimed?.(), this.foes?.() ?? []);
+    const g = this.player.world.groundAt(x, z, y + 1.5);
+    this.clouds.push({ x, y: g > -Infinity ? g : y, z, t: 8 }); // settles on stairs and ledges
   }
 
   blinkHide(): void {
@@ -188,6 +189,24 @@ export class Forsaken {
     }
     return best;
   }
+}
+
+/**
+ * Where Nube di peste lands: on the selected target if it is alive and within reach, else on the
+ * nearest living foe within reach, else on the ground ahead, far enough that the caster stays out of it.
+ */
+export function plagueSpot(p: { x: number; y: number; z: number }, facing: number, aimed: Mob | undefined, foes: Iterable<Mob>): { x: number; y: number; z: number } {
+  const near = (m: Mob) => m.state !== 'dead' && Math.hypot(m.x - p.x, m.z - p.z) <= PLAGUE_RANGE;
+  let best = aimed && near(aimed) ? aimed : undefined;
+  if (!best) {
+    let bestD = Infinity;
+    for (const m of foes) {
+      const d = Math.hypot(m.x - p.x, m.z - p.z);
+      if (near(m) && d < bestD) { bestD = d; best = m; }
+    }
+  }
+  if (best) return { x: best.x, y: best.y, z: best.z };
+  return { x: p.x - Math.sin(facing) * PLAGUE_REACH, y: p.y, z: p.z - Math.cos(facing) * PLAGUE_REACH };
 }
 
 /** Distance from (x,z) to the segment a-b. */
@@ -223,7 +242,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20, mana: 80, charge: 10,
-    desc: `Getta davanti a te una nube pestilenziale che ristagna per 8 s e corrode chi vi resta dentro (${PLAGUE_DPS} danni al secondo).`,
+    desc: `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale che ristagna per 8 s e corrode i nemici che vi restano dentro (${PLAGUE_DPS} danni al secondo).`,
     fire(k) {
       k.plague();
       const a = chest(k);

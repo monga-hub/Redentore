@@ -11,7 +11,7 @@ import { face, feet, walk, type Target } from './brain.ts';
 export interface CasterKind {
   hp: number; aggro: number; leash: number; blind: number; range: number; keep: number; backoff: number;
   speed: number; back: number; walk: number; cast: number; cooldown: number; bolt: number; life: number;
-  damage: number; radius: number; respawn: number; margin: number;
+  damage: number; radius: number; margin: number;
   /** Staff swing when the player is in reach (sacerdoti, boss): rooted for `swing` s, lands at `windup` if still within `hit`. */
   melee?: { reach: number; hit: number; windup: number; swing: number; cooldown: number; damage: number };
   /** Boss only: every `every` s in melee range, channel `cast` s, then hit everything within `radius`. */
@@ -35,7 +35,6 @@ export const PRIEST: CasterKind = {
   life: 4, // s before a bolt that never reached the player fizzles out
   damage: 30, // magic, per bolt: a group of three ~22 dps against the player's 1280 hp
   radius: 0.4,
-  respawn: 60,
   margin: 0.8, // m kept from the cloister's walls
 };
 
@@ -79,7 +78,6 @@ export interface Priest {
   melee: number; // swing cooldown left
   nova: number; // s until the next nova (boss)
   struck: boolean; // this swing or nova already resolved
-  once?: boolean; // dies for good: no respawn (the church, everyone after the boss falls)
   backoff: number; // backpedal budget left until the next cast
   blind: number; // s pulled without line of sight
   los: { ok: boolean; t: number }; // line of sight to the player, re-traced every LOS_EVERY s
@@ -145,6 +143,15 @@ export function cloisterPlan(world: World, areas: (Bounds & { label: string })[]
   return cloisters.map((area) => ({ area, groups: cloisterSpots(world, area, groupsFor(size(area), largest)) }));
 }
 
+/** The gardens past the orti, by the lagoon (zones/nord.ts): one sacerdote and two priests in each. */
+export const GARDENS = ['Giardino dei pitosfori', 'Giardino del pozzo', 'Prato nord-est'];
+export function gardenPlan<A extends Bounds & { label: string }>(world: World, areas: A[]): { area: A; group: [number, number, number][] }[] {
+  return GARDENS.map((label) => {
+    const area = areas.find((a) => a.label === label)!;
+    return { area, group: cloisterSpots(world, area, 1)[0] };
+  });
+}
+
 /** Groups of casters; `kinds[i][k]` (default PRIEST) is the k-th member of group i. */
 export function spawnPriests(world: World, groups: [number, number, number][][], bounds: Bounds[], kinds: CasterKind[][] = []): Priest[][] {
   return groups.map((g, i) => {
@@ -159,7 +166,7 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
 
 /**
  * The church: a sacerdote and two priests at the head of the nave and another trio behind the
- * high altar, the Reverendissimo alone under the dome. All of them die for good.
+ * high altar, the Reverendissimo alone under the dome.
  */
 export const CHURCH = { x0: -12.5, x1: 12.5, z0: -60, z1: 0 };
 export const BOSS_AT = { x: 0, z: -37 }; // crossing centre (zones/chiesa.ts CX)
@@ -172,14 +179,12 @@ export function spawnChurch(world: World): { all: Priest[]; boss: Priest } {
   ];
   const kinds = [[SACERDOTE], [SACERDOTE], [REVERENDISSIMO]];
   const all = spawnPriests(world, groups, groups.map(() => CHURCH), kinds).flat();
-  for (const f of all) f.once = true;
   return { all, boss: all[all.length - 1] };
 }
 
-/** Everyone drops dead at once and stays down (the boss's fall). */
-export function killAll(fs: { state: string; hp: number; t: number; once?: boolean }[]): void {
+/** Everyone drops dead at once (the boss's fall). */
+export function killAll(fs: { state: string; hp: number; t: number }[]): void {
   for (const f of fs) {
-    f.once = true;
     if (f.state === 'dead') continue;
     f.hp = 0;
     f.state = 'dead';
@@ -293,13 +298,7 @@ export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bol
       f.move = 1;
       if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
       return 0;
-    case 'dead':
-      if (f.t >= K.respawn && !f.once) {
-        f.x = f.home.x; f.z = f.home.z; f.yaw = f.home.yaw;
-        f.y = feet(world, f.x, f.z);
-        f.hp = K.hp;
-        enter(f, 'pray');
-      }
+    case 'dead': // for good: nobody respawns
       return 0;
   }
 }

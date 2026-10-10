@@ -17,7 +17,6 @@ export const FRIAR = {
   cooldown: 2.4, // s between swings
   damage: 45, // against the player's 1280 hp: a pair kills in ~15 s if ignored
   radius: 0.4,
-  respawn: 60, // s after death
 };
 const TURN = 8; // 1/s
 
@@ -31,7 +30,6 @@ export interface Friar {
   t: number; // s in the current state
   cd: number; // swing cooldown left
   struck: boolean; // this swing already resolved
-  once?: boolean; // dies for good: no respawn (set when the boss falls, see caster.ts killAll)
   home: { x: number; z: number; yaw: number };
   mates: Friar[]; // the hoeing group, pulled together
 }
@@ -127,13 +125,7 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
       f.hp = FRIAR.hp;
       if (walk(f, f.home.x, f.home.z, FRIAR.walk, 0, world, dt) < 0.05) enter(f, 'hoe');
       return 0;
-    case 'dead':
-      if (f.t >= FRIAR.respawn && !f.once) {
-        f.x = f.home.x; f.z = f.home.z; f.yaw = f.home.yaw;
-        f.y = feet(world, f.x, f.z);
-        f.hp = FRIAR.hp;
-        enter(f, 'hoe');
-      }
+    case 'dead': // for good: nobody respawns
       return 0;
   }
 }

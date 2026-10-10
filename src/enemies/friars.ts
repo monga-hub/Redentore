@@ -43,7 +43,6 @@ class View {
   private bar = new THREE.Group();
   private fill: THREE.Sprite;
   private lastClip = 0;
-  private rising = false;
 
   constructor(t: Template) {
     const model = cloneSkinned(t.scene) as THREE.Group;
@@ -51,7 +50,7 @@ class View {
     this.blade = model.getObjectByName('hoeBlade')!;
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
-    for (const c of new Set(Object.values(CLIPS)).add('Skeletons_Awaken_Standing')) {
+    for (const c of new Set(Object.values(CLIPS))) {
       const clip = THREE.AnimationClip.findByName(t.clips, c);
       if (clip) this.actions.set(c, this.mixer.clipAction(clip));
     }
@@ -73,7 +72,6 @@ class View {
   /** Sync with the brain. `vfx` gets dirt puffs on every hoe stroke. */
   update(f: Friar, dt: number, vfx: Vfx): void {
     if (f.state !== this.state) this.enter(f.state, this.state);
-    else if (this.rising && !this.current!.isRunning()) this.enter(f.state, 'hoe');
     const a = this.current!;
 
     // Hoe strokes throw up a clod of earth where the blade bites.
@@ -102,14 +100,12 @@ class View {
   }
 
   private enter(s: State, from?: State): void {
-    this.rising = from === 'dead'; // respawn: claw up out of the soil before hoeing
-    const next = this.actions.get(this.rising ? 'Skeletons_Awaken_Standing' : CLIPS[s])!;
+    const next = this.actions.get(CLIPS[s])!;
     next.reset();
-    next.setLoop(s === 'swing' || s === 'dead' || this.rising ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+    next.setLoop(s === 'swing' || s === 'dead' ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
     next.clampWhenFinished = true;
     next.timeScale = s === 'swing' ? SWING_RATE : s === 'hoe' ? HOE_RATE : s === 'chase' ? FRIAR.speed / 2.2 : 1;
-    if (this.rising) next.timeScale = 1;
-    else if (s === 'hoe' && !from) next.time = Math.random() * next.getClip().duration; // groups don't hoe in lockstep
+    if (s === 'hoe' && !from) next.time = Math.random() * next.getClip().duration; // groups don't hoe in lockstep
     next.play();
     if (this.current && this.current !== next) next.crossFadeFrom(this.current, FADE, false);
     this.current = next;

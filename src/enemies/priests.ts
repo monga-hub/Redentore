@@ -6,20 +6,21 @@ import type { Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, hurt, killAll, spawnChurch, spawnPriests, think, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
 import { barMat, ownMaterials } from './friars.ts';
 
 // Preti non-morti: the same KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) as the friars,
 // re-dressed darker so they read apart at a glance — a tall pointed hood, a gold-edged stole,
 // the robe dyed near-black violet, violet eyes and a staff with a shadow crystal. They pray
 // in the cloisters in threes and throw homing shadow bolts; the AI lives in caster.ts.
-// The church's sacerdoti are the same mage, taller, in a white robe under a violet hood and
-// cape; the Reverendissimo is a giant one in white and violet with a gold-banded mitre.
+// The sacerdoti (each leading two priests: two in the church, one in each lagoon garden)
+// are the same mage, taller, in a white robe under a violet hood and cape; the
+// Reverendissimo is a giant one in white and violet with a gold-banded mitre.
 
 const URL = `${import.meta.env.BASE_URL}models/skeleton_mage.glb`;
 const CLIPS: Record<CasterState, string> = { pray: 'Idle', chase: 'Idle_Combat', cast: 'Spellcasting', swing: '2H_Melee_Attack_Chop', nova: 'Spellcast_Summon', evade: 'Running_B', dead: 'Death_A' };
 const STEP: Record<-1 | 1, string> = { [-1]: 'Walking_Backwards', 1: 'Walking_A' };
-const SHOOT = 'Spellcast_Shoot', RISE = 'Skeletons_Awaken_Standing';
+const SHOOT = 'Spellcast_Shoot';
 const FADE = 0.2;
 const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 };
@@ -50,7 +51,7 @@ class View {
   private current?: THREE.AnimationAction;
   private clip = '';
   private state?: CasterState;
-  private once = false; // a one-shot (bolt release, rising from the dead) is playing
+  private once = false; // a one-shot (bolt release, staff swing) is playing
   private mats: THREE.MeshStandardMaterial[];
   private flash = 0;
   private tip: THREE.Object3D;
@@ -66,7 +67,7 @@ class View {
     this.tip = model.getObjectByName('staffTip')!;
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
-    for (const c of [...Object.values(CLIPS), ...Object.values(STEP), SHOOT, RISE]) {
+    for (const c of [...Object.values(CLIPS), ...Object.values(STEP), SHOOT]) {
       const clip = THREE.AnimationClip.findByName(t.clips, c);
       if (clip) this.actions.set(c, this.mixer.clipAction(clip));
     }
@@ -95,8 +96,7 @@ class View {
     const from = this.state;
     if (f.state !== from) {
       this.state = f.state;
-      if (from === 'dead') this.play(RISE, true); // respawn: claw up before praying
-      else if (from === 'cast' && f.state === 'chase' && f.cd > 1) this.play(SHOOT, true); // released, not interrupted
+      if (from === 'cast' && f.state === 'chase' && f.cd > 1) this.play(SHOOT, true); // released, not interrupted
       else if (f.state === 'swing') this.play(CLIPS.swing, true, this.actions.get(CLIPS.swing)!.getClip().duration / f.kind.melee!.swing);
       else this.once = false;
     }
@@ -254,7 +254,7 @@ function dye(m: THREE.MeshStandardMaterial, robe: string): void {
   m.customProgramCacheKey = () => `cassock-${robe}`;
 }
 
-/** Every priest in the cloisters and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
+/** Every priest in the cloisters, the gardens and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
 export class Priests {
   readonly root = new THREE.Group();
   readonly all: Priest[];
@@ -276,9 +276,14 @@ export class Priests {
     this.vfx = vfx;
     this.stats = stats;
     const plan = cloisterPlan(world, areas);
+    const gardens = gardenPlan(world, areas);
     const church = spawnChurch(world);
     this.boss = church.boss;
-    this.all = [...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.area))).flat(), ...church.all];
+    this.all = [
+      ...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.area))).flat(),
+      ...spawnPriests(world, gardens.map((g) => g.group), gardens.map((g) => g.area), gardens.map(() => [SACERDOTE])).flat(),
+      ...church.all,
+    ];
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: new THREE.Color(SHADOW).multiplyScalar(2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),

@@ -1,14 +1,14 @@
 // Headless friar AI check (`npm run check`): hoeing spots sit on the orto beds and off the
 // paths, aggro pulls the whole group, melee swings land on a cooldown, leash evades home at
-// full health, death and respawn. Then the same for the cloister priests, plus line of sight,
-// spell cooldowns, magic bolts and backpedalling inside their cloister. Then the church: two
-// sacerdoti with two priests each and the Reverendissimo, magic plus melee, the boss's nova,
+// full health, death for good (no respawn). Then the same for the cloister priests, plus line of sight,
+// spell cooldowns, magic bolts and backpedalling inside their cloister; a sacerdote and two
+// priests in each lagoon garden. Then the church: two sacerdoti with two priests each and the Reverendissimo, magic plus melee, the boss's nova,
 // and everyone dropping dead for good when the boss falls.
 import { buildLevel } from '../src/level/index.ts';
 import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
 import { FRIAR, GROUPS, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, hurt as casterHurt, killAll, spawnChurch, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -71,9 +71,8 @@ if (Math.hypot(a.x - a.home.x, a.z - a.home.z) > 0.1) fail('evade stopped short 
 if (!hurt(b, FRIAR.hp)) fail('lethal hit did not kill');
 expect(b, 'dead', 'killed');
 if (hurt(b, 5)) fail('killed twice');
-run(FRIAR.respawn + 1);
-expect(b, 'hoe', 'respawned');
-if (b.hp !== FRIAR.hp) fail('respawn at full health');
+run(600);
+expect(b, 'dead', 'still dead 10 minutes later (no respawn)');
 console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
 
 // ---------------------------------------------------------------- priests (caster.ts)
@@ -92,6 +91,22 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
         if (x < area.x0 + 3 || x > area.x1 - 3 || z < area.z0 + 3 || z > area.z1 - 3) fail(`${at} outside the court`);
         if (level.world.blocked(x, z, 0, PRIEST.radius)) fail(`${at} inside a wall`);
       }
+    }
+  }
+}
+
+// Lagoon gardens: one sacerdote and two priests standing clear in each garden.
+{
+  const level = buildLevel();
+  const plan = gardenPlan(level.world, level.areas);
+  if (plan.length !== GARDENS.length || plan.some((g) => !g.area)) fail('a lagoon garden is missing from the level');
+  for (const { area, group } of plan) {
+    if (area.zone !== 'giardini') fail(`${area.label}: not in the giardini zone`);
+    if (group.length !== 3) fail(`${area.label}: group of ${group.length}`);
+    for (const [x, z] of group) {
+      const at = `garden spot (${x.toFixed(1)}, ${z.toFixed(1)}) in ${area.label}`;
+      if (x < area.x0 + 3 || x > area.x1 - 3 || z < area.z0 + 3 || z > area.z1 - 3) fail(`${at} outside the garden`);
+      if (level.world.blocked(x, z, 0, SACERDOTE.radius)) fail(`${at} inside a wall or hedge`);
     }
   }
 }
@@ -160,8 +175,8 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
 
   if (!casterHurt(e, PRIEST.hp)) fail('lethal hit did not kill the priest');
   want(e, 'dead', 'killed');
-  tick(PRIEST.respawn + 1);
-  want(e, 'pray', 'respawned');
+  tick(600);
+  want(e, 'dead', 'still dead 10 minutes later (no respawn)');
   console.log(`priests ok (${magic} magic damage over ${casts} casts)`);
 }
 
@@ -219,7 +234,7 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   casterHurt(boss, boss.hp);
   if (boss.state !== 'dead') fail('boss: lethal hit did not kill');
   killAll(crowd);
-  for (let t = 0; t < PRIEST.respawn + FRIAR.respawn; t += 0.5) { casterThink(sac, pl, fl, 0.5, bolts); think(crowd[1] as Friar, pl, fl, 0.5); }
+  for (let t = 0; t < 600; t += 0.5) { casterThink(sac, pl, fl, 0.5, bolts); think(crowd[1] as Friar, pl, fl, 0.5); }
   if (crowd.some((f) => f.state !== 'dead')) fail('killAll: someone got up again');
   console.log(`church ok (sacerdote ${magic} magic + melee, boss nova ${n.damage})`);
 }

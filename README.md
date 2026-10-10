@@ -5,7 +5,7 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
 
 - Three.js nel browser, build Vite.
 - Terza persona, controlli WASD.
-- v1: solo esplorazione (niente nemici/boss).
+- Primi nemici: frati non-morti che zappano l'orto (solo mischia); niente boss.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile
@@ -17,7 +17,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: ogni area è raggiungibile dallo spawn + sistema abilità
+npm run check    # verifica headless: ogni area è raggiungibile dallo spawn + sistema abilità + IA dei frati
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -88,6 +88,11 @@ src/
   abilities/forsaken.ts      le 8 abilità del Reietto (tabella `ABILITIES`, ordine `BAR`)
   abilities/vfx.ts           particelle in pool (un draw call), anelli, colonna, fuoco fatuo
                              e l'unica PointLight delle abilità, creata all'avvio
+  enemies/brain.ts           IA dei frati non-morti (zappa, aggro di gruppo, inseguimento,
+                             zappata in mischia, evade, morte/respawn) e punti di spawn
+                             nell'orto. Nessuna dipendenza da three
+  enemies/friars.ts          modello (KayKit Skeleton Mage con cappuccio e zappa), animazioni,
+                             barra vita; danni al player via `PlayerStats.takeDamage`
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
                              pergole; registra collider e aree

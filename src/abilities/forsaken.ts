@@ -10,6 +10,8 @@ import { Vfx, type Puff } from './vfx.ts';
 const VIOLET = 0xa45cff, SHADOW = 0x1a0f24, PLAGUE = 0x7dff3a, BILE = 0x1f2e0c, WISP = 0x8dffe0;
 const BLOOD = 0xff2a3a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a;
 
+const PLAGUE_DPS = 12, STEP_DAMAGE = 25;
+
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 /** Emit `rate`/s on average this frame. */
 const every = (rate: number, dt: number, f: () => void) => {
@@ -32,6 +34,8 @@ export class Forsaken {
   private columnT = -1;
   private time = 0;
   private wispVel = new THREE.Vector3();
+  /** Damage dealer, wired to the enemies by main.ts: hurts whatever stands where `inside` holds. */
+  hurt?: (inside: (x: number, z: number) => boolean, n: number) => void;
 
   readonly spawn: { x: number; z: number; yaw: number };
 
@@ -71,6 +75,7 @@ export class Forsaken {
 
     for (const c of this.clouds) {
       c.t -= dt;
+      this.hurt?.((x, z) => Math.hypot(x - c.x, z - c.z) < 2.2, PLAGUE_DPS * dt);
       const r = 2.2 * Math.min(1, (8 - c.t) * 2); // swells in over half a second
       every(60, dt, () => {
         const a = rnd(0, Math.PI * 2), d = Math.sqrt(Math.random()) * r;
@@ -161,6 +166,13 @@ export class Forsaken {
   }
 }
 
+/** Distance from (x,z) to the segment a-b. */
+const segDist = (x: number, z: number, ax: number, az: number, bx: number, bz: number) => {
+  const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
+  return Math.hypot(x - ax - dx * t, z - az - dz * t);
+};
+
 const chest = (k: Forsaken) => ({ x: k.player.pos.x, y: k.player.pos.y + 1, z: k.player.pos.z });
 const smoke = (color: number, size: number, alpha: number): Omit<Puff, 'x' | 'y' | 'z'> =>
   ({ life: 1.1, size, grow: 2, color, alpha, normal: true, drag: 3 });
@@ -168,12 +180,13 @@ const smoke = (color: number, size: number, alpha: number): Omit<Puff, 'x' | 'y'
 export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'step', name: "Passo d'ombra", icon: 'step', cooldown: 12, mana: 40,
-    desc: "Ti dissolvi nell'ombra e riappari fino a 8 m più avanti. I muri ti fermano.",
+    desc: `Ti dissolvi nell'ombra e riappari fino a 8 m più avanti, infliggendo ${STEP_DAMAGE} danni a chi attraversi. I muri ti fermano.`,
     fire(k) {
       const a = chest(k), v = k.vfx;
       v.burst(a.x, a.y, a.z, 26, 0.5, smoke(SHADOW, 0.6, 0.8), 1.4);
       v.burst(a.x, a.y, a.z, 30, 0.4, { life: 0.7, size: 0.1, color: VIOLET, hdr: 3, drag: 3 }, 3);
       const d = k.player.blink(8), b = chest(k);
+      k.hurt?.((x, z) => segDist(x, z, a.x, a.z, b.x, b.z) < 1.2, STEP_DAMAGE);
       for (let s = 0; s <= d; s += 0.35) {
         const t = s / Math.max(d, 1e-3);
         v.puff({ x: a.x + (b.x - a.x) * t, y: a.y + rnd(-0.3, 0.5), z: a.z + (b.z - a.z) * t, life: rnd(0.4, 0.8), size: 0.25, grow: 0.2, color: VIOLET, hdr: 1.8, alpha: 0.7 });
@@ -185,7 +198,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20, mana: 80,
-    desc: 'Getta davanti a te una nube pestilenziale che ristagna per 8 s.',
+    desc: `Getta davanti a te una nube pestilenziale che ristagna per 8 s e corrode chi vi resta dentro (${PLAGUE_DPS} danni al secondo).`,
     fire(k) {
       k.plague();
       const a = chest(k);

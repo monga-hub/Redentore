@@ -35,6 +35,11 @@ export class PlayerController {
     this.model.attack();
   }
 
+  /** Spell-cast pose over `seconds` (a cast bar's length, or a quick throw); `0` cuts it short. */
+  cast(seconds: number): void {
+    this.model.cast(seconds);
+  }
+
   /** Blink up to `dist` m along the facing, stopping short of the first wall. Returns metres travelled. */
   blink(dist: number): number {
     const dx = -Math.sin(this.facing), dz = -Math.cos(this.facing), STEP = 0.2;

@@ -15,6 +15,7 @@ const PLAGUE_DPS = 12, STEP_DAMAGE = 25, WISP_DPS = 15;
 const PLAGUE_RADIUS = 2.2, PLAGUE_RANGE = 20, PLAGUE_REACH = 6; // m: cloud size, reach for a foe, throw with none
 const MELEE_DAMAGE = 10, MELEE_RANGE = 2.6, MELEE_ARC = Math.cos(1.1); // ~125° cone in front
 const WISP_RADIUS = 1.6, WISP_MOVING = 0.6; // m, m/s: the wisp only scorches while it drifts
+const WISP_CAST = 1.5; // s
 const VEIL_TIME = 5;
 const STRIKE_DAMAGE = 50, STRIKE_RANGE = 30, STRIKE_ARC = 0.5; // no target: nearest foe within ~120° in front
 const NOVA_DAMAGE = 20, NOVA_RADIUS = 6, WARD_TIME = 5;
@@ -244,15 +245,17 @@ export const ABILITIES: Ability<Forsaken>[] = [
     id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 5, mana: 20, charge: 10,
     desc: `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale che ristagna per 8 s e corrode i nemici che vi restano dentro (${PLAGUE_DPS} danni al secondo).`,
     fire(k) {
+      k.player.cast(0.25);
       k.plague();
       const a = chest(k);
       k.vfx.burst(a.x, a.y + 0.3, a.z, 20, 0.3, { life: 0.6, size: 0.1, color: PLAGUE, hdr: 3, drag: 4 }, 2.5);
     },
   },
   {
-    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: 1.5, mana: 60, charge: 10,
+    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', cooldown: 30, cast: WISP_CAST, mana: 60, charge: 10,
     desc: `Evoca un fuoco fatuo che ti segue per 60 s e rischiara il buio. Mentre si sposta brucia chi sfiora (${WISP_DPS} danni al secondo entro ${WISP_RADIUS} m).`,
     during(k, _p, dt) {
+      k.player.cast(WISP_CAST); // the pose over the cast bar
       const p = k.player.pos, f = k.player.facing, v = k.vfx;
       const hx = p.x - Math.sin(f) * 0.5, hz = p.z - Math.cos(f) * 0.5;
       every(50, dt, () => {
@@ -267,6 +270,9 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.wisp = 60;
       k.vfx.burst(w.position.x, w.position.y, w.position.z, 30, 0.1, { life: 0.8, size: 0.09, color: WISP, hdr: 3, drag: 2.5 }, 2.2);
       k.vfx.pulse(w.position.x, w.position.y, w.position.z, WISP, 35);
+    },
+    end(k, ok) {
+      if (!ok) k.player.cast(0);
     },
     active: (k) => k.wisp > 0,
   },
@@ -329,6 +335,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: `Speciale (barra della furia piena). Un'onda di schegge d'ossa esplode da te: ${NOVA_DAMAGE} danni a tutti i nemici entro ${NOVA_RADIUS} m.`,
     fire(k) {
       const p = k.player.pos, v = k.vfx;
+      k.player.cast(0.25);
       k.hurt?.((x, z) => Math.hypot(x - p.x, z - p.z) < NOVA_RADIUS, NOVA_DAMAGE);
       k.startWave();
       for (let i = 0; i < 64; i++) { // shards flung flat along the ground, reaching the radius

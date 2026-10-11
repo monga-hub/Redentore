@@ -94,6 +94,7 @@ src/
                              con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
   core/input.ts              tastiera + mouse
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
+  player/undead.ts           modello del Reietto (Meshy), animazioni, fendente e lancio sovrapposti al busto
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
   camera/intro.ts            piano sequenza d'apertura (spline Catmull-Rom sulle chiavi, saltabile)
   ui/hud.ts                  nome dell'area corrente
@@ -107,16 +108,17 @@ src/
   enemies/brain.ts           IA dei frati non-morti (zappa, aggro di gruppo, inseguimento,
                              zappata in mischia, evade, morte/respawn) e punti di spawn
                              nell'orto. Nessuna dipendenza da three
-  enemies/friars.ts          modello (Zombie di Quaternius con cappuccio e zappa), animazioni,
-                             barra vita; danni al player via `PlayerStats.takeDamage`
+  enemies/friars.ts          modello (frate non-morto Meshy con la zappa in pugno), animazioni,
+                             barra vita; danni al player via `PlayerStats.takeDamage`; helper
+                             condivisi per i modelli Meshy (caricamento, posa, oggetto in mano)
   enemies/caster.ts          IA dei preti caster (anche sacerdoti e Reverendissimo: `CasterKind` con mischia
                              e nova; spawn della chiesa, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
                              con cooldown, dardi a ricerca, indietreggiare restando nel
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
-  enemies/priests.ts         un corpo per tipo: Ghost Skull di Quaternius da prete (bastone col
-                             cristallo), KayKit Skeleton Warrior da sacerdote (cappuccio, stola),
-                             Demon di Quaternius gigante da Reverendissimo (mitra, tridente);
-                             animazioni, VFX dei dardi d'ombra e della nova
+  enemies/priests.ts         un corpo Meshy per tipo: prete in tonaca nera e cremisi (bastone col
+                             cristallo), sacerdote corazzato viola e oro (mazza alata),
+                             Reverendissimo arcivescovo-lich gigante (pastorale); animazioni,
+                             VFX dei dardi d'ombra e della nova
   quest/progress.ts          stato della progressione: grate e porte (collider rimovibili), baule
                              con la chiave, prompt di interazione, vittoria. Nessuna dipendenza da three
   quest/view.ts              grate e battenti animati, baule, prompt "F", barra del boss, banner di vittoria

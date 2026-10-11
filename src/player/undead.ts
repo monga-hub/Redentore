@@ -3,44 +3,43 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { PLAYER } from '../core/physics.ts';
 
-// The hero: a Forsaken-style undead warrior generated and auto-rigged with Meshy AI (see
-// ATTRIBUTION.md), its Walking and Running clips merged into one meshopt/WebP GLB.
+// The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
+// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB.
 // Loaded async; `root` stays empty until the GLB arrives.
 // The model faces +Z; the controller's yaw 0 faces -Z, so it is turned round.
 
 const URL = `${import.meta.env.BASE_URL}models/reietto.glb`; // public/, under Vite's base
-// ponytail: the export has only Walking and Running, so idle and air are frames of those held
-// still (`at`: s into the clip). Swap in Meshy's Idle and Jump clips once exported.
-const CLIPS: Record<'idle' | 'walk' | 'run' | 'air', { name: string; at?: number }> = {
-  idle: { name: 'Walking', at: 0.05 }, // passing frame, feet together
-  walk: { name: 'Walking' },
-  run: { name: 'Running' },
-  air: { name: 'Running', at: 0.25 },
-};
+const CLIPS = { idle: 'Idle', walk: 'Walking', run: 'Running', air: 'Jump_Run' } as const;
 type State = keyof typeof CLIPS;
 const FADE = 0.2;
+// Airborne: the running jump's flight, from takeoff (s into the clip) at a slow rate so a fall
+// of any length stays in the air pose.
+const AIR = { from: 0.55, rate: 0.6 };
 
-// Caduta d'ossa. ponytail: no attack clip in the export yet, so the swing is a keyed torso twist
-// and right-arm chop played additively over locomotion: wound up at 0.06 s, through the body by
-// 0.12 s, recovered at 0.7 s (inside the 1 s swing rate). Replace with Meshy's attack clip.
-const SWING_T = [0, 0.06, 0.12, 0.25, 0.7];
-const SWING: [bone: string, axis: THREE.Vector3, angles: number[]][] = [
-  ['mixamorigSpine1', new THREE.Vector3(0, 1, 0), [0, 0.45, -0.2, -0.5, 0]],
-  ['mixamorigSpine2', new THREE.Vector3(0, 1, 0), [0, 0.3, -0.15, -0.35, 0]],
-  ['mixamorigRightArm', new THREE.Vector3(1, 0, 0), [0, -1.6, -0.9, 0.2, 0]],
-  ['mixamorigRightForeArm', new THREE.Vector3(1, 0, 0), [0, -0.9, -0.2, 0, 0]],
-];
+// One-shots layered over locomotion: the upper body always, the legs only while standing still,
+// so running keeps its stride under the swing instead of skating. Times are s into the clip:
+// played from `from`, its blow at `hit`, cut at `stop`; `in`/`out`: fade times.
+// Caduta d'ossa: the right-hand slash, entered past its windup so the blow crosses the body
+// 0.1 s after the key press (the damage is instant) and recovered by ~0.7 s, inside the 1 s rate.
+const SLASH = { clip: 'Right_Hand_Sword_Slash', from: 0.4, hit: 0.55, stop: 1.5, in: 0.06, out: 0.18 };
+// Spells: the charged cast, timed so the two-hand thrust lands as the spell goes off: the whole
+// charge-up for a cast bar, only the thrust for an instant spell.
+const SPELL = { clip: 'Charged_Spell_Cast_1', from: 0.3, quick: 1.5, hit: 1.95, stop: 3, in: 0.15, out: 0.3 };
+// Bones above the hips.
+const UPPER = /^(Spine|neck|Head|head|Left(Shoulder|Arm|ForeArm|Hand)|Right(Shoulder|Arm|ForeArm|Hand))/;
+/** Weight that gives an action share `k` of a track the locomotion (total weight 1) also drives. */
+const over = (k: number) => k / (1 - Math.min(k, 0.99));
 
-const swingClip = () => new THREE.AnimationClip('Swing', SWING_T.at(-1), SWING.map(([bone, axis, angles]) =>
-  new THREE.QuaternionKeyframeTrack(`${bone}.quaternion`, SWING_T,
-    angles.flatMap((a) => new THREE.Quaternion().setFromAxisAngle(axis, a).toArray()))));
+interface Shot { upper: THREE.AnimationAction; lower: THREE.AnimationAction; in: number; out: number; t: number; end: number }
 
 export class UndeadModel {
   readonly root = new THREE.Group();
   private mixer?: THREE.AnimationMixer;
   private actions = {} as Record<State, THREE.AnimationAction>;
   private state?: State;
-  private swing?: THREE.AnimationAction;
+  private shots = new Map<string, Shot>();
+  private playing?: Shot;
+  private still = 1; // 0..1, eased: how much of the legs a one-shot takes over
 
   constructor() {
     new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(URL, (gltf) => {
@@ -56,23 +55,56 @@ export class UndeadModel {
         o.frustumCulled = false; // skinned: the bind-pose bounds don't follow the animation
       });
       this.mixer = new THREE.AnimationMixer(model);
-      for (const [s, c] of Object.entries(CLIPS) as [State, (typeof CLIPS)[State]][]) {
-        const clip = THREE.AnimationClip.findByName(gltf.animations, c.name);
-        if (!clip) continue;
-        // a held frame needs its own action: clipAction() would hand back the moving one
-        const a = this.mixer.clipAction(c.at === undefined ? clip : clip.clone());
-        if (c.at !== undefined) { a.time = c.at; a.timeScale = 0; }
-        this.actions[s] = a;
+      for (const [s, name] of Object.entries(CLIPS) as [State, string][]) {
+        const clip = THREE.AnimationClip.findByName(gltf.animations, name);
+        if (clip) this.actions[s] = this.mixer.clipAction(clip);
       }
-      this.swing = this.mixer.clipAction(swingClip(), undefined, THREE.AdditiveAnimationBlendMode);
-      this.swing.setLoop(THREE.LoopOnce, 1);
+      this.actions.air.setLoop(THREE.LoopOnce, 1);
+      this.actions.air.clampWhenFinished = true;
+      for (const c of [SLASH, SPELL]) {
+        const clip = THREE.AnimationClip.findByName(gltf.animations, c.clip);
+        if (!clip) continue;
+        const layer = (part: string, keep: boolean) => {
+          const a = this.mixer!.clipAction(new THREE.AnimationClip(`${clip.name}_${part}`, clip.duration,
+            clip.tracks.filter((t) => UPPER.test(t.name) === keep)));
+          a.setLoop(THREE.LoopOnce, 1);
+          a.clampWhenFinished = true;
+          return a;
+        };
+        this.shots.set(c.clip, { upper: layer('upper', true), lower: layer('lower', false), in: c.in, out: c.out, t: -1, end: 0 });
+      }
       this.root.add(model);
     }, undefined, (e) => console.error('player model failed to load', e));
   }
 
   /** Play the main-attack swing once over whatever the legs are doing. */
   attack(): void {
-    this.swing?.reset().play();
+    this.fire(SLASH.clip, SLASH.from, 0.1, SLASH.hit, SLASH.stop);
+  }
+
+  /** The spell-cast pose, its thrust landing `seconds` from now (a cast bar's length, or a few
+   * tenths for an instant spell). Repeat calls while it plays are ignored; `0` cuts it short. */
+  cast(seconds: number): void {
+    const s = this.shots.get(SPELL.clip);
+    if (!s) return;
+    if (seconds <= 0) { if (this.playing === s) s.end = Math.min(s.end, s.t + s.out); return; }
+    if (this.playing !== s) this.fire(SPELL.clip, seconds > 1 ? SPELL.from : SPELL.quick, seconds, SPELL.hit, SPELL.stop);
+  }
+
+  /** Start a one-shot at clip time `from` so its `hit` comes `after` s from now; it ends at `stop`. */
+  private fire(clip: string, from: number, after: number, hit: number, stop: number): void {
+    const s = this.shots.get(clip);
+    if (!s) return;
+    if (this.playing && this.playing !== s) { this.playing.upper.stop(); this.playing.lower.stop(); }
+    const rate = (hit - from) / after;
+    for (const a of [s.upper, s.lower]) {
+      a.reset().setEffectiveWeight(0).play();
+      a.time = from;
+      a.timeScale = rate;
+    }
+    s.t = 0;
+    s.end = (stop - from) / rate;
+    this.playing = s;
   }
 
   /** `speed`: horizontal m/s this frame; `grounded`: feet on the floor. */
@@ -82,13 +114,27 @@ export class UndeadModel {
     if (next !== this.state) {
       const from = this.state && this.actions[this.state], to = this.actions[next];
       to.reset().play();
-      to.time = CLIPS[next].at ?? 0; // reset() rewinds a held frame too
+      if (next === 'air') { to.time = AIR.from; to.timeScale = AIR.rate; }
       if (from) to.crossFadeFrom(from, FADE, false);
       this.state = next;
     }
-    // ponytail: stride matched by timeScale against the clips' authored pace (≈2.5 / 6 m/s)
-    if (next === 'walk') this.actions.walk.timeScale = speed / 2.5;
-    if (next === 'run') this.actions.run.timeScale = speed / 6;
+    // stride matched by timeScale against the clips' pace (a planted foot's speed: 1.6 / 5.5 m/s)
+    if (next === 'walk') this.actions.walk.timeScale = speed / 1.6;
+    if (next === 'run') this.actions.run.timeScale = speed / 5.5;
+    this.still += ((next === 'idle' ? 1 : 0) - this.still) * Math.min(1, dt / FADE);
+    const s = this.playing;
+    if (s) {
+      const t = (s.t += dt);
+      if (t >= s.end) {
+        s.upper.stop();
+        s.lower.stop();
+        this.playing = undefined;
+      } else {
+        const k = Math.max(0, Math.min(1, t / s.in, (s.end - t) / s.out)); // fade in, hold, fade out
+        s.upper.setEffectiveWeight(over(k));
+        s.lower.setEffectiveWeight(over(k * this.still));
+      }
+    }
     this.mixer.update(dt);
   }
 }

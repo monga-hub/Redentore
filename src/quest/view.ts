@@ -164,8 +164,8 @@ export class QuestView {
     return notice;
   }
 
-  private pose(v: GateView): void {
-    const e = v.p * v.p * (3 - 2 * v.p);
+  private pose(v: GateView, p = v.p): void {
+    const e = p * p * (3 - 2 * p);
     if (v.gate.kind === 'grate') v.leaves[0].position.y = e * (v.gate.h - 0.1); // up into the wall above
     else for (const l of v.leaves) l.rotation.y = l.userData.side * SWING[v.gate.id as keyof typeof SWING] * e * 1.75;
   }
@@ -174,6 +174,18 @@ export class QuestView {
   settle(): void {
     for (const v of this.gates) if (v.gate.open) { v.p = 1; this.pose(v); }
     if (this.quest.chestOpen) this.lidP = 1;
+  }
+
+  /**
+   * The intro's camera (camera/intro.ts) flies through shut gates: each one opens as `eye` comes
+   * near and shuts again behind it, for show only, the quest's state untouched. null puts them back.
+   */
+  peek(eye: THREE.Vector3 | null): void {
+    for (const v of this.gates) {
+      if (v.gate.open) continue;
+      const c = this.quest.centre(v.gate);
+      this.pose(v, eye ? 1 - THREE.MathUtils.smoothstep(Math.hypot(eye.x - c.x, eye.z - c.z), 4, 12) : v.p);
+    }
   }
 
   victory(): void {

@@ -3,7 +3,8 @@ import { buildLevel } from './level/index.ts';
 import { SPAWN } from './level/plan.ts';
 import { Input } from './core/input.ts';
 import { PlayerController } from './player/controller.ts';
-import { ThirdPersonCamera } from './camera/thirdPersonCamera.ts';
+import { EYE, ThirdPersonCamera } from './camera/thirdPersonCamera.ts';
+import { Intro } from './camera/intro.ts';
 import { Hud } from './ui/hud.ts';
 import { TouchControls } from './ui/touch.ts';
 import { Atmosphere } from './fx/atmosphere.ts';
@@ -86,6 +87,9 @@ if (loaded) {
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: 'Partita caricata' });
 } else kit.system.notices.push({ kind: 'info', text: 'Il portone della chiesa è sbarrato: entra nel convento dalla calle' });
+// A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
+cam.update(0, input, player.pos);
+const intro = loaded ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE));
 const menu = new Menu({
   snapshot: () => serialize(game),
   where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
@@ -108,7 +112,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
+Object.assign(window, { intro, scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -119,6 +123,21 @@ renderer.setAnimationLoop(() => {
     input.endFrame();
     fx.render();
     return;
+  }
+  if (intro && !intro.done) {
+    if (intro.update(dt)) { // the world plays on for the camera: no HUD, nobody aggroes, gates open for it alone
+      const eye = cam.camera.position, unseen = { x: eye.x, y: eye.y + 1000, z: eye.z }; // never level with a mob, so never pulled
+      input.consume();
+      player.update(dt, input, cam.yaw, false); // idle at the spawn: the intro swallows keys and presses
+      friars.update(dt, unseen);
+      priests.update(dt, unseen);
+      questView.peek(eye);
+      fx.update(dt, eye);
+      fx.render();
+      input.endFrame();
+      return;
+    }
+    questView.peek(null);
   }
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();

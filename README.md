@@ -25,10 +25,16 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti e boss + salvataggi
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti e boss + salvataggi + volo dell'intro senza compenetrazioni
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
+
+Una nuova partita si apre con un piano sequenza in tempo reale (`src/camera/intro.ts`):
+dalla laguna alle sale espositive, l'orto, il corridoio, i chiostri mediano e grande, la
+chiesa, un giro attorno al Reverendissimo e fuori dal portone che si chiude, fino alla
+camera dietro al personaggio. Esc, Spazio, Invio, clic o tap la saltano; una partita
+caricata parte senza intro.
 
 ## Controlli
 
@@ -89,6 +95,7 @@ src/
   core/input.ts              tastiera + mouse
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
+  camera/intro.ts            piano sequenza d'apertura (spline Catmull-Rom sulle chiavi, saltabile)
   ui/hud.ts                  nome dell'area corrente
   ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,
                              tooltip, errori, testo di combattimento); ui/icons.ts icone SVG

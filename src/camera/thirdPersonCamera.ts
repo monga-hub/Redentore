@@ -3,7 +3,7 @@ import type { Input } from '../core/input.ts';
 
 const MIN_DIST = 1.5, MAX_DIST = 30, SENS = 0.005;
 const MIN_PITCH = -0.35, MAX_PITCH = 1.35;
-const EYE = 1.6;
+export const EYE = 1.6; // m above the feet the camera orbits
 
 /**
  * WoW-style follow camera: orbits a target point above the player's head.

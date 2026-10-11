@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { FogLayer } from './fog.ts';
 
 /** Something on the map: a mob (alive unless `state === 'dead'`) or a fixed spot. */
 export interface Pin { x: number; z: number; state?: string }
@@ -10,8 +11,8 @@ const PAINT: Partial<Record<string, string>> = {
   hedge: '#3a5229', foliage: '#43592f', wood: '#6e5235', stone: '#b4a88c', stoneDark: '#6a6355',
   plaster: '#9a5e46', brick: '#87503b', mass: '#7a6a50', water: '#1c3442',
 };
-const WATER = '#16303e'; // everything the level does not cover: the lagoon and the canal
-const PX = 4; // baked map texels per metre
+export const WATER = '#16303e'; // everything the level does not cover: the lagoon and the canal
+export const PX = 4; // baked map texels per metre
 const OVERHEAD = 3.6; // m: a slab starting this high is a ceiling or an upper floor, not on the map
 const WALL = 1.6; // m: a box this tall reads as a wall (bright, outlined)
 const ZOOMS = [1.4, 2, 2.8, 4]; // display px per metre; WoW's zoom steps
@@ -19,8 +20,9 @@ const HZ = 30; // redraws per second
 
 /**
  * WoW-style minimap, top right (styled in index.html): a round window on a top-down chart of the
- * complex, north up, centred on the player with an arrow turning with their facing; red dots for
- * living enemies in range and a gold marker for the current objective, pinned to the rim when far.
+ * complex, north up, centred on the player with an arrow turning with their facing, the unexplored
+ * parts under the fog of war; red dots for living enemies in range and a gold marker for the
+ * current objective, pinned to the rim when far. The book button opens the big map (ui/worldMap.ts).
  * The chart is baked once from the level's floor and wall boxes into an offscreen canvas, so a
  * frame costs one drawImage plus a few dots, at most HZ times a second.
  */
@@ -29,16 +31,19 @@ export class Minimap {
   private name = this.el.querySelector<HTMLElement>('.name')!;
   private canvas = this.el.querySelector('canvas')!;
   private ctx = this.canvas.getContext('2d')!;
-  private chart: HTMLCanvasElement;
-  private x0: number; // world x/z of the chart's top-left texel
-  private z0: number;
+  /** The baked chart, PX texels per metre; the big map draws it too. */
+  readonly chart: HTMLCanvasElement;
+  readonly x0: number; // world x/z of the chart's top-left texel
+  readonly z0: number;
+  private fog: FogLayer;
   private zoom = 1;
   private size = 0; // css px of the round window, read from the layout
   private wait = 0;
   private label = '';
 
-  /** `root`: the level's meshes (after flush). */
-  constructor(root: THREE.Object3D) {
+  /** `root`: the level's meshes (after flush). `openMap`: the book button. */
+  constructor(root: THREE.Object3D, fog: FogLayer, openMap: () => void) {
+    this.fog = fog;
     const shapes = bake(root);
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const s of shapes) for (const [x, z] of s.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
@@ -65,7 +70,8 @@ export class Minimap {
       }
     }
 
-    const [zin, zout] = this.el.querySelectorAll('button');
+    const [zin, zout, map] = this.el.querySelectorAll('button');
+    map.addEventListener('click', openMap);
     zin.addEventListener('click', () => this.step(1));
     zout.addEventListener('click', () => this.step(-1));
     this.el.addEventListener('wheel', (e) => { e.preventDefault(); this.step(e.deltaY < 0 ? 1 : -1); }, { passive: false });
@@ -97,6 +103,7 @@ export class Minimap {
     // The chart, scaled so 1 m = k px, with the player's spot at the centre.
     c.imageSmoothingEnabled = true;
     c.drawImage(this.chart, (p.x - this.x0) * PX - r / k * PX, (p.z - this.z0) * PX - r / k * PX, size / k * PX, size / k * PX, 0, 0, size, size);
+    this.fog.draw(c, p.x - r / k, p.z - r / k, k, size, size);
     // Inner shade towards the rim, like a lens.
     const shade = c.createRadialGradient(r, r, r * 0.6, r, r, r);
     shade.addColorStop(0, 'rgba(0,0,0,0)');

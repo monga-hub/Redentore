@@ -1,11 +1,12 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, key, open gates and their colliders, the
-// dead staying dead, play time); slots and the reload handoff survive storage and refuse junk.
+// dead staying dead, play time, the explored map); slots and the reload handoff survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { deserialize, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
+import { deserialize, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
+import { Discovery } from '../src/core/discovery.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -18,8 +19,10 @@ function boot(): Game {
     quest: new Quest(level.world),
     mobs: spawnGroups(level.world).flat(),
     time: 0,
+    fog: new Discovery(level.areas),
   };
 }
+const fogOf = (g: Game) => g.fog as Discovery;
 
 const a = boot();
 Object.assign(a.player.pos, { x: -10, y: 0, z: -90 });
@@ -30,6 +33,15 @@ const grata = a.quest.gates.find((g) => g.id === 'grata-nord')!;
 a.quest.open(grata);
 a.mobs[2].state = 'dead'; a.mobs[2].hp = 0;
 a.time = 754;
+// Fog: the spawn's surroundings are seen, the far north is not; standing still reveals nothing new.
+const fa = fogOf(a);
+if (!fa.reveal(SPAWN.x, SPAWN.z) || fa.reveal(SPAWN.x, SPAWN.z)) fail('reveal at spawn');
+fa.reveal(-10, -90);
+if (!fa.seen(SPAWN.x + 10, SPAWN.z) || fa.seen(SPAWN.x + 30, SPAWN.z) || fa.seen(-35, -190)) fail('sight radius wrong');
+const area = (label: string) => buildLevel().areas.find((x) => x.label === label)!;
+if (!fa.discovered(area('Fondamenta San Giacomo')) || fa.discovered(area('Pontile'))) fail('discovered areas wrong');
+const seenCount = fa.cells.reduce((n, v) => n + v, 0);
+if (seenCount === 0 || seenCount > fa.cells.length / 10) fail(`${seenCount} of ${fa.cells.length} cells seen at the start`);
 
 const s = JSON.parse(JSON.stringify(serialize(a)));
 const b = boot();
@@ -42,6 +54,15 @@ if (open.join() !== 'grata-nord') fail(`open gates ${open}`);
 if (b.quest.gates.some((g) => g.open && b.quest['world'].boxes.includes(g.box))) fail('an opened gate still blocks');
 if (b.mobs[2].state !== 'dead' || b.mobs.filter((m) => m.state === 'dead').length !== 1) fail('dead mobs not restored');
 if (b.time !== 754) fail('play time not restored');
+if (fogOf(b).cells.join('') !== fa.cells.join('')) fail('explored map not restored');
+
+// A save from before the fog loads fully fogged; a grid of another size or junk is refused untouched.
+const old = boot();
+const { fog: _, ...legacy } = s;
+deserialize(old, legacy);
+if (fogOf(old).cells.some((v) => v)) fail('legacy save not fogged');
+if (old.fog.decode('3x3:AA==') || old.fog.decode('junk') || old.fog.decode(s.fog.replace(/:.*/, ':!!'))) fail('bad fog grid accepted');
+if (!valid(legacy) || valid({ ...s, fog: 5 })) fail('fog field validation');
 
 // The boss's fall carries the portone with it; a saved corpse player wakes alive.
 const c = boot();

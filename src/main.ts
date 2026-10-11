@@ -20,6 +20,9 @@ import { QuestView } from './quest/view.ts';
 import { checkVersion } from './ui/version.ts';
 import { Minimap } from './ui/minimap.ts';
 import { Menu } from './ui/menu.ts';
+import { Discovery } from './core/discovery.ts';
+import { FogLayer } from './ui/fog.ts';
+import { WorldMap } from './ui/worldMap.ts';
 import { deserialize, serialize, takePending, type Game } from './core/save.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
@@ -33,7 +36,10 @@ const scene = new THREE.Scene();
 
 const level = buildLevel();
 scene.add(level.root);
-const minimap = new Minimap(level.root); // top-down chart of the level, top right
+const discovery = new Discovery(level.areas); // fog of war: what the player has seen
+const fog = new FogLayer(discovery);
+const minimap = new Minimap(level.root, fog, () => openMap()); // top-down chart of the level, top right
+const worldMap = new WorldMap(discovery, fog, minimap, level.areas); // M: the whole map
 const quest = new Quest(level.world); // church shut, key in the chest on the pontile
 const questView = new QuestView(quest);
 scene.add(questView.root);
@@ -72,7 +78,7 @@ kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(insid
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all];
 kit.foes = () => foes;
-const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs: foes, time: 0 };
+const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs: foes, time: 0, fog: discovery };
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
 if (loaded) {
   deserialize(game, loaded);
@@ -83,8 +89,15 @@ if (loaded) {
 const menu = new Menu({
   snapshot: () => serialize(game),
   where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
-  opened: () => { kit.system.cancel(); input.consume(); },
+  opened: () => { kit.system.cancel(); input.consume(); worldMap.close(); },
 });
+const goal = () => (!quest.key ? CHEST : !quest.bossDead ? priests.boss : undefined); // the key, then the Reverendissimo
+function openMap(): void {
+  if (menu.paused) return;
+  kit.system.cancel();
+  input.consume();
+  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal() });
+}
 const pressed = (code: string) => input.pressed(code);
 
 addEventListener('resize', () => {
@@ -95,13 +108,13 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting, quest, menu, game });
+Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.05);
-  if (menu.paused) { // the world holds still behind the menu; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open) { // the world holds still behind the menu or map; drags and wheel turns made meanwhile are dropped
     input.consume();
     input.endFrame();
     fx.render();
@@ -111,6 +124,7 @@ renderer.setAnimationLoop(() => {
     if (kit.system.casting) kit.system.cancel();
     else menu.toggle();
   }
+  if (input.pressed('KeyM')) openMap();
   game.time += dt;
   playerStats.update(dt);
   kit.update(dt, pressed); // before the player moves: casts see last frame's motion
@@ -129,8 +143,9 @@ renderer.setAnimationLoop(() => {
   targeting.update(dt, player.pos);
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;
   hud.setArea(area);
-  const goal = !quest.key ? CHEST : !quest.bossDead ? priests.boss : undefined; // the key, then the Reverendissimo
-  minimap.update(dt, player.pos, player.facing, area, foes, goal);
+  discovery.reveal(player.pos.x, player.pos.z);
+  fog.update(dt);
+  minimap.update(dt, player.pos, player.facing, area, foes, goal());
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
   fx.render();

@@ -1,5 +1,5 @@
 // Saved games: the state worth keeping as plain JSON (player, quest flags, who is dead, play
-// time), three localStorage slots, and the handoff that carries a loaded game across a reload.
+// time, the map explored so far), three localStorage slots, and the handoff that carries a loaded game across a reload.
 // Loading and "Nuova partita" reload the page so every system boots clean (no stray bolts,
 // cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
@@ -18,6 +18,7 @@ export interface GameState {
   quest: { key: boolean; gates: string[]; bossDead: boolean }; // gates: ids of the open ones
   dead: number[]; // indices into Game.mobs
   time: number; // s played
+  fog?: string; // Discovery.encode(); absent in saves from before the fog of war, which load fully fogged
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -28,6 +29,7 @@ export interface Game {
   quest: Quest;
   mobs: { state: string; hp: number; t: number }[];
   time: number;
+  fog: { encode(): string; decode(s: string): boolean };
 }
 
 export function serialize(g: Game): GameState {
@@ -38,6 +40,7 @@ export function serialize(g: Game): GameState {
     quest: { key: g.quest.key, gates: g.quest.gates.filter((q) => q.open).map((q) => q.id), bossDead: g.quest.bossDead },
     dead: g.mobs.flatMap((m, i) => (m.state === 'dead' ? [i] : [])),
     time: g.time,
+    fog: g.fog.encode(),
   };
 }
 
@@ -56,6 +59,7 @@ export function deserialize(g: Game, s: GameState): void {
   killAll(dead);
   for (const m of dead) m.t = GONE;
   g.time = s.time;
+  if (s.fog) g.fog.decode(s.fog); // a grid from another build's level is dropped: fogged, not garbled
 }
 
 /** Shape check for anything read back from storage: a hand-edited or older save is refused, not half-applied. */
@@ -64,7 +68,7 @@ export function valid(s: unknown): s is GameState {
   const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
   return !!o && o.v === VERSION && !!o.player && ['x', 'y', 'z', 'yaw', 'hp', 'mana', 'charge'].every((k) => num(o.player[k as keyof GameState['player']]))
     && !!o.quest && typeof o.quest.key === 'boolean' && typeof o.quest.bossDead === 'boolean' && Array.isArray(o.quest.gates)
-    && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time);
+    && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string');
 }
 
 export interface Slot { label: string; savedAt: number; state: GameState }

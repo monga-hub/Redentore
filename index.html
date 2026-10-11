@@ -63,7 +63,7 @@
       @keyframes lowhp { to { filter: brightness(1.7) } }
 
       /* Minimap (src/ui/minimap.ts): round chart in a bronze ring, top right, zone name on a plate
-         above, N on the rim, zoom buttons below. The column right of it stays free for the menu
+         above, N on the rim, zoom buttons below right, big-map button below left. The column right of it stays free for the menu
          and fullscreen buttons; narrow screens drop it under the player frame. */
       #minimap {
         --m: 150px;
@@ -94,6 +94,8 @@
       #minimap button:active { filter: brightness(1.4); }
       #minimap .zin { right: -6px; bottom: 16px; }
       #minimap .zout { right: 16px; bottom: -6px; }
+      #minimap .wmap { left: -6px; bottom: 16px; width: 26px; height: 26px; }
+      #minimap .wmap svg { display: block; width: 62%; height: 62%; margin: auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
       body.touch #minimap { --m: calc(150px * var(--k)); }
       @media (max-width: 720px) { #minimap { top: calc(26px + 80px * var(--k, 1) + env(safe-area-inset-top)); } }
 
@@ -283,6 +285,7 @@
       <canvas></canvas>
       <b class="north">N</b>
       <button class="zin" aria-label="Ingrandisci">+</button><button class="zout" aria-label="Riduci">&minus;</button>
+      <button class="wmap" aria-label="Mappa (M)" title="Mappa (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" /></svg></button>
     </div>
     <div id="stick"><div id="knob"></div></div>
     <button id="jump" class="touch-btn ring" aria-label="Salta" style="--a: 180deg; --r: 192px; --d: 48px">

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { World } from '../core/physics.ts';
 import type { Vfx } from '../abilities/vfx.ts';
@@ -7,12 +7,17 @@ import type { PlayerStats } from '../player/stats.ts';
 import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
 import { killAll, wipe } from './caster.ts';
 
-// Frati non-morti: KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) re-dressed as a friar —
-// the wizard hat swapped for a procedural cowl, the robe dyed habit-brown, eyes turned
-// grave-green and a hoe in the right hand. One GLB load, a skinned clone per friar sharing
+// Frati non-morti: KayKit "Skeleton Minion" (CC0, see ATTRIBUTION.md) dressed as a friar —
+// a procedural cowl, the rags dyed habit-brown, eyes turned grave-green and a hoe in the
+// right hand. The minion's GLB carries no animations: every KayKit skeleton shares one rig,
+// so it plays the mage's clips (the priests' model). A skinned clone per friar sharing
 // geometry; the AI lives in brain.ts.
 
-const URL = `${import.meta.env.BASE_URL}models/skeleton_mage.glb`;
+const URL = `${import.meta.env.BASE_URL}models/skeleton_minion.glb`;
+const RIG_URL = `${import.meta.env.BASE_URL}models/skeleton_mage.glb`; // the priests' body, and the shared rig's animations
+let rig: Promise<GLTF> | undefined;
+/** The mage's GLB, fetched once for friars and priests alike. */
+export const loadRig = (): Promise<GLTF> => (rig ??= new GLTFLoader().loadAsync(RIG_URL));
 const HEIGHT = 1.75; // m, cowl tip
 const CHOP = '2H_Melee_Attack_Chop';
 const SWING_RATE = 1.4; // swing: clip played this much faster than authored
@@ -136,15 +141,13 @@ export function barMat(color: number): THREE.SpriteMaterial {
   return new THREE.SpriteMaterial({ color, fog: false, toneMapped: false, sizeAttenuation: false });
 }
 
-/** Re-dress the mage once; every friar is a clone of this. */
+/** Dress the minion once; every friar is a clone of this. */
 function dress(scene: THREE.Group): void {
   scene.rotation.y = Math.PI; // the model faces +Z, the game's yaw 0 faces -Z
-  const hat = scene.getObjectByName('Skeleton_Mage_Hat')!;
-  const head = hat.parent!;
-  hat.removeFromParent();
+  const head = scene.getObjectByName('head')!;
   scene.updateMatrixWorld(true);
 
-  const skull = new THREE.Box3().setFromObject(scene.getObjectByName('Skeleton_Mage_Skull')!);
+  const skull = new THREE.Box3().setFromObject(scene.getObjectByName('Skeleton_Minion_Head')!);
   const size = skull.getSize(new THREE.Vector3()), c = skull.getCenter(new THREE.Vector3());
   const cloth = new THREE.MeshStandardMaterial({ color: CLOTH, roughness: 0.95, side: THREE.DoubleSide });
   const hood = new THREE.Group();
@@ -199,7 +202,7 @@ function dress(scene: THREE.Group): void {
   scene.scale.setScalar(HEIGHT / top);
 }
 
-/** Robe and sleeves share the bone atlas, so dye in the shader: only the mage's reds turn habit brown. */
+/** Rags and bones share one atlas, so dye in the shader: only the minion's rusty reds turn habit brown. */
 function dye(m: THREE.MeshStandardMaterial): void {
   m.onBeforeCompile = (s) => {
     s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
@@ -224,12 +227,12 @@ export class Friars {
     this.vfx = vfx;
     this.stats = stats;
     this.all = spawnGroups(world).flat();
-    new GLTFLoader().load(URL, (gltf) => {
-      dress(gltf.scene);
-      const t = { scene: gltf.scene, clips: gltf.animations };
+    Promise.all([new GLTFLoader().loadAsync(URL), loadRig()]).then(([body, rig]) => {
+      dress(body.scene);
+      const t = { scene: body.scene, clips: rig.animations };
       this.views = this.all.map(() => new View(t));
       for (const v of this.views) this.root.add(v.root);
-    }, undefined, (e) => console.error('friar model failed to load', e));
+    }, (e) => console.error('friar model failed to load', e));
   }
 
   /** AI + animation. `player`: feet position. Melee hits go to the player's stats. */

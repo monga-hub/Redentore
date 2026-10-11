@@ -7,17 +7,19 @@ import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
-import { barMat, ownMaterials } from './friars.ts';
+import { barMat, loadRig, ownMaterials } from './friars.ts';
 
-// Preti non-morti: the same KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) as the friars,
-// re-dressed darker so they read apart at a glance — a tall pointed hood, a gold-edged stole,
-// the robe dyed near-black violet, violet eyes and a staff with a shadow crystal. They pray
-// in the cloisters in threes and throw homing shadow bolts; the AI lives in caster.ts.
-// The sacerdoti (each leading two priests: two in the church, one in each lagoon garden)
-// are the same mage, taller, in a white robe under a violet hood and cape; the
-// Reverendissimo is a giant one in white and violet with a gold-banded mitre.
+// Preti non-morti: KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) re-dressed — a tall pointed
+// hood, a gold-edged stole, the robe dyed near-black violet, violet eyes and a staff with a
+// shadow crystal. They pray in the cloisters in threes and throw homing shadow bolts; the AI
+// lives in caster.ts. The sacerdoti (each leading two priests: two in the church, one in each
+// lagoon garden) are KayKit's armoured "Skeleton Warrior", taller, its helmet traded for a
+// violet hood and cape, its reds bleached white; the Reverendissimo is a giant warrior in
+// gilded armour, white and violet, with a gold-banded mitre. Every body shares one rig and
+// plays the mage's clips (the warrior's GLB carries no animations).
 
-const URL = `${import.meta.env.BASE_URL}models/skeleton_mage.glb`;
+const MODELS = `${import.meta.env.BASE_URL}models/`;
+const RIG = 'skeleton_mage.glb'; // loadRig()'s GLB
 const CLIPS: Record<CasterState, string> = { pray: 'Idle', chase: 'Idle_Combat', cast: 'Spellcasting', swing: '2H_Melee_Attack_Chop', nova: 'Spellcast_Summon', evade: 'Running_B', dead: 'Death_A' };
 const STEP: Record<-1 | 1, string> = { [-1]: 'Walking_Backwards', 1: 'Walking_A' };
 const SHOOT = 'Spellcast_Shoot';
@@ -29,12 +31,24 @@ const FAR = 40; // m: praying priests farther than this skip their animation (th
 const TRIM = 0xb48a3c;
 const SHADOW = 0x8a3cff, CORE = 0xa45cff, SMOKE = 0x1a0b26;
 
-/** How one kind of caster is dressed. `robe`: GLSL tint the mage's red robe is dyed to (times its luminance). */
-interface Look { height: number; cloth: number; eyes: number; robe: string; mitre?: boolean }
+/** The skeletons' reds turn a cassock colour: `tint` times their luminance (the cloth shares the bone atlas). */
+const cassock = (tint: string) => `
+	float redness = smoothstep(0.06, 0.2, diffuseColor.r - max(diffuseColor.g, diffuseColor.b));
+	vec3 cassock = min(vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * ${tint}, vec3(0.92));
+	diffuseColor.rgb = mix(diffuseColor.rgb, cassock, redness);`;
+
+/** The boss's armour: the warrior's cool steel greys turn gilded, after `dye` (masked first: the gold would read as a red, the cassock's whites as steel). */
+const gilt = (dye: string) => `
+	vec3 g = diffuseColor.rgb;
+	float steel = (1.0 - smoothstep(0.04, 0.1, max(g.r, max(g.g, g.b)) - min(g.r, min(g.g, g.b)))) * step(g.r, g.b + 0.01) * (1.0 - smoothstep(0.45, 0.6, g.g));${dye}
+	diffuseColor.rgb = mix(diffuseColor.rgb, g.ggg * vec3(2.6, 1.75, 0.3), steel);`;
+
+/** How one kind of caster is dressed. `body`: GLB under models/, `skull`: its head mesh, `hat`: a mesh to take off, `dye`: GLSL recolouring its atlas. */
+interface Look { body: string; skull: string; hat?: string; height: number; cloth: number; eyes: number; dye: string; mitre?: boolean }
 const LOOKS = new Map<CasterKind, Look>([
-  [PRIEST, { height: 1.85, cloth: 0x1d1424, eyes: 0xb05cff, robe: 'vec3(0.42, 0.3, 0.55)' }],
-  [SACERDOTE, { height: 2.5, cloth: 0x4a1f78, eyes: 0xd27bff, robe: 'vec3(1.9, 1.85, 1.8)' }],
-  [REVERENDISSIMO, { height: 4.6, cloth: 0x5a2390, eyes: 0xff5ce1, robe: 'vec3(2, 1.95, 1.9)', mitre: true }],
+  [PRIEST, { body: RIG, skull: 'Skeleton_Mage_Skull', hat: 'Skeleton_Mage_Hat', height: 1.85, cloth: 0x1d1424, eyes: 0xb05cff, dye: cassock('vec3(0.42, 0.3, 0.55)') }],
+  [SACERDOTE, { body: 'skeleton_warrior.glb', skull: 'Skeleton_Warrior_Head', height: 2.5, cloth: 0x4a1f78, eyes: 0xd27bff, dye: cassock('vec3(1.9, 1.85, 1.8)') }],
+  [REVERENDISSIMO, { body: 'skeleton_warrior.glb', skull: 'Skeleton_Warrior_Head', height: 4.6, cloth: 0x5a2390, eyes: 0xff5ce1, dye: gilt(cassock('vec3(2, 1.95, 1.9)')), mitre: true }],
 ]);
 
 interface Template {
@@ -147,15 +161,14 @@ class View {
   }
 }
 
-/** Re-dress a copy of the mage for one kind of caster; every caster of that kind is a clone of this. */
+/** Dress one kind of caster's body; every caster of that kind is a clone of this. */
 function dress(scene: THREE.Group, look: Look): void {
   scene.rotation.y = Math.PI; // the model faces +Z, the game's yaw 0 faces -Z
-  const hat = scene.getObjectByName('Skeleton_Mage_Hat')!;
-  const head = hat.parent!;
-  hat.removeFromParent();
+  const head = scene.getObjectByName('head')!;
+  if (look.hat) scene.getObjectByName(look.hat)!.removeFromParent();
   scene.updateMatrixWorld(true);
 
-  const skull = new THREE.Box3().setFromObject(scene.getObjectByName('Skeleton_Mage_Skull')!);
+  const skull = new THREE.Box3().setFromObject(scene.getObjectByName(look.skull)!);
   const size = skull.getSize(new THREE.Vector3()), c = skull.getCenter(new THREE.Vector3());
   const cloth = new THREE.MeshStandardMaterial({ color: look.cloth, roughness: 0.9, side: THREE.DoubleSide });
   const gold = new THREE.MeshStandardMaterial({ color: TRIM, roughness: 0.45, metalness: 0.8 });
@@ -224,17 +237,17 @@ function dress(scene: THREE.Group, look: Look): void {
   hand.attach(staff);
   staff.rotation.set(0, 0, Math.PI / 2); // upright along the slot's -X, which points up while idle and casting
 
-  const own = new Map<THREE.Material, THREE.MeshStandardMaterial>(); // the copies share the mage's materials
+  const own = new Map<THREE.Material, THREE.MeshStandardMaterial>(); // the bodies come from the loader: dye copies
   scene.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
     o.castShadow = o.material !== glow;
     o.frustumCulled = false; // skinned: bind-pose bounds don't follow the animation
     const m = o.material as THREE.MeshStandardMaterial;
-    if (m.name !== 'Glow' && m.name !== 'skeleton') return;
+    if (!m.map && m.name !== 'Glow') return; // our own cloth, gold and wood
     if (!own.has(m)) {
       const c = m.clone();
       if (m.name === 'Glow') { c.color.setHex(look.eyes); c.emissive.setHex(look.eyes); }
-      else dye(c, look.robe);
+      else dye(c, look.dye);
       own.set(m, c);
     }
     o.material = own.get(m)!;
@@ -243,15 +256,12 @@ function dress(scene: THREE.Group, look: Look): void {
   scene.scale.setScalar(look.height / top);
 }
 
-/** The mage's reds turn the kind's cassock colour (shader dye, the robe shares the bone atlas). */
-function dye(m: THREE.MeshStandardMaterial, robe: string): void {
+/** Recolour a body's atlas in the shader (`glsl` from a Look). */
+function dye(m: THREE.MeshStandardMaterial, glsl: string): void {
   m.onBeforeCompile = (s) => {
-    s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-	float redness = smoothstep(0.06, 0.2, diffuseColor.r - max(diffuseColor.g, diffuseColor.b));
-	vec3 cassock = min(vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * ${robe}, vec3(0.92));
-	diffuseColor.rgb = mix(diffuseColor.rgb, cassock, redness);`);
+    s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>${glsl}`);
   };
-  m.customProgramCacheKey = () => `cassock-${robe}`;
+  m.customProgramCacheKey = () => `cassock-${glsl}`;
 }
 
 /** Every priest in the cloisters, the gardens and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
@@ -289,17 +299,20 @@ export class Priests {
       new THREE.MeshBasicMaterial({ color: new THREE.Color(SHADOW).multiplyScalar(2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
     );
     this.ring.visible = false;
-    new GLTFLoader().load(URL, (gltf) => {
+    const loader = new GLTFLoader(), looks = [...LOOKS];
+    const bodies = [...new Set(looks.map(([, l]) => l.body))];
+    // The priests wear the rig's own mage; each kind dresses its own copy of a body.
+    Promise.all([loadRig(), ...bodies.map((b) => b === RIG ? loadRig() : loader.loadAsync(MODELS + b))]).then(([rig, ...gltfs]) => {
       const templates = new Map<CasterKind, Template>();
-      for (const [kind, look] of LOOKS) {
-        const scene = cloneSkinned(gltf.scene) as THREE.Group;
+      for (const [kind, look] of looks) {
+        const scene = cloneSkinned(gltfs[bodies.indexOf(look.body)].scene) as THREE.Group;
         dress(scene, look);
-        templates.set(kind, { scene, clips: gltf.animations, height: look.height });
+        templates.set(kind, { scene, clips: rig.animations, height: look.height });
       }
       this.views = this.all.map((f) => new View(templates.get(f.kind)!));
       for (const v of this.views) this.root.add(v.root);
       this.root.add(this.ring); // after the models: main.ts reads an empty root as "not loaded yet"
-    }, undefined, (e) => console.error('priest model failed to load', e));
+    }, (e) => console.error('priest model failed to load', e));
   }
 
   /** The boss has fallen: every caster drops dead for good. */

@@ -1,14 +1,12 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { arm, loadModel, stand } from '../core/models.ts';
 import { PLAYER } from '../core/physics.ts';
 
 // The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
-// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB.
-// Loaded async; `root` stays empty until the GLB arrives.
-// The model faces +Z; the controller's yaw 0 faces -Z, so it is turned round.
+// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB, a Meshy bone club in the
+// right fist. Loaded async; `root` stays empty until the GLBs arrive.
 
-const URL = `${import.meta.env.BASE_URL}models/reietto.glb`; // public/, under Vite's base
+const CLUB = { length: 0.95, grip: 0.12, tilt: 1 }; // m long, held near the butt, leaning toward the fingers
 const CLIPS = { idle: 'Idle', walk: 'Walking', run: 'Running', air: 'Jump_Run' } as const;
 type State = keyof typeof CLIPS;
 const FADE = 0.2;
@@ -42,18 +40,10 @@ export class UndeadModel {
   private still = 1; // 0..1, eased: how much of the legs a one-shot takes over
 
   constructor() {
-    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(URL, (gltf) => {
+    Promise.all([loadModel('reietto.glb'), loadModel('clava.glb')]).then(([gltf, club]) => {
       const model = gltf.scene;
-      model.rotation.y = Math.PI;
-      const box = new THREE.Box3().setFromObject(model); // bind pose
-      const k = PLAYER.height / (box.max.y - box.min.y);
-      model.scale.setScalar(k);
-      model.position.y = -box.min.y * k; // feet on y = 0
-      model.traverse((o) => {
-        if (!(o instanceof THREE.Mesh)) return;
-        o.castShadow = true;
-        o.frustumCulled = false; // skinned: the bind-pose bounds don't follow the animation
-      });
+      stand(model, PLAYER.height);
+      arm(model, club.scene, CLUB.length, CLUB.grip, CLUB.tilt);
       this.mixer = new THREE.AnimationMixer(model);
       for (const [s, name] of Object.entries(CLIPS) as [State, string][]) {
         const clip = THREE.AnimationClip.findByName(gltf.animations, name);
@@ -74,7 +64,7 @@ export class UndeadModel {
         this.shots.set(c.clip, { upper: layer('upper', true), lower: layer('lower', false), in: c.in, out: c.out, t: -1, end: 0 });
       }
       this.root.add(model);
-    }, undefined, (e) => console.error('player model failed to load', e));
+    }, (e) => console.error('player model failed to load', e));
   }
 
   /** Play the main-attack swing once over whatever the legs are doing. */

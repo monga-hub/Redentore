@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { arm, loadModel, stand } from '../core/models.ts';
 import type { World } from '../core/physics.ts';
 import type { Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
@@ -117,13 +116,6 @@ class View {
   }
 }
 
-const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-
-/** A GLB under public/models/ (Vite's base). */
-export function loadModel(file: string): Promise<GLTF> {
-  return loader.loadAsync(`${import.meta.env.BASE_URL}models/${file}`);
-}
-
 /** Give a skinned clone its own materials so a hit flash only lights this one; programs stay shared. */
 export function ownMaterials(model: THREE.Object3D): THREE.MeshStandardMaterial[] {
   const own = new Map<THREE.Material, THREE.MeshStandardMaterial>();
@@ -148,46 +140,6 @@ export function flash(mats: THREE.MeshStandardMaterial[], k: number): void {
 
 export function barMat(color: number): THREE.SpriteMaterial {
   return new THREE.SpriteMaterial({ color, fog: false, toneMapped: false, sizeAttenuation: false });
-}
-
-/** Stand a Meshy body `height` m tall on y = 0, facing the game's yaw 0 (-Z; the models face +Z). */
-export function stand(scene: THREE.Group, height: number): void {
-  scene.rotation.y = Math.PI;
-  scene.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(scene); // bind pose
-  const k = height / (box.max.y - box.min.y);
-  scene.scale.setScalar(k);
-  scene.position.y = -box.min.y * k;
-  scene.updateMatrixWorld(true);
-  scene.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
-    o.castShadow = true;
-    o.frustumCulled = false; // skinned: bind-pose bounds don't follow the animation
-  });
-}
-
-/**
- * Put `prop` (a Meshy prop, upright in its file) in the stood body's right fist, `length` m long
- * and held `grip` of the way up, its length along the hand bone's +Z: across the fist, so it
- * stands up in the idle and prayer poses and points ahead in a cast. Returns its top end, where
- * the hoe's blade or a staff's crystal is.
- */
-export function arm(scene: THREE.Group, prop: THREE.Group, length: number, grip: number): THREE.Object3D {
-  const box = new THREE.Box3().setFromObject(prop), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
-  const k = length / size.y;
-  prop.scale.setScalar(k);
-  prop.position.set(-c.x * k, -(box.min.y + grip * size.y) * k, -c.z * k); // the grip at the origin
-  prop.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
-  const held = new THREE.Group(), top = new THREE.Object3D();
-  held.name = 'held';
-  top.position.y = (1 - grip) * length;
-  held.add(prop, top);
-  const hand = scene.getObjectByName('RightHand')!, fore = scene.getObjectByName('RightForeArm')!;
-  const wrist = hand.getWorldPosition(new THREE.Vector3()), elbow = fore.getWorldPosition(new THREE.Vector3());
-  held.position.copy(wrist).addScaledVector(wrist.clone().sub(elbow).normalize(), 0.08 * length); // in the palm, past the wrist
-  hand.attach(held);
-  held.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
-  return top;
 }
 
 /** Stand the friar up and give it its hoe; every friar is a clone of this. */

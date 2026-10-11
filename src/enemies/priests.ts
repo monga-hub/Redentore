@@ -6,7 +6,8 @@ import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
-import { arm, barMat, flash, loadModel, ownMaterials, stand } from './friars.ts';
+import { arm, loadModel, stand } from '../core/models.ts';
+import { barMat, flash, ownMaterials } from './friars.ts';
 
 // The casters, one body per kind, each generated, rigged and animated with Meshy AI (see
 // ATTRIBUTION.md), with a Meshy-made staff in the right fist. Preti non-morti: hooded skeletons

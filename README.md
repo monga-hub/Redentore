@@ -93,8 +93,10 @@ src/
   core/physics.ts            collisioni: tutto è un box (anche ruotato); pavimenti e muri
                              con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
   core/input.ts              tastiera + mouse
+  core/models.ts             modelli Meshy: caricamento GLB, posa in piedi, oggetto nel pugno
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
-  player/undead.ts           modello del Reietto (Meshy), animazioni, fendente e lancio sovrapposti al busto
+  player/undead.ts           modello del Reietto (Meshy) con la clava d'ossa, animazioni, fendente e
+                             lancio sovrapposti al busto
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
   camera/intro.ts            piano sequenza d'apertura (spline Catmull-Rom sulle chiavi, saltabile)
   ui/hud.ts                  nome dell'area corrente
@@ -109,8 +111,7 @@ src/
                              zappata in mischia, evade, morte/respawn) e punti di spawn
                              nell'orto. Nessuna dipendenza da three
   enemies/friars.ts          modello (frate non-morto Meshy con la zappa in pugno), animazioni,
-                             barra vita; danni al player via `PlayerStats.takeDamage`; helper
-                             condivisi per i modelli Meshy (caricamento, posa, oggetto in mano)
+                             barra vita; danni al player via `PlayerStats.takeDamage`
   enemies/caster.ts          IA dei preti caster (anche sacerdoti e Reverendissimo: `CasterKind` con mischia
                              e nova; spawn della chiesa, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
                              con cooldown, dardi a ricerca, indietreggiare restando nel

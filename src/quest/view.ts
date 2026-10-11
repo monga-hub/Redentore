@@ -146,9 +146,7 @@ export class QuestView {
     for (const v of this.gates) {
       if (!v.gate.open || v.p >= 1) continue;
       v.p = Math.min(1, v.p + dt / OPEN_TIME);
-      const e = v.p * v.p * (3 - 2 * v.p);
-      if (v.gate.kind === 'grate') v.leaves[0].position.y = e * (v.gate.h - 0.1); // up into the wall above
-      else for (const l of v.leaves) l.rotation.y = l.userData.side * SWING[v.gate.id as keyof typeof SWING] * e * 1.75;
+      this.pose(v);
     }
 
     if (this.quest.chestOpen && this.lidP < 1) this.lidP = Math.min(1, this.lidP + dt * 1.5);
@@ -164,6 +162,18 @@ export class QuestView {
       this.bossText.textContent = `${Math.ceil(boss.hp)} / ${boss.kind.hp}`;
     }
     return notice;
+  }
+
+  private pose(v: GateView): void {
+    const e = v.p * v.p * (3 - 2 * v.p);
+    if (v.gate.kind === 'grate') v.leaves[0].position.y = e * (v.gate.h - 0.1); // up into the wall above
+    else for (const l of v.leaves) l.rotation.y = l.userData.side * SWING[v.gate.id as keyof typeof SWING] * e * 1.75;
+  }
+
+  /** A loaded game: gates already open and the chest already emptied, without playing the openings. */
+  settle(): void {
+    for (const v of this.gates) if (v.gate.open) { v.p = 1; this.pose(v); }
+    if (this.quest.chestOpen) this.lidP = 1;
   }
 
   victory(): void {

@@ -25,7 +25,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti e boss
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti e boss + salvataggi
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -43,7 +43,7 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 | rotella | zoom |
 | Q / E | ruota la camera |
 | 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti); 9 = pozione |
-| Esc | annulla il lancio in corso |
+| Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | F | interagisci (apri baule, grate, porte); su touch tocca il riquadro che appare |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,

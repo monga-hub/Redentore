@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "check": "node scripts/check-walkable.ts && node scripts/check-abilities.ts && node scripts/check-enemies.ts && node scripts/check-target.ts"
+    "check": "node scripts/check-walkable.ts && node scripts/check-abilities.ts && node scripts/check-enemies.ts && node scripts/check-target.ts && node scripts/check-save.ts"
   },
   "dependencies": {
     "three": "^0.186.1"

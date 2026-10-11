@@ -19,6 +19,8 @@ import { CHEST, Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
 import { checkVersion } from './ui/version.ts';
 import { Minimap } from './ui/minimap.ts';
+import { Menu } from './ui/menu.ts';
+import { deserialize, serialize, takePending, type Game } from './core/save.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -70,7 +72,19 @@ kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(insid
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all];
 kit.foes = () => foes;
-kit.system.notices.push({ kind: 'info', text: 'Il portone della chiesa è sbarrato: entra nel convento dalla calle' });
+const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs: foes, time: 0 };
+const loaded = takePending(); // a slot picked in the menu, carried across the reload
+if (loaded) {
+  deserialize(game, loaded);
+  cam.yaw = player.facing;
+  questView.settle();
+  kit.system.notices.push({ kind: 'info', text: 'Partita caricata' });
+} else kit.system.notices.push({ kind: 'info', text: 'Il portone della chiesa è sbarrato: entra nel convento dalla calle' });
+const menu = new Menu({
+  snapshot: () => serialize(game),
+  where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
+  opened: () => { kit.system.cancel(); input.consume(); },
+});
 const pressed = (code: string) => input.pressed(code);
 
 addEventListener('resize', () => {
@@ -81,13 +95,23 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting, quest });
+Object.assign(window, { scene, level, player, cam, fx, kit, playerStats, friars, priests, targeting, quest, menu, game });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.05);
-  if (input.pressed('Escape')) kit.system.cancel();
+  if (menu.paused) { // the world holds still behind the menu; drags and wheel turns made meanwhile are dropped
+    input.consume();
+    input.endFrame();
+    fx.render();
+    return;
+  }
+  if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
+    if (kit.system.casting) kit.system.cancel();
+    else menu.toggle();
+  }
+  game.time += dt;
   playerStats.update(dt);
   kit.update(dt, pressed); // before the player moves: casts see last frame's motion
   player.update(dt, input, cam.yaw, (input.buttons & 2) !== 0);

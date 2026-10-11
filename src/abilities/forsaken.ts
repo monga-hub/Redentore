@@ -283,7 +283,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     // The main attack: off the GCD so the 1 s recovery is the real swing rate, WoW auto-attack style.
-    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 1, offGcd: true, charge: 3,
+    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 0.3, offGcd: true, charge: 3,
     desc: `Un fendente di schegge d'ossa davanti a te: ${MELEE_DAMAGE} danni a tutti i nemici entro ${num(MELEE_RANGE)} m.`,
     fire(k) {
       const p = k.player.pos, f = k.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), v = k.vfx;

@@ -15,9 +15,10 @@ import { Friars } from './enemies/friars.ts';
 import { Priests } from './enemies/priests.ts';
 import { FRIAR } from './enemies/brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { Quest } from './quest/progress.ts';
+import { CHEST, Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
 import { checkVersion } from './ui/version.ts';
+import { Minimap } from './ui/minimap.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -30,6 +31,7 @@ const scene = new THREE.Scene();
 
 const level = buildLevel();
 scene.add(level.root);
+const minimap = new Minimap(level.root); // top-down chart of the level, top right
 const quest = new Quest(level.world); // church shut, key in the chest on the pontile
 const questView = new QuestView(quest);
 scene.add(questView.root);
@@ -66,7 +68,8 @@ playerStats.onDeath = () => { // ponytail: wake at the last checkpoint at full h
 };
 kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
-kit.foes = () => [...friars.all, ...priests.all];
+const foes = [...friars.all, ...priests.all];
+kit.foes = () => foes;
 kit.system.notices.push({ kind: 'info', text: 'Il portone della chiesa è sbarrato: entra nel convento dalla calle' });
 const pressed = (code: string) => input.pressed(code);
 
@@ -100,7 +103,10 @@ renderer.setAnimationLoop(() => {
   }
   cam.update(dt, input, player.pos);
   targeting.update(dt, player.pos);
-  hud.setArea(level.areaAt(player.pos.x, player.pos.z)?.label);
+  const area = level.areaAt(player.pos.x, player.pos.z)?.label;
+  hud.setArea(area);
+  const goal = !quest.key ? CHEST : !quest.bossDead ? priests.boss : undefined; // the key, then the Reverendissimo
+  minimap.update(dt, player.pos, player.facing, area, foes, goal);
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
   fx.render();

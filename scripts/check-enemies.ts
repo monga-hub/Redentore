@@ -94,6 +94,38 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
       }
     }
   }
+
+  // The player lures the chiostro mediano's priests towards its arcade walks, door gaps
+  // included, then leaves: they keep to the court inside the muretto and all walk home. They used
+  // to follow through a gap and evade straight into the muretto, stuck there for good.
+  const { court, groups } = plan.find((c) => c.area.label === 'Chiostro mediano')!;
+  const ps = spawnPriests(level.world, groups, groups.map(() => court)).flat();
+  const pl: Target = { x: 0, y: 0, z: 0 };
+  const tick = (s: number) => {
+    for (let t = 0; t < s; t += 1 / 60) for (const f of ps) {
+      casterThink(f, pl, level.world, 1 / 60, []);
+      if (f.x < court.x0 || f.x > court.x1 || f.z < court.z0 || f.z > court.z1) fail(`mediano priest out of the court at (${f.x.toFixed(1)}, ${f.z.toFixed(1)})`);
+    }
+  };
+  for (const [x, z] of [[-29.9, -69.9], [-18.4, -70.4], [-29.4, -63.4], [-18.9, -67.4], [-24, -57.5], [-24, -78.8]]) { // west and east door gaps, walks round the court
+    pl.x = x; pl.z = z;
+    for (const f of ps) if (f.state === 'pray') f.state = 'chase';
+    tick(8);
+  }
+  pl.x = 500; // gone
+  tick(15);
+  for (const f of ps) if (f.state !== 'pray') fail(`mediano priest stuck ${f.state} at (${f.x.toFixed(1)}, ${f.z.toFixed(1)})`);
+}
+
+// Evading home straight into a wall (a well, a bench): it warps home rather than stand there for good.
+{
+  const fl = new World();
+  fl.add(0, 0, 100, 100, -1, 0);
+  fl.add(0, 2, 1, 0.5, 0, 1); // a well between the priest and its spot
+  const f = spawnPriests(fl, [[[0, 0, 0]]], [{ x0: -10, x1: 10, z0: -10, z1: 10 }])[0][0];
+  Object.assign(f, { z: 4, state: 'evade', t: 0 });
+  for (let t = 0; t < 12; t += 1 / 60) casterThink(f, { x: 0, y: 0, z: 500 }, fl, 1 / 60, []);
+  if (f.state !== 'pray' || Math.hypot(f.x, f.z) > 0.1) fail(`evade pinned on a wall: ${f.state} at (${f.x.toFixed(1)}, ${f.z.toFixed(1)})`);
 }
 
 // Lagoon gardens: one sacerdote and two priests standing clear in each garden.

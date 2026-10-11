@@ -280,7 +280,7 @@ export class Priests {
     const church = spawnChurch(world);
     this.boss = church.boss;
     this.all = [
-      ...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.area))).flat(),
+      ...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.court))).flat(),
       ...spawnPriests(world, gardens.map((g) => g.group), gardens.map((g) => g.area), gardens.map(() => [SACERDOTE])).flat(),
       ...church.all,
     ];

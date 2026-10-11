@@ -67,6 +67,12 @@ export const REVERENDISSIMO: CasterKind = {
   melee: { reach: 1.5, hit: 3.5, windup: 0.8, swing: 1.6, cooldown: 3.2, damage: 60 },
   nova: { every: 15, cast: 2.6, radius: 6, damage: 160 },
 };
+/**
+ * s: an evade that hasn't reached home by now is pinned on a well, bench or tree in its
+ * straight-line path (mobs don't pathfind) and warps home, WoW-style. The longest honest walk home,
+ * across the chiostro grande at `walk`, takes ~8 s.
+ */
+const EVADE_MAX = 10;
 const LOS_EVERY = 0.25; // s: tracing a ray through the cloister costs ~0.2 ms
 const CHEST = 1.1; // m above the feet: where bolts leave the staff and strike the player
 
@@ -90,7 +96,7 @@ export interface Priest {
   los: { ok: boolean; t: number }; // line of sight to the player, re-traced every LOS_EVERY s
   move: -1 | 0 | 1; // backpedalling, standing, walking forward (for the animation)
   home: { x: number; z: number; yaw: number };
-  bounds: Bounds; // the cloister: never leaves it
+  bounds: Bounds; // the cloister's court (or garden, church floor): never leaves it
   mates: Priest[];
 }
 
@@ -103,6 +109,14 @@ export interface Bolt {
 
 /** The cloisters, by area label: the arcaded courts of the convent zone. */
 export const isCloister = (label: string) => /^Chiostr/.test(label);
+
+/**
+ * m from a cloister's outer walls to its court: the arcade walks (2.5-3 m deep, builder.ts arcade)
+ * end at a muretto, a parapet the casters can't step over, open only at the doors.
+ */
+const WALK = 3;
+/** The open court of the cloister `b`, inside the muretto. */
+const court = (b: Bounds): Bounds => ({ x0: b.x0 + WALK, x1: b.x1 - WALK, z0: b.z0 + WALK, z1: b.z1 - WALK });
 
 /** Groups of three a cloister holds: one for a small court, two for a large one, three for the largest. */
 export function groupsFor(area: number, largest: number): number {
@@ -117,8 +131,9 @@ export function groupsFor(area: number, largest: number): number {
  */
 export function cloisterSpots(world: World, b: Bounds, n: number): [number, number, number][][] {
   const long = b.x1 - b.x0 >= b.z1 - b.z0, groups: [number, number, number][][] = [], taken: number[][] = [];
+  const c = court(b);
   const free = (x: number, z: number) =>
-    x > b.x0 + 3 && x < b.x1 - 3 && z > b.z0 + 3 && z < b.z1 - 3 // out of the arcade walks
+    x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1 // out of the arcade walks
     && !world.blocked(x, z, 0, PRIEST.radius + 0.3) && Math.abs(world.groundAt(x, z, 0)) < 0.3
     && taken.every(([tx, tz]) => Math.hypot(tx - x, tz - z) > 1.4);
   for (let i = 0; i < n; i++) {
@@ -142,12 +157,16 @@ export function cloisterSpots(world: World, b: Bounds, n: number): [number, numb
   return groups;
 }
 
-/** Every cloister among `areas` with its groups' spots, sized by `groupsFor`. */
-export function cloisterPlan(world: World, areas: (Bounds & { label: string })[]): { area: Bounds & { label: string }; groups: [number, number, number][][] }[] {
+/**
+ * Every cloister among `areas` with its groups' spots, sized by `groupsFor`, and the court its
+ * priests keep to. Not the whole area: chasing a player into the arcade walks used to lead them
+ * through a door gap in the muretto, and the straight walk home then pinned them against it for good.
+ */
+export function cloisterPlan(world: World, areas: (Bounds & { label: string })[]): { area: Bounds & { label: string }; court: Bounds; groups: [number, number, number][][] }[] {
   const cloisters = areas.filter((a) => isCloister(a.label));
   const size = (a: Bounds) => (a.x1 - a.x0) * (a.z1 - a.z0);
   const largest = Math.max(...cloisters.map(size));
-  return cloisters.map((area) => ({ area, groups: cloisterSpots(world, area, groupsFor(size(area), largest)) }));
+  return cloisters.map((area) => ({ area, court: court(area), groups: cloisterSpots(world, area, groupsFor(size(area), largest)) }));
 }
 
 /** The gardens past the orti, by the lagoon (zones/nord.ts): one sacerdote and two priests in each. */
@@ -324,6 +343,7 @@ export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bol
       f.hp = K.hp;
       walk(f, f.home.x, f.home.z, K.walk, 0, world, dt, K.radius);
       f.move = 1;
+      if (f.t > EVADE_MAX) { f.x = f.home.x; f.z = f.home.z; f.y = feet(world, f.x, f.z); }
       if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
       return 0;
     case 'dead': // for good: nobody respawns

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { World } from '../core/physics.ts';
 import type { Vfx } from '../abilities/vfx.ts';
@@ -7,28 +7,23 @@ import type { PlayerStats } from '../player/stats.ts';
 import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
 import { killAll, wipe } from './caster.ts';
 
-// Frati non-morti: KayKit "Skeleton Minion" (CC0, see ATTRIBUTION.md) dressed as a friar —
-// a procedural cowl, the rags dyed habit-brown, eyes turned grave-green and a hoe in the
-// right hand. The minion's GLB carries no animations: every KayKit skeleton shares one rig,
-// so it plays the mage's clips (the priests' model). A skinned clone per friar sharing
-// geometry; the AI lives in brain.ts.
+// Frati non-morti: Quaternius' "Zombie" (CC0, see ATTRIBUTION.md) dressed as a friar — a
+// procedural cowl and shoulder cape, the ragged trousers dyed habit-brown, a hoe in the right
+// hand; it claws at the soil while idle. A skinned clone per friar sharing geometry; the AI
+// lives in brain.ts.
 
-const URL = `${import.meta.env.BASE_URL}models/skeleton_minion.glb`;
-const RIG_URL = `${import.meta.env.BASE_URL}models/skeleton_mage.glb`; // the priests' body, and the shared rig's animations
-let rig: Promise<GLTF> | undefined;
-/** The mage's GLB, fetched once for friars and priests alike. */
-export const loadRig = (): Promise<GLTF> => (rig ??= new GLTFLoader().loadAsync(RIG_URL));
+const URL = `${import.meta.env.BASE_URL}models/zombie.glb`;
 const HEIGHT = 1.75; // m, cowl tip
-const CHOP = '2H_Melee_Attack_Chop';
-const SWING_RATE = 1.4; // swing: clip played this much faster than authored
+const PUNCH = 'Punch', CLAW = 'Idle_Attack';
+const SWING_RATE = 0.65; // swing: the punch clip slowed so its blow (0.4 s in) lands at FRIAR.windup
 const HOE_RATE = 0.7; // idle hoeing: slow and heavy
-const IMPACT = FRIAR.windup * SWING_RATE; // s into the chop clip where the hoe bites
-const CLIPS: Record<State, string> = { hoe: CHOP, chase: 'Walking_D_Skeletons', swing: CHOP, evade: 'Running_B', dead: 'Death_A' };
+const IMPACT = 0.75; // s into the claw clip where the hoe bites
+const CLIPS: Record<State, string> = { hoe: CLAW, chase: 'Walk', swing: PUNCH, evade: 'Run', dead: 'Death' };
 const FADE = 0.2;
 const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 }; // corpse sinks into the soil, then hides
 
-const CLOTH = 0x6e4c33, EYES = 0x7dff3a, DIRT = 0x3d2b1c, BLOOD = 0x8dff6a;
+const CLOTH = 0x6e4c33, DIRT = 0x3d2b1c, BLOOD = 0x8dff6a;
 
 interface Template {
   scene: THREE.Group;
@@ -80,7 +75,7 @@ class View {
     const a = this.current!;
 
     // Hoe strokes throw up a clod of earth where the blade bites.
-    if (f.state === 'hoe' && a.getClip().name === CHOP) {
+    if (f.state === 'hoe') {
       if (this.lastClip < IMPACT && a.time >= IMPACT) {
         const p = this.blade.getWorldPosition(new THREE.Vector3());
         vfx.burst(p.x, Math.max(p.y, f.y + 0.1), p.z, 10, 0.15, { life: 0.7, size: 0.09, color: DIRT, alpha: 0.9, normal: true, grav: 9, vy: 2.2, drag: 1 }, 1.1);
@@ -141,42 +136,57 @@ export function barMat(color: number): THREE.SpriteMaterial {
   return new THREE.SpriteMaterial({ color, fog: false, toneMapped: false, sizeAttenuation: false });
 }
 
-/** Dress the minion once; every friar is a clone of this. */
+/** World box of the vertices of `scene`'s skinned meshes that ride mostly on one of `bones`, as posed now. */
+export function boneBox(scene: THREE.Object3D, bones: string[]): THREE.Box3 {
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  scene.updateMatrixWorld(true);
+  scene.traverse((o) => {
+    if (!(o instanceof THREE.SkinnedMesh)) return;
+    const idx = o.geometry.attributes.skinIndex, w = o.geometry.attributes.skinWeight;
+    const want = o.skeleton.bones.map((b) => bones.includes(b.name));
+    for (let i = 0; i < idx.count; i++) {
+      let k = 0;
+      for (let j = 1; j < 4; j++) if (w.getComponent(i, j) > w.getComponent(i, k)) k = j;
+      if (!want[idx.getComponent(i, k)]) continue;
+      box.expandByPoint(o.getVertexPosition(i, v).applyMatrix4(o.matrixWorld)); // skinned: posed
+    }
+  });
+  return box;
+}
+
+/** Dress the zombie once; every friar is a clone of this. */
 function dress(scene: THREE.Group): void {
   scene.rotation.y = Math.PI; // the model faces +Z, the game's yaw 0 faces -Z
-  const head = scene.getObjectByName('head')!;
-  scene.updateMatrixWorld(true);
-
-  const skull = new THREE.Box3().setFromObject(scene.getObjectByName('Skeleton_Minion_Head')!);
+  const head = scene.getObjectByName('Head')!;
+  const skull = boneBox(scene, ['Head', 'Eyelid.L', 'Eyelid.R', 'Tongue1']);
   const size = skull.getSize(new THREE.Vector3()), c = skull.getCenter(new THREE.Vector3());
   const cloth = new THREE.MeshStandardMaterial({ color: CLOTH, roughness: 0.95, side: THREE.DoubleSide });
   const hood = new THREE.Group();
   // Cowl: a sphere with the face cut out, open just below the jaw; the tip trails behind.
   // World space of the template (rotated π): the face looks along -Z here.
-  const r = Math.max(size.x, size.z) * 0.68;
-  const cowl = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12, Math.PI * 1.5 + 0.6, Math.PI * 2 - 1.2, 0, Math.PI * 0.74), cloth);
-  cowl.scale.set(1, size.y / size.x * 1.08, 1.08);
-  cowl.position.set(c.x, c.y + size.y * 0.06, c.z + size.z * 0.1);
+  const r = size.y * 0.56; // the box's height: its width and depth carry the ears and the tongue
+  const cowl = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12, Math.PI * 1.5 + 0.75, Math.PI * 2 - 1.5, 0, Math.PI * 0.7), cloth);
+  cowl.scale.set(1.1, 1, 1.05);
+  cowl.position.set(c.x, c.y + size.y * 0.1, c.z + size.z * 0.12);
   const tip = new THREE.Mesh(new THREE.ConeGeometry(r * 0.45, r * 1.1, 10), cloth);
-  tip.position.set(c.x, c.y + size.y * 0.32, c.z + r * 0.85);
+  tip.position.set(c.x, c.y + size.y * 0.36, c.z + r * 0.85);
   tip.rotation.x = 1.05;
   hood.add(cowl, tip);
   head.attach(hood);
   // Mozzetta: the short shoulder cape the cowl hangs from.
   const capeH = size.y * 0.42;
-  const cape = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.62, r * 1.05, capeH, 16, 1, true), cloth);
-  cape.position.set(c.x, skull.min.y - capeH * 0.35, c.z + size.z * 0.08);
-  scene.getObjectByName('chest')!.attach(cape);
+  const cape = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.7, r * 1.15, capeH, 16, 1, true), cloth);
+  cape.position.set(c.x, skull.min.y - capeH * 0.3, c.z + size.z * 0.05);
+  scene.getObjectByName('Torso')!.attach(cape);
   scene.updateMatrixWorld(true);
   const top = new THREE.Box3().setFromObject(scene).max.y; // cowl tip, before the hoe rises above it
 
-  // Hoe in the right fist: ash handle, iron blade at the top facing forward. In the bind pose
-  // the arms are out along ±X and a fist grips along Y.
-  const hand = scene.getObjectByName('handslotr')!; // GLTFLoader strips the dot from 'handslot.r'
-  const hp = hand.getWorldPosition(new THREE.Vector3());
-  const L = size.y * 2.6; // ~1.3 m against a ~0.5 m skull in the scaled model
+  // Hoe in the right fist: ash handle, iron blade at the top facing forward, built upright at
+  // the palm in the bind pose (arms out along ±X), then rolled into the grip.
+  const hand = scene.getObjectByName('Middle1R')!; // GLTFLoader strips the dot from 'Middle1.R'
+  const L = size.y * 2.2; // ~1.3 m against the zombie's big head
   const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.85 });
-  const iron = new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 0.5, metalness: 0.7 });
+  const iron = new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: 0.5, metalness: 0.3 });
   const hoe = new THREE.Group();
   const handle = new THREE.Mesh(new THREE.CylinderGeometry(L * 0.018, L * 0.022, L, 6), wood);
   handle.position.y = L * 0.2;
@@ -187,7 +197,8 @@ function dress(scene: THREE.Group): void {
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(L * 0.03, L * 0.03, L * 0.06, 6), iron);
   collar.position.y = L * 0.68;
   hoe.add(handle, blade, collar);
-  hoe.position.copy(hp);
+  hoe.position.copy(hand.getWorldPosition(new THREE.Vector3()));
+  hoe.rotation.copy(GRIP);
   hand.attach(hoe);
 
   scene.traverse((o) => {
@@ -195,20 +206,22 @@ function dress(scene: THREE.Group): void {
     o.castShadow = true;
     o.frustumCulled = false; // skinned: bind-pose bounds don't follow the animation
     const m = o.material as THREE.MeshStandardMaterial;
-    if (m.name === 'Glow') { m.color.setHex(EYES); m.emissive.setHex(EYES); }
-    if (m.name === 'skeleton') dye(m);
+    if (m.map) dye(m);
   });
 
   scene.scale.setScalar(HEIGHT / top);
 }
 
-/** Rags and bones share one atlas, so dye in the shader: only the minion's rusty reds turn habit brown. */
+/** The hoe's tilt in the template before the palm takes it. */
+const GRIP = new THREE.Euler(-Math.PI / 2, 0, 0); // carried over the shoulder, the blade bites the soil when it claws
+
+/** Trousers and skin share one palette atlas, so dye in the shader: only the denim blues turn habit brown. */
 function dye(m: THREE.MeshStandardMaterial): void {
   m.onBeforeCompile = (s) => {
     s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-	float redness = smoothstep(0.06, 0.2, diffuseColor.r - max(diffuseColor.g, diffuseColor.b));
-	vec3 habit = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.25, 0.88, 0.6);
-	diffuseColor.rgb = mix(diffuseColor.rgb, habit, redness);`);
+	float denim = smoothstep(0.01, 0.04, diffuseColor.b - max(diffuseColor.r, diffuseColor.g));
+	vec3 habit = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * vec3(1.5, 1.05, 0.7);
+	diffuseColor.rgb = mix(diffuseColor.rgb, habit, denim);`);
   };
   m.customProgramCacheKey = () => 'friar-habit';
 }
@@ -227,9 +240,9 @@ export class Friars {
     this.vfx = vfx;
     this.stats = stats;
     this.all = spawnGroups(world).flat();
-    Promise.all([new GLTFLoader().loadAsync(URL), loadRig()]).then(([body, rig]) => {
-      dress(body.scene);
-      const t = { scene: body.scene, clips: rig.animations };
+    new GLTFLoader().loadAsync(URL).then((gltf) => {
+      dress(gltf.scene);
+      const t = { scene: gltf.scene, clips: gltf.animations };
       this.views = this.all.map(() => new View(t));
       for (const v of this.views) this.root.add(v.root);
     }, (e) => console.error('friar model failed to load', e));

@@ -7,22 +7,17 @@ import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
-import { barMat, loadRig, ownMaterials } from './friars.ts';
+import { barMat, boneBox, ownMaterials } from './friars.ts';
 
-// Preti non-morti: KayKit "Skeleton Mage" (CC0, see ATTRIBUTION.md) re-dressed — a tall pointed
-// hood, a gold-edged stole, the robe dyed near-black violet, violet eyes and a staff with a
-// shadow crystal. They pray in the cloisters in threes and throw homing shadow bolts; the AI
-// lives in caster.ts. The sacerdoti (each leading two priests: two in the church, one in each
-// lagoon garden) are KayKit's armoured "Skeleton Warrior", taller, its helmet traded for a
-// violet hood and cape, its reds bleached white; the Reverendissimo is a giant warrior in
-// gilded armour, white and violet, with a gold-banded mitre. Every body shares one rig and
-// plays the mage's clips (the warrior's GLB carries no animations).
+// The casters, one body per kind (all CC0, see ATTRIBUTION.md). Preti non-morti: Quaternius'
+// "Ghost Skull", a skull-faced wraith that floats in the cloisters in threes, a staff with a
+// shadow crystal in its claw, throwing homing shadow bolts. Sacerdoti (each leading two priests:
+// two in the church, one in each lagoon garden): KayKit's armoured "Skeleton Warrior", its
+// helmet traded for a violet hood, cape and gold-edged stole, its reds bleached white. Il
+// Reverendissimo: Quaternius' winged "Demon", a giant in cardinal red with a gold-banded mitre,
+// the crystal on its own trident. The AI lives in caster.ts.
 
 const MODELS = `${import.meta.env.BASE_URL}models/`;
-const RIG = 'skeleton_mage.glb'; // loadRig()'s GLB
-const CLIPS: Record<CasterState, string> = { pray: 'Idle', chase: 'Idle_Combat', cast: 'Spellcasting', swing: '2H_Melee_Attack_Chop', nova: 'Spellcast_Summon', evade: 'Running_B', dead: 'Death_A' };
-const STEP: Record<-1 | 1, string> = { [-1]: 'Walking_Backwards', 1: 'Walking_A' };
-const SHOOT = 'Spellcast_Shoot';
 const FADE = 0.2;
 const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 };
@@ -31,30 +26,54 @@ const FAR = 40; // m: praying priests farther than this skip their animation (th
 const TRIM = 0xb48a3c;
 const SHADOW = 0x8a3cff, CORE = 0xa45cff, SMOKE = 0x1a0b26;
 
-/** The skeletons' reds turn a cassock colour: `tint` times their luminance (the cloth shares the bone atlas). */
+/** The warrior's reds (and warm bones) turn a cassock colour: `tint` times their luminance (cloth and bones share one atlas). */
 const cassock = (tint: string) => `
 	float redness = smoothstep(0.06, 0.2, diffuseColor.r - max(diffuseColor.g, diffuseColor.b));
 	vec3 cassock = min(vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * ${tint}, vec3(0.92));
 	diffuseColor.rgb = mix(diffuseColor.rgb, cassock, redness);`;
 
-/** The boss's armour: the warrior's cool steel greys turn gilded, after `dye` (masked first: the gold would read as a red, the cassock's whites as steel). */
-const gilt = (dye: string) => `
-	vec3 g = diffuseColor.rgb;
-	float steel = (1.0 - smoothstep(0.04, 0.1, max(g.r, max(g.g, g.b)) - min(g.r, min(g.g, g.b)))) * step(g.r, g.b + 0.01) * (1.0 - smoothstep(0.45, 0.6, g.g));${dye}
-	diffuseColor.rgb = mix(diffuseColor.rgb, g.ggg * vec3(2.6, 1.75, 0.3), steel);`;
-
-/** How one kind of caster is dressed. `body`: GLB under models/, `skull`: its head mesh, `hat`: a mesh to take off, `dye`: GLSL recolouring its atlas. */
-interface Look { body: string; skull: string; hat?: string; height: number; cloth: number; eyes: number; dye: string; mitre?: boolean }
+/**
+ * How one kind of caster is dressed. `body`: GLB under models/ (with its clips); `clips`, `step`
+ * (walking back/forward) and `shoot` (bolt release): its clip names. `head`: bones whose
+ * vertices size the hood or mitre (the first carries them); `hand`: the bone gripping the staff,
+ * `grip` the staff's tilt once gripped; `weapon`: a skinned mesh of its own whose far end holds
+ * the crystal instead. `cloth`: hood, cape and stole (if any); `eyes`: materials made to glow
+ * `glow`, or `sockets`: where two glowing eyes sit in the head's box (fractions of it, from its
+ * centre); `dye`: GLSL recolouring its atlas; `paint`: flat colours by material name.
+ */
+interface Look {
+  body: string; height: number;
+  clips: Record<CasterState, string>; step: Record<-1 | 1, string>; shoot: string;
+  head: string[]; hand: string; grip?: THREE.Euler; weapon?: string; sockets?: [number, number, number];
+  cloth?: number; mitre?: boolean; eyes: string[]; glow: number; dye?: string; paint?: Record<string, number>;
+}
 const LOOKS = new Map<CasterKind, Look>([
-  [PRIEST, { body: RIG, skull: 'Skeleton_Mage_Skull', hat: 'Skeleton_Mage_Hat', height: 1.85, cloth: 0x1d1424, eyes: 0xb05cff, dye: cassock('vec3(0.42, 0.3, 0.55)') }],
-  [SACERDOTE, { body: 'skeleton_warrior.glb', skull: 'Skeleton_Warrior_Head', height: 2.5, cloth: 0x4a1f78, eyes: 0xd27bff, dye: cassock('vec3(1.9, 1.85, 1.8)') }],
-  [REVERENDISSIMO, { body: 'skeleton_warrior.glb', skull: 'Skeleton_Warrior_Head', height: 4.6, cloth: 0x5a2390, eyes: 0xff5ce1, dye: gilt(cassock('vec3(2, 1.95, 1.9)')), mitre: true }],
+  [PRIEST, {
+    body: 'ghost_skull.glb', height: 1.85,
+    clips: { pray: 'Flying_Idle', chase: 'Flying_Idle', cast: 'Flying_Idle', swing: 'Punch', nova: 'Punch', evade: 'Fast_Flying', dead: 'Death' },
+    step: { [-1]: 'Fast_Flying', 1: 'Fast_Flying' }, shoot: 'Punch',
+    head: ['Head'], hand: 'Middle1R', eyes: [], sockets: [0.2, -0.1, -0.4], glow: 0xb05cff,
+  }],
+  [SACERDOTE, {
+    body: 'skeleton_warrior.glb', height: 2.5,
+    clips: { pray: 'Idle', chase: 'Idle_Combat', cast: 'Spellcasting', swing: '2H_Melee_Attack_Chop', nova: 'Spellcasting', evade: 'Running_B', dead: 'Death_A' },
+    step: { [-1]: 'Walking_Backwards', 1: 'Walking_A' }, shoot: 'Spellcast_Shoot',
+    head: ['head'], hand: 'handslotr', grip: new THREE.Euler(0, 0, Math.PI / 2), // upright along the slot's -X, which points up while idle and casting
+    cloth: 0x4a1f78, eyes: ['Glow'], glow: 0xd27bff, dye: cassock('vec3(1.9, 1.85, 1.8)'),
+  }],
+  [REVERENDISSIMO, {
+    body: 'demon.glb', height: 4.6,
+    clips: { pray: 'Idle', chase: 'Idle', cast: 'Wave', swing: 'Weapon', nova: 'Duck', evade: 'Run', dead: 'Death' },
+    step: { [-1]: 'Walk', 1: 'Walk' }, shoot: 'Punch',
+    head: ['Head'], hand: 'Middle1L', weapon: 'Trident', mitre: true, eyes: ['Eye_White'], glow: 0xff5ce1,
+    paint: { Demon_Main: 0xb3142a }, // cardinal red, bright enough to read at night
+  }],
 ]);
 
 interface Template {
   scene: THREE.Group;
   clips: THREE.AnimationClip[];
-  height: number;
+  look: Look;
 }
 
 /** One priest's model, animation and nameplate bar. */
@@ -72,16 +91,16 @@ class View {
   private bar = new THREE.Group();
   private fill: THREE.Sprite;
   private sparks = 0;
-  private height: number;
+  private look: Look;
 
   constructor(t: Template) {
-    this.height = t.height;
+    this.look = t.look;
     const model = cloneSkinned(t.scene) as THREE.Group;
     this.mats = ownMaterials(model);
     this.tip = model.getObjectByName('staffTip')!;
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
-    for (const c of [...Object.values(CLIPS), ...Object.values(STEP), SHOOT]) {
+    for (const c of [...Object.values(t.look.clips), ...Object.values(t.look.step), t.look.shoot]) {
       const clip = THREE.AnimationClip.findByName(t.clips, c);
       if (clip) this.actions.set(c, this.mixer.clipAction(clip));
     }
@@ -92,7 +111,7 @@ class View {
     this.fill.scale.set(BAR_W, 0.006, 1);
     this.fill.renderOrder = 1;
     this.bar.add(bg, this.fill);
-    this.bar.position.y = t.height + 0.35;
+    this.bar.position.y = t.look.height + 0.35;
     this.root.add(this.bar);
   }
 
@@ -107,15 +126,15 @@ class View {
 
   /** Sync with the brain; `far`: the player is too far for anyone to see this priest animate. */
   update(f: Priest, dt: number, vfx: Vfx, far: boolean): void {
-    const from = this.state;
+    const from = this.state, L = this.look;
     if (f.state !== from) {
       this.state = f.state;
-      if (from === 'cast' && f.state === 'chase' && f.cd > 1) this.play(SHOOT, true); // released, not interrupted
-      else if (f.state === 'swing') this.play(CLIPS.swing, true, this.actions.get(CLIPS.swing)!.getClip().duration / f.kind.melee!.swing);
+      if (from === 'cast' && f.state === 'chase' && f.cd > 1) this.play(L.shoot, true); // released, not interrupted
+      else if (f.state === 'swing') this.play(L.clips.swing, true, this.actions.get(L.clips.swing)!.getClip().duration / f.kind.melee!.swing);
       else this.once = false;
     }
     if (this.once && !this.current!.isRunning()) this.once = false;
-    if (!this.once) this.play(f.state === 'chase' && f.move ? STEP[f.move] : CLIPS[f.state], false, f.state === 'chase' && f.move === 1 ? f.kind.speed / 2 : 1);
+    if (!this.once) this.play(f.state === 'chase' && f.move ? L.step[f.move] : L.clips[f.state], false, f.state === 'chase' && f.move === 1 ? f.kind.speed / 2 : 1);
 
     // Casting: the crystal swells and shadow motes spiral into it (a nova draws them in too).
     const p = f.state === 'cast' ? Math.min(f.t / f.kind.cast, 1) : f.state === 'nova' ? Math.min(f.t / f.kind.nova!.cast, 1) : 0;
@@ -136,7 +155,7 @@ class View {
     let sink = 0;
     if (f.state === 'dead') sink = THREE.MathUtils.clamp((f.t - SINK.after) / SINK.time, 0, 1);
     this.root.visible = sink < 1;
-    this.root.position.set(f.x, f.y - sink * SINK.depth * (this.height / 1.85), f.z);
+    this.root.position.set(f.x, f.y - sink * SINK.depth * (L.height / 1.85), f.z);
     this.root.rotation.y = f.yaw;
 
     const r = f.hp / f.kind.hp;
@@ -149,10 +168,10 @@ class View {
     if (name === this.clip && !once) return;
     const next = this.actions.get(name)!;
     next.reset();
-    next.setLoop(once || name === CLIPS.dead ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+    next.setLoop(once || name === this.look.clips.dead ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
     next.clampWhenFinished = true;
-    next.timeScale = name === SHOOT ? 1.4 : rate;
-    if (name === CLIPS.pray && !this.clip) next.time = Math.random() * next.getClip().duration; // not in lockstep
+    next.timeScale = once && name === this.look.shoot ? 1.4 : rate;
+    if (name === this.look.clips.pray && !this.clip) next.time = Math.random() * next.getClip().duration; // not in lockstep
     next.play();
     if (this.current && this.current !== next) next.crossFadeFrom(this.current, FADE, false);
     this.current = next;
@@ -163,97 +182,138 @@ class View {
 
 /** Dress one kind of caster's body; every caster of that kind is a clone of this. */
 function dress(scene: THREE.Group, look: Look): void {
-  scene.rotation.y = Math.PI; // the model faces +Z, the game's yaw 0 faces -Z
-  const head = scene.getObjectByName('head')!;
-  if (look.hat) scene.getObjectByName(look.hat)!.removeFromParent();
-  scene.updateMatrixWorld(true);
-
-  const skull = new THREE.Box3().setFromObject(scene.getObjectByName(look.skull)!);
+  scene.rotation.y = Math.PI; // the models face +Z, the game's yaw 0 faces -Z
+  const head = scene.getObjectByName(look.head[0])!;
+  const skull = boneBox(scene, look.head);
   const size = skull.getSize(new THREE.Vector3()), c = skull.getCenter(new THREE.Vector3());
-  const cloth = new THREE.MeshStandardMaterial({ color: look.cloth, roughness: 0.9, side: THREE.DoubleSide });
-  const gold = new THREE.MeshStandardMaterial({ color: TRIM, roughness: 0.45, metalness: 0.8 });
-  // Hood: a deep cowl with the face cut out (the face looks along -Z here, see friars.ts)
-  // drawn up into a tall point that leans back: a silhouette no friar has.
+  const gold = new THREE.MeshStandardMaterial({ color: TRIM, roughness: 0.5, metalness: 0.3 }); // no environment map: a real metal would render black
   const r = Math.max(size.x, size.z) * 0.7;
-  const hood = new THREE.Group();
-  const cowl = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12, Math.PI * 1.5 + 0.5, Math.PI * 2 - 1, 0, Math.PI * 0.78), cloth);
-  cowl.scale.set(1, (size.y / size.x) * 1.12, 1.12);
-  cowl.position.set(c.x, c.y + size.y * 0.06, c.z + size.z * 0.12);
-  const point = new THREE.Mesh(new THREE.ConeGeometry(r * 0.8, r * 2.2, 14, 1, true), cloth);
-  point.position.set(c.x, c.y + size.y * 0.62, c.z + r * 0.35);
-  point.rotation.x = 0.35;
-  const hem = new THREE.Mesh(new THREE.TorusGeometry(r * 0.78, r * 0.06, 6, 24, Math.PI * 2 - 1.1), gold); // gold edge round the face
-  hem.position.set(c.x, c.y + size.y * 0.06, c.z - r * 0.55);
-  hem.rotation.z = Math.PI / 2 + 0.55;
+  if (look.cloth !== undefined) {
+    // Hood: a deep cowl with the face cut out (the face looks along -Z here, see friars.ts)
+    // drawn up into a tall point that leans back: a silhouette no friar has.
+    const cloth = new THREE.MeshStandardMaterial({ color: look.cloth, roughness: 0.9, side: THREE.DoubleSide });
+    const hood = new THREE.Group();
+    const cowl = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 12, Math.PI * 1.5 + 0.5, Math.PI * 2 - 1, 0, Math.PI * 0.78), cloth);
+    cowl.scale.set(1, (size.y / size.x) * 1.12, 1.12);
+    cowl.position.set(c.x, c.y + size.y * 0.06, c.z + size.z * 0.12);
+    const point = new THREE.Mesh(new THREE.ConeGeometry(r * 0.8, r * 2.2, 14, 1, true), cloth);
+    point.position.set(c.x, c.y + size.y * 0.62, c.z + r * 0.35);
+    point.rotation.x = 0.35;
+    const hem = new THREE.Mesh(new THREE.TorusGeometry(r * 0.78, r * 0.06, 6, 24, Math.PI * 2 - 1.1), gold); // gold edge round the face
+    hem.position.set(c.x, c.y + size.y * 0.06, c.z - r * 0.55);
+    hem.rotation.z = Math.PI / 2 + 0.55;
+    hood.add(cowl, point, hem);
+    head.attach(hood);
+    // Shoulder cape and a stole: two gold-edged bands hanging down the chest.
+    const chest = scene.getObjectByName('chest')!;
+    const capeH = size.y * 0.5;
+    const cape = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r * 1.2, capeH, 16, 1, true), cloth);
+    cape.position.set(c.x, skull.min.y - capeH * 0.3, c.z + size.z * 0.08);
+    chest.attach(cape);
+    for (const s of [-1, 1]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(size.x * 0.16, size.y * 1.1, size.z * 0.03), gold);
+      band.position.set(c.x + s * size.x * 0.2, skull.min.y - size.y * 0.75, c.z - r * 0.95);
+      chest.attach(band);
+    }
+  }
   if (look.mitre) {
-    // A bishop's mitre instead of the point: a tall white cap, flattened front to back, gold-banded.
+    // A bishop's mitre on the crown: a tall white cap, flattened front to back, gold-banded.
     const white = new THREE.MeshStandardMaterial({ color: 0xece6da, roughness: 0.7 });
-    (point as THREE.Mesh).geometry = new THREE.CylinderGeometry(r * 0.1, r * 0.6, r * 1.8, 4, 1);
-    point.material = white;
-    point.rotation.set(0, Math.PI / 4, 0);
-    point.scale.set(1, 1, 0.6);
-    point.position.set(c.x, c.y + size.y * 0.5 + r * 1.05, c.z + r * 0.4); // sits on the crown, clear of the face
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.53, r * 0.57, r * 0.2, 4, 1), gold);
+    const m = r * MITRE.size, base = c.y + size.y * MITRE.at, z = c.z + size.z * MITRE.back;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(m * 0.3, m * 0.6, m * 1.5, 4, 1), white);
+    cap.rotation.y = Math.PI / 4;
+    cap.scale.set(1, 1, 0.6);
+    cap.position.set(c.x, base + m * 0.7, z);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(m * 0.53, m * 0.57, m * 0.2, 4, 1), gold);
     band.rotation.y = Math.PI / 4;
     band.scale.set(1, 1, 0.62);
-    band.position.set(c.x, c.y + size.y * 0.5 + r * 0.25, c.z + r * 0.4);
-    hood.add(band);
+    band.position.set(c.x, base, z);
+    head.attach(cap);
+    head.attach(band);
   }
-  hood.add(cowl, point, hem);
-  head.attach(hood);
-  // Shoulder cape and a stole: two gold-edged bands hanging down the chest.
-  const chest = scene.getObjectByName('chest')!;
-  const capeH = size.y * 0.5;
-  const cape = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r * 1.2, capeH, 16, 1, true), cloth);
-  cape.position.set(c.x, skull.min.y - capeH * 0.3, c.z + size.z * 0.08);
-  chest.attach(cape);
-  for (const s of [-1, 1]) {
-    const band = new THREE.Mesh(new THREE.BoxGeometry(size.x * 0.16, size.y * 1.1, size.z * 0.03), gold);
-    band.position.set(c.x + s * size.x * 0.2, skull.min.y - size.y * 0.75, c.z - r * 0.95);
-    chest.attach(band);
+  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(SHADOW).multiplyScalar(2.5) });
+  glow.userData.shared = true; // a hit flash leaves the crystal and the eyes alone
+  if (look.sockets) {
+    const [x, y, z] = look.sockets, eye = new THREE.MeshBasicMaterial({ color: new THREE.Color(look.glow).multiplyScalar(2) });
+    eye.userData.shared = true;
+    for (const s of [-1, 1]) {
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(size.x * 0.07, 10, 8), eye);
+      ball.position.set(c.x + s * x * size.x, c.y + y * size.y, c.z + z * size.z);
+      head.attach(ball);
+    }
   }
   scene.updateMatrixWorld(true);
-  const top = new THREE.Box3().setFromObject(scene).max.y; // hood tip, before the staff rises above it
+  const top = new THREE.Box3().setFromObject(scene).max.y; // hood tip or mitre, before the staff rises above it
 
-  // Staff in the right fist: dark wood, gold
-  // prongs cradling a violet shadow crystal that swells while a spell is cast.
-  const hand = scene.getObjectByName('handslotr')!;
-  const L = size.y * 3.2; // ~1.6 m
-  const wood = new THREE.MeshStandardMaterial({ color: 0x2b1d17, roughness: 0.8 });
-  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(SHADOW).multiplyScalar(2.5) });
-  glow.userData.shared = true; // a hit flash leaves the crystal alone
-  const staff = new THREE.Group();
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(L * 0.016, L * 0.02, L, 6), wood);
-  shaft.position.y = L * 0.2;
-  const crown = new THREE.Mesh(new THREE.TorusGeometry(L * 0.045, L * 0.008, 5, 10, Math.PI * 1.4), gold);
-  crown.position.y = L * 0.74;
-  crown.rotation.z = -Math.PI * 0.2;
+  // The crystal, violet, swelling while a spell is cast: on a staff in the fist (dark wood, gold
+  // prongs cradling it), or on the head of the body's own weapon.
+  const hand = scene.getObjectByName(look.hand)!;
+  const L = (top - scene.position.y) * 0.85; // a staff a little shorter than its bearer
   const tip = new THREE.Mesh(new THREE.OctahedronGeometry(L * 0.035), glow);
-  tip.position.y = L * 0.76;
   tip.scale.y = 1.5;
   tip.name = 'staffTip';
-  staff.add(shaft, crown, tip);
-  staff.position.copy(hand.getWorldPosition(new THREE.Vector3()));
-  hand.attach(staff);
-  staff.rotation.set(0, 0, Math.PI / 2); // upright along the slot's -X, which points up while idle and casting
+  if (look.weapon) {
+    const weapon = scene.getObjectByName(look.weapon) as THREE.SkinnedMesh;
+    const far = farEnd(weapon, farEnd(weapon, hand.getWorldPosition(new THREE.Vector3())).at); // the head: the end farthest from the butt, the butt being farthest from the palm
+    const mount = new THREE.Object3D(); // takes the bone's scale, so the View can swell the tip freely
+    mount.position.copy(far.at);
+    far.bone.attach(mount);
+    mount.add(tip);
+  } else {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x2b1d17, roughness: 0.8 });
+    const staff = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(L * 0.016, L * 0.02, L, 6), wood);
+    shaft.position.y = L * 0.2;
+    const crown = new THREE.Mesh(new THREE.TorusGeometry(L * 0.045, L * 0.008, 5, 10, Math.PI * 1.4), gold);
+    crown.position.y = L * 0.74;
+    crown.rotation.z = -Math.PI * 0.2;
+    tip.position.y = L * 0.76;
+    staff.add(shaft, crown, tip);
+    staff.position.copy(hand.getWorldPosition(new THREE.Vector3()));
+    hand.attach(staff);
+    if (look.grip) staff.rotation.copy(look.grip);
+  }
 
-  const own = new Map<THREE.Material, THREE.MeshStandardMaterial>(); // the bodies come from the loader: dye copies
+  const own = new Map<THREE.Material, THREE.MeshStandardMaterial>(); // the bodies come from the loader: recolour copies
   scene.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
-    o.castShadow = o.material !== glow;
+    o.castShadow = !(o.material as THREE.Material).userData.shared;
     o.frustumCulled = false; // skinned: bind-pose bounds don't follow the animation
     const m = o.material as THREE.MeshStandardMaterial;
-    if (!m.map && m.name !== 'Glow') return; // our own cloth, gold and wood
+    if (!(o instanceof THREE.SkinnedMesh)) return; // our own cloth, gold and wood
     if (!own.has(m)) {
       const c = m.clone();
-      if (m.name === 'Glow') { c.color.setHex(look.eyes); c.emissive.setHex(look.eyes); }
-      else dye(c, look.dye);
+      c.metalness = 0; // no environment map to reflect
+      if (look.eyes.includes(m.name)) { c.color.setHex(look.glow); c.emissive.setHex(look.glow); c.userData.shared = true; } // never flashed: keeps its glow
+      else if (look.dye && m.map) dye(c, look.dye);
+      else if (look.paint?.[m.name] !== undefined) c.color.setHex(look.paint[m.name]);
       own.set(m, c);
     }
     o.material = own.get(m)!;
   });
 
   scene.scale.setScalar(look.height / top);
+}
+
+/** The boss's mitre: its size against the head's, where its band sits up the head's box and how far back (fractions of the box). */
+const MITRE = { size: 0.85, at: 0.3, back: 0.12 };
+
+/** The vertex of skinned `mesh` farthest from `from` (world, as posed), and the bone it rides on. */
+function farEnd(mesh: THREE.SkinnedMesh, from: THREE.Vector3): { at: THREE.Vector3; bone: THREE.Bone } {
+  const idx = mesh.geometry.attributes.skinIndex, w = mesh.geometry.attributes.skinWeight, v = new THREE.Vector3();
+  const at = new THREE.Vector3();
+  let best = -1, bone = mesh.skeleton.bones[0];
+  for (let i = 0; i < idx.count; i++) {
+    mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld); // skinned: posed
+    const d = v.distanceToSquared(from);
+    if (d <= best) continue;
+    best = d;
+    at.copy(v);
+    let k = 0;
+    for (let j = 1; j < 4; j++) if (w.getComponent(i, j) > w.getComponent(i, k)) k = j;
+    bone = mesh.skeleton.bones[idx.getComponent(i, k)];
+  }
+  return { at, bone };
 }
 
 /** Recolour a body's atlas in the shader (`glsl` from a Look). */
@@ -300,15 +360,12 @@ export class Priests {
     );
     this.ring.visible = false;
     const loader = new GLTFLoader(), looks = [...LOOKS];
-    const bodies = [...new Set(looks.map(([, l]) => l.body))];
-    // The priests wear the rig's own mage; each kind dresses its own copy of a body.
-    Promise.all([loadRig(), ...bodies.map((b) => b === RIG ? loadRig() : loader.loadAsync(MODELS + b))]).then(([rig, ...gltfs]) => {
+    Promise.all(looks.map(([, l]) => loader.loadAsync(MODELS + l.body))).then((gltfs) => {
       const templates = new Map<CasterKind, Template>();
-      for (const [kind, look] of looks) {
-        const scene = cloneSkinned(gltfs[bodies.indexOf(look.body)].scene) as THREE.Group;
-        dress(scene, look);
-        templates.set(kind, { scene, clips: rig.animations, height: look.height });
-      }
+      looks.forEach(([kind, look], i) => {
+        dress(gltfs[i].scene, look);
+        templates.set(kind, { scene: gltfs[i].scene, clips: gltfs[i].animations, look });
+      });
       this.views = this.all.map((f) => new View(templates.get(f.kind)!));
       for (const v of this.views) this.root.add(v.root);
       this.root.add(this.ring); // after the models: main.ts reads an empty root as "not loaded yet"

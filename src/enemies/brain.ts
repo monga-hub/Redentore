@@ -12,7 +12,7 @@ export const FRIAR = {
   walk: 5, // evade m/s (immune meanwhile, like a WoW evade)
   reach: 1.5, // starts a swing inside this
   hit: 2.2, // the swing lands if the player is still this close at impact
-  windup: 0.62, // s from swing start to impact (matches the chop clip at SWING_RATE in friars.ts)
+  windup: 0.62, // s from swing start to impact (matches the punch clip at SWING_RATE in friars.ts)
   swing: 1.15, // s the swing roots the friar
   cooldown: 2.4, // s between swings
   damage: 45, // against the player's 1280 hp: a pair kills in ~15 s if ignored

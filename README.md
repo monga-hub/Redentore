@@ -107,15 +107,15 @@ src/
   enemies/brain.ts           IA dei frati non-morti (zappa, aggro di gruppo, inseguimento,
                              zappata in mischia, evade, morte/respawn) e punti di spawn
                              nell'orto. Nessuna dipendenza da three
-  enemies/friars.ts          modello (KayKit Skeleton Minion con cappuccio e zappa), animazioni,
+  enemies/friars.ts          modello (Zombie di Quaternius con cappuccio e zappa), animazioni,
                              barra vita; danni al player via `PlayerStats.takeDamage`
   enemies/caster.ts          IA dei preti caster (anche sacerdoti e Reverendissimo: `CasterKind` con mischia
                              e nova; spawn della chiesa, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
                              con cooldown, dardi a ricerca, indietreggiare restando nel
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
-  enemies/priests.ts         Skeleton Mage vestito da prete (cappuccio a punta, stola, bastone
-                             col cristallo), Skeleton Warrior da sacerdote e, gigante e dorato,
-                             da Reverendissimo (mitra); tutti con le clip del Mage (stesso rig);
+  enemies/priests.ts         un corpo per tipo: Ghost Skull di Quaternius da prete (bastone col
+                             cristallo), KayKit Skeleton Warrior da sacerdote (cappuccio, stola),
+                             Demon di Quaternius gigante da Reverendissimo (mitra, tridente);
                              animazioni, VFX dei dardi d'ombra e della nova
   quest/progress.ts          stato della progressione: grate e porte (collider rimovibili), baule
                              con la chiave, prompt di interazione, vittoria. Nessuna dipendenza da three

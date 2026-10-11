@@ -241,7 +241,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 20, mana: 80, charge: 10,
+    id: 'plague', name: 'Nube di peste', icon: 'plague', cooldown: 5, mana: 80, charge: 10,
     desc: `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale che ristagna per 8 s e corrode i nemici che vi restano dentro (${PLAGUE_DPS} danni al secondo).`,
     fire(k) {
       k.plague();

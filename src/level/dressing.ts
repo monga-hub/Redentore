@@ -3,6 +3,7 @@ import type { LevelBuilder } from './builder.ts';
 import { CHURCH_FLOOR as F } from './plan.ts';
 import { groundPatch } from './ground.ts';
 import { BASIN, PATHS_X, PATHS_Z } from './zones/orto.ts';
+import { MODELS, type Model } from './models.ts';
 import { Props, olive, fruitTree, cypress, shrub, vineCanopy, climber, walkPergola, pergolaPosts, bench, wellTop } from './props.ts';
 
 // Set dressing over the walkable skeleton: vegetation, the orto's covered walks,
@@ -123,8 +124,8 @@ function dressConvento(b: LevelBuilder): void {
 }
 
 function pot(p: Props, x: number, z: number, r: number): void {
-  p.disc(x, 0, z, r, r * 1.3, 'brick');
-  shrub(p, x, z, r * 1.3, 'foliage', false, r * 1.2);
+  p.model('pot', x, 0, z, r * 2.9);
+  p.mute(() => shrub(p, x, z, r * 1.3, 'foliage', false, r * 1.2));
   p.b.world.add(x, z, r * 0.8, r * 0.8, 0, r * 1.3);
 }
 
@@ -182,18 +183,18 @@ function dressOrto(b: LevelBuilder): void {
     for (const tx of [-2.8, 1.6]) fruitTree(p, tx + p.rand(-0.15, 0.15), tz + p.rand(-0.15, 0.15), fruits[k++ % 3], p.rand(0.9, 1.1));
   }
   // Lavender hedge along the frutteto's west edge (low, walk-through).
+  let dome = 0;
   for (let z = -149.5; z <= -92; z += 0.8) {
     if (PATHS_Z.some((pz) => z > pz - 0.4 && z < pz + 3.4)) continue;
-    shrub(p, -4.6, z, 0.32, 'olive');
-    if (p.r() < 0.7) p.blob(-4.6 + p.rand(-0.15, 0.15), 0.5, z, 0.09, 0.14, 0.09, 'flower', 0x8f6fc8, true);
+    if (dome++ % 2 === 0) p.model('lavender', -4.6, 0, z + 0.4, 0.6, 1.1 / (MODELS.lavender[0] * 0.6)); // a dome every 1.6 m
+    p.mute(() => {
+      shrub(p, -4.6, z, 0.32, 'olive');
+      if (p.r() < 0.7) p.blob(-4.6 + p.rand(-0.15, 0.15), 0.5, z, 0.09, 0.14, 0.09, 'flower', 0x8f6fc8, true);
+    });
   }
 
-  // Apiario: hive stands, stacked boxes and roofs over the skeleton's hive blocks.
-  for (let hx = -3.5; hx <= 2.6; hx += 1.5) {
-    p.box(hx - 0.32, hx + 0.32, 0.3, 0.34, -130.32, -129.68, 'stoneDark'); // band between supers
-    p.box(hx - 0.36, hx + 0.36, 0.7, 0.8, -130.36, -129.64, 'roof');
-    p.box(hx - 0.12, hx + 0.12, 0.04, 0.08, -129.72, -129.6, 'wood'); // entrance board
-  }
+  // Apiario: a painted hive over each of the skeleton's (hidden) hive blocks.
+  for (let hx = -3.5; hx <= 2.6; hx += 1.5) p.model('beehive', hx, 0, -130, 1.05, 1.05);
   for (const x of [-4, 3.2]) for (const z of [-132.4, -127.6]) shrub(p, x, z, 0.4, 'olive');
 
   // Uliveto: quincunx of olives on a 7.5 m pitch (two staggered rows), a few missing as in
@@ -210,9 +211,11 @@ function dressOrto(b: LevelBuilder): void {
     b.world.add((x0 + x1) / 2, -88.55, (x1 - x0) / 2, 1.95, 0, 0.86);
     for (let z = -90.2; z <= -86.8; z += 0.55) {
       const x = (x0 + x1) / 2 + p.rand(-0.2, 0.2);
-      p.disc(x, 0.86, z, 0.14, 0.18, 'brick');
-      p.blob(x, 1.15, z, 0.2, 0.18, 0.2, 'foliage', p.vary());
-      if (p.r() < 0.4) p.blob(x, 1.3, z, 0.07, 0.07, 0.07, 'flower', 0xe85a6a, true);
+      p.model('pot', x, 0.86, z, 0.5);
+      p.mute(() => {
+        p.blob(x, 1.15, z, 0.2, 0.18, 0.2, 'foliage', p.vary());
+        if (p.r() < 0.4) p.blob(x, 1.3, z, 0.07, 0.07, 0.07, 'flower', 0xe85a6a, true);
+      });
     }
   }
   for (let z = -90.7; z <= -86.3; z += 1.1) for (const x of [-5.33, 3.33]) p.box(x - 0.04, x + 0.04, 0, 3, z - 0.05, z + 0.05, 'wood');
@@ -224,25 +227,32 @@ function dressOrto(b: LevelBuilder): void {
   p.flush();
 }
 
-/** One crop per bed, rows along the bed's long side. */
+/** One crop per bed, rows along the bed's long side: lettuce, cabbage, leeks, artichokes, staked tomatoes. */
+const CROPS: [Model, number][] = [['lettuce', 0.22], ['cabbage', 0.38], ['leek', 0.65], ['artichoke', 0.9], ['tomato', 1.35]]; // model, height
 function crops(p: Props, cx: number, cz: number, w: number, d: number, kind: number): void {
   const y = 0.3, alongZ = d > w;
   const len = (alongZ ? d : w) - 0.6, wid = (alongZ ? w : d) - 0.5;
   const rows = Math.max(1, Math.round(wid / 0.6));
+  const [model, h] = CROPS[kind];
   for (let r = 0; r < rows; r++) {
     const off = -wid / 2 + (wid * (r + 0.5)) / rows;
-    for (let t = -len / 2; t <= len / 2; t += kind === 4 ? 0.7 : 0.5) {
+    for (let t = -len / 2, j = r; t <= len / 2; t += kind === 4 ? 0.7 : 0.5, j++) {
       const x = cx + (alongZ ? off : t), z = cz + (alongZ ? t : off);
-      if (kind === 0) p.blob(x, y + 0.1, z, 0.2, 0.14, 0.2, 'foliage', p.vary(0.3)); // lettuce
-      else if (kind === 1) p.blob(x, y + 0.14, z, 0.26, 0.2, 0.26, 'olive', p.vary(0.2)); // cabbage
-      else if (kind === 2) p.cone(x, y, z, 0.09, p.rand(0.5, 0.8), 'hedge', p.vary()); // leeks, fennel
-      else if (kind === 3) { p.blob(x, y + 0.2, z, 0.18, 0.22, 0.18, 'foliage', p.vary()); if (p.r() < 0.4) p.blob(x, y + 0.38, z, 0.07, 0.07, 0.07, 'flower', 0xf0d040, true); }
-      else { // staked tomatoes
-        p.rod(x, y, z, x, y + 1.5, z, 0.02, 'wood');
-        p.blob(x, y + 0.55, z, 0.2, 0.35, 0.2, 'foliage', p.vary());
-        p.blob(x, y + 1.05, z, 0.16, 0.28, 0.16, 'foliage', p.vary());
-        p.blob(x + 0.1, y + 0.75, z, 0.07, 0.07, 0.07, 'fruit', 0xd03020, true);
-      }
+      // Every other plant, staggered between rows and widened to fill the gap: half the triangles.
+      // ponytail: crops cast no shadow (~800 of them); the beds' own shadow grounds them.
+      if (j % 2 === 0) p.model(model, x, y, z, h, (kind === 4 ? 0.8 : 1) * 1.5, undefined, false);
+      p.mute(() => {
+        if (kind === 0) p.blob(x, y + 0.1, z, 0.2, 0.14, 0.2, 'foliage', p.vary(0.3));
+        else if (kind === 1) p.blob(x, y + 0.14, z, 0.26, 0.2, 0.26, 'olive', p.vary(0.2));
+        else if (kind === 2) p.cone(x, y, z, 0.09, p.rand(0.5, 0.8), 'hedge', p.vary());
+        else if (kind === 3) { p.blob(x, y + 0.2, z, 0.18, 0.22, 0.18, 'foliage', p.vary()); if (p.r() < 0.4) p.blob(x, y + 0.38, z, 0.07, 0.07, 0.07, 'flower', 0xf0d040, true); }
+        else {
+          p.rod(x, y, z, x, y + 1.5, z, 0.02, 'wood');
+          p.blob(x, y + 0.55, z, 0.2, 0.35, 0.2, 'foliage', p.vary());
+          p.blob(x, y + 1.05, z, 0.16, 0.28, 0.16, 'foliage', p.vary());
+          p.blob(x + 0.1, y + 0.75, z, 0.07, 0.07, 0.07, 'fruit', 0xd03020, true);
+        }
+      });
     }
   }
 }

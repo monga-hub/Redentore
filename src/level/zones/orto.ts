@@ -59,7 +59,7 @@ export function buildOrto(b: LevelBuilder): void {
 
   b.area('Frutteto', -5, 4, -150, -91);
   b.area('Apiario', -5, 4, -133, -127);
-  for (let hx = -3.5; hx <= 2.6; hx += 1.5) b.box(hx - 0.3, hx + 0.3, 0, 0.7, -130.3, -129.7, 'wood');
+  for (let hx = -3.5; hx <= 2.6; hx += 1.5) b.box(hx - 0.3, hx + 0.3, 0, 0.7, -130.3, -129.7, 'wood', { visible: false, camera: true }); // dressing.ts puts a hive on each
 
   b.area('Uliveto', 4, 19, Z.ortoNorth, Z.conventNorth);
 

@@ -97,8 +97,13 @@ export const DOT = softDot();
 
 export class Torches {
   readonly root = new THREE.Group();
-  /** Torch and brazier light multiplier ("Stile Diablo" burns brighter). */
-  boost = 1;
+  /** Light multiplier per kind ("Stile Diablo": torches and braziers brighter, the church's lamps and window glows dimmer). */
+  boost: Partial<Record<Emitter['kind'], number>> = {};
+  /** Brazier flame size multiplier: seen from above (Diablo view) the stacked cones would blow out to a white disc. */
+  brazierFlame = 1;
+  /** Brazier flame bases, and the iron that holds them (swapped for a Meshy brazier in the Diablo view). */
+  readonly braziers: { x: number; y: number; z: number }[];
+  readonly brazierIron: THREE.InstancedMesh[];
   private readonly em: Emitter[];
   private readonly flames: number[]; // emitters drawing a flame
   private readonly lit: number[]; // emitters competing for the light pool
@@ -145,6 +150,8 @@ export class Torches {
     const foot = new THREE.CylinderGeometry(0.32, 0.38, 0.12, 10).translate(0, -1.04, 0);
     const bowl = new THREE.CylinderGeometry(0.5, 0.26, 0.3, 12).translate(0, -0.08, 0);
     const parts = [stand, foot, bowl].map((g) => new THREE.InstancedMesh(g, iron, braziers.length));
+    this.braziers = braziers.map(({ x, y, z }) => ({ x, y, z }));
+    this.brazierIron = parts;
     braziers.forEach((t, i) => {
       this.m.makeTranslation(t.x, t.y, t.z);
       for (const p of parts) p.setMatrixAt(i, this.m);
@@ -190,7 +197,7 @@ export class Torches {
     const { em, m, q, sc, v } = this;
     q.identity();
     this.flames.forEach((i, k) => {
-      const e = em[i], f = flicker(t, e.phase), s = FLAME[e.kind];
+      const e = em[i], f = flicker(t, e.phase), s = FLAME[e.kind] * (e.kind === 'brazier' ? this.brazierFlame : 1);
       // Flames stretch and sway a little; height follows the flicker.
       m.compose(v.set(e.x, e.y, e.z), q, sc.set(s * (0.9 + 0.1 * f), s * (0.55 + 0.6 * f), s * (0.9 + 0.1 * f)));
       this.outer.setMatrixAt(k, m);
@@ -210,7 +217,7 @@ export class Torches {
       const e = em[i], w = Math.min(1, Math.max(0, (cut - this.dist[i]) / 4));
       l.position.set(e.x + e.nx * 0.6, e.y + (e.kind === 'brazier' ? 0.5 : e.kind === 'torch' ? 0.3 : 0), e.z + e.nz * 0.6);
       l.color.setHex(e.color);
-      l.intensity = POWER[e.kind] * (e.kind === 'glow' ? 1 : flicker(t, e.phase)) * w * (e.kind === 'torch' || e.kind === 'brazier' ? this.boost : 1);
+      l.intensity = POWER[e.kind] * (e.kind === 'glow' ? 1 : flicker(t, e.phase)) * w * (this.boost[e.kind] ?? 1);
     }
 
     // Sparks: rise with buoyancy and a little drift, cool from gold to dark red.

@@ -200,7 +200,7 @@ export class DiabloFx {
   }
 
   private fall(m: Mob): void {
-    this.stain(m.x, m.y, m.z, 2.4);
+    this.stain(m.x, m.y, m.z, 1.7);
     const b = this.beams.reduce((a, c) => (c.t > a.t ? c : a)); // the oldest
     b.t = 0;
     b.mesh.position.set(m.x, m.y, m.z);

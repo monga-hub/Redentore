@@ -30,6 +30,7 @@ import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
 import { DiabloControls } from './player/diabloControls.ts';
 import { Cutaway } from './fx/cutaway.ts';
 import { DiabloFx } from './fx/diabloFx.ts';
+import { GothicDressing } from './level/gothic.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -92,7 +93,7 @@ const MAIN = kit.system.slots[0]!; // Caduta d'ossa, the swing a click-attack re
 dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(0);
 const AIMED = new Set(['fall', 'step', 'plague', 'strike']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
-const cutaway = new Cutaway([level.root, scene.getObjectByName('fx:torches')!], level.cameraBlockers); // walls and roofs over the hero, Diablo view
+const cutaway = new Cutaway([level.root, fx.torches.root], level.cameraBlockers); // walls and roofs over the hero, Diablo view
 const head = new THREE.Vector3();
 const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs: foes, time: 0, fog: discovery };
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
@@ -117,23 +118,30 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
   { all: [priests.boss], height: 4.6 },
 ], kit.vfx, cam.camera, CHEST);
 scene.add(dfx.root);
+const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
+level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
 level.root.traverse((o) => { if (o.userData.beam) beams.push(o); });
-let started = false; // the first onStyle call is the boot, not a switch: no blend
-onStyle((diablo) => { // the menu's "Stile Diablo" switch, applied mid-game
+/** The Diablo view on or off: camera, controls, cuts, look, HUD. The intro keeps its own look and gets it at the hand-over. */
+function applyStyle(diablo: boolean): void {
   input.orbit = !diablo;
   dctl.enabled = diablo;
   dctl.stop();
   cutaway.enabled = diablo;
   dfx.enabled = diablo;
+  gothic.show(diablo);
   targeting.eye = diablo ? () => head.set(player.pos.x, player.pos.y + EYE, player.pos.z) : undefined; // over the roofs, sight is the hero's
   fx.setStyle(diablo);
   for (const b of beams) b.visible = !diablo;
   document.body.classList.toggle('diablo', diablo);
   if (!diablo) cam.yaw = player.facing; // back behind the hero
   dcam.snap();
-  if (started) blend.start(cam.camera);
-  started = true;
+}
+const flying = () => !!intro && !intro.done;
+onStyle((diablo) => { // the menu's "Stile Diablo" switch, applied mid-game with an eased camera
+  if (flying()) return;
+  applyStyle(diablo);
+  blend.start(cam.camera);
 });
 const goal = () => (!quest.key ? CHEST : !quest.bossDead ? priests.boss : undefined); // the key, then the Reverendissimo
 function openMap(): void {
@@ -152,7 +160,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { intro, scene, level, player, cam, dcam, cutaway, dctl, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
+Object.assign(window, { intro, scene, level, player, cam, dcam, cutaway, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -178,7 +186,10 @@ renderer.setAnimationLoop(() => {
       return;
     }
     questView.peek(null);
-    if (isDiablo()) blend.start(cam.camera); // the flythrough ends behind the hero: ease up into the Diablo view
+    if (isDiablo()) { // the flythrough ends behind the hero: ease up into the Diablo view
+      applyStyle(true);
+      blend.start(cam.camera);
+    }
   }
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();

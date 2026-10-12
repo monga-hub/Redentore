@@ -28,7 +28,7 @@ import { deserialize, serialize, takePending, type Game } from './core/save.ts';
 import { isDiablo, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
 import { DiabloControls } from './player/diabloControls.ts';
-import { Cutaway } from './fx/cutaway.ts';
+import { Occlusion } from './fx/occlusion.ts';
 import { DiabloFx } from './fx/diabloFx.ts';
 import { GothicDressing } from './level/gothic.ts';
 
@@ -102,7 +102,9 @@ const MAIN = kit.system.slots[0]!; // Caduta d'ossa, the swing a click-attack re
 dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(0);
 const AIMED = new Set(['fall', 'step', 'plague', 'strike']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
-const cutaway = new Cutaway([level.root, fx.torches.root], level.cameraBlockers); // walls and roofs over the hero, Diablo view
+const occlusion = new Occlusion([level.root, fx.torches.root], level.roofPlans, () => level.pieceId(), [ // walls fade and roofs lift off over the hero, Diablo view
+  [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], // x-ray silhouettes behind what still hides them
+]);
 const head = new THREE.Vector3();
 const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs: foes, time: 0, fog: discovery };
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
@@ -148,7 +150,7 @@ function applyStyle(diablo: boolean): void {
   input.orbit = !diablo;
   dctl.enabled = diablo;
   dctl.stop();
-  cutaway.enabled = diablo;
+  occlusion.enabled = diablo;
   dfx.enabled = diablo;
   gothic.show(diablo);
   targeting.eye = diablo ? () => head.set(player.pos.x, player.pos.y + EYE, player.pos.z) : undefined; // over the roofs, sight is the hero's
@@ -182,7 +184,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { intro, scene, level, player, cam, dcam, cutaway, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
+Object.assign(window, { intro, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -243,7 +245,7 @@ renderer.setAnimationLoop(() => {
   else cam.update(dt, input, player.pos);
   blend.apply(cam.camera, dt);
   kit.vfx.applyShake(cam.camera, dt); // big hits shake the lens; trails face it
-  cutaway.update(dt, player.pos);
+  occlusion.update(dt, player.pos, cam.camera);
   targeting.update(dt, player.pos);
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;
   hud.setArea(area);

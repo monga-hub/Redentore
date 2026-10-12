@@ -76,6 +76,13 @@ export class LevelBuilder {
   readonly cameraBlockers: THREE.Object3D[] = [];
   /** Candles, lamps and window glows placed by the zones; fx/torches.ts lights them. */
   readonly lights: LightSpot[] = [];
+  /**
+   * Plan [x0, x1, z0, z1] of the roofs whose eaves overhang their walls, by occlusion piece: the
+   * Diablo view lifts a roof off only while the hero stands inside it (fx/occlusion.ts).
+   */
+  readonly roofPlans = new Map<number, [number, number, number, number]>();
+  private piece = 0; // occlusion piece open in together(), 0 = none
+  private pieces = 0;
   private current!: THREE.Group;
   private zoneId = '';
   private decorBatches = new Map<string, { zone: THREE.Group; role: Role; cam: boolean; geos: THREE.BufferGeometry[] }>();
@@ -100,6 +107,7 @@ export class LevelBuilder {
 
   add<T extends THREE.Object3D>(obj: T, role?: Role): T {
     if (role) obj.userData.role = role;
+    obj.userData.piece ??= this.pieceId();
     this.current.add(obj);
     return obj;
   }
@@ -149,6 +157,10 @@ export class LevelBuilder {
   }
 
   private wall(axis: 'x' | 'z', c: number, a0: number, a1: number, o: WallOpts): void {
+    this.together(() => this.wallRun(axis, c, a0, a1, o));
+  }
+
+  private wallRun(axis: 'x' | 'z', c: number, a0: number, a1: number, o: WallOpts): void {
     const { h, y0 = 0, t = 0.6, role = 'mass', doors = [], trim } = o;
     const lo = Math.min(a0, a1) - t / 2, hi = Math.max(a0, a1) + t / 2; // overlap corners
     // wall frame: x along the wall, y up, z across it
@@ -193,8 +205,29 @@ export class LevelBuilder {
     if (o.floor) this.floor(x0, x1, z0, z1, o.floor, y0, 0.02);
   }
 
+  /**
+   * Builds what `f` adds as one occlusion piece, which fades or lifts off as a whole in the Diablo
+   * view (fx/occlusion.ts): a wall run with its trims and arches, an arcade side, a building.
+   * Outside it every mesh and every decor() call is a piece of its own. Nested calls join the open one.
+   */
+  together<T>(f: (piece: number) => T): T {
+    if (this.piece) return f(this.piece);
+    this.piece = ++this.pieces;
+    try {
+      return f(this.piece);
+    } finally {
+      this.piece = 0;
+    }
+  }
+
+  /** The open occlusion piece, or a new one. */
+  pieceId(): number {
+    return this.piece || ++this.pieces;
+  }
+
   /** Visual-only geometry (world space), merged per zone and role by flush(). `cam` = blocks the follow camera. */
   decor(g: THREE.BufferGeometry, role: Role, cam = false): void {
+    g.setAttribute('aPiece', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(this.pieceId()), 1)); // merged, still fades piece by piece
     const key = `${this.zoneId}|${role}|${cam}`;
     let d = this.decorBatches.get(key);
     if (!d) this.decorBatches.set(key, (d = { zone: this.current, role, cam, geos: [] }));
@@ -251,7 +284,7 @@ export class LevelBuilder {
     const rMax = Math.max(...sides.flatMap((sd) => sd.bays.filter((b) => !b.wide).map((b) => (b.o1 - b.o0) / 2)));
     const spring = Math.min(2.6, h - 0.55 - rMax), top = h - 0.2, lintel = h - 0.8;
     const yr = h + 0.18, y = (t: number) => yr - K * t; // rafter underside, rising towards the wall
-    const tiles: THREE.Matrix4[] = [];
+    const tiles: THREE.Matrix4[] = [], tilePieces: number[] = [];
 
     for (const { key, m, local, L, piers, bays } of sides) {
       const put = (s0: number, s1: number, y0: number, y1: number, t0: number, t1: number, role: Role, cam = false) => this.part(m, s0, s1, y0, y1, t0, t1, role, cam);
@@ -259,52 +292,62 @@ export class LevelBuilder {
         const p = new THREE.Vector3(s0, 0, t0).applyMatrix4(m), q = new THREE.Vector3(s1, 0, t1).applyMatrix4(m);
         this.collider(p.x, q.x, y0, y1, p.z, q.z);
       };
-      for (const { s, r } of piers.slice(0, -1)) { // the far corner pier belongs to the next side
-        put(s - r, s + r, 0, spring - 0.28, -r, r, 'brick');
-        put(s - r - 0.09, s + r + 0.09, 0, 0.4, -r - 0.09, r + 0.09, 'stoneDark'); // plinth
-        put(s - r - 0.1, s + r + 0.1, spring - 0.28, spring, -r - 0.1, r + 0.1, 'stoneDark'); // impost
-        solid(s - r, s + r, 0, spring, -r, r);
-      }
-      // Spandrel wall: one extruded outline per side, arches cut along its bottom edge.
-      const sh = new THREE.Shape().moveTo(-e, spring).lineTo(-e, top).lineTo(L + e, top).lineTo(L + e, spring);
-      for (const b of [...bays].reverse()) {
-        sh.lineTo(b.o1, spring);
-        if (b.wide) sh.lineTo(b.o1, lintel).lineTo(b.o0, lintel).lineTo(b.o0, spring);
-        else sh.absarc((b.o0 + b.o1) / 2, spring, (b.o1 - b.o0) / 2, 0, Math.PI, false);
-      }
-      this.decor(shaped(extrude(sh.closePath(), T, 0.04), 0, h).applyMatrix4(m), 'plaster', true);
-      for (const b of bays) {
-        const c = (b.o0 + b.o1) / 2, r = (b.o1 - b.o0) / 2;
-        if (b.wide) put(b.o0 - 0.2, b.o1 + 0.2, lintel, lintel + 0.32, -e - 0.07, e + 0.07, 'stoneDark');
-        else {
-          this.decor(shaped(ring(c, spring, r - 0.06, r + 0.24, T + 0.14), 0, h).applyMatrix4(m), 'stoneDark');
-          put(c - 0.17, c + 0.17, spring + r - 0.1, spring + r + 0.36, -e - 0.12, e + 0.12, 'stoneDark'); // keystone
+      this.together(() => { // piers, arches and parapets: one piece per side
+        for (const { s, r } of piers.slice(0, -1)) { // the far corner pier belongs to the next side
+          put(s - r, s + r, 0, spring - 0.28, -r, r, 'brick');
+          put(s - r - 0.09, s + r + 0.09, 0, 0.4, -r - 0.09, r + 0.09, 'stoneDark'); // plinth
+          put(s - r - 0.1, s + r + 0.1, spring - 0.28, spring, -r - 0.1, r + 0.1, 'stoneDark'); // impost
+          solid(s - r, s + r, 0, spring, -r, r);
         }
-        const open = b.wide || gaps.some((g) => {
-          const [gs, gt] = local(g);
-          return Math.abs(gt) < depth + 0.5 && gs > b.a - 1.2 && gs < b.b + 1.2;
-        });
-        if (open) continue;
-        put(b.o0, b.o1, 0, 0.7, -0.22, 0.22, 'brick'); // parapet
-        put(b.o0, b.o1, 0.7, 0.8, -0.29, 0.29, 'stoneDark'); // coping
-        solid(b.o0, b.o1, 0, 0.8, -0.22, 0.22);
-      }
+        // Spandrel wall: one extruded outline per side, arches cut along its bottom edge.
+        const sh = new THREE.Shape().moveTo(-e, spring).lineTo(-e, top).lineTo(L + e, top).lineTo(L + e, spring);
+        for (const b of [...bays].reverse()) {
+          sh.lineTo(b.o1, spring);
+          if (b.wide) sh.lineTo(b.o1, lintel).lineTo(b.o0, lintel).lineTo(b.o0, spring);
+          else sh.absarc((b.o0 + b.o1) / 2, spring, (b.o1 - b.o0) / 2, 0, Math.PI, false);
+        }
+        this.decor(shaped(extrude(sh.closePath(), T, 0.04), 0, h).applyMatrix4(m), 'plaster', true);
+        for (const b of bays) {
+          const c = (b.o0 + b.o1) / 2, r = (b.o1 - b.o0) / 2;
+          if (b.wide) put(b.o0 - 0.2, b.o1 + 0.2, lintel, lintel + 0.32, -e - 0.07, e + 0.07, 'stoneDark');
+          else {
+            this.decor(shaped(ring(c, spring, r - 0.06, r + 0.24, T + 0.14), 0, h).applyMatrix4(m), 'stoneDark');
+            put(c - 0.17, c + 0.17, spring + r - 0.1, spring + r + 0.36, -e - 0.12, e + 0.12, 'stoneDark'); // keystone
+          }
+          const open = b.wide || gaps.some((g) => {
+            const [gs, gt] = local(g);
+            return Math.abs(gt) < depth + 0.5 && gs > b.a - 1.2 && gs < b.b + 1.2;
+          });
+          if (open) continue;
+          put(b.o0, b.o1, 0, 0.7, -0.22, 0.22, 'brick'); // parapet
+          put(b.o0, b.o1, 0.7, 0.8, -0.29, 0.29, 'stoneDark'); // coping
+          solid(b.o0, b.o1, 0, 0.8, -0.22, 0.22);
+        }
+        put(-e - 0.15, L + e + 0.15, top, h, -e - 0.16, e + 0.16, 'stoneDark'); // cornice
+      });
 
-      // Roof: cornice, wall plate, rafters (jack rafters and a valley beam at the corners),
-      // boards and the coppi slab; plan = trapezoid mitred along the corner diagonals.
-      put(-e - 0.15, L + e + 0.15, top, h, -e - 0.16, e + 0.16, 'stoneDark');
-      put(-e, L + e, h, yr, -0.14, 0.14, 'wood');
-      put(tw, L - tw, y(tw) - 0.22, y(tw), tw, tw + 0.2, 'wood'); // ledger on the wall
-      for (let s = tw + 0.4; s < L - tw - 0.3; s += 0.8) {
-        const te = Math.min(OV, s, L - s);
-        if (te - tw > 0.5) this.decor(beam(new THREE.Vector3(s, y(tw) + 0.11, tw), new THREE.Vector3(s, y(te) + 0.11, te), 0.16, 0.22).applyMatrix4(m), 'wood');
-      }
-      this.decor(beam(new THREE.Vector3(OV, y(OV) + 0.11, OV), new THREE.Vector3(tw, y(tw) + 0.11, tw), 0.2, 0.24).applyMatrix4(m), 'wood');
-      const plan = (t0: number, t1: number): [number, number][] => [[t0, t0], [L - t0, t0], [L - t1, t1], [t1, t1]];
-      this.decor(slope(plan(tw, OV), yr + 0.28, K, 0.05).applyMatrix4(m), 'wood', true);
-      this.decor(slope(plan(tw, OV + 0.12), yr + 0.42, K, 0.14).applyMatrix4(m), 'roof', true);
-      const te = OV + 0.12, tilt = new THREE.Matrix4().makeRotationX(Math.atan(K));
-      for (let s = te + 0.15; s < L - te - 0.1; s += 0.3) tiles.push(m.clone().multiply(new THREE.Matrix4().makeTranslation(s, y(te - 0.2) + 0.42, te - 0.2)).multiply(tilt));
+      // Roof: wall plate, rafters (jack rafters and a valley beam at the corners), boards and
+      // the coppi slab; plan = trapezoid mitred along the corner diagonals. One piece per side,
+      // lifted off while the hero walks under it: the walk, corners included.
+      this.together((piece) => {
+        const a = new THREE.Vector3(tw, 0, tw).applyMatrix4(m), c = new THREE.Vector3(L - tw, 0, 0).applyMatrix4(m);
+        this.roofPlans.set(piece, [Math.min(a.x, c.x), Math.max(a.x, c.x), Math.min(a.z, c.z), Math.max(a.z, c.z)]);
+        put(-e, L + e, h, yr, -0.14, 0.14, 'wood');
+        put(tw, L - tw, y(tw) - 0.22, y(tw), tw, tw + 0.2, 'wood'); // ledger on the wall
+        for (let s = tw + 0.4; s < L - tw - 0.3; s += 0.8) {
+          const te = Math.min(OV, s, L - s);
+          if (te - tw > 0.5) this.decor(beam(new THREE.Vector3(s, y(tw) + 0.11, tw), new THREE.Vector3(s, y(te) + 0.11, te), 0.16, 0.22).applyMatrix4(m), 'wood');
+        }
+        this.decor(beam(new THREE.Vector3(OV, y(OV) + 0.11, OV), new THREE.Vector3(tw, y(tw) + 0.11, tw), 0.2, 0.24).applyMatrix4(m), 'wood');
+        const plan = (t0: number, t1: number): [number, number][] => [[t0, t0], [L - t0, t0], [L - t1, t1], [t1, t1]];
+        this.decor(slope(plan(tw, OV), yr + 0.28, K, 0.05).applyMatrix4(m), 'wood', true);
+        this.decor(slope(plan(tw, OV + 0.12), yr + 0.42, K, 0.14).applyMatrix4(m), 'roof', true);
+        const te = OV + 0.12, tilt = new THREE.Matrix4().makeRotationX(Math.atan(K));
+        for (let s = te + 0.15; s < L - te - 0.1; s += 0.3) {
+          tiles.push(m.clone().multiply(new THREE.Matrix4().makeTranslation(s, y(te - 0.2) + 0.42, te - 0.2)).multiply(tilt));
+          tilePieces.push(piece);
+        }
+      });
 
       // Perimeter wall above the roof: marcapiano and a few deep round-headed windows.
       if (!upper.includes(key)) continue;
@@ -327,6 +370,7 @@ export class LevelBuilder {
     }
     const coppi = new THREE.InstancedMesh(COPPO, material('roof'), tiles.length);
     tiles.forEach((t, i) => coppi.setMatrixAt(i, t));
+    coppi.userData.pieces = tilePieces; // each row of coppi goes with its side's roof
     coppi.computeBoundingSphere();
     this.add(coppi, 'roof');
   }
@@ -354,11 +398,13 @@ export class LevelBuilder {
 
   /** Closed building volume: box, then zoccolo, marcapiano, eaves cornice and a hipped coppi roof. */
   block(x0: number, x1: number, z0: number, z1: number, h: number, role: Role = 'mass'): void {
-    this.box(x0, x1, 0, h, z0, z1, role);
-    this.band(x0, x1, z0, z1, 0, 0.6, 0.08);
-    this.band(x0, x1, z0, z1, h * 0.5, h * 0.5 + 0.22, 0.1);
-    this.band(x0, x1, z0, z1, h - 0.35, h, 0.3);
-    this.hipRoof(x0, x1, z0, z1, h);
+    this.together(() => { // one piece: fades as a whole building
+      this.box(x0, x1, 0, h, z0, z1, role);
+      this.band(x0, x1, z0, z1, 0, 0.6, 0.08);
+      this.band(x0, x1, z0, z1, h * 0.5, h * 0.5 + 0.22, 0.1);
+      this.band(x0, x1, z0, z1, h - 0.35, h, 0.3);
+      this.hipRoof(x0, x1, z0, z1, h);
+    });
   }
 
   /** Visual ring of trim `out` proud of a rectangle's faces, from y0 to y1. */
@@ -371,7 +417,10 @@ export class LevelBuilder {
 
   /** Hipped roof over a rectangle, eaves at y overhanging by `ov`, pitch k (rise per run). Visual only. */
   hipRoof(x0: number, x1: number, z0: number, z1: number, y: number, ov = 0.7, k = 0.45): void {
-    this.decor(hip(x0 - ov, x1 + ov, z0 - ov, z1 + ov, y, k), 'roof');
+    this.together((piece) => {
+      this.roofPlans.set(piece, [x0, x1, z0, z1]); // walking along the walls outside, under the eaves, is not inside
+      this.decor(hip(x0 - ov, x1 + ov, z0 - ov, z1 + ov, y, k), 'roof');
+    });
   }
 
   /** Cylinder with a square collider of matching footprint. */
@@ -413,6 +462,10 @@ export class LevelBuilder {
 
   /** Posts + beams pergola over a rectangle; beams sit at 2.6 m so the player walks under. */
   pergola(x0: number, x1: number, z0: number, z1: number, alongZ: boolean, spacing = 3): void {
+    this.together(() => this.pergolaFrame(x0, x1, z0, z1, alongZ, spacing)); // one piece: posts and beams fade together
+  }
+
+  private pergolaFrame(x0: number, x1: number, z0: number, z1: number, alongZ: boolean, spacing: number): void {
     const len = alongZ ? z1 - z0 : x1 - x0;
     const n = Math.max(1, Math.round(Math.abs(len) / spacing));
     for (let i = 0; i <= n; i++) {

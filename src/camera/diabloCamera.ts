@@ -5,7 +5,7 @@ import type { Input } from '../core/input.ts';
 // not along its axes), looking steeply down through a narrow perspective lens, pulled back so the
 // hero is about a seventh of the screen tall with plenty of floor around and sits a little below
 // the centre. No orbit; wheel and pinch zoom within a range. Walls and roofs between the camera
-// and the hero are cut away by fx/cutaway.ts rather than pulling the camera in.
+// and the hero fade or lift off (fx/occlusion.ts) rather than pulling the camera in.
 
 export const DIABLO = { yaw: Math.PI / 4, pitch: THREE.MathUtils.degToRad(58), fov: 33 }; // yaw: looking north-west
 const MIN_DIST = 9, MAX_DIST = 24, DIST = 18;

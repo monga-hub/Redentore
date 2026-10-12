@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Vfx } from '../abilities/vfx.ts';
+import { T, type Style, type Vfx } from '../abilities/vfx.ts';
 import type { Mob } from '../ui/target.ts';
 
 // "Stile Diablo" flourishes, all visual: it only watches the enemies' health and state, so
@@ -14,6 +14,9 @@ const NUMBERS = 28, NUMBER_LIFE = 0.95;
 const TICK = 0.45; // s: damage over time is shown this often
 const BIG = 25; // a single blow this strong is a "critical" number
 const GORE = 0x4a0806, SPARK = 0xffe2c0, LOOT = 0xff7a12;
+const spark: Style = { life: 0.3, size: 0.07, color: SPARK, hdr: 3, tex: T.spark, stretch: 0.03, drag: 5 };
+const gore: Style = { life: 0.7, size: [0.06, 0.11], color: GORE, alpha: 0.95, tex: T.drop, dark: true, grav: 9, drag: 1 };
+const loot: Style = { life: 1.4, size: 0.08, color: LOOT, hdr: 3, tex: T.spark, stretch: 0.02, drag: 1.2 };
 
 /** Watched enemies: the brains (enemies/brain.ts, caster.ts) and their model height. */
 export interface Watched { all: readonly Mob[]; height: number }
@@ -194,8 +197,8 @@ export class DiabloFx {
 
   private hit(m: Mob, h: number, d: number): void {
     const y = m.y + h * 0.55;
-    this.vfx.burst(m.x, y, m.z, 8, 0.25, { life: 0.3, size: 0.07, color: SPARK, hdr: 3, drag: 5 }, 3.2); // the white flash of the blow
-    this.vfx.burst(m.x, y, m.z, 10, 0.2, { life: 0.7, size: 0.09, color: GORE, alpha: 0.95, normal: true, grav: 9, vy: 1.5, drag: 1 }, 1.8);
+    this.vfx.burst(spark, m.x, y, m.z, 8, 0.25, 3.2); // the white flash of the blow
+    this.vfx.burst(gore, m.x, y, m.z, 10, 0.2, 1.8, 1.5);
     if (d >= 8 || Math.random() < 0.25) this.stain(m.x + (Math.random() - 0.5) * 0.8, m.y, m.z + (Math.random() - 0.5) * 0.8, 0.7 + Math.min(d, 50) / 40);
   }
 
@@ -205,7 +208,7 @@ export class DiabloFx {
     b.t = 0;
     b.mesh.position.set(m.x, m.y, m.z);
     b.disc.position.set(m.x, m.y + 0.05, m.z);
-    this.vfx.burst(m.x, m.y + 0.6, m.z, 30, 0.5, { life: 1.4, size: 0.08, color: LOOT, hdr: 3, vy: 2.2, drag: 1.2 }, 1);
+    this.vfx.burst(loot, m.x, m.y + 0.6, m.z, 30, 0.5, 1, 2.2);
   }
 
   private beam(b: Beam, k: number, steady = false): void {

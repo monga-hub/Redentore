@@ -13,6 +13,8 @@ export class PlayerStats {
   immune = 0;
   /** Called once when health reaches 0. */
   onDeath?: () => void;
+  /** Called with the damage actually taken, before `onDeath` (the hero flinches). */
+  onHurt?: (n: number) => void;
 
   readonly hpMax: number;
   readonly manaMax: number;
@@ -31,6 +33,7 @@ export class PlayerStats {
     if (this.dead || !(n > 0) || this.immune > 0) return 0;
     const d = Math.min(this.veil > 0 ? n * (1 - VEIL_CUT) : n, this.hp);
     this.hp -= d;
+    if (d > 0) this.onHurt?.(d);
     if (this.dead) this.onDeath?.();
     return d;
   }

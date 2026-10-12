@@ -74,16 +74,25 @@ const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.ca
   { name: 'Sacerdote non-morto', max: SACERDOTE.hp, height: 2.5, all: priests.all.filter((f) => f.kind === SACERDOTE), ready: () => priests.root.children.length > 0 },
   { name: 'Il Reverendissimo', max: REVERENDISSIMO.hp, height: 4.6, all: [priests.boss], ready: () => priests.root.children.length > 0, ownBar: () => questView.bossShown },
 ]);
-playerStats.onDeath = () => { // ponytail: wake at the last checkpoint at full health; a death screen can come later
+const FALLEN = 2.6; // s the hero lies dead before waking
+let dying = 0;
+playerStats.onDeath = () => { // the hero falls; the fight is over at once, the wake-up follows
   kit.system.cancel();
   dctl.stop();
   friars.wipe(); // a wipe: whoever was fighting, the boss too, evades home at full health
   priests.wipe();
+  player.model.die();
+  dying = FALLEN;
+};
+playerStats.onHurt = (n) => player.model.flinch(n);
+/** ponytail: wake at the last checkpoint at full health; a death screen can come later. */
+function wake(): void {
   const at = quest.checkpoint();
   player.respawn(at);
   playerStats.revive();
+  player.model.revive();
   kit.system.notices.push({ kind: 'error', text: at === SPAWN ? 'Sei caduto. Ti risvegli sulla fondamenta.' : 'Sei caduto. Ti risvegli alla porta del coro.' });
-};
+}
 kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all];
@@ -122,6 +131,18 @@ const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.b
 level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
 level.root.traverse((o) => { if (o.userData.beam) beams.push(o); });
+// Programs for spell effects, the hero's aura and the casters' glows are compiled up front (fx.warm), textures uploaded and a first draw made:
+// once everyone has loaded, and on a style switch, as the Diablo hero light changes the light count.
+const warm = () => {
+  kit.setGhost(true); // Velo spettrale's see-through variant of the hero's materials
+  fx.warm();
+  kit.setGhost(false);
+  fx.warm();
+  for (const t of kit.vfx.textures) renderer.initTexture(t); // the effects' atlases, painted on canvases
+  kit.prime(); // and a first real draw of each, at nothing
+};
+let warmed = false;
+fx.onDegrade = () => { if (warmed) warm(); };
 /** The Diablo view on or off: camera, controls, cuts, look, HUD. The intro keeps its own look and gets it at the hand-over. */
 function applyStyle(diablo: boolean): void {
   input.orbit = !diablo;
@@ -134,6 +155,7 @@ function applyStyle(diablo: boolean): void {
   fx.setStyle(diablo);
   for (const b of beams) b.visible = !diablo;
   document.body.classList.toggle('diablo', diablo);
+  warm();
   if (!diablo) cam.yaw = player.facing; // back behind the hero
   dcam.snap();
 }
@@ -191,6 +213,7 @@ renderer.setAnimationLoop(() => {
       blend.start(cam.camera);
     }
   }
+  if (!warmed && friars.root.children.length && priests.root.children.length && player.model.root.children.length) { warmed = true; warm(); } // everyone loaded
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();
     else menu.toggle();
@@ -198,9 +221,11 @@ renderer.setAnimationLoop(() => {
   if (input.pressed('KeyM')) openMap();
   game.time += dt;
   playerStats.update(dt);
+  if (dying > 0 && (dying -= dt) <= 0) wake();
+  player.frozen = dying > 0;
   const diablo = isDiablo();
-  dctl.update(dt, input); // click-to-move steering, click-attack swings
-  kit.update(dt, pressed); // before the player moves: casts see last frame's motion
+  if (!player.frozen) dctl.update(dt, input); // click-to-move steering, click-attack swings
+  kit.update(dt, player.frozen ? () => false : pressed); // before the player moves: casts see last frame's motion
   player.update(dt, input, diablo ? dcam.yaw : cam.yaw, !diablo && (input.buttons & 2) !== 0, dctl.steer);
   friars.update(dt, player.pos);
   priests.update(dt, player.pos);
@@ -212,10 +237,12 @@ renderer.setAnimationLoop(() => {
     friars.killAll();
     priests.killAll();
     questView.victory();
+    player.model.play('victory', 0.4);
   }
   if (diablo) dcam.update(dt, input, player.pos);
   else cam.update(dt, input, player.pos);
   blend.apply(cam.camera, dt);
+  kit.vfx.applyShake(cam.camera, dt); // big hits shake the lens; trails face it
   cutaway.update(dt, player.pos);
   targeting.update(dt, player.pos);
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;

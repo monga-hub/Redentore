@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { World } from '../core/physics.ts';
-import type { Vfx } from '../abilities/vfx.ts';
+import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
-import { arm, loadModel, stand } from '../core/models.ts';
+import { Overlay, arm, loadModel, stand } from '../core/models.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
 
 // The casters, one body per kind, each generated, rigged and animated with Meshy AI (see
@@ -15,31 +15,40 @@ import { barMat, flash, ownMaterials } from './friars.ts';
 // Sacerdoti (each leading two priests: two in the church, one in each lagoon garden): armoured
 // battle priests in violet and gold with a winged mace. Il Reverendissimo: a giant lich
 // archbishop in white, violet and gold under a rayed mitre, with a crozier. The AI lives in
-// caster.ts.
+// caster.ts. Spells are drawn with the shared effects (abilities/vfx.ts): bolts with a hot core,
+// a halo, a trail and a spiral of motes; the crystal charging; the boss's nova telegraphed on
+// the floor as a sigil filling up to its edge, then going off in a ring of shadow flame.
 
 const FADE = 0.2;
 const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 };
 const FAR = 40; // m: praying priests farther than this skip their animation (they barely move)
+const BIG = 25; // damage that makes a heavy flinch
 
-const SHADOW = 0x8a3cff, CORE = 0xa45cff, SMOKE = 0x1a0b26;
+const SHADOW = 0x8a3cff, SMOKE = 0x1a0b26;
 
 /**
  * How one kind of caster looks. `body`: GLB under models/ with its clips; `prop`: the staff held
  * in the right fist, `staff` m long, gripped `grip` of the way up (its crystal tip throws the
  * bolts). `clips` per AI state, `step` moving forward (1) and back (-1), `pace` the m/s those
  * clips (and the run, for evades) cover at rate 1 on a 1.8 m body (negative: played in
- * reverse), each picked for a rate near 1 at the kind's speed. `shoot`: the release played as a bolt leaves,
- * from `from` s into its clip (the thrust ~0.1 s in at `rate`); `swing`: a melee clip's `from` and
- * the s where its blow lands, timed onto the kind's windup.
+ * reverse), each picked for a rate near 1 at the kind's speed. `shoots`: releases played in
+ * turn as a bolt leaves, from `from` s into the clip (the thrust ~0.1 s in at `rate`); `swings`:
+ * melee clips in turn, their `from` and the s where the blow lands, timed onto the kind's windup;
+ * `deaths`: one picked at random. `bolt`: its core and glow colours and size.
  */
 interface Look {
   body: string; prop: string; height: number; staff: number; grip: number;
   clips: Record<CasterState, string>; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
-  shoot: { clip: string; from: number; rate: number }; swing: { from: number; hit: number };
+  shoots: { clip: string; from: number; rate: number }[]; swings: { clip: string; from: number; hit: number }[]; deaths: string[];
+  bolt: { core: number; glow: number; size: number };
 }
 const Y = new THREE.Vector3(0, 1, 0), Q = new THREE.Quaternion(), UP = new THREE.Quaternion();
-const CAST = 'mage_soell_cast', RELEASE = { clip: 'mage_soell_cast_3', from: 0.75, rate: 1.4 };
+const CAST = 'mage_soell_cast', RELEASE = { clip: 'mage_soell_cast_3', from: 0.75, rate: 1.4 }, THROW = { clip: 'Cast_Throw', from: 0.66, rate: 1.2 };
+const SWINGS = [{ clip: 'Attack', from: 0.2, hit: 1.1 }, { clip: 'Attack_Hammer', from: 0.6, hit: 1.5 }, { clip: 'Attack_Back', from: 0.35, hit: 0.8 }];
+const DEATHS = ['dying_backwards', 'Dead_Knock', 'Dead_Shot'];
+// Layered on the upper body (s into the clip): a flinch per hit, heavier for big blows; a war cry when pulled.
+const FLINCH = { light: { clip: 'Hit_Light', from: 0.1, stop: 0.75 }, heavy: { clip: 'Hit_Heavy', from: 0.4, stop: 1.3 }, cry: { clip: 'Scream', from: 0.55, stop: 1.8 } };
 // m/s at rate 1 on a 1.8 m body: a planted foot's speed in the Meshy biped clips. Backpedalling
 // plays the walk in reverse (Meshy's own walk backward covers only 0.4 m/s).
 const WALK = 1.55, RUN = 5.5;
@@ -47,24 +56,49 @@ const LOOKS = new Map<CasterKind, Look>([
   [PRIEST, {
     body: 'prete.glb', prop: 'bastone.glb', height: 1.85, staff: 1.2, grip: 0.4,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, evade: 'Running', dead: 'dying_backwards' },
-    step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoot: RELEASE, swing: { from: 0.6, hit: 0.9 }, // no melee: never used
+    step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: DEATHS, // no melee: never used
+    bolt: { core: 0xf0dcff, glow: SHADOW, size: 1 },
   }],
   [SACERDOTE, {
     body: 'sacerdote.glb', prop: 'mazza.glb', height: 2.5, staff: 1.7, grip: 0.4,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: CAST, evade: 'Running', dead: 'dying_backwards' },
-    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoot: RELEASE, swing: { from: 0.2, hit: 1.1 }, // never backpedals
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: SWINGS, deaths: DEATHS, // never backpedals
+    bolt: { core: 0xfff0c8, glow: 0xb050ff, size: 1.2 },
   }],
   [REVERENDISSIMO, {
     body: 'reverendissimo.glb', prop: 'pastorale.glb', height: 4.6, staff: 4.2, grip: 0.45,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', evade: 'Running', dead: 'dying_backwards' },
-    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoot: RELEASE, swing: { from: 0.2, hit: 1.1 },
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: SWINGS, deaths: ['dying_backwards'],
+    bolt: { core: 0xffd8ff, glow: 0x9a20ff, size: 1.7 },
   }],
 ]);
+
+// effects
+const charge: Style = { life: 0.4, size: [0.05, 0.08], color: 0xd8b8ff, color2: SHADOW, hdr: 3, tex: T.spark, stretch: 0.03, drag: 1 };
+const flareBolt: Style = { life: 0.18, size: 1.1, grow: 0.5, color: 0xf0dcff, color2: SHADOW, hdr: 3, tex: T.star, fadeIn: 0.05 };
+const boltMote: Style = { life: [0.3, 0.45], size: [0.05, 0.09], color: 0xe0c8ff, color2: SHADOW, hdr: 3, tex: T.spark, drag: 2 };
+const boltSmoke: Style = { life: [0.5, 0.8], size: [0.25, 0.4], grow: 2, color: SMOKE, alpha: 0.65, tex: T.smoke2, erode: true, dark: true, drag: 2 };
+const boltSpark: Style = { life: [0.25, 0.45], size: 0.06, color: 0xe8d0ff, color2: SHADOW, hdr: 4, tex: T.spark, stretch: 0.05, drag: 3 };
+const boltPuff: Style = { life: [0.7, 1], size: [0.4, 0.7], grow: 2, color: SMOKE, alpha: 0.8, tex: T.smoke, erode: true, dark: true, drag: 2.5, grav: -0.3 };
+const boltShock: DecalStyle = { life: 0.4, size: 0.6, grow: 3.5, tile: D.shock, color: SHADOW, hdr: 1.8, fadeOut: 0.6 };
+const novaFlame: Style = { life: [0.5, 0.8], size: [0.35, 0.6], grow: 0.6, color: 0xa868ff, color2: 0x2a0650, hdr: 1.5, tex: T.flame, upright: true, grav: -2.5, fadeIn: 0.2 };
+const novaBlast: Style = { life: [0.45, 0.7], size: [0.6, 0.9], grow: 0.5, color: 0xd8b0ff, color2: SHADOW, hdr: 2.6, tex: T.flame, upright: true, grav: -4, fadeIn: 0.1 };
+const novaSmoke: Style = { life: [1, 1.5], size: [1, 1.6], grow: 2, color: SMOKE, alpha: 0.7, tex: T.smoke, erode: true, dark: true, drag: 2.5, grav: -0.5 };
+const novaWave: DecalStyle = { life: 0.5, size: 2, grow: REVERENDISSIMO.nova!.radius, tile: D.shock, color: 0xe0c8ff, color2: SHADOW, hdr: 2.4, fadeOut: 0.5 };
+const novaCracks: DecalStyle = { life: 4, size: 8, tile: D.cracks, color: 0x07040a, alpha: 0.9, fadeOut: 0.4, dark: true };
+const novaScar: DecalStyle = { life: 1.4, size: 8, tile: D.cracks, color: SHADOW, hdr: 2.2, fadeOut: 0.8 };
+const tele: DecalStyle = { life: 0, size: REVERENDISSIMO.nova!.radius * 2, tile: D.ring, color: SHADOW, hdr: 1.8 };
+const teleSigil: DecalStyle = { life: 0, size: 4.5, tile: D.sigil, color: SHADOW, hdr: 1.6 };
+const darkSoul: Style = { life: [1.6, 2], size: 0.55, grow: 1.5, color: 0xd0a0ff, hdr: 1.2, alpha: 0.6, tex: T.skull, grav: -1.1, fadeIn: 0.25 };
+const deathSmoke: Style = { life: [1, 1.5], size: [0.6, 1], grow: 2, color: SMOKE, alpha: 0.75, tex: T.smoke2, erode: true, dark: true, drag: 2, grav: -0.6 };
+const swingTrail: RibbonStyle = { color: 0xf0e0ff, color2: SHADOW, hdr: 1.8, alpha: 0.7, width: 0, life: 0.14 };
+const boltTrail = (glow: number, size: number): RibbonStyle => ({ color: 0xffffff, color2: glow, hdr: 2.2, alpha: 0.9, width: 0.22 * size, life: 0.32 });
 
 interface Template {
   scene: THREE.Group;
   clips: THREE.AnimationClip[];
   look: Look;
+  glow: THREE.SpriteMaterial; // the crystal's charging glow, shared by the kind
 }
 
 /** One priest's model, animation and nameplate bar. */
@@ -86,6 +120,15 @@ class View {
   private held: THREE.Object3D; // the staff, gripped in the fist
   private grip: THREE.Quaternion; // its hold in the fist
   private upright = 1; // 0..1, eased: stood upright (prayer, casts, walking) or moved with the fist (melee, falling dead)
+  private overlay: Overlay;
+  private glow: THREE.Sprite;
+  private shots = Math.floor(Math.random() * 2);
+  private swings = Math.floor(Math.random() * 3);
+  private deadClip: string;
+  private trail = -1;
+  private flinched = 9;
+  private v = new THREE.Vector3();
+  private w = new THREE.Vector3();
 
   constructor(t: Template) {
     this.look = t.look;
@@ -96,10 +139,18 @@ class View {
     this.grip = this.held.quaternion.clone();
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
-    for (const c of [...Object.values(t.look.clips), ...Object.values(t.look.step), t.look.shoot.clip]) {
+    const L = t.look;
+    for (const c of new Set([...Object.values(L.clips), ...Object.values(L.step), ...L.shoots.map((s) => s.clip), ...L.swings.map((s) => s.clip), ...L.deaths])) {
       const clip = THREE.AnimationClip.findByName(t.clips, c);
       if (clip) this.actions.set(c, this.mixer.clipAction(clip));
     }
+    this.deadClip = L.deaths[Math.floor(Math.random() * L.deaths.length)];
+    if (!this.actions.has(this.deadClip)) this.deadClip = L.clips.dead;
+    this.overlay = new Overlay(this.mixer, t.clips, Object.values(FLINCH).map((f) => f.clip));
+    this.glow = new THREE.Sprite(t.glow);
+    this.glow.visible = false;
+    this.glow.renderOrder = 3;
+    this.tip.add(this.glow);
 
     const bg = new THREE.Sprite(barMat(0x140c08));
     bg.scale.set(0.075, 0.011, 1);
@@ -111,8 +162,14 @@ class View {
     this.root.add(this.bar);
   }
 
-  hit(): void {
+  /** Struck for `n`: the red flash, and a flinch while it is only closing in or standing. */
+  hit(n: number, f: Priest): void {
     this.flash = 1;
+    if ((f.state === 'chase' || f.state === 'pray') && this.flinched > 0.35) {
+      const k = n >= BIG ? FLINCH.heavy : FLINCH.light;
+      this.overlay.play(k.clip, k.from, k.stop, f.kind === REVERENDISSIMO ? 1.1 : 1.4);
+      this.flinched = 0;
+    }
   }
 
   /** World position of the staff's crystal (bolts leave from here). */
@@ -123,32 +180,51 @@ class View {
   /** Sync with the brain; `far`: the player is too far for anyone to see this priest animate. */
   update(f: Priest, dt: number, vfx: Vfx, far: boolean): void {
     const from = this.state, L = this.look;
+    this.flinched += dt;
     if (f.state !== from) {
       this.state = f.state;
-      if (from === 'cast' && f.state === 'chase' && f.cd > 1) this.play(L.shoot.clip, true, L.shoot.rate, L.shoot.from); // released, not interrupted
-      else if (f.state === 'swing') this.play(L.clips.swing, true, (L.swing.hit - L.swing.from) / f.kind.melee!.windup, L.swing.from);
-      else this.once = false;
+      if (from === 'cast' && f.state === 'chase' && f.cd > 1) { // released, not interrupted
+        const s = L.shoots[this.shots++ % L.shoots.length];
+        this.play(s.clip, true, s.rate, s.from);
+      } else if (f.state === 'swing') {
+        const s = L.swings[this.swings++ % L.swings.length];
+        this.play(s.clip, true, (s.hit - s.from) / f.kind.melee!.windup, s.from);
+      } else this.once = false;
+      if (from === 'pray' && f.state === 'chase') this.overlay.play(FLINCH.cry.clip, FLINCH.cry.from, FLINCH.cry.stop, f.kind === REVERENDISSIMO ? 1 : 1.4); // pulled: a war cry
     }
     if (this.once && !this.current!.isRunning()) this.once = false;
     if (!this.once) {
       const step = f.state === 'chase' && f.move ? f.move : 0;
       const k = 1.8 / L.height; // paces are for a 1.8 m body: a giant's stride covers more ground
       const rate = f.state === 'evade' ? f.kind.walk * k / L.pace.run : step ? (step === 1 ? f.kind.speed : f.kind.back) * k / L.pace[step] : 1;
-      this.play(step ? L.step[step] : L.clips[f.state], false, rate);
+      this.play(step ? L.step[step] : f.state === 'dead' ? this.deadClip : L.clips[f.state], false, rate);
     }
 
-    // Casting: the crystal swells and shadow motes spiral into it (a nova draws them in too).
+    // Casting: the crystal swells and glows, shadow motes spiral into it (a nova draws them in too).
     const p = f.state === 'cast' ? Math.min(f.t / f.kind.cast, 1) : f.state === 'nova' ? Math.min(f.t / f.kind.nova!.cast, 1) : 0;
     this.tip.scale.setScalar(1 + p * 1.2);
+    this.glow.visible = p > 0;
     if (p > 0) {
+      this.glow.scale.setScalar((0.35 + p * 0.6 + Math.sin(f.t * 30) * 0.05) * L.bolt.size);
       this.sparks += dt * (25 + p * 60);
-      const c = this.tipAt();
+      const c = this.tipAt(this.v);
       for (; this.sparks >= 1; this.sparks--) {
         const a = Math.random() * Math.PI * 2, r = 0.35 + Math.random() * 0.3, y = (Math.random() - 0.3) * 0.5;
-        vfx.puff({ x: c.x + Math.cos(a) * r, y: c.y + y, z: c.z + Math.sin(a) * r, vx: -Math.cos(a) * r * 2 - Math.sin(a), vy: -y * 2, vz: -Math.sin(a) * r * 2 + Math.cos(a), life: 0.4, size: 0.07, color: SHADOW, hdr: 2.4, drag: 1 });
+        vfx.spawn(charge, c.x + Math.cos(a) * r, c.y + y, c.z + Math.sin(a) * r, -Math.cos(a) * r * 2 - Math.sin(a), -y * 2, -Math.sin(a) * r * 2 + Math.cos(a));
       }
     }
 
+    // The staff's arc in melee, from just before the blow to just after.
+    const m = f.kind.melee, live = !!m && f.state === 'swing' && f.t > m.windup - 0.3 && f.t < m.windup + 0.12;
+    if (live && this.trail < 0) this.trail = vfx.ribbons.begin(swingTrail, true);
+    if (this.trail >= 0) {
+      this.tipAt(this.w);
+      this.held.getWorldPosition(this.v).lerp(this.w, 0.45);
+      vfx.ribbons.push(this.trail, this.v.x, this.v.y, this.v.z, this.w.x, this.w.y, this.w.z);
+      if (!live) { vfx.ribbons.end(this.trail); this.trail = -1; }
+    }
+
+    this.overlay.update(dt, f.state === 'swing' || f.state === 'cast' || f.state === 'nova' || f.state === 'dead');
     if (!far || f.state !== 'pray') this.mixer.update(dt);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
     flash(this.mats, this.flash);
@@ -177,9 +253,9 @@ class View {
 
   private play(name: string, once = false, rate = 1, from = 0): void {
     if (name === this.clip && !once) return;
-    const next = this.actions.get(name)!;
+    const next = this.actions.get(name) ?? this.actions.get(this.look.clips.chase)!;
     next.reset();
-    next.setLoop(once || name === this.look.clips.dead ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+    next.setLoop(once || name === this.deadClip ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
     next.clampWhenFinished = true;
     next.timeScale = rate;
     next.time = name === this.look.clips.pray && !this.clip ? Math.random() * next.getClip().duration : from; // praying: not in lockstep
@@ -202,18 +278,21 @@ function dress(scene: THREE.Group, prop: THREE.Group, look: Look): void {
   arm(scene, prop, look.staff, look.grip).add(tip);
 }
 
+/** A bolt in flight: its trail and two pooled sprites. */
+interface Flight { trail: number; look: Look; core: THREE.Sprite; halo: THREE.Sprite; spin: number }
+
 /** Every priest in the cloisters, the gardens and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
 export class Priests {
   readonly root = new THREE.Group();
   readonly all: Priest[];
   readonly boss: Priest; // il Reverendissimo
-  private ring: THREE.Mesh; // the boss's nova telegraph on the floor
   private views: View[] = [];
   private bolts: Bolt[] = [];
   private spent: Bolt[] = [];
-  private orbs: THREE.Mesh[] = []; // one glowing core per bolt in flight, pooled
-  private orbGeo = new THREE.SphereGeometry(0.1, 12, 8);
-  private orbMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(CORE).multiplyScalar(1.6), fog: false });
+  private flights = new Map<Bolt, Flight>();
+  private sprites: THREE.Sprite[] = []; // free core/halo sprites, pooled
+  private tele: Decal; // the boss's nova telegraph on the floor
+  private teleSigil: Decal;
   private world: World;
   private vfx: Vfx;
   private stats: PlayerStats;
@@ -232,22 +311,18 @@ export class Priests {
       ...spawnPriests(world, gardens.map((g) => g.group), gardens.map((g) => g.area), gardens.map(() => [SACERDOTE])).flat(),
       ...church.all,
     ];
-    this.ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(SHADOW).multiplyScalar(2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
-    );
-    this.ring.visible = false;
+    this.tele = vfx.hold(tele);
+    this.teleSigil = vfx.hold(teleSigil);
     const looks = [...LOOKS];
     Promise.all(looks.flatMap(([, l]) => [loadModel(l.body), loadModel(l.prop)])).then((gltfs) => {
       const templates = new Map<CasterKind, Template>();
       looks.forEach(([kind, look], i) => {
         const body = gltfs[i * 2], prop = gltfs[i * 2 + 1];
         dress(body.scene, prop.scene, look);
-        templates.set(kind, { scene: body.scene, clips: body.animations, look });
+        templates.set(kind, { scene: body.scene, clips: body.animations, look, glow: vfx.sprite(T.glow, look.bolt.glow, 2.4, 1).material });
       });
       this.views = this.all.map((f) => new View(templates.get(f.kind)!));
       for (const v of this.views) this.root.add(v.root);
-      this.root.add(this.ring); // after the models: main.ts reads an empty root as "not loaded yet"
     }, (e) => console.error('priest model failed to load', e));
   }
 
@@ -259,6 +334,8 @@ export class Priests {
   /** The player died: whoever was fighting, the boss too, evades home at full health; bolts in flight fizzle. */
   wipe(): void {
     wipe(this.all);
+    this.spent.length = 0;
+    for (const b of this.bolts) this.land(b, false);
     this.bolts.length = 0;
   }
 
@@ -266,6 +343,7 @@ export class Priests {
   update(dt: number, player: Target): void {
     if (!this.views.length) return;
     let dmg = 0;
+    const v = this.vfx;
     this.all.forEach((f, i) => {
       const n = this.bolts.length, was = f.state;
       const hit = think(f, player, this.world, dt, this.bolts);
@@ -273,72 +351,121 @@ export class Priests {
       if (was === 'nova' && f.state !== 'nova') this.nova(f, hit > 0);
       if (this.bolts.length === n) return;
       // A new bolt leaves from the caster's crystal, with a flare.
-      const b = this.bolts[n];
+      const b = this.bolts[n], look = LOOKS.get(f.kind)!;
       this.views[i].tipAt(this.v);
       b.x = this.v.x; b.y = this.v.y; b.z = this.v.z;
-      this.vfx.burst(b.x, b.y, b.z, 14, 0.15, { life: 0.4, size: 0.1, color: SHADOW, hdr: 3, drag: 4 }, 2);
+      v.spawn(flareBolt, b.x, b.y, b.z);
+      v.burst(boltSpark, b.x, b.y, b.z, 10, 0.1, 3);
+      this.flights.set(b, { trail: v.ribbons.begin(boltTrail(look.bolt.glow, look.bolt.size)), look, core: this.sprite(look.bolt.core, 3.2), halo: this.sprite(look.bolt.glow, 1.6), spin: Math.random() * 6 });
     });
     separate(this.all, this.world);
     dmg += fly(this.bolts, player, dt, this.spent);
-    for (const b of this.spent) {
-      if (!b.hit) { this.vfx.burst(b.x, b.y, b.z, 10, 0.2, { life: 0.5, size: 0.1, color: SHADOW, hdr: 2, drag: 3 }, 0.8); continue; }
-      this.vfx.burst(b.x, b.y, b.z, 26, 0.3, { life: 0.6, size: 0.12, color: SHADOW, hdr: 3, drag: 3 }, 2.4);
-      this.vfx.burst(b.x, b.y, b.z, 10, 0.3, { life: 0.9, size: 0.3, color: SMOKE, alpha: 0.7, normal: true, grow: 2, drag: 2, vy: 0.4 }, 0.6);
-      this.vfx.pulse(b.x, b.y, b.z, SHADOW, 25);
-    }
+    for (const b of this.spent) this.land(b, b.hit);
     this.drawBolts(dt);
-    this.drawRing();
+    this.drawTelegraph(dt);
     this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, f.state === 'pray' && Math.hypot(f.x - player.x, f.z - player.z) > FAR));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
 
+  /** A pooled additive sprite coloured `color` × `hdr`. */
+  private sprite(color: number, hdr: number): THREE.Sprite {
+    const s = this.sprites.pop() ?? this.vfx.sprite(T.glow, 0xffffff, 1, 1);
+    s.material.color.setHex(color).multiplyScalar(hdr);
+    s.visible = true;
+    if (!s.parent) this.root.add(s);
+    return s;
+  }
+
+  /** A spent bolt: a burst where it struck (or a fizzle), its sprites back to the pool. */
+  private land(b: Bolt, hit: boolean): void {
+    const f = this.flights.get(b), v = this.vfx;
+    if (f) {
+      v.ribbons.end(f.trail);
+      for (const s of [f.core, f.halo]) { s.visible = false; this.sprites.push(s); }
+      this.flights.delete(b);
+    }
+    const k = f?.look.bolt.size ?? 1;
+    if (!hit) { v.burst(boltSpark, b.x, b.y, b.z, 8, 0.2, 1.5); v.burst(boltSmoke, b.x, b.y, b.z, 3, 0.2, 0.5); return; }
+    v.spawn(flareBolt, b.x, b.y, b.z);
+    v.burst(boltSpark, b.x, b.y, b.z, Math.round(22 * k), 0.3, 5);
+    v.burst(boltPuff, b.x, b.y, b.z, Math.round(6 * k), 0.3, 1);
+    v.decal(boltShock, b.x, b.y - 1.05, b.z);
+    v.pulse(b.x, b.y, b.z, f?.look.bolt.glow ?? SHADOW, 25 * k);
+    v.shake(0.08 * k);
+  }
+
   private drawBolts(dt: number): void {
-    while (this.orbs.length < this.bolts.length) {
-      const o = new THREE.Mesh(this.orbGeo, this.orbMat);
-      this.orbs.push(o);
-      this.root.add(o);
+    const v = this.vfx;
+    for (const b of this.bolts) {
+      const f = this.flights.get(b);
+      if (!f) continue;
+      const k = f.look.bolt.size, pulse = 1 + Math.sin(b.t * 30) * 0.12;
+      f.core.position.set(b.x, b.y, b.z);
+      f.core.scale.setScalar(0.38 * k * pulse);
+      f.halo.position.set(b.x, b.y, b.z);
+      f.halo.scale.setScalar(1.1 * k * pulse);
+      v.ribbons.push(f.trail, b.x, b.y, b.z);
+      // a spiral of motes and a wisp of dark smoke behind
+      const a = (f.spin += dt * 18), r = 0.18 * k;
+      v.spawn(boltMote, b.x + Math.cos(a) * r, b.y + Math.sin(a) * r, b.z + Math.sin(a * 0.7) * r);
+      if (Math.random() < dt * 25) v.spawn(boltSmoke, b.x, b.y, b.z, 0, 0.3, 0);
     }
-    this.orbs.forEach((o, i) => {
-      const b = this.bolts[i];
-      o.visible = !!b;
-      if (!b) return;
-      o.position.set(b.x, b.y, b.z);
-      o.scale.setScalar((1 + Math.sin(b.t * 30) * 0.15) * Math.sqrt(b.dmg / PRIEST.damage)); // the boss's are fat
-      // Trail: bright motes and a wisp of dark smoke streaming behind.
-      for (let n = 0; n < 2; n++) this.vfx.puff({ x: b.x + (Math.random() - 0.5) * 0.15, y: b.y + (Math.random() - 0.5) * 0.15, z: b.z + (Math.random() - 0.5) * 0.15, life: 0.35, size: 0.14, color: SHADOW, hdr: 2.6, grow: 0.3 });
-      if (Math.random() < dt * 30) this.vfx.puff({ x: b.x, y: b.y, z: b.z, vy: 0.3, life: 0.6, size: 0.18, color: SMOKE, alpha: 0.6, normal: true, grow: 2 });
-    });
   }
 
-  /** The nova's floor ring grows in while the boss channels it. */
-  private drawRing(): void {
-    const f = this.boss;
-    this.ring.visible = f.state === 'nova';
-    if (!this.ring.visible) return;
-    const p = Math.min(f.t / f.kind.nova!.cast, 1), r = f.kind.nova!.radius;
-    this.ring.position.set(f.x, f.y + 0.05, f.z);
-    this.ring.scale.setScalar(r * (0.25 + 0.75 * p));
-    (this.ring.material as THREE.MeshBasicMaterial).opacity = 0.35 + 0.65 * p;
+  /** The nova's sigil fills the floor out to its edge while the boss channels it; shadow flames lick the edge. */
+  private drawTelegraph(dt: number): void {
+    const f = this.boss, on = f.state === 'nova', t = this.tele, s = this.teleSigil;
+    t.on = s.on = on;
+    if (!on) return;
+    const n = f.kind.nova!, p = Math.min(f.t / n.cast, 1);
+    t.x = s.x = f.x; t.y = s.y = f.y + 0.06; t.z = s.z = f.z;
+    t.fill = 0.08 + 0.92 * p;
+    t.alpha = 0.55 + 0.45 * p;
+    t.rot += dt * 0.3;
+    s.rot -= dt * (0.6 + p * 2);
+    s.alpha = Math.min(1, f.t * 3);
+    s.size = 4.5 + p * 1.5;
+    const v = this.vfx;
+    for (let i = v.count(40 + p * 120, dt); i > 0; i--) {
+      const a = Math.random() * Math.PI * 2, r = n.radius * (0.97 + Math.random() * 0.06);
+      v.spawn(novaFlame, f.x + Math.cos(a) * r, f.y + 0.1, f.z + Math.sin(a) * r, 0, 0.6 + p, 0);
+    }
   }
 
-  /** The nova goes off: a ring of shadow rushing out to its radius. */
+  /** The nova goes off: a shock wave racing out to its radius, a ring of shadow flame, scorched cracks. */
   private nova(f: Priest, hit: boolean): void {
-    const r = f.kind.nova!.radius;
-    for (let k = 0; k < 90; k++) {
-      const a = (k / 90) * Math.PI * 2, s = r * 2.4;
-      this.vfx.puff({ x: f.x + Math.cos(a) * 0.8, y: f.y + 0.4, z: f.z + Math.sin(a) * 0.8, vx: Math.cos(a) * s, vy: 0.6, vz: Math.sin(a) * s, life: 0.45, size: 0.35, color: SHADOW, hdr: 3, drag: 1.2 });
+    const r = f.kind.nova!.radius, v = this.vfx, y = f.y + 0.05;
+    v.decal(novaWave, f.x, y + 0.02, f.z);
+    v.decal(novaCracks, f.x, y, f.z);
+    v.decal(novaScar, f.x, y + 0.01, f.z);
+    for (let k = 0; k < 72; k++) {
+      const a = (k / 72) * Math.PI * 2, s = r * 2.6;
+      v.spawn(novaBlast, f.x + Math.cos(a) * 0.8, f.y + 0.3, f.z + Math.sin(a) * 0.8, Math.cos(a) * s, 1.5, Math.sin(a) * s);
     }
-    this.vfx.burst(f.x, f.y + 1.5, f.z, 30, 1.5, { life: 1.1, size: 0.6, color: SMOKE, alpha: 0.7, normal: true, grow: 2, drag: 2, vy: 0.8 }, 2);
-    this.vfx.pulse(f.x, f.y + 2, f.z, SHADOW, hit ? 60 : 40);
+    for (let k = 0; k < 10; k++) { // columns of flame at the edge
+      const a = (k / 10) * Math.PI * 2;
+      v.burst(novaFlame, f.x + Math.cos(a) * r, f.y + 0.3, f.z + Math.sin(a) * r, 6, 0.3, 1, 4);
+    }
+    v.ring(novaSmoke, f.x, f.y + 0.4, f.z, 20, 1, r * 1.2, 0.5);
+    v.burst(boltSpark, f.x, f.y + 2, f.z, 40, 1, 7);
+    v.pulse(f.x, f.y + 2, f.z, SHADOW, hit ? 70 : 50);
+    v.shake(hit ? 0.7 : 0.35);
   }
 
   /** Damage every priest for which `inside(x, z)` holds (abilities). */
   hurtWhere(inside: (x: number, z: number, f: Priest) => boolean, n: number): void {
     this.all.forEach((f, i) => {
       if (f.state === 'dead' || !inside(f.x, f.z, f)) return;
-      const killed = hurt(f, n);
-      if (n >= 1 || killed) this.views[i]?.hit();
-      if (killed) this.vfx.burst(f.x, f.y + 1, f.z, 30, 0.4, { life: 1.2, size: 0.12, color: SHADOW, hdr: 2, drag: 1.5, vy: 0.8 }, 1.4);
+      const killed = hurt(f, n), h = LOOKS.get(f.kind)!.height;
+      if (n >= 1 || killed) {
+        this.views[i]?.hit(n, f);
+        this.vfx.impact(f.x, f.y + h * 0.6, f.z, n >= BIG);
+      }
+      if (killed) {
+        this.vfx.burst(boltSpark, f.x, f.y + h * 0.5, f.z, 30, 0.4, 3);
+        this.vfx.burst(deathSmoke, f.x, f.y + h * 0.4, f.z, 8, 0.4, 0.8);
+        this.vfx.spawn(darkSoul, f.x, f.y + h * 0.8, f.z);
+      }
     });
   }
 }

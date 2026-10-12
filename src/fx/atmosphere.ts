@@ -338,6 +338,23 @@ export class Atmosphere {
     else this.scene.remove(this.hero);
   }
 
+  /** Called after dropping to low quality (its light state rebuilds every program): main.ts warms them again. */
+  onDegrade?: () => void;
+
+  /**
+   * Compile every material in the scene now, for both targets it may be drawn into (the HDR
+   * buffer, and the canvas in low quality: colour space and tone mapping are part of a program's
+   * key), rather than on first use mid-fight, a hitch of up to half a second for a new spell effect.
+   */
+  warm(): void {
+    const r = this.renderer, was = r.getRenderTarget();
+    for (const target of [this.composer.readBuffer, null]) {
+      r.setRenderTarget(target);
+      r.compileAsync(this.scene, this.camera).catch(() => undefined); // its compile() runs now, under this target
+    }
+    r.setRenderTarget(was);
+  }
+
   render(): void {
     if (this.low) this.renderer.render(this.scene, this.camera);
     else this.composer.render();
@@ -347,6 +364,7 @@ export class Atmosphere {
     this.low = true;
     this.moon.castShadow = false; // light state change recompiles programs without shadows
     console.info(`[fx] low quality: ${why}`);
+    this.onDegrade?.();
   }
 }
 

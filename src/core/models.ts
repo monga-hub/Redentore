@@ -52,3 +52,55 @@ export function arm(scene: THREE.Group, prop: THREE.Group, length: number, grip:
   held.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, Math.sin(tilt), Math.cos(tilt)));
   return top;
 }
+
+// Bones above the hips: what a layered one-shot moves while the legs keep their own clip.
+export const UPPER = /^(Spine|neck|Head|head|Left(Shoulder|Arm|ForeArm|Hand)|Right(Shoulder|Arm|ForeArm|Hand))/;
+/** Weight that gives an action share `k` of a track the base clip (total weight 1) also drives. */
+export const over = (k: number) => k / (1 - Math.min(k, 0.99));
+
+/**
+ * Upper-body one-shots over a body's base clip (flinches, a war cry): the legs keep running or
+ * standing as they were. One plays at a time; `play` from `from` s into the clip to `stop`.
+ */
+export class Overlay {
+  private acts = new Map<string, THREE.AnimationAction>();
+  private cur?: { a: THREE.AnimationAction; t: number; end: number; out: number };
+
+  constructor(mixer: THREE.AnimationMixer, clips: THREE.AnimationClip[], names: string[]) {
+    for (const n of names) {
+      const c = THREE.AnimationClip.findByName(clips, n);
+      if (!c) continue;
+      const a = mixer.clipAction(new THREE.AnimationClip(`${n}_upper`, c.duration, c.tracks.filter((t) => UPPER.test(t.name))));
+      a.setLoop(THREE.LoopOnce, 1);
+      a.clampWhenFinished = true;
+      this.acts.set(n, a);
+    }
+  }
+
+  has(name: string): boolean {
+    return this.acts.has(name);
+  }
+
+  get busy(): boolean {
+    return !!this.cur;
+  }
+
+  play(name: string, from: number, stop: number, rate = 1): void {
+    const a = this.acts.get(name);
+    if (!a) return;
+    this.cur?.a.stop();
+    a.reset().setEffectiveWeight(0).play();
+    a.time = from;
+    a.timeScale = rate;
+    this.cur = { a, t: 0, end: (stop - from) / rate, out: Math.min(0.25, (stop - from) / rate / 3) };
+  }
+
+  /** Before the mixer's update. `cut`: drop it now (the body went into an attack or died). */
+  update(dt: number, cut = false): void {
+    const c = this.cur;
+    if (!c) return;
+    const t = (c.t += dt);
+    if (cut || t >= c.end) { c.a.stop(); this.cur = undefined; return; }
+    c.a.setEffectiveWeight(over(Math.max(0, Math.min(1, t / 0.06, (c.end - t) / c.out))));
+  }
+}

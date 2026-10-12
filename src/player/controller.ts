@@ -8,7 +8,10 @@ const RUN = 6, WALK = 2.5, GRAVITY = 22, JUMP = 7, TURN = 12;
 /** Hero: skinned undead model over a capsule collider, camera-relative WASD, gravity, jump, step-up. */
 export class PlayerController {
   readonly mesh = new THREE.Group();
-  private model = new UndeadModel();
+  /** The body: its moves, aura and hands (abilities drive it). */
+  readonly model = new UndeadModel();
+  /** Dead and falling: keys, stick and steering are ignored (gravity still applies). */
+  frozen = false;
   readonly pos = new THREE.Vector3(); // feet position
   private vy = 0;
   private grounded = true;
@@ -28,16 +31,6 @@ export class PlayerController {
     this.pos.set(s.x, this.world.standHeight(s.x, s.z), s.z);
     this.vy = 0;
     this.facing = s.yaw;
-  }
-
-  /** Main-attack swing on the model; movement carries on underneath. */
-  attack(): void {
-    this.model.attack();
-  }
-
-  /** Spell-cast pose over `seconds` (a cast bar's length, or a quick throw); `0` cuts it short. */
-  cast(seconds: number): void {
-    this.model.cast(seconds);
   }
 
   /** Blink up to `dist` m along the facing, stopping short of the first wall. Returns metres travelled. */
@@ -60,6 +53,7 @@ export class PlayerController {
     let r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
     if (!f && !r) { f = -input.stickY; r = input.stickX; } // touch stick: analog, |v| <= 1
+    if (this.frozen) { f = r = 0; steer = undefined; turnToCamera = false; }
     const speed = (input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN);
 
     // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
@@ -80,7 +74,7 @@ export class PlayerController {
 
     this.world.resolve(this.pos, this.pos.y);
 
-    if (this.grounded && input.down('Space')) { this.vy = JUMP; this.grounded = false; }
+    if (this.grounded && !this.frozen && input.down('Space')) { this.vy = JUMP; this.grounded = false; }
     const ground = this.world.groundAt(this.pos.x, this.pos.z, this.pos.y);
     if (this.grounded && this.vy <= 0 && this.pos.y - ground < PLAYER.step + 0.05) {
       this.pos.y = ground; // stick to stairs going down, step up going up

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { arm, loadModel, stand } from '../core/models.ts';
+import { Overlay, arm, loadModel, stand } from '../core/models.ts';
 import type { World } from '../core/physics.ts';
-import type { Vfx } from '../abilities/vfx.ts';
+import { D, T, type DecalStyle, type RibbonStyle, type Style, type Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
 import { killAll, wipe } from './caster.ts';
@@ -13,18 +13,29 @@ import { killAll, wipe } from './caster.ts';
 
 const HEIGHT = 1.75; // m
 const HOE = { length: 1.5, grip: 0.35 }; // m long, held this far up the handle
-// swing: the overhead chop entered past its stance (`from`, s into the clip) and sped up so its
-// blow (`hit`) lands at FRIAR.windup
-const SWING = { from: 0.2, hit: 1.1 };
+// Swings, picked in turn: each entered past its stance (`from`, s into the clip) and sped up so
+// its blow (`hit`) lands at FRIAR.windup: the overhead chop, a hammering two-handed blow, a slash.
+const SWINGS = [{ clip: 'Attack', from: 0.2, hit: 1.1 }, { clip: 'Attack_Hammer', from: 0.6, hit: 1.5 }, { clip: 'Attack_Slash', from: 0.3, hit: 0.52 }];
+const DEATHS = ['Dead', 'Dead_Knock', 'Dead_Shot'];
+// Layered on the upper body: a flinch per hit (a heavier one for big blows), a war cry on aggro (s into the clip).
+const FLINCH = { light: { clip: 'Hit_Light', from: 0.1, stop: 0.75 }, heavy: { clip: 'Hit_Heavy', from: 0.4, stop: 1.3 }, cry: { clip: 'Scream', from: 0.55, stop: 1.8 } };
+const BIG = 25; // damage that makes a heavy flinch
 const HOE_RATE = 1; // idle hoeing
 const IMPACT = 1.6; // s into the hoeing clip where the blade bites
 const RUN = 5.5 * HEIGHT / 1.8; // m/s the run covers at rate 1 (a planted foot's speed, on a 1.8 m body): a slowed run chases, evades
-const CLIPS: Record<State, string> = { hoe: 'Hoe', chase: 'Running', swing: 'Attack', evade: 'Running', dead: 'Dead' };
+const CLIPS: Record<State, string> = { hoe: 'Hoe', chase: 'Running', swing: 'Attack', evade: 'Running', dead: 'Dead' }; // swing, dead: see SWINGS, DEATHS
 const FADE = 0.2;
 const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 }; // corpse sinks into the soil, then hides
 
 const DIRT = 0x3d2b1c, BLOOD = 0x8dff6a;
+const clod: Style = { life: [0.5, 0.8], size: [0.07, 0.12], color: DIRT, alpha: 0.95, dark: true, tex: T.ember, grav: 9, drag: 1, spin: [2, 6] };
+const dust: Style = { life: [0.8, 1.2], size: [0.3, 0.5], grow: 2, color: 0x6a5642, alpha: 0.4, tex: T.smoke, erode: true, dark: true, drag: 2 };
+const ichor: Style = { life: [0.6, 1.1], size: [0.06, 0.12], color: BLOOD, hdr: 2, tex: T.drop, grav: 8, drag: 1 };
+const soul: Style = { life: [1.4, 1.8], size: 0.5, grow: 1.5, color: 0xb8ffb0, hdr: 1.2, alpha: 0.6, tex: T.skull, grav: -1.2, fadeIn: 0.25 };
+const soulWisp: Style = { life: [1, 1.5], size: [0.4, 0.6], grow: 1.8, color: BLOOD, hdr: 0.7, alpha: 0.5, tex: T.wisp, erode: true, grav: -1 };
+const gash: DecalStyle = { life: 2.5, size: 0.9, tile: D.scorch, color: 0x1a120a, alpha: 0.7, fadeOut: 0.5, dark: true };
+const hoeTrail: RibbonStyle = { color: 0xd8cfc0, color2: 0x4a3a26, hdr: 1.2, alpha: 0.55, width: 0, life: 0.12 };
 
 interface Template {
   scene: THREE.Group;
@@ -44,17 +55,27 @@ class View {
   private bar = new THREE.Group();
   private fill: THREE.Sprite;
   private lastClip = 0;
+  private overlay: Overlay;
+  private swings = 0; // which of SWINGS comes next
+  private trail = -1; // the hoe's swing trail
+  private flinched = 0; // s since the last flinch
+  private held: THREE.Object3D;
+  private v = new THREE.Vector3();
+  private w = new THREE.Vector3();
 
   constructor(t: Template) {
     const model = cloneSkinned(t.scene) as THREE.Group;
     this.mats = ownMaterials(model);
     this.blade = model.getObjectByName('hoeBlade')!;
+    this.held = model.getObjectByName('held')!;
     this.root.add(model);
     this.mixer = new THREE.AnimationMixer(model);
-    for (const c of new Set(Object.values(CLIPS))) {
+    for (const c of new Set([...Object.values(CLIPS), ...SWINGS.map((w) => w.clip), ...DEATHS])) {
       const clip = THREE.AnimationClip.findByName(t.clips, c);
       if (clip) this.actions.set(c, this.mixer.clipAction(clip));
     }
+    this.swings = Math.floor(Math.random() * SWINGS.length);
+    this.overlay = new Overlay(this.mixer, t.clips, Object.values(FLINCH).map((f) => f.clip));
 
     const bg = new THREE.Sprite(barMat(0x140c08));
     bg.scale.set(0.075, 0.011, 1); // fraction of the view height: nameplate-sized at any distance
@@ -66,24 +87,49 @@ class View {
     this.root.add(this.bar);
   }
 
-  hit(): void {
+  /** Struck for `n`: the red flash, and a flinch unless it is mid-swing. */
+  hit(n: number, f: Friar): void {
     this.flash = 1;
+    if (f.state === 'chase' && this.flinched > 0.35) {
+      const k = n >= BIG ? FLINCH.heavy : FLINCH.light;
+      this.overlay.play(k.clip, k.from, k.stop, 1.4);
+      this.flinched = 0;
+    }
   }
 
-  /** Sync with the brain. `vfx` gets dirt puffs on every hoe stroke. */
+  /** Sync with the brain. `vfx` gets dirt puffs on every hoe stroke and the hoe's swing trails. */
   update(f: Friar, dt: number, vfx: Vfx): void {
+    const was = this.state;
     if (f.state !== this.state) this.enter(f.state, this.state);
+    if (was === 'hoe' && f.state === 'chase') this.overlay.play(FLINCH.cry.clip, FLINCH.cry.from, FLINCH.cry.stop, 1.4); // pulled: a war cry as it sets off
     const a = this.current!;
+    this.flinched += dt;
 
     // Hoe strokes throw up a clod of earth where the blade bites.
     if (f.state === 'hoe') {
       if (this.lastClip < IMPACT && a.time >= IMPACT) {
-        const p = this.blade.getWorldPosition(new THREE.Vector3());
-        vfx.burst(p.x, Math.max(p.y, f.y + 0.1), p.z, 10, 0.15, { life: 0.7, size: 0.09, color: DIRT, alpha: 0.9, normal: true, grav: 9, vy: 2.2, drag: 1 }, 1.1);
+        const p = this.blade.getWorldPosition(this.v);
+        vfx.burst(clod, p.x, Math.max(p.y, f.y + 0.1), p.z, 8, 0.15, 1.1, 2.2);
+        vfx.spawn(dust, p.x, f.y + 0.15, p.z);
       }
       this.lastClip = a.time;
     }
 
+    // The swing's arc, from just before the blow to just after; a blow on the floor gouges it.
+    const live = f.state === 'swing' && f.t > FRIAR.windup - 0.3 && f.t < FRIAR.windup + 0.12;
+    if (live && this.trail < 0) this.trail = vfx.ribbons.begin(hoeTrail, true);
+    if (this.trail >= 0) {
+      this.blade.getWorldPosition(this.w);
+      this.held.getWorldPosition(this.v).lerp(this.w, 0.5);
+      vfx.ribbons.push(this.trail, this.v.x, this.v.y, this.v.z, this.w.x, this.w.y, this.w.z);
+      if (!live) {
+        vfx.ribbons.end(this.trail);
+        this.trail = -1;
+        if (this.w.y < f.y + 0.5) { vfx.decal(gash, this.w.x, f.y + 0.03, this.w.z); vfx.burst(clod, this.w.x, f.y + 0.1, this.w.z, 10, 0.2, 1.5, 2.5); }
+      }
+    }
+
+    this.overlay.update(dt, f.state === 'swing' || f.state === 'dead');
     this.mixer.update(dt);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
     flash(this.mats, this.flash);
@@ -101,12 +147,15 @@ class View {
   }
 
   private enter(s: State, from?: State): void {
-    const next = this.actions.get(CLIPS[s])!;
+    const sw = SWINGS[this.swings % SWINGS.length];
+    if (s === 'swing') this.swings++;
+    const clip = s === 'swing' ? sw.clip : s === 'dead' ? DEATHS[Math.floor(Math.random() * DEATHS.length)] : CLIPS[s];
+    const next = this.actions.get(clip) ?? this.actions.get(CLIPS[s])!;
     next.reset();
     next.setLoop(s === 'swing' || s === 'dead' ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
     next.clampWhenFinished = true;
-    next.timeScale = s === 'swing' ? (SWING.hit - SWING.from) / FRIAR.windup : s === 'hoe' ? HOE_RATE : s === 'chase' ? FRIAR.speed / RUN : s === 'evade' ? FRIAR.walk / RUN : 1;
-    if (s === 'swing') next.time = SWING.from;
+    next.timeScale = s === 'swing' ? (sw.hit - sw.from) / FRIAR.windup : s === 'hoe' ? HOE_RATE : s === 'chase' ? FRIAR.speed / RUN : s === 'evade' ? FRIAR.walk / RUN : 1;
+    if (s === 'swing') next.time = sw.from;
     if (s === 'hoe' && !from) next.time = Math.random() * next.getClip().duration; // groups don't hoe in lockstep
     next.play();
     if (this.current && this.current !== next) next.crossFadeFrom(this.current, FADE, false);
@@ -214,8 +263,15 @@ export class Friars {
     this.all.forEach((f, i) => {
       if (f.state === 'dead' || !inside(f.x, f.z, f)) return;
       const killed = hurt(f, n);
-      if (n >= 1 || killed) this.views[i]?.hit(); // damage-over-time ticks don't strobe
-      if (killed) this.vfx.burst(f.x, f.y + 1, f.z, 30, 0.4, { life: 1.2, size: 0.12, color: BLOOD, hdr: 2, drag: 1.5, vy: 0.8 }, 1.4);
+      if (n >= 1 || killed) { // damage-over-time ticks don't strobe
+        this.views[i]?.hit(n, f);
+        this.vfx.impact(f.x, f.y + HEIGHT * 0.6, f.z, n >= BIG);
+      }
+      if (killed) {
+        this.vfx.burst(ichor, f.x, f.y + 1, f.z, 24, 0.4, 2.5, 1.5);
+        this.vfx.spawn(soul, f.x, f.y + 1.4, f.z);
+        this.vfx.burst(soulWisp, f.x, f.y + 1, f.z, 5, 0.3, 0.5);
+      }
     });
   }
 }

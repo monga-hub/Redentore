@@ -123,8 +123,10 @@ src/
   core/input.ts              tastiera + mouse
   core/models.ts             modelli Meshy: caricamento GLB, posa in piedi, oggetto nel pugno
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
-  player/undead.ts           modello del Reietto (Meshy) con la clava d'ossa, animazioni, fendente e
-                             lancio sovrapposti al busto
+  player/undead.ts           modello del Reietto (Meshy) con la clava d'ossa: idle ansimante con
+                             giravolte della clava, guardia dopo il combattimento, passo e corsa a
+                             falcata misurata (niente piedi che scivolano), combo a 3 colpi, una
+                             mossa per incantesimo, reazioni ai colpi, morte; aura per Velo e Patto
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
   camera/intro.ts            piano sequenza d'apertura (spline Catmull-Rom sulle chiavi, saltabile)
   camera/diabloCamera.ts     Stile Diablo: camera isometrica fissa; CameraBlend per i cambi di stile
@@ -138,12 +140,17 @@ src/
   abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s, off-GCD,
                              lanci, canalizzate, interruzione al movimento. Nessun DOM/three
   abilities/forsaken.ts      le 8 abilità del Reietto (tabella `ABILITIES`, ordine `BAR`)
-  abilities/vfx.ts           particelle in pool (un draw call), anelli, colonna, fuoco fatuo
-                             e l'unica PointLight delle abilità, creata all'avvio
+  abilities/vfx.ts           effetti di tutti gli incantesimi, in pool e senza allocazioni per
+                             frame: particelle su quad da un atlante procedurale (bagliori,
+                             scintille stirate, fumo che si erode, schegge, fiamme), scie, decal
+                             a terra (onde d'urto, cerchi runici, crepe, pozze, telegrafi che si
+                             riempiono), spuntoni d'osso, l'unica PointLight delle abilità e la
+                             scossa della camera
   enemies/brain.ts           IA dei frati non-morti (zappa, aggro di gruppo, inseguimento,
                              zappata in mischia, evade, morte/respawn) e punti di spawn
                              nell'orto. Nessuna dipendenza da three
-  enemies/friars.ts          modello (frate non-morto Meshy con la zappa in pugno), animazioni,
+  enemies/friars.ts          modello (frate non-morto Meshy con la zappa in pugno), animazioni
+                             (tre colpi a turno, reazioni ai colpi, grido all'aggro, morti varie),
                              barra vita; danni al player via `PlayerStats.takeDamage`
   enemies/caster.ts          IA dei preti caster (anche sacerdoti e Reverendissimo: `CasterKind` con mischia
                              e nova; spawn della chiesa, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
@@ -151,8 +158,9 @@ src/
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
   enemies/priests.ts         un corpo Meshy per tipo: prete in tonaca nera e cremisi (bastone col
                              cristallo), sacerdote corazzato viola e oro (mazza alata),
-                             Reverendissimo arcivescovo-lich gigante (pastorale); animazioni,
-                             VFX dei dardi d'ombra e della nova
+                             Reverendissimo arcivescovo-lich gigante (pastorale); animazioni
+                             (reazioni, colpi alternati, morti varie), dardi d'ombra con scia,
+                             nova del boss telegrafata a terra
   quest/progress.ts          stato della progressione: grate e porte (collider rimovibili), baule
                              con la chiave, prompt di interazione, vittoria. Nessuna dipendenza da three
   quest/view.ts              grate e battenti animati, baule, prompt "F", barra del boss, banner di vittoria

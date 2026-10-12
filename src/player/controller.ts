@@ -51,8 +51,11 @@ export class PlayerController {
     return d;
   }
 
-  /** `camYaw`: camera heading; movement is relative to it. `turnToCamera`: right mouse held. */
-  update(dt: number, input: Input, camYaw: number, turnToCamera: boolean): void {
+  /**
+   * `camYaw`: camera heading; movement is relative to it. `turnToCamera`: right mouse held.
+   * `steer`: world-space direction (length <= 1) to run along when no key or stick is held (click-to-move).
+   */
+  update(dt: number, input: Input, camYaw: number, turnToCamera: boolean, steer?: { x: number; z: number }): void {
     let f = (input.down('KeyW', 'ArrowUp') ? 1 : 0) - (input.down('KeyS', 'ArrowDown') ? 1 : 0);
     let r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
@@ -62,6 +65,7 @@ export class PlayerController {
     // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
     const sin = Math.sin(camYaw), cos = Math.cos(camYaw);
     let mx = -sin * f + cos * r, mz = -cos * f - sin * r;
+    if (!mx && !mz && steer) { mx = steer.x; mz = steer.z; }
     const len = Math.hypot(mx, mz);
     if (len > 0) {
       const k = Math.min(1, len) / len; // keys: unit length; stick: keeps its partial tilt

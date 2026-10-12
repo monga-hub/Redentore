@@ -39,6 +39,19 @@ const MOOD = {
   vignette: [0.35, 0.55],
   dust: [0.12, 0.45],
 } as const;
+// "Stile Diablo": a darker gothic night. Less fill light, so the torches and the light the hero
+// carries make the pools of warmth; the grade desaturates, splits cold shadows from warm lights,
+// adds contrast and closes in a heavy vignette.
+const DIABLO_MOOD: Record<keyof typeof MOOD, readonly [number, number]> = {
+  ...MOOD,
+  hemi: [0.3, 0.09],
+  exposure: [1.0, 1.1],
+  cool: [0.35, 0.15],
+  vignette: [0.62, 0.72],
+};
+const GRADE = { wow: { sat: 1, contrast: 1, split: 0 }, diablo: { sat: 0.68, contrast: 1.16, split: 0.55 } };
+const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, height: 2.6 }; // the hero's light radius
+const TORCH_BOOST = 1.7;
 const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
 
@@ -145,13 +158,13 @@ const mistMaterial = () => new THREE.ShaderMaterial({
 // Night grade in linear HDR, before ACES: shadows and mids drift to moonlit blue and lose
 // some saturation (night vision); bright values keep their hue, so flames stay warm.
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uCool: { value: 0 }, uVignette: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uCool: { value: 0 }, uVignette: { value: 0 }, uSat: { value: 1 }, uContrast: { value: 1 }, uSplit: { value: 0 } },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
-    uniform float uCool, uVignette;
+    uniform float uCool, uVignette, uSat, uContrast, uSplit;
     varying vec2 vUv;
     const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
     void main() {
@@ -160,6 +173,12 @@ const GradeShader = {
       float l = dot(c, LUMA), k = uCool * (1.0 - smoothstep(0.25, 1.5, l));
       vec3 night = l * vec3(0.62, 0.8, 1.22);
       c = mix(c, mix(c, night, 0.55), k);
+      if (uSplit > 0.0) { // Diablo grade: desaturate, cold shadows / warm lights, contrast about mid grey
+        l = dot(c, LUMA);
+        c = mix(vec3(l), c, uSat);
+        c *= mix(vec3(1.0), mix(vec3(0.8, 0.9, 1.1), vec3(1.2, 0.97, 0.76), smoothstep(0.03, 0.45, l)), uSplit);
+        c = pow(max(c, 0.0) / 0.18, vec3(uContrast)) * 0.18;
+      }
       vec2 d = vUv - 0.5;
       c *= clamp(1.0 - dot(d, d) * uVignette * 2.4, 0.0, 1.0);
       gl_FragColor = vec4(c, t.a);
@@ -170,6 +189,8 @@ const lerp = (r: readonly [number, number], k: number) => r[0] + (r[1] - r[0]) *
 
 export class Atmosphere {
   indoor = 0;
+  private mood: Record<keyof typeof MOOD, readonly [number, number]> = MOOD;
+  private readonly hero = new THREE.PointLight(HERO_LIGHT.color, HERO_LIGHT.intensity, HERO_LIGHT.distance, HERO_LIGHT.decay);
   private low = new URLSearchParams(location.search).get('fx') === 'low';
   private readonly fog = new THREE.FogExp2(FOG_OUT.getHex(), MOOD.fog[0]);
   private readonly hemi = new THREE.HemisphereLight(0x5a74a0, 0x15130f, MOOD.hemi[0]);
@@ -257,13 +278,16 @@ export class Atmosphere {
     // Damp lagoon air: fog thickens from the orto's north edge to the riva.
     const lagoon = THREE.MathUtils.smoothstep(-focus.z, -Z.ortoNorth, -Z.riva);
 
-    this.hemi.intensity = lerp(MOOD.hemi, k);
-    this.fog.density = lerp(MOOD.fog, k) + LAGOON_FOG * lagoon * (1 - k);
+    const mood = this.mood;
+    this.hemi.intensity = lerp(mood.hemi, k);
+    this.fog.density = lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k);
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
-    this.renderer.toneMappingExposure = lerp(MOOD.exposure, k);
-    this.grade.uniforms.uCool.value = lerp(MOOD.cool, k);
-    this.grade.uniforms.uVignette.value = lerp(MOOD.vignette, k);
-    this.dustMat.opacity = lerp(MOOD.dust, k);
+    this.renderer.toneMappingExposure = lerp(mood.exposure, k);
+    this.grade.uniforms.uCool.value = lerp(mood.cool, k);
+    this.grade.uniforms.uVignette.value = lerp(mood.vignette, k);
+    this.dustMat.opacity = lerp(mood.dust, k);
+    this.hero.position.set(focus.x, focus.y + HERO_LIGHT.height, focus.z);
+    this.hero.intensity = HERO_LIGHT.intensity * (0.94 + 0.06 * Math.sin(this.t * 7.3) * Math.sin(this.t * 2.9));
     this.dustMat.color.lerpColors(DUST_OUT, DUST_IN, k);
 
     this.sky.position.copy(this.camera.position);
@@ -290,6 +314,18 @@ export class Atmosphere {
     this.avgDt += (dt - this.avgDt) * 0.05;
     this.slowFor = this.t > 5 && this.avgDt > 0.04 ? this.slowFor + dt : 0;
     if (!this.low && this.slowFor > 4) this.degrade(`slow frames (${(1 / this.avgDt).toFixed(0)} fps)`);
+  }
+
+  /** "Stile Diablo" on or off: mood and grade, brighter torches, and a warm light that follows the hero (one more light: programs recompile once). */
+  setStyle(diablo: boolean): void {
+    this.mood = diablo ? DIABLO_MOOD : MOOD;
+    const g = diablo ? GRADE.diablo : GRADE.wow, u = this.grade.uniforms;
+    u.uSat.value = g.sat;
+    u.uContrast.value = g.contrast;
+    u.uSplit.value = g.split;
+    this.torches.boost = diablo ? TORCH_BOOST : 1;
+    if (diablo) this.scene.add(this.hero);
+    else this.scene.remove(this.hero);
   }
 
   render(): void {

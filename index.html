@@ -237,10 +237,10 @@
          floats above the character. Hold a ring button to read its tooltip (src/ui/actionBar.ts). */
       body.touch { --k: .72; }
       @media (max-height: 340px), (orientation: portrait) { body.touch { --k: .62; } }
-      body.touch .actionbar { transform: none; left: 0; right: 0; bottom: auto; top: 62%; pointer-events: none; }
-      body.touch .actionbar .bar { display: contents; }
-      body.touch .slot:not(.ring), body.touch .slot .key { display: none; }
-      body.touch .ring {
+      body:is(.touch, .diablo) .actionbar { transform: none; left: 0; right: 0; bottom: auto; top: 62%; pointer-events: none; }
+      body:is(.touch, .diablo) .actionbar .bar { display: contents; }
+      body:is(.touch, .diablo) .slot:not(.ring), body.touch .slot .key { display: none; }
+      body:is(.touch, .diablo) .ring {
         --cx: 74px; --cy: 70px; /* centre of the big button, from the right/bottom edges */
         --s: calc(var(--d) * var(--k));
         position: fixed; width: var(--s); height: var(--s); pointer-events: auto;
@@ -249,12 +249,64 @@
         border-radius: 50%; border: 2px solid #b8955a;
         box-shadow: 0 0 0 2px #000, 0 3px 10px rgba(0,0,0,.7), inset 0 0 8px #000;
       }
-      body.touch .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 4px rgba(212,175,95,.3); }
-      body.touch .slot.ring.active, body.touch .slot.ring.casting { border-color: #ffd75e; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ffd75e; }
-      body.touch .slot.ring.special:not(.locked) { border-color: #ff5a3a; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ff5a3a; }
-      body.touch .slot.ring.down { border-color: #f3e2b0; filter: brightness(1.25); }
+      body:is(.touch, .diablo) .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 4px rgba(212,175,95,.3); }
+      body:is(.touch, .diablo) .slot.ring.active, body:is(.touch, .diablo) .slot.ring.casting { border-color: #ffd75e; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ffd75e; }
+      body:is(.touch, .diablo) .slot.ring.special:not(.locked) { border-color: #ff5a3a; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ff5a3a; }
+      body:is(.touch, .diablo) .slot.ring.down { border-color: #f3e2b0; filter: brightness(1.25); }
+      body.diablo:not(.touch) { --k: .9; } /* Stile Diablo on desktop: the same fan, mouse-sized */
       body.touch .tooltip { width: 230px; font-size: 11px; }
       body.touch .tooltip b { font-size: 13px; }
+
+
+      /* Stile Diablo (src/core/style.ts): Diablo Immortal's HUD. Portrait and a blood-red health bar
+         top left, the skill fan bottom right (desktop too), menu and map top right; dark iron frames
+         instead of WoW's gold. */
+      body.diablo #zone { font: 600 24px Georgia, serif; text-transform: uppercase; letter-spacing: 5px; color: #e9d6b0;
+        text-shadow: 0 0 10px #000, 0 2px 3px #000, 0 0 22px rgba(170,30,10,.6); }
+      body.diablo #unit .portrait { width: 64px; height: 64px; border: 3px solid #1d1a17;
+        box-shadow: 0 0 0 2px #77705f, 0 0 0 4px #0a0908, 0 0 16px rgba(170,25,12,.55), inset 0 0 14px #000;
+        background: radial-gradient(circle at 50% 35%, #3a1a14, #050303); }
+      body.diablo #unit .frame { width: 196px; margin-left: -12px; padding: 2px 8px 4px 18px; background: linear-gradient(90deg, rgba(0,0,0,.55), transparent);
+        border: 0; border-radius: 0; box-shadow: none; }
+      body.diablo #unit .name { font: bold 12px/15px Georgia, serif; text-transform: uppercase; letter-spacing: 1.5px; color: #d9ccb4; }
+      body.diablo #unit #target { width: 160px; margin-left: 14px; background: linear-gradient(90deg, rgba(0,0,0,.6), rgba(0,0,0,.2)); }
+      body.diablo #unit #target .name { color: #ff6a4a; }
+      body.diablo .res { border-radius: 1px; background: #0b0504; border: 1px solid #000;
+        box-shadow: 0 0 0 1px #5d574e, 0 0 0 2px #000, inset 0 2px 6px #000; }
+      body.diablo .res.hp { height: 15px; }
+      body.diablo .res.hp .fill { background: linear-gradient(#e2361f, #a10f07 50%, #4c0402); }
+      body.diablo .res.mp { height: 6px; margin-top: 5px; }
+      body.diablo .res.mp span { display: none; }
+      body.diablo .res.mp .fill { background: linear-gradient(#5a9cff, #1440b0); }
+      body.diablo .res .lag { background: #ffe0b8; }
+      body.diablo .res span { line-height: 15px; }
+      body.diablo .ring { border: 2px solid #15120f; background: radial-gradient(circle at 50% 40%, #2b1712, #070404);
+        box-shadow: 0 0 0 2px #6f685d, 0 0 0 3px #000, 0 4px 12px rgba(0,0,0,.85), inset 0 0 10px #000; }
+      body.diablo .slot.ring.main { box-shadow: 0 0 0 3px #8b8173, 0 0 0 5px #000, 0 0 20px rgba(210,45,20,.5), inset 0 0 14px #000; }
+      body.diablo .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.75), inset 0 0 14px rgba(170,30,10,.35);
+        background: radial-gradient(circle at 50% 28%, rgba(255,235,210,.14), transparent 58%); }
+      body.diablo .slot .icon { filter: saturate(1.15) contrast(1.08); }
+      body.diablo .slot.ring.active, body.diablo .slot.ring.casting { border-color: #ff9a3a; box-shadow: 0 0 0 2px #000, 0 0 14px 3px #ff7a2a; }
+      body.diablo .slot.ring.special:not(.locked) { border-color: #ff3a1a; box-shadow: 0 0 0 2px #000, 0 0 16px 3px #ff3a1a; }
+      body.diablo:not(.touch) .slot .key { top: auto; bottom: 10%; right: 50%; transform: translateX(50%); font-size: 10px; color: #d9ccb4; }
+      body.diablo #jump { background: radial-gradient(circle at 50% 40%, #2b1712, #070404); border-color: #6f685d; }
+      body.diablo #minimap canvas { box-shadow: 0 0 0 3px #0a0908, 0 0 0 5px #6f685d, 0 0 0 7px #24201c, 0 0 0 8px #000, 0 4px 14px 8px rgba(0,0,0,.65); }
+      body.diablo #minimap .name, body.diablo #update { color: #e9d6b0; background: linear-gradient(rgba(30,26,22,.94), rgba(6,5,4,.94)); border-color: #5d574e; }
+      body.diablo #minimap button, body.diablo #minimap .north { background: radial-gradient(circle at 40% 35%, #3a3530, #0a0908); border-color: #77705f; color: #e9d6b0; }
+      body.diablo #menu-btn { background: radial-gradient(circle at 40% 35%, #3a3530, #0a0908); border-color: #77705f; color: #e9d6b0; }
+      body.diablo .castbar { box-shadow: 0 0 0 1px #6f685d, 0 2px 8px #000; }
+      body.diablo .castbar .fill { background: linear-gradient(#ff9a3a, #a8300c); }
+
+      /* Damage numbers over the enemies (src/fx/diabloFx.ts, Stile Diablo): placed by transform each frame, popped by scale. */
+      #dmg { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+      #dmg span {
+        position: absolute; left: 0; top: 0; translate: -50% -100%; white-space: nowrap; will-change: transform;
+        font: bold 19px Georgia, serif; color: #fff1dc; text-shadow: 0 0 3px #000, 0 2px 2px #000, 0 0 10px rgba(0,0,0,.8);
+        animation: dmgpop .95s ease-out forwards;
+      }
+      #dmg span.big { color: #ffb43a; font-size: 29px; text-shadow: 0 0 4px #000, 0 2px 3px #000, 0 0 14px rgba(255,90,10,.75); }
+      #dmg span.dot { color: #d2ff9a; font-size: 14px; }
+      @keyframes dmgpop { 0% { scale: .4; opacity: 0 } 12% { scale: 1.35; opacity: 1 } 28% { scale: 1 } 72% { opacity: 1 } 100% { scale: .9; opacity: 0 } }
 
       /* Build id and new-version prompt (src/ui/version.ts). */
       #version {

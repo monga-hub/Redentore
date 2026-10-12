@@ -12,6 +12,15 @@ const icon = (id: string, from: string, to: string, glyph: string) => `
 </svg>`;
 
 export const ICONS: Record<string, string> = {
+  // the Reietto's portrait: a hooded, half-rotten skull with ember eyes
+  will: icon('will', '#5a3a2a', '#0a0605', `
+    <path d="M10 64 C10 40 14 18 32 10 C50 18 54 40 54 64 Z" fill="#1c1410" stroke="#6a5a48" stroke-width="1.5"/>
+    <path d="M20 46 C18 32 22 22 32 20 C42 22 46 32 44 46 C42 52 38 56 32 56 C26 56 22 52 20 46 Z" fill="#cfc2a6" stroke="#efe6d2" stroke-width="1"/>
+    <path d="M23 34 q4 -3 8 1 q-1 5 -5 5 q-3 -1 -3 -6z M41 34 q-4 -3 -8 1 q1 5 5 5 q3 -1 3 -6z" fill="#120a06"/>
+    <circle cx="27" cy="36" r="1.8" fill="#ff7a2a"/><circle cx="37" cy="36" r="1.8" fill="#ff7a2a"/>
+    <path d="M30 43 l2 -3 2 3z" fill="#2a1a10"/>
+    <path d="M25 49 h14 M27 49 v3 M30 49 v4 M34 49 v4 M37 49 v3" stroke="#3a2a1c" stroke-width="1.3"/>
+    <path d="M40 24 q4 6 3 14" stroke="#7a8a5a" stroke-width="2" fill="none" opacity=".7"/>`),
   // hooded figure dissolving into chevrons
   step: icon('step', '#6b3fa8', '#12081f', `
     <path d="M24 50 C22 38 24 26 30 18 C34 13 40 14 42 20 C44 27 41 36 40 50 Z" fill="#1a0f24" stroke="#d6b8ff" stroke-width="2"/>

@@ -56,6 +56,8 @@ export class Targeting {
   private t = 0;
   private ray = new THREE.Raycaster();
   private blockers: THREE.Object3D[];
+  /** Where line of sight is checked from: the camera, unless set (the Diablo view's camera is above the roofs). */
+  eye?: () => THREE.Vector3;
 
   constructor(el: HTMLElement, camera: THREE.Camera, scene: THREE.Scene, blockers: THREE.Object3D[], kinds: readonly Kind[]) {
     this.kinds = kinds;
@@ -80,7 +82,7 @@ export class Targeting {
     addEventListener('pointerup', (e) => {
       const d = downs.get(e.pointerId);
       downs.delete(e.pointerId);
-      if (d && d.moved < TAP_PX && performance.now() - d.t < TAP_MS) this.target = pick(this.kinds, this.camera, d.x, d.y, innerWidth, innerHeight, (m, k) => this.seen(m, k));
+      if (d && d.moved < TAP_PX && performance.now() - d.t < TAP_MS) this.target = this.at(d.x, d.y);
     });
     addEventListener('pointercancel', (e) => downs.delete(e.pointerId));
     addEventListener('keydown', (e) => {
@@ -105,10 +107,16 @@ export class Targeting {
     if (best) this.target = best;
   }
 
-  /** Line of sight from the camera to the mob's chest, through the same meshes the camera avoids. */
+  /** The living, visible enemy under screen point (x, y), if any. */
+  at(x: number, y: number): { kind: Kind; mob: Mob } | undefined {
+    return pick(this.kinds, this.camera, x, y, innerWidth, innerHeight, (m, k) => this.seen(m, k));
+  }
+
+  /** Line of sight from the eye to the mob's chest, through the same meshes the camera avoids. */
   private seen(m: Mob, k: Kind): boolean {
-    const to = new THREE.Vector3(m.x, m.y + k.height * 0.6, m.z).sub(this.camera.position);
-    this.ray.set(this.camera.position, to.clone().normalize());
+    const eye = this.eye?.() ?? this.camera.position;
+    const to = new THREE.Vector3(m.x, m.y + k.height * 0.6, m.z).sub(eye);
+    this.ray.set(eye, to.clone().normalize());
     this.ray.far = to.length();
     return this.ray.intersectObjects(this.blockers, false).length === 0;
   }

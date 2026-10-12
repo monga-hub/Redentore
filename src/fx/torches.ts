@@ -97,6 +97,8 @@ export const DOT = softDot();
 
 export class Torches {
   readonly root = new THREE.Group();
+  /** Torch and brazier light multiplier ("Stile Diablo" burns brighter). */
+  boost = 1;
   private readonly em: Emitter[];
   private readonly flames: number[]; // emitters drawing a flame
   private readonly lit: number[]; // emitters competing for the light pool
@@ -208,7 +210,7 @@ export class Torches {
       const e = em[i], w = Math.min(1, Math.max(0, (cut - this.dist[i]) / 4));
       l.position.set(e.x + e.nx * 0.6, e.y + (e.kind === 'brazier' ? 0.5 : e.kind === 'torch' ? 0.3 : 0), e.z + e.nz * 0.6);
       l.color.setHex(e.color);
-      l.intensity = POWER[e.kind] * (e.kind === 'glow' ? 1 : flicker(t, e.phase)) * w;
+      l.intensity = POWER[e.kind] * (e.kind === 'glow' ? 1 : flicker(t, e.phase)) * w * (e.kind === 'torch' || e.kind === 'brazier' ? this.boost : 1);
     }
 
     // Sparks: rise with buoyancy and a little drift, cool from gold to dark red.

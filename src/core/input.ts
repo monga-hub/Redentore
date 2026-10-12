@@ -12,6 +12,8 @@ export class Input {
   zoom = 1; // pinch: camera distance multiplier accumulated since last consume()
   stickX = 0; // virtual joystick, -1..1 (right / down positive)
   stickY = 0;
+  /** Mouse drags orbit the camera under pointer lock; off in the Diablo view, which needs the cursor. */
+  orbit = true;
 
   constructor(el: HTMLElement) {
     addEventListener('keydown', (e) => {
@@ -26,7 +28,7 @@ export class Input {
       if (e.pointerType === 'touch') return;
       this.buttons = e.buttons;
       el.setPointerCapture(e.pointerId);
-      el.requestPointerLock?.()?.catch?.(() => {});
+      if (this.orbit) el.requestPointerLock?.()?.catch?.(() => {});
     });
     addEventListener('pointerup', (e) => {
       if (e.pointerType === 'touch') return;

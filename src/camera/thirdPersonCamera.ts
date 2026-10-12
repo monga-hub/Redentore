@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Input } from '../core/input.ts';
 
-const MIN_DIST = 1.5, MAX_DIST = 30, SENS = 0.005;
+const MIN_DIST = 1.5, MAX_DIST = 30, SENS = 0.005, FOV = 60;
 const MIN_PITCH = -0.35, MAX_PITCH = 1.35;
 export const EYE = 1.6; // m above the feet the camera orbits
 
@@ -25,7 +25,7 @@ export class ThirdPersonCamera {
 
   constructor(aspect: number, yaw: number, blockers: THREE.Object3D[]) {
     this.blockers = blockers;
-    this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1200);
+    this.camera = new THREE.PerspectiveCamera(FOV, aspect, 0.1, 1200);
     this.yaw = yaw;
   }
 
@@ -53,5 +53,9 @@ export class ThirdPersonCamera {
 
     this.camera.position.copy(this.target).addScaledVector(this.dir, this.shown);
     this.camera.lookAt(this.target);
+    if (this.camera.fov !== FOV) { // back from the Diablo view's narrow lens
+      this.camera.fov = FOV;
+      this.camera.updateProjectionMatrix();
+    }
   }
 }

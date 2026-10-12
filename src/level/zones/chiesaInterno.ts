@@ -369,6 +369,7 @@ function shaft(b: LevelBuilder, w: { outline: THREE.Vector2[]; m: THREE.Matrix4 
   const g = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)).setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const beam = new THREE.Mesh(g, additive({ map: SHAFT, color: tint.clone().multiplyScalar(strength) }));
   beam.renderOrder = 2;
+  beam.userData.beam = true; // hidden in the Diablo view: seen from above, a cut-off shaft is a bright slab
   b.add(beam);
   // Floor print: the pane's own triangulation with every vertex carried down to the floor.
   const pg = pane(w.outline).translate(0, 0, 0.06).applyMatrix4(w.m), pp = pg.getAttribute('position');

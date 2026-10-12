@@ -1,5 +1,6 @@
 import attribution from '../../ATTRIBUTION.md?raw';
 import { getAudio, setAudio } from '../core/audio.ts';
+import { isDiablo, setDiablo } from '../core/style.ts';
 import { save, setPending, slots, type GameState, type Slot } from '../core/save.ts';
 
 // Game menu, WoW style: a gear button in the top-right corner opens a framed panel that
@@ -40,6 +41,11 @@ body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under 
 #menu .btn:active { transform: translateY(1px); }
 #menu .btn:disabled { cursor: default; filter: grayscale(1) brightness(.6); }
 #menu .btn.back { margin-top: 16px; background: linear-gradient(#4a3a26, #1c140c); }
+#menu .btn.style { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+#menu .btn.style small { font: 11px/1.3 system-ui, sans-serif; color: #c9b48a; text-shadow: none; }
+#menu .btn.style i { flex: none; width: 38px; height: 20px; border-radius: 10px; background: #1c140c; border: 1px solid #c9a45c; position: relative; }
+#menu .btn.style i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #6b5332; transition: left .15s, background .15s; }
+#menu .btn.style[aria-pressed=true] i::after { left: 20px; background: #ff5a3a; box-shadow: 0 0 6px #ff5a3a; }
 #menu hr { border: 0; border-top: 1px solid #4a3a26; margin: 12px 0; }
 #menu .slot-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 10px; text-align: left; }
 #menu .slot-row b { display: block; color: #ffd75e; }
@@ -79,6 +85,10 @@ export function credits(md: string): string {
   const prose = lines.filter((l) => l && !l.startsWith('|') && !l.startsWith('#')).map((l) => `<p>${inline(esc(l))}</p>`).join('');
   return cards + prose;
 }
+
+/** The "Stile Diablo" switch: camera, controls, look and HUD of Diablo Immortal, applied at once and remembered. */
+const styleBtn = () => `<button class="btn style" data-do="style" aria-pressed="${isDiablo()}"><span>Stile Diablo<br><small>${isDiablo()
+  ? 'Visuale isometrica, clic per muoverti e attaccare' : 'Ora: camera in terza persona (WoW)'}</small></span><i aria-hidden="true"></i></button>`;
 
 export const playTime = (s: number) => {
   const m = Math.floor(s / 60);
@@ -164,13 +174,15 @@ export class Menu {
         <button class="btn" data-do="close">Torna al gioco</button><hr>
         <button class="btn" data-go="save">Salva partita</button>
         <button class="btn" data-go="load">Carica partita</button>
-        <button class="btn" data-go="audio">Audio</button><hr>
+        <button class="btn" data-go="audio">Audio</button>
+        ${styleBtn()}<hr>
         <button class="btn" data-do="new">Nuova partita</button>
         <button class="btn" data-go="credits">Crediti</button>
         <button class="btn" data-do="exit">Esci</button></div>`;
       case 'title': return `<div class="panel"><div class="logo">Redentore Dungeon<small>Giudecca, Venezia</small></div>
         <button class="btn" data-do="new">Nuova partita</button>
         <button class="btn" data-go="load">Carica partita</button>
+        ${styleBtn()}
         <button class="btn" data-go="credits">Crediti</button></div>`;
       case 'save':
       case 'load': {
@@ -210,6 +222,11 @@ export class Menu {
     else if (d === 'back') this.show(this.from);
     else if (d === 'new') location.reload(); // a clean boot is a clean start
     else if (d === 'exit') this.show('title');
+    else if (d === 'style') {
+      setDiablo(!isDiablo());
+      b.outerHTML = styleBtn();
+      this.el.querySelector<HTMLElement>('[data-do="style"]')!.focus();
+    }
     else if (slot !== undefined) this.slot(+slot);
   }
 

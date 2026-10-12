@@ -52,6 +52,8 @@ export class AbilitySystem<C extends Caster = Caster> {
   notices: Notice[] = [];
   /** 0..CHARGE_MAX: every cast fills it by its `charge`, a special spends it all. */
   charge = 0;
+  /** Called as a cast is about to start, before its `check`: the Diablo view turns the hero to the target. */
+  aim?: (a: Ability<C>) => void;
   /** Mana pool abilities with a `mana` cost draw from (player/stats.ts). Absent = free. */
   pool?: { mana: number; spendMana(n: number): boolean };
   readonly slots: (Ability<C> | undefined)[];
@@ -83,6 +85,7 @@ export class AbilitySystem<C extends Caster = Caster> {
     if ((a.cast || a.channel) && this.moving) return this.fail('Non puoi farlo mentre ti muovi.');
     if (!this.affordable(a)) return this.fail('Mana insufficiente.');
     if (!this.charged(a)) return this.fail('La barra della furia non è piena.');
+    this.aim?.(a);
     const why = a.check?.(this.ctx);
     if (why) return this.fail(why);
 

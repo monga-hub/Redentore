@@ -48,6 +48,8 @@ export class QuestView {
   private bossFill: HTMLElement;
   private bossText: HTMLElement;
   private victoryEl = document.createElement('div');
+  /** The boss bar is up: the target frame and the boss's own nameplate bar give way to it. */
+  bossShown = false;
   private shown = '';
   private tapped = false;
 
@@ -155,7 +157,7 @@ export class QuestView {
     this.glint.rotation.y += dt * 2;
     this.glint.position.y = CHEST.h + 0.45 + Math.sin(performance.now() * 0.003) * 0.08;
 
-    const fighting = boss.state !== 'pray' && boss.state !== 'dead' && boss.state !== 'evade';
+    const fighting = (this.bossShown = boss.state !== 'pray' && boss.state !== 'dead' && boss.state !== 'evade');
     this.bossEl.style.display = fighting ? 'block' : 'none';
     if (fighting) {
       this.bossFill.style.width = `${(boss.hp / boss.kind.hp) * 100}%`;

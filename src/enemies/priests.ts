@@ -162,7 +162,7 @@ class View {
     this.stand(f.yaw);
 
     const r = f.hp / f.kind.hp;
-    this.bar.visible = f.state !== 'dead' && (f.state !== 'pray' || r < 1);
+    this.bar.visible = f.kind !== REVERENDISSIMO && f.state !== 'dead' && (f.state !== 'pray' || r < 1); // the boss's bar is the big one up top (quest/view.ts)
     this.fill.scale.x = BAR_W * Math.max(r, 1e-3);
     this.fill.center.x = 0.5 / Math.max(r, 1e-3);
   }

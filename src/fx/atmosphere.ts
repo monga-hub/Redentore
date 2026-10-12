@@ -28,6 +28,7 @@ function indoorness(zone: string | undefined, label: string | undefined): number
 
 // Low in the east-south-east: rakes the facade and throws long shadows across the sagrato.
 const MOON_DIR = new THREE.Vector3(0.75, 0.5, 0.35).normalize();
+const MOON = 2.4;
 
 // Outdoor -> indoor endpoints of everything the indoor factor drives.
 const FOG_OUT = new THREE.Color(0x1a2332), FOG_IN = new THREE.Color(0x0c0d11);
@@ -49,6 +50,11 @@ const DIABLO_MOOD: Record<keyof typeof MOOD, readonly [number, number]> = {
   cool: [0.35, 0.15],
   vignette: [0.62, 0.72],
 };
+// Out in the open (orto, gardens, laguna) that night still has to read: more fill and exposure, a
+// brighter moon, a lighter vignette, less crushed shadows and the hero's light up to match. Added to
+// DIABLO_MOOD's outdoor end, scaled by `open`, which fades out by the cloister walks (indoor 0.45):
+// the church and the cloisters keep their dark.
+const DIABLO_OPEN = { hemi: 0.7, moon: 0.9, exposure: 0.35, vignette: -0.25, contrast: -0.1, hero: 0.6 };
 const GRADE = { wow: { sat: 1, contrast: 1, split: 0 }, diablo: { sat: 0.68, contrast: 1.16, split: 0.55 } };
 const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, height: 2.6 }; // the hero's light radius
 const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight from nowhere (the cut-away chandeliers)
@@ -194,7 +200,7 @@ export class Atmosphere {
   private low = new URLSearchParams(location.search).get('fx') === 'low';
   private readonly fog = new THREE.FogExp2(FOG_OUT.getHex(), MOOD.fog[0]);
   private readonly hemi = new THREE.HemisphereLight(0x5a74a0, 0x15130f, MOOD.hemi[0]);
-  private readonly moon = new THREE.DirectionalLight(0xa9c2f0, 2.4);
+  private readonly moon = new THREE.DirectionalLight(0xa9c2f0, MOON);
   private readonly moonOffset = MOON_DIR.clone().multiplyScalar(150);
   private readonly sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), skyMaterial());
   private readonly mist = new THREE.Mesh(new THREE.PlaneGeometry(700, 800).rotateX(-Math.PI / 2), mistMaterial());
@@ -278,16 +284,19 @@ export class Atmosphere {
     // Damp lagoon air: fog thickens from the orto's north edge to the riva.
     const lagoon = THREE.MathUtils.smoothstep(-focus.z, -Z.ortoNorth, -Z.riva);
 
-    const mood = this.mood;
-    this.hemi.intensity = lerp(mood.hemi, k);
+    const mood = this.mood, u = this.grade.uniforms;
+    const open = mood === DIABLO_MOOD ? 1 - Math.min(k / 0.45, 1) : 0;
+    this.hemi.intensity = lerp(mood.hemi, k) + DIABLO_OPEN.hemi * open;
+    this.moon.intensity = MOON + DIABLO_OPEN.moon * open;
     this.fog.density = lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k);
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
-    this.renderer.toneMappingExposure = lerp(mood.exposure, k);
-    this.grade.uniforms.uCool.value = lerp(mood.cool, k);
-    this.grade.uniforms.uVignette.value = lerp(mood.vignette, k);
+    this.renderer.toneMappingExposure = lerp(mood.exposure, k) + DIABLO_OPEN.exposure * open;
+    u.uCool.value = lerp(mood.cool, k);
+    u.uVignette.value = lerp(mood.vignette, k) + DIABLO_OPEN.vignette * open;
+    u.uContrast.value = (mood === DIABLO_MOOD ? GRADE.diablo : GRADE.wow).contrast + DIABLO_OPEN.contrast * open;
     this.dustMat.opacity = lerp(mood.dust, k);
     this.hero.position.set(focus.x, focus.y + HERO_LIGHT.height, focus.z);
-    this.hero.intensity = HERO_LIGHT.intensity * (0.94 + 0.06 * Math.sin(this.t * 7.3) * Math.sin(this.t * 2.9));
+    this.hero.intensity = HERO_LIGHT.intensity * (1 + DIABLO_OPEN.hero * open) * (0.94 + 0.06 * Math.sin(this.t * 7.3) * Math.sin(this.t * 2.9));
     this.dustMat.color.lerpColors(DUST_OUT, DUST_IN, k);
 
     this.sky.position.copy(this.camera.position);
@@ -321,8 +330,7 @@ export class Atmosphere {
     this.mood = diablo ? DIABLO_MOOD : MOOD;
     const g = diablo ? GRADE.diablo : GRADE.wow, u = this.grade.uniforms;
     u.uSat.value = g.sat;
-    u.uContrast.value = g.contrast;
-    u.uSplit.value = g.split;
+    u.uSplit.value = g.split; // uContrast: per frame, with the open air
     this.torches.boost = diablo ? LIGHT_BOOST : {};
     this.torches.brazierFlame = diablo ? 0.55 : 1;
     this.torches.brazierLift = diablo ? 1.8 : 0.5;

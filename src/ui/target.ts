@@ -4,8 +4,11 @@ import { Bar } from './hud.ts';
 /** A targetable mob: brain state from enemies/brain.ts or enemies/caster.ts. */
 export interface Mob { x: number; y: number; z: number; hp: number; state: string }
 
-/** One kind of enemy: display name, full health, model height and the live brains. */
-export interface Kind { name: string; max: number; height: number; all: readonly Mob[]; ready: () => boolean }
+/**
+ * One kind of enemy: display name, full health, model height and the live brains. `ownBar`: true
+ * while a bar of its own shows its name and health (the boss bar), so the target frame stays hidden.
+ */
+export interface Kind { name: string; max: number; height: number; all: readonly Mob[]; ready: () => boolean; ownBar?: () => boolean }
 
 const TAP_PX = 8; // pointer travel below this is a tap, not a camera drag
 const TAP_MS = 350;
@@ -126,7 +129,7 @@ export class Targeting {
     this.player.copy(player);
     if (this.target?.mob.state === 'dead') this.target = undefined;
     const tg = this.target;
-    this.frame.hidden = !tg;
+    this.frame.hidden = !tg || !!tg.kind.ownBar?.();
     this.ring.visible = !!tg;
     if (!tg) return;
     this.t += dt;

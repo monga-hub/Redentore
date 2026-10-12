@@ -78,9 +78,11 @@ com'è e passa alla visuale Diablo quando si prende il controllo.
   (`src/player/diabloControls.ts`). I lanci girano l'eroe verso il bersaglio, altrimenti verso il
   nemico più vicino o il cursore. Le abilità si dispongono a ventaglio in basso a destra anche su desktop.
 - Aspetto: grading gotico più scuro (desaturato, ombre fredde e luci calde, contrasto, vignetta),
-  una luce calda che segue l'eroe, torce più forti; numeri di danno, scintille, sangue a terra che
-  si asciuga e una colonna di luce sui nemici caduti e sul baule della chiave (`src/fx/diabloFx.ts`);
-  HUD in ferro scuro e rosso sangue.
+  una luce calda che segue l'eroe, torce più forti; all'aperto (orto, giardini, laguna) la notte
+  si schiarisce quanto basta a leggere piante, sentieri e nemici, chiesa e chiostri restano bui
+  (`src/fx/atmosphere.ts`); numeri di danno, scintille, sangue a terra che si asciuga e una colonna
+  di luce sui nemici caduti e sul baule della chiave (`src/fx/diabloFx.ts`); HUD in ferro scuro e
+  rosso sangue.
 - Arredo gotico Meshy, solo in questa modalità e caricato la prima volta che la si attiva
   (`src/level/gothic.ts`, `public/models/gotico.glb`): cumuli di teschi, ossa, candelabri,
   bare, lapidi nel chiostro grande e nel cortile degli ulivi, colonne cadute, una gabbia, bracieri

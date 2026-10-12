@@ -60,6 +60,32 @@ con salto e pozione tra i tasti piccoli.
 In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,
 anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
+## Stile Diablo
+
+Nel menu di gioco (anche nella schermata del titolo) l'interruttore **Stile Diablo** passa alla
+visuale e all'aspetto di Diablo Immortal, subito e senza ricaricare; la scelta resta salvata nel
+browser (`src/core/style.ts`). Predefinito: la camera in terza persona stile WoW. L'intro resta
+com'è e passa alla visuale Diablo quando si prende il controllo.
+
+- Camera alta e fissa (`src/camera/diabloCamera.ts`): imbardata a 45° (il complesso si legge in
+  diagonale), inclinazione 58°, obiettivo stretto (33°), eroe piccolo e un po' sotto il centro;
+  rotella o pizzico per lo zoom entro un intervallo, niente orbita.
+- Muri e tetti tra la camera e l'eroe si tagliano nello shader (`src/fx/cutaway.ts`): sotto un
+  tetto tutto quello che sta oltre 3,6 m sopra i piedi sparisce (i muri tagliati hanno il cappello
+  scuro), e un cono dalla camera all'eroe buca quel che resta davanti.
+- Comandi: WASD e stick relativi allo schermo; col mouse clic sul pavimento per andarci (tieni
+  premuto per seguire il cursore), clic su un nemico per raggiungerlo e colpirlo finché cade
+  (`src/player/diabloControls.ts`). I lanci girano l'eroe verso il bersaglio, altrimenti verso il
+  nemico più vicino o il cursore. Le abilità si dispongono a ventaglio in basso a destra anche su desktop.
+- Aspetto: grading gotico più scuro (desaturato, ombre fredde e luci calde, contrasto, vignetta),
+  una luce calda che segue l'eroe, torce più forti; numeri di danno, scintille, sangue a terra che
+  si asciuga e una colonna di luce sui nemici caduti e sul baule della chiave (`src/fx/diabloFx.ts`);
+  HUD in ferro scuro e rosso sangue.
+- Arredo gotico Meshy, solo in questa modalità e caricato la prima volta che la si attiva
+  (`src/level/gothic.ts`, `public/models/gotico.glb`): cumuli di teschi, ossa, candelabri,
+  bare, lapidi nel chiostro grande e nel cortile degli ulivi, colonne cadute, una gabbia, bracieri
+  di ferro chiodato con teschi. Solo visivo: nessun collider, percorribilità invariata.
+
 ## Deploy
 
 Push su `main` → GitHub Actions (`.github/workflows/deploy.yml`) builda e pubblica
@@ -99,6 +125,11 @@ src/
                              lancio sovrapposti al busto
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
   camera/intro.ts            piano sequenza d'apertura (spline Catmull-Rom sulle chiavi, saltabile)
+  camera/diabloCamera.ts     Stile Diablo: camera isometrica fissa; CameraBlend per i cambi di stile
+  core/style.ts              interruttore Stile Diablo (localStorage), `onStyle` per chi ne dipende
+  player/diabloControls.ts   Stile Diablo: clic per muoversi e attaccare, mira dei lanci
+  fx/cutaway.ts              Stile Diablo: taglio di tetti e muri tra camera ed eroe nello shader
+  fx/diabloFx.ts             Stile Diablo: numeri di danno, sangue, colonne di luce
   ui/hud.ts                  nome dell'area corrente
   ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,
                              tooltip, errori, testo di combattimento); ui/icons.ts icone SVG
@@ -129,6 +160,7 @@ src/
   level/props.ts             prop stilizzati low-poly (ulivi, alberi da frutto, cipressi,
                              arbusti, viti, pergole su percorsi, panche, pozzi) in InstancedMesh
   level/dressing.ts          allestimento per zona: vegetazione, portici dell'orto, arredi
+  level/gothic.ts            Stile Diablo: arredo gotico Meshy (teschi, lapidi, bracieri...), solo visivo
   level/materials.ts         materiali stilizzati per ruolo semantico
   level/index.ts             buildLevel(): assembla le zone sud → nord, poi dressLevel()
   level/zones/

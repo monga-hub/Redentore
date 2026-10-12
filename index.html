@@ -285,7 +285,9 @@
       body.diablo .slot.ring.main { box-shadow: 0 0 0 3px #8b8173, 0 0 0 5px #000, 0 0 20px rgba(210,45,20,.5), inset 0 0 14px #000; }
       body.diablo .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.75), inset 0 0 14px rgba(170,30,10,.35);
         background: radial-gradient(circle at 50% 28%, rgba(255,235,210,.14), transparent 58%); }
-      body.diablo .slot .icon { filter: saturate(1.15) contrast(1.08); }
+      body.diablo .slot .icon { filter: sepia(.8) saturate(3) hue-rotate(-42deg) contrast(1.1); } /* Diablo Immortal's ember-red skill art */
+      body.diablo .slot.oom .icon { filter: brightness(.5) sepia(1) hue-rotate(180deg) saturate(2.5); }
+      body.diablo .slot.locked .icon { filter: grayscale(1) brightness(.35); }
       body.diablo .slot.ring.active, body.diablo .slot.ring.casting { border-color: #ff9a3a; box-shadow: 0 0 0 2px #000, 0 0 14px 3px #ff7a2a; }
       body.diablo .slot.ring.special:not(.locked) { border-color: #ff3a1a; box-shadow: 0 0 0 2px #000, 0 0 16px 3px #ff3a1a; }
       body.diablo:not(.touch) .slot .key { top: auto; bottom: 10%; right: 50%; transform: translateX(50%); font-size: 10px; color: #d9ccb4; }

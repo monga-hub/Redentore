@@ -99,8 +99,10 @@ export class Torches {
   readonly root = new THREE.Group();
   /** Light multiplier per kind ("Stile Diablo": torches and braziers brighter, the church's lamps and window glows dimmer). */
   boost: Partial<Record<Emitter['kind'], number>> = {};
-  /** Brazier flame size multiplier: seen from above (Diablo view) the stacked cones would blow out to a white disc. */
+  /** Brazier flame size multiplier, and how far over the bowl its light hangs: seen from above (Diablo view) the
+   * stacked cones and a light just over the wide Meshy bowl would blow out to a white disc. */
   brazierFlame = 1;
+  brazierLift = 0.5;
   /** Brazier flame bases, and the iron that holds them (swapped for a Meshy brazier in the Diablo view). */
   readonly braziers: { x: number; y: number; z: number }[];
   readonly brazierIron: THREE.InstancedMesh[];
@@ -215,7 +217,7 @@ export class Torches {
       const l = this.lights[k], i = this.order[k];
       if (i === undefined) { l.intensity = 0; continue; }
       const e = em[i], w = Math.min(1, Math.max(0, (cut - this.dist[i]) / 4));
-      l.position.set(e.x + e.nx * 0.6, e.y + (e.kind === 'brazier' ? 0.5 : e.kind === 'torch' ? 0.3 : 0), e.z + e.nz * 0.6);
+      l.position.set(e.x + e.nx * 0.6, e.y + (e.kind === 'brazier' ? this.brazierLift : e.kind === 'torch' ? 0.3 : 0), e.z + e.nz * 0.6);
       l.color.setHex(e.color);
       l.intensity = POWER[e.kind] * (e.kind === 'glow' ? 1 : flicker(t, e.phase)) * w * (this.boost[e.kind] ?? 1);
     }

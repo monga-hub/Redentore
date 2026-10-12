@@ -8,7 +8,7 @@ import type { Input } from '../core/input.ts';
 // and the hero are cut away by fx/cutaway.ts rather than pulling the camera in.
 
 export const DIABLO = { yaw: Math.PI / 4, pitch: THREE.MathUtils.degToRad(58), fov: 33 }; // yaw: looking north-west
-const MIN_DIST = 9, MAX_DIST = 24, DIST = 16;
+const MIN_DIST = 9, MAX_DIST = 24, DIST = 18;
 const AIM_UP = 1, AIM_AHEAD = 1.3; // m: aim over the head and a little up-screen, so the hero sits below the centre
 const FOLLOW = 8, FOLLOW_Y = 5; // 1/s: a quick but soft follow; stairs ease in slower
 

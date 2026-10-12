@@ -51,7 +51,7 @@ const DIABLO_MOOD: Record<keyof typeof MOOD, readonly [number, number]> = {
 };
 const GRADE = { wow: { sat: 1, contrast: 1, split: 0 }, diablo: { sat: 0.68, contrast: 1.16, split: 0.55 } };
 const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, height: 2.6 }; // the hero's light radius
-const LIGHT_BOOST = { torch: 1.35, brazier: 0.7, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight from nowhere (the cut-away chandeliers)
+const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight from nowhere (the cut-away chandeliers)
 const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
 
@@ -325,6 +325,7 @@ export class Atmosphere {
     u.uSplit.value = g.split;
     this.torches.boost = diablo ? LIGHT_BOOST : {};
     this.torches.brazierFlame = diablo ? 0.55 : 1;
+    this.torches.brazierLift = diablo ? 1.8 : 0.5;
     if (diablo) this.scene.add(this.hero);
     else this.scene.remove(this.hero);
   }

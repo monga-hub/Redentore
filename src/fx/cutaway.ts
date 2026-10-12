@@ -17,6 +17,7 @@ const ROOF = 3.6, ROOF_R = 30, HOLE = 3.2, FLOOR = 1;
 const OPEN = 1e4; // roof height when nothing is overhead
 const PLANTS = new Set(['hedge', 'foliage', 'olive', 'flower', 'fruit', 'trunk']);
 const CHECK = 0.2; // s between looks overhead
+const AROUND = [[3, 0], [-3, 0], [0, 3], [0, -3]]; // m: where else to look up
 
 const U = {
   uCutOn: { value: 0 },
@@ -82,7 +83,7 @@ export class Cutaway {
   constructor(roots: THREE.Object3D[], blockers: THREE.Object3D[]) {
     this.roots = roots;
     this.blockers = blockers;
-    this.ray.far = 30;
+    this.ray.far = 60; // the dome closes 33 m over the crossing floor
   }
 
   /** Switch the cuts on (Diablo view) or off: back faces become caps or are culled again (programs recompile once). */
@@ -108,8 +109,10 @@ export class Cutaway {
     }
     if ((this.check -= dt) <= 0) {
       this.check = CHECK;
-      this.ray.set(this.head.set(feet.x, feet.y + 1.7, feet.z), this.up);
-      const over = this.ray.intersectObjects(this.blockers, false).some((h) => h.object.visible); // pergolas' invisible camera stops don't count
+      // Overhead straight up, or above three of four points around: the dome's oculus is open right over the boss.
+      let around = 0;
+      for (const [dx, dz] of AROUND) if (this.overhead(feet.x + dx, feet.y, feet.z + dz)) around++;
+      const over = around >= 3 || this.overhead(feet.x, feet.y, feet.z);
       this.roofT = over === this.roofed ? 0 : this.roofT + CHECK;
       if (this.roofT >= (over ? 0.15 : 0.4)) { this.roofed = over; this.roofT = 0; }
     }
@@ -118,6 +121,12 @@ export class Cutaway {
     U.uCutRoof.value = this.roof > 29 ? OPEN : feet.y + this.roof;
     U.uCutEye.value.set(feet.x, feet.y + 1.2, feet.z);
     U.uCutFloor.value = feet.y + FLOOR;
+  }
+
+  /** A visible camera-blocking mesh above (x, feet + 1.7, z)? Pergolas' invisible camera stops don't count. */
+  private overhead(x: number, feet: number, z: number): boolean {
+    this.ray.set(this.head.set(x, feet + 1.7, z), this.up);
+    return this.ray.intersectObjects(this.blockers, false).some((h) => h.object.visible);
   }
 
   private patchAll(): void {

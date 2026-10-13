@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { Overlay, arm, loadModel, stand } from '../core/models.ts';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import type { World } from '../core/physics.ts';
 import { D, T, type DecalStyle, type RibbonStyle, type Style, type Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
@@ -27,6 +28,7 @@ const CLIPS: Record<State, string> = { hoe: 'Hoe', chase: 'Running', swing: 'Att
 const FADE = 0.2;
 const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 }; // corpse sinks into the soil, then hides
+const FAR = 40; // m: hoeing friars farther than this skip their animation, like the priests (priests.ts)
 
 const DIRT = 0x3d2b1c, BLOOD = 0x8dff6a;
 const clod: Style = { life: [0.5, 0.8], size: [0.07, 0.12], color: DIRT, alpha: 0.95, dark: true, tex: T.ember, grav: 9, drag: 1, spin: [2, 6] };
@@ -56,6 +58,7 @@ class View {
   private fill: THREE.Sprite;
   private lastClip = 0;
   private overlay: Overlay;
+  private shadows: Shadows;
   private swings = 0; // which of SWINGS comes next
   private trail = -1; // the hoe's swing trail
   private flinched = 0; // s since the last flinch
@@ -69,6 +72,7 @@ class View {
     this.blade = model.getObjectByName('hoeBlade')!;
     this.held = model.getObjectByName('held')!;
     this.root.add(model);
+    this.shadows = new Shadows(model);
     this.mixer = new THREE.AnimationMixer(model);
     for (const c of new Set([...Object.values(CLIPS), ...SWINGS.map((w) => w.clip), ...DEATHS])) {
       const clip = THREE.AnimationClip.findByName(t.clips, c);
@@ -97,8 +101,8 @@ class View {
     }
   }
 
-  /** Sync with the brain. `vfx` gets dirt puffs on every hoe stroke and the hoe's swing trails. */
-  update(f: Friar, dt: number, vfx: Vfx): void {
+  /** Sync with the brain. `vfx` gets dirt puffs on every hoe stroke and the hoe's swing trails. `d`: m from the hero. */
+  update(f: Friar, dt: number, vfx: Vfx, d: number): void {
     const was = this.state;
     if (f.state !== this.state) this.enter(f.state, this.state);
     if (was === 'hoe' && f.state === 'chase') this.overlay.play(FLINCH.cry.clip, FLINCH.cry.from, FLINCH.cry.stop, 1.4); // pulled: a war cry as it sets off
@@ -130,7 +134,8 @@ class View {
     }
 
     this.overlay.update(dt, f.state === 'swing' || f.state === 'dead');
-    this.mixer.update(dt);
+    if (d < FAR || f.state !== 'hoe') this.mixer.update(dt);
+    this.shadows.update(d);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
     flash(this.mats, this.flash);
 
@@ -199,20 +204,23 @@ function dress(scene: THREE.Group): void {
 
 /**
  * The hoe, upright, 1 unit long: an ash handle, an iron blade at the top set at a right angle.
+ * One mesh coloured per vertex (one draw call per friar, not three).
  * ponytail: built here, as three Meshy attempts never gave a blade across the handle.
  */
 function hoe(): THREE.Group {
-  const wood = new THREE.MeshStandardMaterial({ color: 0x7a5534, roughness: 0.85 });
-  const iron = new THREE.MeshStandardMaterial({ color: 0x5e5a55, roughness: 0.55, metalness: 0.3 }); // no environment map: a real metal would render black
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 1, 6), wood);
-  handle.position.y = 0.5;
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.012, 0.15), iron);
-  blade.position.set(0, 0.97, 0.07); // out from the handle, angled down like a hoe's
-  blade.rotation.x = 0.35;
-  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6), iron);
-  collar.position.y = 0.97;
+  const part = (geo: THREE.BufferGeometry, color: number, m: THREE.Matrix4) => {
+    const g = geo.applyMatrix4(m).toNonIndexed(), c = new THREE.Color(color), n = g.attributes.position.count;
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).map((_, i) => c.toArray()[i % 3]), 3));
+    return g;
+  };
+  const at = (x: number, y: number, z: number, rx = 0) => new THREE.Matrix4().makeRotationX(rx).setPosition(x, y, z);
+  const geo = mergeGeometries([
+    part(new THREE.CylinderGeometry(0.018, 0.022, 1, 6), 0x7a5534, at(0, 0.5, 0)), // ash handle
+    part(new THREE.BoxGeometry(0.16, 0.012, 0.15), 0x5e5a55, at(0, 0.97, 0.07, 0.35)), // blade, out from the handle, angled down like a hoe's
+    part(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6), 0x5e5a55, at(0, 0.97, 0)), // iron collar
+  ]);
   const g = new THREE.Group();
-  g.add(handle, blade, collar);
+  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.15 }))); // no environment map: a real metal would render black
   return g;
 }
 
@@ -244,7 +252,7 @@ export class Friars {
     let dmg = 0;
     for (const f of this.all) dmg += think(f, player, this.world, dt);
     separate(this.all, this.world);
-    this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx));
+    this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, Math.hypot(f.x - player.x, f.z - player.z)));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
 

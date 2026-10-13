@@ -24,7 +24,12 @@ export function stand(scene: THREE.Group, height: number): void {
   scene.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
     o.castShadow = true;
-    o.frustumCulled = false; // skinned: bind-pose bounds don't follow the animation
+    if (!(o instanceof THREE.SkinnedMesh)) return;
+    // Culled (from the view and from the shadow map) on generous bounds of the posed body, kept by
+    // every clone: swings, casts and falls reach past the pose they are taken in.
+    o.skeleton.update();
+    o.computeBoundingSphere();
+    o.boundingSphere!.radius *= 1.6;
   });
 }
 
@@ -102,5 +107,26 @@ export class Overlay {
     const t = (c.t += dt);
     if (cut || t >= c.end) { c.a.stop(); this.cur = undefined; return; }
     c.a.setEffectiveWeight(over(Math.max(0, Math.min(1, t / 0.06, (c.end - t) / c.out))));
+  }
+}
+
+/** m: a mob farther than this from the hero casts no shadow. The moon's shadow box spans ±45 m, but a far body's shadow isn't worth its draw calls. */
+export const SHADOW_FAR = 30;
+
+/** A body's shadow casters, switched on and off together by distance (see SHADOW_FAR). */
+export class Shadows {
+  private meshes: THREE.Object3D[] = [];
+  private on = true;
+
+  constructor(root: THREE.Object3D) {
+    root.traverse((o) => { if (o.castShadow) this.meshes.push(o); });
+  }
+
+  /** `d`: m from the hero. */
+  update(d: number): void {
+    const on = d < SHADOW_FAR;
+    if (on === this.on) return;
+    this.on = on;
+    for (const m of this.meshes) m.castShadow = on;
   }
 }

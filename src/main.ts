@@ -14,8 +14,9 @@ import { PlayerStats } from './player/stats.ts';
 import { Targeting } from './ui/target.ts';
 import { Friars } from './enemies/friars.ts';
 import { Priests } from './enemies/priests.ts';
-import { FRIAR } from './enemies/brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
+import { Bees } from './enemies/bees.ts';
+import { FRIAR, GROUPS } from './enemies/brain.ts';
+import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
 import { CHEST, Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
 import { checkVersion } from './ui/version.ts';
@@ -68,11 +69,15 @@ const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars h
 scene.add(friars.root);
 const priests = new Priests(level.world, kit.vfx, playerStats, level.areas); // undead priests casting in the cloisters
 scene.add(priests.root);
+const bees = new Bees(level.world, kit.vfx, playerStats); // the giant hornet and her workers at the apiary
+scene.add(bees.root);
 const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, [ // click/tap an enemy, Tab for the nearest
   { name: 'Frate non-morto', max: FRIAR.hp, height: 1.75, all: friars.all, ready: () => friars.root.children.length > 0 },
   { name: 'Prete non-morto', max: PRIEST.hp, height: 1.85, all: priests.all.filter((f) => f.kind === PRIEST), ready: () => priests.root.children.length > 0 },
   { name: 'Sacerdote non-morto', max: SACERDOTE.hp, height: 2.5, all: priests.all.filter((f) => f.kind === SACERDOTE), ready: () => priests.root.children.length > 0 },
   { name: 'Il Reverendissimo', max: REVERENDISSIMO.hp, height: 4.6, all: [priests.boss], ready: () => priests.root.children.length > 0, ownBar: () => questView.bossShown },
+  { name: 'Ape gigante', max: APE.hp, height: Bees.HEIGHT.queen, all: [bees.queen], ready: () => bees.root.children.length > 0 },
+  { name: 'Ape operaia', max: APETTA.hp, height: Bees.HEIGHT.worker, all: bees.all.filter((f) => f.kind === APETTA), ready: () => bees.root.children.length > 0 },
 ]);
 const FALLEN = 2.6; // s the hero lies dead before waking
 let dying = 0;
@@ -81,6 +86,7 @@ playerStats.onDeath = () => { // the hero falls; the fight is over at once, the 
   dctl.stop();
   friars.wipe(); // a wipe: whoever was fighting, the boss too, evades home at full health
   priests.wipe();
+  bees.wipe();
   player.model.die();
   dying = FALLEN;
 };
@@ -93,9 +99,9 @@ function wake(): void {
   player.model.revive();
   kit.system.notices.push({ kind: 'error', text: at === SPAWN ? 'Sei caduto. Ti risvegli sulla fondamenta.' : 'Sei caduto. Ti risvegli alla porta del coro.' });
 }
-kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); };
+kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
-const foes = [...friars.all, ...priests.all];
+const foes = [...friars.all, ...priests.all, ...bees.all];
 kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
 const MAIN = kit.system.slots[0]!; // Caduta d'ossa, the swing a click-attack repeats
@@ -103,10 +109,13 @@ dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(0);
 const AIMED = new Set(['fall', 'step', 'plague', 'strike']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
 const occlusion = new Occlusion([level.root, fx.torches.root], level.roofPlans, () => level.pieceId(), [ // walls fade and roofs lift off over the hero, Diablo view
-  [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], // x-ray silhouettes behind what still hides them
+  [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], [bees.root, 0xff3b2e], // x-ray silhouettes behind what still hides them
 ]);
 const head = new THREE.Vector3();
-const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs: foes, time: 0, fog: discovery };
+// Saved games index the mobs: the original friars and every priest first, as before the new friar groups and the bees, which follow.
+const old = GROUPS.flat().length;
+const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all];
+const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery };
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
 if (loaded) {
   deserialize(game, loaded);
@@ -127,6 +136,8 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
   { all: priests.all.filter((f) => f.kind === PRIEST), height: 1.85 },
   { all: priests.all.filter((f) => f.kind === SACERDOTE), height: 2.5 },
   { all: [priests.boss], height: 4.6 },
+  { all: [bees.queen], height: Bees.HEIGHT.queen },
+  { all: bees.all.filter((f) => f.kind === APETTA), height: Bees.HEIGHT.worker },
 ], kit.vfx, cam.camera, CHEST);
 scene.add(dfx.root);
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
@@ -184,7 +195,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { intro, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, targeting, quest, menu, game, discovery, worldMap });
+Object.assign(window, { intro, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -203,6 +214,7 @@ renderer.setAnimationLoop(() => {
       player.update(dt, input, cam.yaw, false); // idle at the spawn: the intro swallows keys and presses
       friars.update(dt, unseen);
       priests.update(dt, unseen);
+      bees.update(dt, unseen);
       questView.peek(eye);
       fx.update(dt, eye);
       fx.render();
@@ -215,7 +227,7 @@ renderer.setAnimationLoop(() => {
       blend.start(cam.camera);
     }
   }
-  if (!warmed && friars.root.children.length && priests.root.children.length && player.model.root.children.length) { warmed = true; warm(); } // everyone loaded
+  if (!warmed && friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length) { warmed = true; warm(); } // everyone loaded
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();
     else menu.toggle();
@@ -231,6 +243,7 @@ renderer.setAnimationLoop(() => {
   player.update(dt, input, diablo ? dcam.yaw : cam.yaw, !diablo && (input.buttons & 2) !== 0, dctl.steer);
   friars.update(dt, player.pos);
   priests.update(dt, player.pos);
+  bees.update(dt, player.pos);
   dfx.update(dt, !quest.key);
   const notice = questView.update(dt, player.pos, pressed, priests.boss);
   if (notice) kit.system.notices.push({ kind: 'info', text: notice });
@@ -238,6 +251,7 @@ renderer.setAnimationLoop(() => {
     quest.win();
     friars.killAll();
     priests.killAll();
+    bees.killAll();
     questView.victory();
     player.model.play('victory', 0.4);
   }

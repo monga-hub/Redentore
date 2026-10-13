@@ -9,7 +9,7 @@ import { introPath } from '../src/camera/intro.ts';
 import { EYE, ThirdPersonCamera } from '../src/camera/thirdPersonCamera.ts';
 import type { Input } from '../src/core/input.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { cloisterPlan, gardenPlan, spawnChurch } from '../src/enemies/caster.ts';
+import { APE, cloisterPlan, gardenPlan, lagoonPlan, spawnApiary, spawnChurch } from '../src/enemies/caster.ts';
 
 const t0 = performance.now();
 let failed = 0;
@@ -38,7 +38,9 @@ const mobs = [
   ...spawnGroups(world).flat().map((f) => mob(f.x, f.z, 1.9)),
   ...cloisterPlan(world, level.areas).flatMap((c) => c.groups.flat()).map(([x, z]) => mob(x, z, 2.7)),
   ...gardenPlan(world, level.areas).flatMap((g) => g.group).map(([x, z]) => mob(x, z, 2.7)),
+  ...lagoonPlan(level.areas).flatMap((g) => g.group).map(([x, z]) => mob(x, z, 2.7)),
   ...church.all.map((p) => mob(p.x, p.z, p === church.boss ? 4.9 : 2.7)),
+  ...spawnApiary(world).all.map((b) => mob(b.x, b.z, b.kind === APE ? 3.8 : 2)), // flying: up to the giant's rise in the swarm
 ];
 
 // Every visible triangle of the level in world space, bucketed on a 4 m grid in plan.

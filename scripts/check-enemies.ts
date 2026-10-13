@@ -3,13 +3,14 @@
 // full health, death for good (no respawn). Then the same for the cloister priests, plus line of sight,
 // spell cooldowns, magic bolts and backpedalling inside their cloister; a sacerdote and two
 // priests in each lagoon garden. Then the church: two sacerdoti with two priests each and the Reverendissimo, magic plus melee, the boss's nova,
-// and everyone dropping dead for good when the boss falls.
+// and everyone dropping dead for good when the boss falls. Last the apiary's giant bee: an elite between a sacerdote and the
+// boss, stinger and poison swarm, no bolts, with her workers.
 import { buildLevel } from '../src/level/index.ts';
 import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
 import { CHOIR_DOOR } from '../src/quest/progress.ts';
-import { FRIAR, GROUPS, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
+import { FRIAR, GROUPS, MORE, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
+import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, spawnApiary, cloisterPlan, fly, gardenPlan, lagoonPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -17,7 +18,8 @@ const fail = (why: string) => { throw new Error(why); };
 {
   const level = buildLevel();
   const orti = level.areas.find((a) => a.label === 'Orti coltivati')!;
-  for (const g of GROUPS) {
+  if (GROUPS.flat().length + MORE.flat().length < 2 * GROUPS.flat().length) fail('want at least twice the original friars in the orti');
+  for (const g of [...GROUPS, ...MORE]) {
     if (g.length < 2 || g.length > 3) fail(`group of ${g.length} friars`);
     for (const [x, z] of g) {
       const at = `friar spot (${x}, ${z})`;
@@ -142,6 +144,24 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
       if (level.world.blocked(x, z, 0, SACERDOTE.radius)) fail(`${at} inside a wall or hedge`);
     }
   }
+}
+
+// Lagoon buildings: groups of 2-4 priests (a sacerdote at most) standing clear inside their room or on the pontile.
+{
+  const level = buildLevel();
+  const plan = lagoonPlan(level.areas);
+  if (plan.some((g) => !g.area)) fail('a lagoon building is missing from the level');
+  for (const { area, group, kinds } of plan) {
+    if (group.length < 2 || group.length > 4) fail(`${area.label}: group of ${group.length}`);
+    if (kinds.filter((k) => k === SACERDOTE).length > 1) fail(`${area.label}: more than one sacerdote`);
+    group.forEach(([x, z], i) => {
+      const at = `lagoon spot (${x}, ${z}) in ${area.label}`, r = kinds[i].radius;
+      if (x < area.x0 + kinds[i].margin - 1e-6 || x > area.x1 - kinds[i].margin + 1e-6 || z < area.z0 + kinds[i].margin - 1e-6 || z > area.z1 - kinds[i].margin + 1e-6) fail(`${at} outside its room`);
+      if (level.world.blocked(x, z, 0, r)) fail(`${at} inside a wall`);
+      if (Math.abs(spawnPriests(level.world, [[[x, z, 0]]], [area])[0][0].y) > 0.05) fail(`${at} not on the floor`);
+    });
+  }
+  console.log(`lagoon ok (${plan.length} groups, ${plan.reduce((n, g) => n + g.group.length, 0)} casters)`);
 }
 
 {
@@ -304,4 +324,51 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   for (let t = 0; t < 600; t += 0.5) { casterThink(sac, pl, fl, 0.5, bolts); think(crowd[1] as Friar, pl, fl, 0.5); }
   if (crowd.some((f) => f.state !== 'dead')) fail('killAll: someone got up again');
   console.log(`church ok (sacerdote ${magic} magic + melee, boss nova ${n.damage})`);
+}
+
+// ---------------------------------------------------------------- the apiary (ape gigante, workers)
+{
+  const level = buildLevel();
+  const { all, queen } = spawnApiary(level.world);
+  const apiario = level.areas.find((a) => a.label === 'Apiario')!;
+  if (queen.kind !== APE || all.filter((f) => f.kind === APETTA).length !== 3) fail('apiary: want the giant bee and three workers');
+  if (new Set(all.map((f) => f.mates)).size !== 1) fail('apiary: the bees are pulled together');
+  if (!(APE.hp > SACERDOTE.hp && APE.hp < REVERENDISSIMO.hp && APE.melee!.damage >= SACERDOTE.melee!.damage * 0.8)) fail('apiary: the giant should sit between a sacerdote and the boss');
+  for (const f of all) {
+    const at = `bee spot (${f.x}, ${f.z})`;
+    if (f.x < apiario.x0 || f.x > apiario.x1 || f.z < apiario.z0 || f.z > apiario.z1) fail(`${at} outside the apiario`);
+    if (level.world.blocked(f.x, f.z, 0, f.kind.radius)) fail(`${at} inside a hive or a tree`);
+    // Off the beaten track: walking the paved paths (zones/orto.ts) never pulls the swarm.
+    const strips = [...PATHS_X.map((px) => [px, px + 3, -149, -87]), ...PATHS_Z.map((pz) => [-37, 4, pz, pz + 3])];
+    const gap = Math.min(...strips.map(([x0, x1, z0, z1]) => Math.hypot(Math.max(x0 - f.x, 0, f.x - x1), Math.max(z0 - f.z, 0, f.z - z1))));
+    if (gap <= f.kind.aggro) fail(`${at}: pulled from a paved path ${gap.toFixed(1)} m off`);
+  }
+
+  // On an open floor: stings in melee and a swarm in reach, never a bolt; it fights on
+  // without line of sight to lose (range 0), leashes home healed, dies for good.
+  const fl = new World();
+  fl.add(0, 0, 100, 100, -1, 0);
+  const [q, w] = spawnPriests(fl, [[[0, 0, 0], [3, 0, 0]]], [{ x0: -40, x1: 40, z0: -40, z1: 40 }], [[APE, APETTA]])[0];
+  const pl: Target = { x: 0, y: 0, z: -(APE.aggro - 1) };
+  const bolts: Bolt[] = [];
+  let sting = 0, swarm = 0, worker = 0, was = q.state;
+  for (let t = 0; t < 30; t += 1 / 60) {
+    const d = casterThink(q, pl, fl, 1 / 60, bolts);
+    if (was === 'nova' && q.state !== 'nova') swarm += d; else sting += d;
+    was = q.state;
+    worker += casterThink(w, pl, fl, 1 / 60, bolts);
+  }
+  if (bolts.length) fail('apiary: a bee cast a bolt');
+  if (!sting || sting % APE.melee!.damage) fail(`apiary: stings landed ${sting}`);
+  if (swarm < APE.nova!.damage) fail(`apiary: the swarm did not land (${swarm})`);
+  if (!worker || worker % APETTA.melee!.damage) fail(`apiary: worker stings ${worker}`);
+  if (q.state === 'evade' || q.state === 'pray') fail(`apiary: the giant gave up the fight (${q.state})`);
+  casterHurt(q, 100);
+  pl.z = APE.leash + 20;
+  for (let t = 0; t < 30; t += 1 / 60) casterThink(q, pl, fl, 1 / 60, bolts);
+  if (q.state !== 'pray' || q.hp !== APE.hp) fail(`apiary: leash left the giant ${q.state} at ${q.hp} hp`);
+  if (!casterHurt(q, APE.hp)) fail('apiary: lethal hit did not kill the giant');
+  for (let t = 0; t < 600; t += 0.5) casterThink(q, pl, fl, 0.5, bolts);
+  if (q.state !== 'dead') fail('apiary: the giant got up again');
+  console.log(`apiary ok (${sting} sting + ${swarm} swarm, workers ${worker})`);
 }

@@ -390,11 +390,6 @@ class XRay {
         s.bind(src.skeleton, src.bindMatrix);
         s.bindMode = src.bindMode;
         t = s;
-        if (!src.frustumCulled) { // stood bodies are never culled (core/models.ts): cull them on generous posed bounds, which pays for the silhouettes many times over
-          src.computeBoundingSphere();
-          src.boundingSphere!.radius *= 1.6; // swings and casts reach past the pose it was taken in
-          src.frustumCulled = true;
-        }
       }
       t.userData.xray = true;
       t.frustumCulled = false;

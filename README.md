@@ -5,9 +5,13 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
 
 - Three.js nel browser, build Vite.
 - Terza persona, controlli WASD.
-- Nemici: frati non-morti che zappano l'orto (solo mischia) e preti non-morti che pregano
-  nei chiostri a gruppi di 3 (1 gruppo nei chiostri piccoli, 2 nel mediano, 3 nel grande) e
-  lanciano dardi d'ombra a distanza, indietreggiando se ti avvicini. In chiesa due sacerdoti
+- Nemici: frati non-morti che zappano l'orto a gruppi di 2-3 (32 in 12 gruppi, solo mischia) e preti
+  non-morti che pregano nei chiostri a gruppi di 3 (1 gruppo nei chiostri piccoli, 2 nel mediano, 3 nel
+  grande) e lanciano dardi d'ombra a distanza, indietreggiando se ti avvicini. Altri gruppi di preti
+  (2-3, con un sacerdote nella cappella e nel frantoio) presidiano gli edifici verso la laguna: pontile,
+  sale espositive, caffè, cappella di meditazione, laboratori, frantoio. All'apiario un'ape gigante
+  (élite tra sacerdote e boss: pungiglione in picchiata e uno sciame velenoso telegrafato a terra da
+  cui scappare) con tre api operaie; fuori dalla portata dei sentieri lastricati. In chiesa due sacerdoti
   (bianco e viola, magia + mischia) con due preti ciascuno — a capo della navata e dietro l'altare —
   e il boss, il Reverendissimo, sotto la cupola (magia, mischia, nova d'ombra da cui scappare).
 - Progressione: il portone della chiesa è sbarrato. Dalla calle si attraversa il convento e l'orto
@@ -25,7 +29,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti e boss + salvataggi + volo dell'intro senza compenetrazioni
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti, boss e api + salvataggi + volo dell'intro senza compenetrazioni
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -124,6 +128,8 @@ src/
                              con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
   core/input.ts              tastiera + mouse
   core/models.ts             modelli Meshy: caricamento GLB, posa in piedi, oggetto nel pugno
+                             (corpi esclusi fuori dal campo visivo su bounding sphere larghe, ombre solo
+                             entro 30 m dall'eroe: `Shadows`)
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
   player/undead.ts           modello del Reietto (Meshy) con la clava d'ossa: idle ansimante con
                              giravolte della clava, guardia dopo il combattimento, passo e corsa a
@@ -154,10 +160,13 @@ src/
   enemies/friars.ts          modello (frate non-morto Meshy con la zappa in pugno), animazioni
                              (tre colpi a turno, reazioni ai colpi, grido all'aggro, morti varie),
                              barra vita; danni al player via `PlayerStats.takeDamage`
-  enemies/caster.ts          IA dei preti caster (anche sacerdoti e Reverendissimo: `CasterKind` con mischia
-                             e nova; spawn della chiesa, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
+  enemies/caster.ts          IA dei preti caster (anche sacerdoti, Reverendissimo e api: `CasterKind` con mischia
+                             e nova; spawn della chiesa, della laguna e dell'apiario, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
                              con cooldown, dardi a ricerca, indietreggiare restando nel
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
+  enemies/bees.ts            ape gigante e operaie: un calabrone Meshy statico animato in codice (volo
+                             librato, ali che battono nel vertex shader, picchiata col pungiglione,
+                             sciame velenoso, sussulto ai colpi, caduta da morta); IA: caster.ts `APE`
   enemies/priests.ts         un corpo Meshy per tipo: prete in tonaca nera e cremisi (bastone col
                              cristallo), sacerdote corazzato viola e oro (mazza alata),
                              Reverendissimo arcivescovo-lich gigante (pastorale); animazioni

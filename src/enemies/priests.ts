@@ -5,14 +5,14 @@ import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type V
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
-import { Overlay, arm, loadModel, stand } from '../core/models.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, lagoonPlan, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
+import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
 
 // The casters, one body per kind, each generated, rigged and animated with Meshy AI (see
 // ATTRIBUTION.md), with a Meshy-made staff in the right fist. Preti non-morti: hooded skeletons
 // in black cassocks and crimson sashes, in threes in the cloisters, throwing homing shadow bolts.
-// Sacerdoti (each leading two priests: two in the church, one in each lagoon garden): armoured
+// Sacerdoti (each leading two priests: two in the church, one in each lagoon garden, the cappella and the frantoio): armoured
 // battle priests in violet and gold with a winged mace. Il Reverendissimo: a giant lich
 // archbishop in white, violet and gold under a rayed mitre, with a crozier. The AI lives in
 // caster.ts. Spells are drawn with the shared effects (abilities/vfx.ts): bolts with a hot core,
@@ -121,6 +121,7 @@ class View {
   private grip: THREE.Quaternion; // its hold in the fist
   private upright = 1; // 0..1, eased: stood upright (prayer, casts, walking) or moved with the fist (melee, falling dead)
   private overlay: Overlay;
+  private shadows: Shadows;
   private glow: THREE.Sprite;
   private shots = Math.floor(Math.random() * 2);
   private swings = Math.floor(Math.random() * 3);
@@ -138,6 +139,7 @@ class View {
     this.held = model.getObjectByName('held')!;
     this.grip = this.held.quaternion.clone();
     this.root.add(model);
+    this.shadows = new Shadows(model);
     this.mixer = new THREE.AnimationMixer(model);
     const L = t.look;
     for (const c of new Set([...Object.values(L.clips), ...Object.values(L.step), ...L.shoots.map((s) => s.clip), ...L.swings.map((s) => s.clip), ...L.deaths])) {
@@ -177,8 +179,8 @@ class View {
     return this.tip.getWorldPosition(v);
   }
 
-  /** Sync with the brain; `far`: the player is too far for anyone to see this priest animate. */
-  update(f: Priest, dt: number, vfx: Vfx, far: boolean): void {
+  /** Sync with the brain; `d`: m from the hero (far off, a praying priest skips its animation). */
+  update(f: Priest, dt: number, vfx: Vfx, d: number): void {
     const from = this.state, L = this.look;
     this.flinched += dt;
     if (f.state !== from) {
@@ -225,7 +227,8 @@ class View {
     }
 
     this.overlay.update(dt, f.state === 'swing' || f.state === 'cast' || f.state === 'nova' || f.state === 'dead');
-    if (!far || f.state !== 'pray') this.mixer.update(dt);
+    if (d < FAR || f.state !== 'pray') this.mixer.update(dt);
+    this.shadows.update(d);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
     flash(this.mats, this.flash);
 
@@ -281,7 +284,7 @@ function dress(scene: THREE.Group, prop: THREE.Group, look: Look): void {
 /** A bolt in flight: its trail and two pooled sprites. */
 interface Flight { trail: number; look: Look; core: THREE.Sprite; halo: THREE.Sprite; spin: number }
 
-/** Every priest in the cloisters, the gardens and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
+/** Every priest in the cloisters, the gardens, the lagoon buildings and the church, the sacerdoti and the boss: brains, models, shadow bolts, combat glue. */
 export class Priests {
   readonly root = new THREE.Group();
   readonly all: Priest[];
@@ -305,11 +308,13 @@ export class Priests {
     const plan = cloisterPlan(world, areas);
     const gardens = gardenPlan(world, areas);
     const church = spawnChurch(world);
+    const lagoon = lagoonPlan(areas);
     this.boss = church.boss;
     this.all = [
       ...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.court))).flat(),
       ...spawnPriests(world, gardens.map((g) => g.group), gardens.map((g) => g.area), gardens.map(() => [SACERDOTE])).flat(),
       ...church.all,
+      ...spawnPriests(world, lagoon.map((g) => g.group), lagoon.map((g) => g.area), lagoon.map((g) => g.kinds)).flat(), // last: saved games keep their indices
     ];
     this.tele = vfx.hold(tele);
     this.teleSigil = vfx.hold(teleSigil);
@@ -363,7 +368,7 @@ export class Priests {
     for (const b of this.spent) this.land(b, b.hit);
     this.drawBolts(dt);
     this.drawTelegraph(dt);
-    this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, f.state === 'pray' && Math.hypot(f.x - player.x, f.z - player.z) > FAR));
+    this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, Math.hypot(f.x - player.x, f.z - player.z)));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
 

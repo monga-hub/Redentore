@@ -53,8 +53,22 @@ export const GROUPS: [number, number, number][][] = [
   [[-28.5, -101.5, W], [-28.5, -96, -W], [-32, -99, Math.PI]],
   [[-15, -104.3, 0], [-12, -104.3, Math.PI], [-13.5, -93.7, 0]],
 ];
+/**
+ * More working groups, on the walks left free and along the blocks' outer edges (x -35.5 by the
+ * pergola, x -21.75 by the paved path, z -138.6 and -88.5 at the orti's ends). Kept apart from
+ * GROUPS so saved games keep their indices (main.ts lists these after every priest).
+ */
+export const MORE: [number, number, number][][] = [
+  [[-25, -132, 0], [-21.75, -135, W], [-24, -138.6, Math.PI]],
+  [[-35.5, -129, -W], [-35.5, -135.5, -W]],
+  [[-15, -138.6, Math.PI], [-11.5, -138.6, Math.PI]],
+  [[-35.5, -119, -W], [-35.5, -115.5, -W], [-21.75, -117.5, W]],
+  [[-33, -104.3, 0], [-25, -104.3, Math.PI], [-21.75, -101.5, W]],
+  [[-33, -93.7, 0], [-25, -93.7, 0], [-30, -88.5, 0]],
+  [[-15.5, -99, 0], [-11.5, -99, Math.PI], [-10.5, -93.7, 0]],
+];
 
-export function spawnGroups(world: World, groups = GROUPS): Friar[][] {
+export function spawnGroups(world: World, groups = [...GROUPS, ...MORE]): Friar[][] {
   return groups.map((g) => {
     const mates: Friar[] = [];
     for (const [x, z, yaw] of g) {

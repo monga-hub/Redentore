@@ -68,6 +68,42 @@ export const REVERENDISSIMO: CasterKind = {
   nova: { every: 15, cast: 2.6, radius: 6, damage: 160 },
 };
 /**
+ * L'ape gigante: a giant hornet guarding the apiary, an elite between a sacerdote and the boss.
+ * The caster brain without bolts (`range` 0: it never casts, so it never loses sight either):
+ * a stinger dive in melee and, every `nova.every` s of fighting, a poison swarm round itself to
+ * run out of. It flies, but its brain walks the ground like everyone else (bees.ts lifts the body).
+ * Against the player's 1280 hp: ~25 dps from the stinger if the swarm is dodged, about 40 s to kill.
+ */
+export const APE: CasterKind = {
+  ...PRIEST,
+  hp: 550,
+  aggro: 6, leash: 30, blind: Infinity, // off the paved paths' reach: the player steps into the frutteto to pull it
+  range: 0, keep: 0,
+  speed: 4.4, walk: 6,
+  radius: 0.9, margin: 1,
+  melee: { reach: 1.3, hit: 2.6, windup: 0.75, swing: 1.4, cooldown: 2.2, damage: 55 },
+  nova: { every: 9, cast: 1.8, radius: 4.5, damage: 90 },
+};
+/** Worker bees round the hives, pulled with the giant: quick, frail, small stings. */
+export const APETTA: CasterKind = {
+  ...APE,
+  hp: 30,
+  aggro: 5,
+  speed: 5.2, walk: 7,
+  radius: 0.35, margin: 0.5,
+  melee: { reach: 0.7, hit: 1.6, windup: 0.35, swing: 0.8, cooldown: 1.8, damage: 8 },
+  nova: undefined,
+};
+/** The apiary (zones/orto.ts, hives at z -130): the giant and her workers on the hives' north side, away from the paved paths. */
+export const APIARY = { x: 0.5, z: -132.6 };
+/** Where the bees may fly: the whole orto, the frutteto and the uliveto, so a player on the paths can't hit them from outside. */
+export const APIARY_BOUNDS = { x0: -36, x1: 18.5, z0: -150.5, z1: -87 };
+export function spawnApiary(world: World): { all: Priest[]; queen: Priest } {
+  const all = spawnPriests(world, [[[APIARY.x, APIARY.z, Math.PI], [-0.4, -131.2, Math.PI], [2.3, -131.4, Math.PI], [3.4, -132.5, Math.PI]]], [APIARY_BOUNDS], [[APE, APETTA, APETTA, APETTA]])[0];
+  return { all, queen: all[0] };
+}
+
+/**
  * s: an evade that hasn't reached home by now is pinned on a well, bench or tree in its
  * straight-line path (mobs don't pathfind) and warps home, WoW-style. The longest honest walk home,
  * across the chiostro grande at `walk`, takes ~8 s.
@@ -176,6 +212,28 @@ export function gardenPlan<A extends Bounds & { label: string }>(world: World, a
     const area = areas.find((a) => a.label === label)!;
     return { area, group: cloisterSpots(world, area, 1)[0] };
   });
+}
+
+/**
+ * Guards of the buildings by the lagoon (zones/nord.ts): priests on the pontile by the key's
+ * chest, in the sale espositive and the caffè, round the altar of the cappella with a sacerdote,
+ * in the laboratori and by the frantoio's press with a sacerdote. Each keeps to its room (the
+ * pontile), off the line between its doors, facing `at` (the room's middle, the altar, the press). [x, z, sacerdote?]
+ */
+export const LAGOON: { label: string; at: [number, number]; group: [number, number, boolean?][] }[] = [
+  { label: 'Pontile', at: [-35, -190], group: [[-37.2, -191.5], [-37.2, -188.5]] },
+  { label: 'Sale espositive (antiche officine)', at: [-34.5, -156], group: [[-37.5, -159], [-37.5, -153], [-31.5, -159]] },
+  { label: 'Caffè', at: [-26, -156], group: [[-28.3, -158.8], [-23.7, -158.8]] },
+  { label: 'Cappella di meditazione', at: [-45, -156], group: [[-42.5, -156, true], [-45, -153], [-45, -159]] },
+  { label: 'Laboratori', at: [-2, -156], group: [[-6, -158.5], [-6, -153.5], [2.5, -158.5]] },
+  { label: 'Frantoio e sala di smielatura', at: [11, -156], group: [[14.5, -156, true], [16.5, -158.5], [16.5, -153.5]] },
+];
+export function lagoonPlan<A extends Bounds & { label: string }>(areas: A[]): { area: A; group: [number, number, number][]; kinds: CasterKind[] }[] {
+  return LAGOON.map(({ label, at: [cx, cz], group }) => ({
+    area: areas.find((a) => a.label === label)!,
+    group: group.map(([x, z]) => [x, z, Math.atan2(x - cx, z - cz)]),
+    kinds: group.map(([, , sac]) => (sac ? SACERDOTE : PRIEST)),
+  }));
 }
 
 /** Groups of casters; `kinds[i][k]` (default PRIEST) is the k-th member of group i. */

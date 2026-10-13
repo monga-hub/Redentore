@@ -77,10 +77,10 @@ export class LevelBuilder {
   /** Candles, lamps and window glows placed by the zones; fx/torches.ts lights them. */
   readonly lights: LightSpot[] = [];
   /**
-   * Plan [x0, x1, z0, z1] of the roofs whose eaves overhang their walls, by occlusion piece: the
-   * Diablo view lifts a roof off only while the hero stands inside it (fx/occlusion.ts).
+   * Upright solid boxes at least a metre tall, by occlusion piece: [piece, unit cube -> world box, role].
+   * The Diablo view caps them with a coping where it lowers a wall (fx/occlusion.ts).
    */
-  readonly roofPlans = new Map<number, [number, number, number, number]>();
+  readonly solids: [number, THREE.Matrix4, Role][] = [];
   private piece = 0; // occlusion piece open in together(), 0 = none
   private pieces = 0;
   private current!: THREE.Group;
@@ -129,7 +129,10 @@ export class LevelBuilder {
     mesh.updateMatrixWorld();
     this.add(mesh, role);
     if (collide) this.world.add(cx, cz, w / 2, d / 2, y0, y1, rot);
-    if (o.camera ?? (collide && visible)) this.cameraBlockers.push(mesh);
+    if (o.camera ?? (collide && visible)) {
+      this.cameraBlockers.push(mesh);
+      if (visible) this.solid(mesh.userData.piece, mesh.matrixWorld.clone().scale(new THREE.Vector3(w, h, d)), role);
+    }
     return mesh;
   }
 
@@ -206,7 +209,7 @@ export class LevelBuilder {
   }
 
   /**
-   * Builds what `f` adds as one occlusion piece, which fades or lifts off as a whole in the Diablo
+   * Builds what `f` adds as one occlusion piece, which drops or fades out as a whole in the Diablo
    * view (fx/occlusion.ts): a wall run with its trims and arches, an arcade side, a building.
    * Outside it every mesh and every decor() call is a piece of its own. Nested calls join the open one.
    */
@@ -225,20 +228,29 @@ export class LevelBuilder {
     return this.piece || ++this.pieces;
   }
 
-  /** Visual-only geometry (world space), merged per zone and role by flush(). `cam` = blocks the follow camera. */
-  decor(g: THREE.BufferGeometry, role: Role, cam = false): void {
-    g.setAttribute('aPiece', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(this.pieceId()), 1)); // merged, still fades piece by piece
+  /** Visual-only geometry (world space), merged per zone and role by flush(). `cam` = blocks the follow camera. Returns its piece. */
+  decor(g: THREE.BufferGeometry, role: Role, cam = false): number {
+    const piece = this.pieceId();
+    g.setAttribute('aPiece', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(piece), 1)); // merged, still fades piece by piece
     const key = `${this.zoneId}|${role}|${cam}`;
     let d = this.decorBatches.get(key);
     if (!d) this.decorBatches.set(key, (d = { zone: this.current, role, cam, geos: [] }));
     d.geos.push(g);
+    return piece;
   }
 
   /** Visual-only chamfered box by extents in frame `m` (null = world), batched through decor(). */
   part(m: THREE.Matrix4 | null, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, role: Role, cam = false): void {
     const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
     const g = chamferBox(w, h, d, Math.min(0.06, 0.25 * Math.min(w, h, d))).clone().translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-    this.decor(m ? g.applyMatrix4(m) : g, role, cam);
+    const piece = this.decor(m ? g.applyMatrix4(m) : g, role, cam);
+    this.solid(piece, (m?.clone() ?? new THREE.Matrix4()).multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)).scale(new THREE.Vector3(w, h, d)), role);
+  }
+
+  /** Notes an upright box (unit cube -> world) a metre or more tall for the Diablo view's copings. */
+  private solid(piece: number, m: THREE.Matrix4, role: Role): void {
+    const e = m.elements; // column 1 is the box's height: vertical, or the box is not upright
+    if (e[5] >= 1 && Math.abs(e[4]) + Math.abs(e[6]) < 1e-3) this.solids.push([piece, m, role]);
   }
 
   /** Merges every decor() batch into one mesh per zone and role. Call once, after building. */
@@ -327,11 +339,8 @@ export class LevelBuilder {
       });
 
       // Roof: wall plate, rafters (jack rafters and a valley beam at the corners), boards and
-      // the coppi slab; plan = trapezoid mitred along the corner diagonals. One piece per side,
-      // lifted off while the hero walks under it: the walk, corners included.
+      // the coppi slab. One piece per side, hidden while it covers the hero's surroundings.
       this.together((piece) => {
-        const a = new THREE.Vector3(tw, 0, tw).applyMatrix4(m), c = new THREE.Vector3(L - tw, 0, 0).applyMatrix4(m);
-        this.roofPlans.set(piece, [Math.min(a.x, c.x), Math.max(a.x, c.x), Math.min(a.z, c.z), Math.max(a.z, c.z)]);
         put(-e, L + e, h, yr, -0.14, 0.14, 'wood');
         put(tw, L - tw, y(tw) - 0.22, y(tw), tw, tw + 0.2, 'wood'); // ledger on the wall
         for (let s = tw + 0.4; s < L - tw - 0.3; s += 0.8) {
@@ -398,7 +407,7 @@ export class LevelBuilder {
 
   /** Closed building volume: box, then zoccolo, marcapiano, eaves cornice and a hipped coppi roof. */
   block(x0: number, x1: number, z0: number, z1: number, h: number, role: Role = 'mass'): void {
-    this.together(() => { // one piece: fades as a whole building
+    this.together(() => { // one piece: drops as a whole building
       this.box(x0, x1, 0, h, z0, z1, role);
       this.band(x0, x1, z0, z1, 0, 0.6, 0.08);
       this.band(x0, x1, z0, z1, h * 0.5, h * 0.5 + 0.22, 0.1);
@@ -417,10 +426,7 @@ export class LevelBuilder {
 
   /** Hipped roof over a rectangle, eaves at y overhanging by `ov`, pitch k (rise per run). Visual only. */
   hipRoof(x0: number, x1: number, z0: number, z1: number, y: number, ov = 0.7, k = 0.45): void {
-    this.together((piece) => {
-      this.roofPlans.set(piece, [x0, x1, z0, z1]); // walking along the walls outside, under the eaves, is not inside
-      this.decor(hip(x0 - ov, x1 + ov, z0 - ov, z1 + ov, y, k), 'roof');
-    });
+    this.decor(hip(x0 - ov, x1 + ov, z0 - ov, z1 + ov, y, k), 'roof'); // its own piece, or the block's
   }
 
   /** Cylinder with a square collider of matching footprint. */

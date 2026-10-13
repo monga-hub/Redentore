@@ -108,7 +108,7 @@ const MAIN = kit.system.slots[0]!; // Caduta d'ossa, the swing a click-attack re
 dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(0);
 const AIMED = new Set(['fall', 'step', 'plague', 'strike']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
-const occlusion = new Occlusion([level.root, fx.torches.root], level.roofPlans, () => level.pieceId(), [ // walls fade and roofs lift off over the hero, Diablo view
+const occlusion = new Occlusion([level.root, fx.torches.root], level, [ // walls drop, roofs and props in the way fade out, Diablo view
   [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], [bees.root, 0xff3b2e], // x-ray silhouettes behind what still hides them
 ]);
 const head = new THREE.Vector3();

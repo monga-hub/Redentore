@@ -74,11 +74,17 @@ com'è e passa alla visuale Diablo quando si prende il controllo.
 - Camera alta e fissa (`src/camera/diabloCamera.ts`): imbardata a 45° (il complesso si legge in
   diagonale), inclinazione 58°, obiettivo stretto (33°), eroe piccolo e un po' sotto il centro;
   rotella o pizzico per lo zoom entro un intervallo, niente orbita.
-- Muri e tetti tra la camera e l'eroe (`src/fx/occlusion.ts`), come in Diablo Immortal: quel che
-  copre l'eroe sfuma intero a un fantasma trasparente (un muro con cornici e archi, un lato di
-  chiostro, un edificio, un albero), il tetto sotto cui si trova si solleva intero, e l'eroe e i
-  nemici ancora coperti si vedono in sagoma luminosa (x-ray). Niente buchi nei modelli: i pezzi
-  (`LevelBuilder.together`) sfumano con l'alpha-to-coverage dell'MSAA, senza draw call in più.
+- Muri e tetti tra la camera e l'eroe (`src/fx/occlusion.ts`), come in Diablo Immortal: niente
+  veli trasparenti. I muri dal lato della camera che coprono il pavimento attorno all'eroe (fino ai
+  muri della stanza in cui si trova) scendono in un quarto di secondo a un moncone di un metro
+  chiuso da una copertina di pietra (un muro con cornici e archi, un lato di chiostro, un edificio,
+  che sopra ha il colore dei suoi muri); quelli dal lato opposto restano interi. I tetti che coprono
+  quel pavimento, e quel che poggia o pende da un muro abbassato, svaniscono del tutto; alberi,
+  pergole e colonne tra la camera e l'eroe pure. Isteresi su distanza e lato, così camminare lungo
+  un muro non lo fa lampeggiare. L'eroe e i nemici ancora coperti si vedono in sagoma luminosa
+  (x-ray). I pezzi (`LevelBuilder.together`) scendono o sfumano senza draw call in più: una texture
+  di altezze di taglio e dissolvenze per pezzo; le copertine sono una draw call per colore, solo
+  mentre un muro è giù, e quel che è svanito del tutto non si disegna (ma fa ancora ombra).
 - Comandi: WASD e stick relativi allo schermo; col mouse clic sul pavimento per andarci (tieni
   premuto per seguire il cursore), clic su un nemico per raggiungerlo e colpirlo finché cade
   (`src/player/diabloControls.ts`). I lanci girano l'eroe verso il bersaglio, altrimenti verso il
@@ -140,7 +146,7 @@ src/
   camera/diabloCamera.ts     Stile Diablo: camera isometrica fissa; CameraBlend per i cambi di stile
   core/style.ts              interruttore Stile Diablo (localStorage), `onStyle` per chi ne dipende
   player/diabloControls.ts   Stile Diablo: clic per muoversi e attaccare, mira dei lanci
-  fx/occlusion.ts            Stile Diablo: muri in dissolvenza, tetti sollevati, sagome x-ray
+  fx/occlusion.ts            Stile Diablo: muri abbassati, tetti e prop svaniti, sagome x-ray
   fx/diabloFx.ts             Stile Diablo: numeri di danno, sangue, colonne di luce
   ui/hud.ts                  nome dell'area corrente
   ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,

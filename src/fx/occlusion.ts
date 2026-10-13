@@ -1,46 +1,71 @@
 import * as THREE from 'three';
+import { material, type Role } from '../level/materials.ts';
+import type { LevelBuilder } from '../level/builder.ts';
+import type { Box } from '../core/physics.ts';
 
-// Diablo view, after Diablo Immortal: whatever stands between the high camera and the hero fades,
-// whole, to a ghost of itself, and the roofs over the hero lift off, so the camera never has to
-// dive in and nothing is ever sliced.
+// Diablo view, after Diablo Immortal: nothing between the high camera and the floor around the hero
+// is ever see-through. Walls on the camera's side drop to a low stub capped with a stone coping,
+// roofs and tall props in the way fade out whole, and whoever is still hidden shows as an x-ray
+// silhouette. The camera never has to dive in and nothing is ever veiled or sliced open.
 //  - Pieces: the level is tagged in pieces (LevelBuilder.together: a wall run with its trims and
 //    arches, an arcade side, a roof, a building; any other mesh, decor batch member or prop
 //    instance is a piece of its own). Here a small piece standing on a big one (a pilaster, an
-//    entablature, a torch on its wall) joins it, so they always fade together.
-//  - Each frame a piece the sight lines to the hero cross eases to GHOST; a roof the hero stands
-//    under, and whatever hangs from it, eases to nothing.
-//  - Every mesh reads its piece's fade from a small texture by a per-vertex (merged batches) or
-//    per-instance id, so pieces of one batch fade apart without a single extra draw call. Solid
-//    materials turn the fade into MSAA coverage (alpha to coverage): see-through in the opaque
-//    pass, without sorting, holes or z-fighting. The shadow map is untouched: a lifted roof still
-//    shades the room under it.
+//    entablature, a torch on its wall) joins it, so they always go together.
+//  - Each frame: a wall at least TALL with a solid box in it (LevelBuilder.solids), on the camera's
+//    side of the hero, whose run hides any floor within REACH of him (up to the walls of where he
+//    stands) eases down to STUB over the floor; a roof (all above the head) hiding any of that floor
+//    fades out, and so does whatever rests on or hangs from a lowered wall; a tree, pergola, column
+//    or prop crossing the sight lines to the hero fades out. Hysteresis on reach and side, and a
+//    short hold, so walking along a wall never flickers.
+//  - Every mesh reads its piece's fade and cut height from a small texture by a per-vertex
+//    (merged batches) or per-instance id, so pieces of one batch go apart without a single extra
+//    draw call. The cut is a discard over that height; instanced slabs (a stone coping per upright
+//    box the cut crosses, a top in the wall colour on a building) close the stubs, one draw per
+//    colour while any wall is down. Fades of solid materials are MSAA coverage (alpha to coverage),
+//    so they need no sorting; a mesh faded out whole leaves the view's layer, not the shadow map's:
+//    a hidden roof still shades its room.
 //  - The hero and the enemies show through whatever still hides them as an x-ray silhouette, drawn
 //    where the level is in front of them, before they are drawn themselves.
-// In the WoW view everything reads fully opaque and the silhouettes are off.
+// In the WoW view everything reads whole and opaque and the silhouettes are off.
 
-const GHOST = 0.22; // opacity of a piece in the way
-const CLOSE = 6; // m: in the way this near the eye, a ghost would only veil the view (and cost a second layer of shading): gone
+const STUB = 1; // m over the floor: a lowered wall, knee to waist
+const COPING = 0.1, LIP = 0.04; // m: the slab capping a stub, and its overhang
+const RIM = 0.3; // m: over a stub this much wider (a building), the top is its own wall colour inside a stone rim
 const HEAD = 2.1; // m over the feet: a roof is all above this
-const LOW = 1.2; // m over the feet: a piece lower than this never hides the hero from the high camera
-const WIDE = new THREE.Vector3(0.25, 0, 0.25); // m: sight lines are this much thicker than lines
-const IN = 0.25, OUT = 0.35; // m: under a roof once this far inside its plan, out again this far outside it
-const HANG = 0.6; // m: what starts this little under a lifted roof (ribs, coffers, lanterns) goes with it
-const HOLD = 0.3; // s a piece stays faded once the sight lines leave it
-const RATE = { down: 4.5, up: 2.8 }; // fade per s
+const ROOF = 2; // m: a roof is at least this wide both ways (a window band or a lantern is not)
+const LOW = 1.2; // m over the feet: a piece lower than this never hides anyone
+const TALL = 3.2; // m: walls drop from this tall; garden walls, podiums and landings never do
+const REACH = 4.5, GIVE = 1; // m around the hero whose floor stays in view; let go this much further out
+const SIDE = { on: 0.2, off: -1.2 }; // m towards the eye: a wall on the camera's side of the hero
+const WIDE = new THREE.Vector3(0.25, 0, 0.25); // m: sight lines to the hero are this much thicker than lines
+const HOLD = 0.3; // s a piece stays down once out of the way
+const RATE = { down: 4, up: 3.3 }; // per s: down in a quarter second, back in a third
 const HOST = 2.5, JOIN = 0.8; // m: an upright piece this tall and long hosts the smaller ones within this of it
-const ROOF = 2; // m: a roof is at least this wide both ways (a chandelier is not)
 const SCAN = 1; // s between looks for models streamed in
 const ROW = 256; // fade texture width
+const FAR = 1e6; // cut height of a whole piece
+const DEEP = -10, CM = 100; // the texture keeps a cut height as centimetres over DEEP in 16 bits (all ones: no cut)
+const GONE = 1; // layer of a mesh faded out whole: the shadow cameras still draw it (a hidden roof still shades its room), the view does not
+const UNIT = new THREE.Box3(new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, 0.5, 0.5));
 const PLANTS = new Set(['hedge', 'foliage', 'olive', 'flower', 'fruit', 'trunk', 'grass']);
+
+interface Solid {
+  m: THREE.Matrix4; // unit cube -> world
+  box: THREE.Box3;
+  role?: Role; // the colour of its top when lowered, if wide enough to show one
+}
 
 interface Group {
   box: THREE.Box3; // all its pieces
   wide: THREE.Box3; // the box a little wider, so a post or a trunk between two sight lines still counts
-  plan?: readonly [number, number, number, number]; // a roof with eaves: inside = within its walls
   pieces: number[];
-  fade: number;
+  solids: Solid[]; // its upright boxes: a wall hides what they hide (a roof's eaves over it do not count), a cut through one needs a coping
+  on: boolean;
   seen: number; // s left in the way
-  under: boolean;
+  k: number; // 0 whole .. 1 lowered or gone
+  floor: number; // a wall's stub top, this frame
+  fade: number; // as drawn
+  cut: number;
 }
 
 type Tagged = THREE.Mesh & { userData: { occ?: THREE.BufferGeometry; piece?: number; pieces?: number[]; role?: string } };
@@ -50,23 +75,33 @@ const U = { uPieceFade: { value: null as THREE.DataTexture | null } };
 const VERT = /* glsl */ `#include <fog_vertex>
 {
   int p = int(aPiece + 0.5);
-  vOcc = texelFetch(uPieceFade, ivec2(p % ${ROW}, p / ${ROW}), 0).r;
+  vec4 o = texelFetch(uPieceFade, ivec2(p % ${ROW}, p / ${ROW}), 0);
+  // A piece is either faded (its fade) or cut (whole below the cut height, gone a millimetre over it):
+  // one varying, so the fragment shader stays as light as without cuts. The view is rigid, so the
+  // world height comes from the view position.
+#ifdef USE_INSTANCING
+  vOcc = o.r; // props and coppi: never cut, only faded
+#else
+  float cut = o.g * 65280.0 + o.b * 255.0;
+  vOcc = cut < 65534.5 ? 1.0 + 1000.0 * (cut / ${CM}.0 + ${DEEP}.0 - dot(viewMatrix[1].xyz, mvPosition.xyz - viewMatrix[3].xyz)) : o.r;
+#endif
 }`;
 
 const FRAG_DECL = /* glsl */ `varying float vOcc;
 float occNoise() { return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))); }
 `;
 
-// Solid materials: the fade is the MSAA coverage. Cut-outs: a screen-door on a fixed noise (no time
-// in it: nothing crawls). Glass: a plain alpha.
+// Solid materials: the fade is the MSAA coverage, and it darkens too, so it reads as going into
+// shadow rather than as a veil; under a cut vOcc is over 1: whole (coverage saturates). Cut-outs: a
+// screen-door on a fixed noise (no time in it: nothing crawls). Glass and flames: a plain alpha.
 const FRAG_END = /* glsl */ `#include <dithering_fragment>
 #if defined(OCC_SOLID)
-gl_FragColor.rgb *= vOcc; // a ghost is a shade, not a lit veil over the room
+gl_FragColor.rgb *= min(vOcc, 1.0);
 gl_FragColor.a = vOcc;
 #elif defined(OCC_CUT)
 if (vOcc < 0.995 && occNoise() > vOcc) discard;
 #else
-gl_FragColor.a *= vOcc;
+gl_FragColor.a *= min(vOcc, 1.0);
 #endif`;
 
 // Shadow pass for alpha-to-coverage materials: three would otherwise alpha-test their triplanar
@@ -84,49 +119,83 @@ export class Occlusion {
   private on = false;
   private scan = 0;
   private readonly roots: THREE.Object3D[];
-  private readonly plans: ReadonlyMap<number, readonly [number, number, number, number]>;
+  private readonly walls: Box[]; // colliders that bound the floor in view: two metres tall or more
+  private readonly area = { x: NaN, z: NaN, y: NaN, w: 0, e: 0, n: 0, s: 0 }; // free floor around the hero, m each way
+  private readonly solids = new Map<number, Solid[]>(); // piece -> its upright boxes
   private readonly fresh: () => number;
   private readonly boxes = new Map<number, THREE.Box3>(); // piece -> world bounds
   private groups: Group[] = [];
-  private byPiece = new Map<number, Group>();
+  private readonly meshes = new Map<THREE.Mesh, { pieces: number[]; gone: boolean }>(); // every tagged mesh: its pieces
   private dirty = false; // pieces added since the groups were built
   private tex!: THREE.DataTexture;
+  private readonly caps: THREE.InstancedMesh;
+  private readonly tops = new Map<Role, THREE.InstancedMesh>(); // a lowered building's top, by wall role
   private readonly xray: XRay;
   private readonly ray = new THREE.Ray();
+  private readonly sweep = new THREE.Ray(); // from the hero's middle to the eye
   private readonly eye = new THREE.Vector3();
+  private readonly mid = new THREE.Vector3();
   private readonly sight = new THREE.Box3(); // around all the sight lines
   private readonly to: THREE.Vector3[] = Array.from({ length: 5 }, () => new THREE.Vector3());
   private readonly hit = new THREE.Vector3();
   private readonly right = new THREE.Vector3();
   private readonly toEye = new THREE.Vector3();
-  private readonly under: Group[] = [];
+  private readonly near = new THREE.Box3();
+  private readonly lowered: Group[] = [];
   private readonly one: THREE.Vector3[] = [];
   private readonly frustum = new THREE.Frustum();
   private readonly vp = new THREE.Matrix4();
 
   /**
-   * `roots`: what may fade (the level, torches). `plans`/`fresh`: the builder's roof plans and
-   * piece counter. `bodies`: [root, colour] of the characters that show through as silhouettes.
+   * `roots`: what may fade (the level, torches); the copings go in the first. `level`: its upright
+   * boxes, colliders and piece counter. `bodies`: [root, colour] of the characters that show through
+   * as silhouettes.
    */
-  constructor(roots: THREE.Object3D[], plans: ReadonlyMap<number, readonly [number, number, number, number]>, fresh: () => number, bodies: [THREE.Object3D, number][]) {
+  constructor(roots: THREE.Object3D[], level: Pick<LevelBuilder, 'solids' | 'world' | 'pieceId'>, bodies: [THREE.Object3D, number][]) {
     this.roots = roots;
-    this.plans = plans;
-    this.fresh = fresh;
+    const solids = level.solids, wide = new Map<Role, number>();
+    for (const [p, m, role] of solids) {
+      let l = this.solids.get(p);
+      if (!l) this.solids.set(p, (l = []));
+      const box = UNIT.clone().applyMatrix4(m), e = m.elements;
+      const top = Math.min(Math.hypot(e[0], e[2]), Math.hypot(e[8], e[10])) > 2 * RIM + 0.5 && e[5] >= TALL && !role.startsWith('stone');
+      l.push({ m, box, role: top ? role : undefined });
+      if (top) wide.set(role, (wide.get(role) ?? 0) + 1);
+    }
+    this.walls = level.world.boxes.filter((b) => b.y1 - b.y0 >= 2);
+    this.fresh = () => level.pieceId();
     this.xray = new XRay(bodies);
     this.texture(1);
+    const make = (role: Role, n: number) => {
+      const im = new THREE.InstancedMesh(SLAB, material(role), n);
+      im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      im.userData.occ = im.geometry; // never tagged: piece 0, whole
+      im.frustumCulled = false;
+      im.receiveShadow = false; // inside the wall's own shadow: lit as the top of a parapet
+      im.count = 0;
+      im.visible = false;
+      roots[0].add(im);
+      return im;
+    };
+    this.caps = make('stoneDark', solids.length);
+    for (const [role, n] of wide) this.tops.set(role, make(role, n));
   }
 
-  /** Diablo view on or off: fades and silhouettes; off, every piece reads opaque again. */
+  /** Diablo view on or off: lowered walls, fades and silhouettes; off, every piece reads whole again. */
   set enabled(on: boolean) {
     if (on === this.on) return;
     this.on = on;
-    this.scan = 0;
     this.xray.enabled = on;
     this.xray.update(this.frustum, () => false);
-    if (on) return;
-    for (const g of this.groups) { g.fade = 1; g.seen = 0; g.under = false; }
-    this.tex.image.data!.fill(255);
-    this.tex.needsUpdate = true;
+    if (on) { // patch the level now, so a warm-up right after compiles the programs drawn
+      this.look();
+      this.scan = SCAN;
+      return;
+    }
+    for (const g of this.groups) Object.assign(g, { on: false, seen: 0, k: 0, fade: 1, cut: FAR });
+    this.clear();
+    this.cull();
+    for (const im of [this.caps, ...this.tops.values()]) im.visible = false;
   }
 
   get enabled(): boolean {
@@ -138,11 +207,10 @@ export class Occlusion {
     if (!this.on) return;
     if ((this.scan -= dt) <= 0) { // models stream in after boot (Meshy props, the gothic dressing)
       this.scan = SCAN;
-      for (const r of this.roots) r.traverse((o) => this.tag(o as Tagged));
-      if (this.dirty) this.group();
-      this.xray.scan();
+      this.look();
     }
     const eye = camera.getWorldPosition(this.eye);
+    // Sight lines to the hero, for props; the floor around him swept towards the eye, for walls and roofs.
     this.right.setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize().multiplyScalar(0.55);
     const [foot, chest, head, left, right] = this.to;
     foot.copy(feet).setY(feet.y + 0.3);
@@ -151,47 +219,125 @@ export class Occlusion {
     left.copy(chest).sub(this.right);
     right.copy(chest).add(this.right);
     this.sight.setFromPoints(this.to).expandByPoint(eye);
-    const top = feet.y + HEAD;
+    this.mid.copy(feet).setY(feet.y + 0.95);
+    this.measure(feet);
+    this.toEye.subVectors(eye, feet).setY(0).normalize();
+    const top = feet.y + HEAD, len = eye.distanceTo(this.mid);
+    this.sweep.origin.copy(this.mid);
+    this.sweep.direction.subVectors(eye, this.mid).divideScalar(len);
 
-    // Roofs the hero stands under (plan, with some give either way so the edge never flickers);
-    // the smallest one is the room he is in.
-    this.under.length = 0;
-    let room: readonly number[] | undefined, area = Infinity;
-    for (const g of this.groups) {
-      const b = g.box;
-      if (b.min.y <= top || b.max.x - b.min.x < ROOF || b.max.z - b.min.z < ROOF) { g.under = false; continue; }
-      const plan = g.plan ?? [b.min.x, b.max.x, b.min.z, b.max.z], [x0, x1, z0, z1] = plan, m = g.under ? -OUT : IN;
-      g.under = feet.x > x0 + m && feet.x < x1 - m && feet.z > z0 + m && feet.z < z1 - m;
-      if (!g.under) continue;
-      this.under.push(g);
-      if ((x1 - x0) * (z1 - z0) < area) { room = plan; area = (x1 - x0) * (z1 - z0); }
-    }
-    // Indoors, the room's walls on the camera's side fade whole, as in Diablo: the room opens like a box.
-    const toEye = this.toEye.subVectors(eye, feet).setY(0);
-
-    const data = this.tex.image.data as Uint8Array;
     let changed = false;
-    for (const g of this.groups) {
-      const b = g.box;
-      if (b.max.y > feet.y + LOW && (this.sight.intersectsBox(g.wide) && this.crosses(eye, this.to, g.wide) || room && this.near(b, room, toEye))) g.seen = HOLD;
-      else g.seen -= dt;
-      let want = g.seen <= 0 ? 1 : b.distanceToPoint(eye) < CLOSE ? 0 : GHOST;
-      if (b.min.y > top && this.lifted(b)) want = 0;
-      if (want === g.fade) continue;
-      g.fade = want < g.fade ? Math.max(want, g.fade - RATE.down * dt) : Math.min(want, g.fade + RATE.up * dt);
-      for (const p of g.pieces) data[p] = Math.round(255 * g.fade);
+    for (const im of [this.caps, ...this.tops.values()]) im.count = 0;
+    this.lowered.length = 0;
+    for (const pass of [0, 1]) for (const g of this.groups) { // walls first: what rests on or hangs from a lowered wall goes with it
+      const b = g.box, wall = g.solids.length > 0 && b.max.y - b.min.y >= TALL && b.min.y < feet.y + 3; // walls on the church podium too
+      if (wall !== (pass === 0)) continue;
+      const floor = g.floor = Math.max(b.min.y, feet.y) + STUB, r = REACH + (g.on ? GIVE : 0);
+      let hit: boolean;
+      if (wall) {
+        hit = b.max.y > floor + 0.3 && this.ahead(b, feet) > (g.on ? SIDE.off : SIDE.on) && g.solids.some((s) => this.sweeps(s.box, r, len));
+        if (hit || g.k > 0) this.lowered.push(g);
+      } else if (b.min.y > top && b.max.x - b.min.x >= ROOF && b.max.z - b.min.z >= ROOF) hit = this.sweeps(b, r, len) || this.carried(b, true);
+      else hit = this.carried(b, false) || g.solids.length === 0 && b.max.y > feet.y + LOW && this.sight.intersectsBox(g.wide) && this.crosses(eye, this.to, g.wide); // other architecture stays: the silhouettes show who it hides
+      g.seen = hit ? HOLD : g.seen - dt;
+      g.on = g.seen > 0;
+      const k = g.on ? Math.min(1, g.k + RATE.down * dt) : Math.max(0, g.k - RATE.up * dt);
+      const e = k * k * (3 - 2 * k);
+      const fade = wall ? 1 : 1 - e, cut = wall && k > 0 ? b.max.y + 0.01 + (floor - b.max.y - 0.01) * e : FAR;
+      if (wall && k > 0) for (const s of g.solids) this.cap(s, cut);
+      g.k = k;
+      if (fade === g.fade && cut === g.cut) continue;
+      g.fade = fade;
+      g.cut = cut;
       changed = true;
+      for (const p of g.pieces) {
+        // A prop on a lowered wall (a torch, a banner) is never sliced: it goes whole if the cut would cross it.
+        const whole = wall && !this.solids.has(p) && this.boxes.get(p)!.max.y > floor + 0.05;
+        this.write(p, whole ? 1 - e : fade, whole ? FAR : cut);
+      }
     }
-    if (changed) this.tex.needsUpdate = true;
+    if (changed) {
+      this.tex.needsUpdate = true;
+      this.cull();
+    }
+    for (const im of [this.caps, ...this.tops.values()]) {
+      if (im.count || im.visible) im.instanceMatrix.needsUpdate = true;
+      im.visible = im.count > 0;
+    }
     this.frustum.setFromProjectionMatrix(this.vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     this.xray.update(this.frustum, (p) => this.hidden(eye, p));
   }
 
-  /** Is `p` behind a piece that is not faded? */
+  /** Does the free floor within `r` of the hero, swept towards the eye, run into `b`? */
+  private sweeps(b: THREE.Box3, r: number, len: number): boolean {
+    const a = this.area, n = this.near.copy(b); // b grown by the floor patch mirrored: the sweep of the patch hits b = the ray hits this
+    n.min.x -= Math.min(r, a.e);
+    n.max.x += Math.min(r, a.w);
+    n.min.z -= Math.min(r, a.s);
+    n.max.z += Math.min(r, a.n);
+    n.min.y -= 0.95;
+    n.max.y += 0.95;
+    return this.sweep.intersectBox(n, this.hit) !== null && this.hit.distanceTo(this.mid) < len;
+  }
+
+  /** The free floor around the hero along each axis, up to the first wall (and just into it). */
+  private measure(feet: THREE.Vector3): void {
+    const a = this.area;
+    if (Math.abs(feet.x - a.x) + Math.abs(feet.z - a.z) + Math.abs(feet.y - a.y) < 0.1) return; // he has not moved
+    a.x = feet.x; a.y = feet.y; a.z = feet.z;
+    const run = (dx: number, dz: number) => {
+      for (let d = 0.25; d < REACH + GIVE; d += 0.25) if (this.walled(feet.x + dx * d, feet.z + dz * d, feet.y)) return d + 0.1;
+      return REACH + GIVE;
+    };
+    a.e = run(1, 0); a.w = run(-1, 0); a.s = run(0, 1); a.n = run(0, -1);
+  }
+
+  /** Is (x, z) inside a wall standing over the floor at `y`? */
+  private walled(x: number, z: number, y: number): boolean {
+    for (const b of this.walls) {
+      if (b.y1 < y + 2 || b.y0 > y + 1.8) continue;
+      const dx = x - b.cx, dz = z - b.cz;
+      if (Math.abs(b.cos * dx - b.sin * dz) <= b.hx && Math.abs(b.sin * dx + b.cos * dz) <= b.hz) return true;
+    }
+    return false;
+  }
+
+  /** Closes upright box `s` where the cut at `y` crosses it: a stone coping, and on a building a top in its wall colour inside a stone rim. */
+  private cap(s: Solid, y: number): void {
+    if (s.box.min.y > y - 0.05 || s.box.max.y < y + 0.05) return;
+    slab(this.caps, s.m.elements, LIP, COPING, y + 0.005);
+    if (s.role) slab(this.tops.get(s.role)!, s.m.elements, -RIM, 0.05, y + 0.012);
+  }
+
+  /**
+   * Does `b` go with a wall being lowered: a roof resting on its top, or something hanging from it
+   * (off the floor, over its stub, centred within JOIN of it)?
+   */
+  private carried(b: THREE.Box3, roof: boolean): boolean {
+    for (const w of this.lowered) {
+      const l = w.box;
+      if (roof ? b.min.y > l.max.y - 1.5 && b.min.y < l.max.y + 1 && b.min.x < l.max.x && b.max.x > l.min.x && b.min.z < l.max.z && b.max.z > l.min.z
+        : b.min.y > w.floor - STUB + 0.3 && b.max.y > w.floor + 0.3 && b.min.y < l.max.y + 1.5 && Math.abs(b.min.x + b.max.x - l.min.x - l.max.x) < l.max.x - l.min.x + 2 * JOIN && Math.abs(b.min.z + b.max.z - l.min.z - l.max.z) < l.max.z - l.min.z + 2 * JOIN) return true;
+    }
+    return false;
+  }
+
+  /** How far towards the eye the nearest point of `b` lies from the hero (on the ground). */
+  private ahead(b: THREE.Box3, feet: THREE.Vector3): number {
+    const x = THREE.MathUtils.clamp(feet.x, b.min.x, b.max.x), z = THREE.MathUtils.clamp(feet.z, b.min.z, b.max.z);
+    return (x - feet.x) * this.toEye.x + (z - feet.z) * this.toEye.z;
+  }
+
+  /** Is `p` behind a piece that is still there? A lowered wall counts up to its stub. */
   private hidden(eye: THREE.Vector3, p: THREE.Vector3): boolean {
     this.sight.setFromPoints([eye, p]);
     this.one[0] = p;
-    for (const g of this.groups) if (g.fade > 0.5 && this.sight.intersectsBox(g.box) && this.crosses(eye, this.one, g.box)) return true;
+    for (const g of this.groups) {
+      if (g.fade <= 0.5) continue;
+      const b = this.near.copy(g.box);
+      b.max.y = Math.min(b.max.y, g.cut);
+      if (this.sight.intersectsBox(b) && this.crosses(eye, this.one, b)) return true;
+    }
     return false;
   }
 
@@ -206,19 +352,23 @@ export class Occlusion {
     return false;
   }
 
-  /** A wall of the room (plan x0 x1 z0 z1) on the side `toEye` looks from? */
-  private near(b: THREE.Box3, [x0, x1, z0, z1]: readonly number[], toEye: THREE.Vector3): boolean {
-    if (b.max.y - b.min.y < HOST || b.min.x < x0 - 1 || b.max.x > x1 + 1 || b.min.z < z0 - 1 || b.max.z > z1 + 1) return false;
-    return ((b.min.x + b.max.x - x0 - x1) * toEye.x + (b.min.z + b.max.z - z0 - z1) * toEye.z) > 0; // its centre is off the room's towards the eye
+  /** Meshes whose pieces are all faded out leave the view's layer: no draw call, no vertex work. */
+  private cull(): void {
+    const d = this.tex.image.data as Uint8Array;
+    for (const [mesh, m] of this.meshes) {
+      const gone = m.pieces.every((p) => d[4 * p] === 0);
+      if (gone === m.gone) continue;
+      m.gone = gone;
+      mesh.layers.set(gone ? GONE : 0);
+    }
   }
 
-  /** Under one of the roofs the hero stands under: that roof itself, and what hangs from it. */
-  private lifted(b: THREE.Box3): boolean {
-    for (const r of this.under) {
-      const R = r.box;
-      if (b.min.y >= R.min.y - HANG && b.min.x >= R.min.x - 0.3 && b.max.x <= R.max.x + 0.3 && b.min.z >= R.min.z - 0.3 && b.max.z <= R.max.z + 0.3) return true;
-    }
-    return false;
+  /** Tags what streamed in since the last look; regroups if anything did. */
+  private look(): void {
+    this.roots[0].parent?.traverse((o) => (o as THREE.Object3D & { shadow?: THREE.LightShadow }).shadow?.camera.layers.enable(GONE)); // lights added since too
+    for (const r of this.roots) r.traverse((o) => this.tag(o as Tagged));
+    if (this.dirty) this.group();
+    this.xray.scan();
   }
 
   /** Give a mesh its piece ids (a vertex or instance attribute) and patch its materials; noted bounds per piece. */
@@ -232,9 +382,14 @@ export class Occlusion {
     mesh.updateWorldMatrix(true, false);
     if (!src.boundingBox) src.computeBoundingBox();
     let g = src;
+    let pieces: number[];
     if (src.getAttribute('aPiece') && !im.isInstancedMesh) { // a merged batch: bounds per piece from its vertices
-      const pos = src.getAttribute('position'), ids = src.getAttribute('aPiece'), v = new THREE.Vector3();
-      for (let i = 0; i < pos.count; i++) this.grow(ids.getX(i), v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld));
+      const pos = src.getAttribute('position'), ids = src.getAttribute('aPiece'), v = new THREE.Vector3(), seen = new Set<number>();
+      for (let i = 0; i < pos.count; i++) {
+        this.grow(ids.getX(i), v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld));
+        seen.add(ids.getX(i));
+      }
+      pieces = [...seen];
     } else if (im.isInstancedMesh) {
       const m = new THREE.Matrix4(), box = new THREE.Box3(), plant = PLANTS.has(mesh.userData.role ?? '');
       const ids = mesh.userData.pieces ??= Array.from({ length: im.count }, (_, i) => {
@@ -248,11 +403,14 @@ export class Occlusion {
         this.grow(ids[i], box.min).grow(ids[i], box.max);
       }
       g = ids.some((id) => id) ? shared(src, new THREE.InstancedBufferAttribute(Float32Array.from(ids), 1)) : src; // none: aPiece reads its default, 0
+      pieces = ids;
     } else {
       const id = mesh.userData.piece ?? this.fresh(), box = src.boundingBox!.clone().applyMatrix4(mesh.matrixWorld);
       this.grow(id, box.min).grow(id, box.max);
       g = shared(src, new THREE.Float32BufferAttribute(new Float32Array(src.getAttribute('position').count).fill(id), 1));
+      pieces = [id];
     }
+    this.meshes.set(mesh, { pieces, gone: false });
     mesh.geometry = g;
     mesh.userData.occ = g;
     this.dirty = true;
@@ -280,43 +438,63 @@ export class Occlusion {
       for (const h of hosts) if (h.id !== id && h.vol > v && h.vol < bestV && h.box.containsBox(b)) { best = h.id; bestV = h.vol; }
       owner.set(id, best);
     }
-    const old = this.byPiece, byOwner = new Map<number, Group>();
+    const old = new Map(this.groups.flatMap((g) => g.pieces.map((p) => [p, g] as const))), byOwner = new Map<number, Group>();
     for (const id of ids) {
       const o = owner.get(id)!;
       let g = byOwner.get(o);
       if (!g) {
-        const before = old.get(o);
-        byOwner.set(o, (g = { box: new THREE.Box3(), wide: new THREE.Box3(), plan: this.plans.get(o), pieces: [], fade: before?.fade ?? 1, seen: before?.seen ?? 0, under: before?.under ?? false }));
+        const { on = false, seen = 0, k = 0 } = old.get(o) ?? {};
+        byOwner.set(o, (g = { box: new THREE.Box3(), wide: new THREE.Box3(), pieces: [], solids: [], on, seen, k, floor: 0, fade: NaN, cut: NaN })); // NaN: drawn on the next update
       }
       g.box.union(this.boxes.get(id)!);
       g.pieces.push(id);
+      g.solids.push(...this.solids.get(id) ?? []);
     }
     this.groups = [...byOwner.values()];
     for (const g of this.groups) g.wide.copy(g.box).expandByVector(WIDE);
-    this.byPiece = new Map(this.groups.flatMap((g) => g.pieces.map((p) => [p, g] as const)));
     this.texture(Math.max(...ids, 1) + 1);
-    const data = this.tex.image.data as Uint8Array;
-    for (const g of this.groups) for (const p of g.pieces) data[p] = Math.round(255 * g.fade);
-    this.tex.needsUpdate = true;
   }
 
-  /** A fade texture with room for `n` pieces (texel 0: untagged, always opaque). */
+  /** A fade texture with room for `n` pieces: fade, cut height (two bytes) each; texel 0, untagged, always whole. */
   private texture(n: number): void {
     const rows = Math.ceil(n / ROW);
     if (this.tex && this.tex.image.height >= rows) return;
-    const t = new THREE.DataTexture(new Uint8Array(ROW * rows).fill(255), ROW, rows, THREE.RedFormat, THREE.UnsignedByteType);
-    t.needsUpdate = true;
+    const t = new THREE.DataTexture(new Uint8Array(4 * ROW * rows), ROW, rows);
     this.tex?.dispose();
     this.tex = U.uPieceFade.value = t;
+    this.clear();
+    for (const g of this.groups) g.fade = g.cut = NaN;
+  }
+
+  /** Piece `p` drawn at `fade`, cut at height `cut` (FAR: whole). */
+  private write(p: number, fade: number, cut: number): void {
+    const d = this.tex.image.data as Uint8Array, c = cut >= FAR ? 65535 : THREE.MathUtils.clamp(Math.round((cut - DEEP) * CM), 0, 65534);
+    d[4 * p] = Math.round(255 * fade);
+    d[4 * p + 1] = c >> 8;
+    d[4 * p + 2] = c & 255;
+  }
+
+  /** Every piece whole. */
+  private clear(): void {
+    (this.tex.image.data as Uint8Array).fill(255);
+    this.tex.needsUpdate = true;
   }
 }
 
-/** Patched for fading: level materials and the Meshy props' own. Glows and effects never fade. */
-function fades(m: THREE.Material): boolean {
-  return !(m as THREE.ShaderMaterial).isShaderMaterial && m.blending === THREE.NormalBlending;
+const SLAB = new THREE.BoxGeometry().translate(0, -0.5, 0); // top face at the origin
+
+/** Instance `i` of `im`: box `e` (unit cube -> world) as a slab `h` thick, `out` wider all round (negative: inset), its top at `y`. */
+function slab(im: THREE.InstancedMesh, e: ArrayLike<number>, out: number, h: number, y: number): void {
+  const kx = 1 + (2 * out) / Math.hypot(e[0], e[2]), kz = 1 + (2 * out) / Math.hypot(e[8], e[10]);
+  (im.instanceMatrix.array as Float32Array).set([e[0] * kx, 0, e[2] * kx, 0, 0, h, 0, 0, e[8] * kz, 0, e[10] * kz, 0, e[12], y, e[14], 1], 16 * im.count++);
 }
 
-/** Wraps a material's own onBeforeCompile with the fade; solid ones turn alpha into coverage (programs recompile once). */
+/** Patched for fading: level materials, the Meshy props' own and the torch flames. Spell effects never fade. */
+function fades(m: THREE.Material): boolean {
+  return !(m as THREE.ShaderMaterial).isShaderMaterial && (m.blending === THREE.NormalBlending || m.blending === THREE.AdditiveBlending);
+}
+
+/** Wraps a material's own onBeforeCompile with the fade and the cut; solid ones turn alpha into coverage (programs recompile once). */
 function patch(m: THREE.Material): void {
   if (m.userData.occ) return;
   m.userData.occ = true;
@@ -331,7 +509,7 @@ function patch(m: THREE.Material): void {
       .replace('#include <dithering_fragment>', FRAG_END);
   };
   m.customProgramCacheKey = () => `${key}|occ`;
-  Object.assign(m, { defaultAttributeValues: { ...(m as THREE.ShaderMaterial).defaultAttributeValues, aPiece: [0] } }); // meshes left untagged: piece 0, opaque
+  Object.assign(m, { defaultAttributeValues: { ...(m as THREE.ShaderMaterial).defaultAttributeValues, aPiece: [0] } }); // meshes left untagged: piece 0, whole
   m.defines = { ...m.defines, [solid ? 'OCC_SOLID' : m.alphaTest > 0 ? 'OCC_CUT' : 'OCC_BLEND']: '' };
   m.alphaToCoverage = solid;
   m.needsUpdate = true;

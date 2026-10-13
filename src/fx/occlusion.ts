@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { material, type Role } from '../level/materials.ts';
+import { material } from '../level/materials.ts';
 import type { LevelBuilder } from '../level/builder.ts';
 import type { Box } from '../core/physics.ts';
 
@@ -20,8 +20,8 @@ import type { Box } from '../core/physics.ts';
 //  - Every mesh reads its piece's fade and cut height from a small texture by a per-vertex
 //    (merged batches) or per-instance id, so pieces of one batch go apart without a single extra
 //    draw call. The cut is a discard over that height; instanced slabs (a stone coping per upright
-//    box the cut crosses, a top in the wall colour on a building) close the stubs, one draw per
-//    colour while any wall is down. Fades of solid materials are MSAA coverage (alpha to coverage),
+//    box the cut crosses, a dark fill inside it on a building) close the stubs, two draws while any
+//    wall is down. Fades of solid materials are MSAA coverage (alpha to coverage),
 //    so they need no sorting; a mesh faded out whole leaves the view's layer, not the shadow map's:
 //    a hidden roof still shades its room.
 //  - The hero and the enemies show through whatever still hides them as an x-ray silhouette, drawn
@@ -30,7 +30,7 @@ import type { Box } from '../core/physics.ts';
 
 const STUB = 1; // m over the floor: a lowered wall, knee to waist
 const COPING = 0.1, LIP = 0.04; // m: the slab capping a stub, and its overhang
-const RIM = 0.3; // m: over a stub this much wider (a building), the top is its own wall colour inside a stone rim
+const RIM = 0.3; // m: over a stub this much wider (a building), the top is a dark fill inside a stone rim
 const HEAD = 2.1; // m over the feet: a roof is all above this
 const ROOF = 2; // m: a roof is at least this wide both ways (a window band or a lantern is not)
 const LOW = 1.2; // m over the feet: a piece lower than this never hides anyone
@@ -52,7 +52,7 @@ const PLANTS = new Set(['hedge', 'foliage', 'olive', 'flower', 'fruit', 'trunk',
 interface Solid {
   m: THREE.Matrix4; // unit cube -> world
   box: THREE.Box3;
-  role?: Role; // the colour of its top when lowered, if wide enough to show one
+  top: boolean; // wide enough (a building) to show a dark fill inside its coping when cut
 }
 
 interface Group {
@@ -129,7 +129,7 @@ export class Occlusion {
   private dirty = false; // pieces added since the groups were built
   private tex!: THREE.DataTexture;
   private readonly caps: THREE.InstancedMesh;
-  private readonly tops = new Map<Role, THREE.InstancedMesh>(); // a lowered building's top, by wall role
+  private readonly tops: THREE.InstancedMesh; // lowered buildings' fills
   private readonly xray: XRay;
   private readonly ray = new THREE.Ray();
   private readonly sweep = new THREE.Ray(); // from the hero's middle to the eye
@@ -142,6 +142,7 @@ export class Occlusion {
   private readonly toEye = new THREE.Vector3();
   private readonly near = new THREE.Box3();
   private readonly lowered: Group[] = [];
+  private readonly lifted: THREE.Box3[] = []; // roofs going or gone this frame
   private readonly one: THREE.Vector3[] = [];
   private readonly frustum = new THREE.Frustum();
   private readonly vp = new THREE.Matrix4();
@@ -153,21 +154,19 @@ export class Occlusion {
    */
   constructor(roots: THREE.Object3D[], level: Pick<LevelBuilder, 'solids' | 'world' | 'pieceId'>, bodies: [THREE.Object3D, number][]) {
     this.roots = roots;
-    const solids = level.solids, wide = new Map<Role, number>();
-    for (const [p, m, role] of solids) {
+    const solids = level.solids;
+    for (const [p, m] of solids) {
       let l = this.solids.get(p);
       if (!l) this.solids.set(p, (l = []));
-      const box = UNIT.clone().applyMatrix4(m), e = m.elements;
-      const top = Math.min(Math.hypot(e[0], e[2]), Math.hypot(e[8], e[10])) > 2 * RIM + 0.5 && e[5] >= TALL && !role.startsWith('stone');
-      l.push({ m, box, role: top ? role : undefined });
-      if (top) wide.set(role, (wide.get(role) ?? 0) + 1);
+      const e = m.elements;
+      l.push({ m, box: UNIT.clone().applyMatrix4(m), top: Math.min(Math.hypot(e[0], e[2]), Math.hypot(e[8], e[10])) > 2 * RIM + 0.5 && e[5] >= TALL });
     }
     this.walls = level.world.boxes.filter((b) => b.y1 - b.y0 >= 2);
     this.fresh = () => level.pieceId();
     this.xray = new XRay(bodies);
     this.texture(1);
-    const make = (role: Role, n: number) => {
-      const im = new THREE.InstancedMesh(SLAB, material(role), n);
+    const make = (mat: THREE.Material) => {
+      const im = new THREE.InstancedMesh(SLAB, mat, solids.length);
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       im.userData.occ = im.geometry; // never tagged: piece 0, whole
       im.frustumCulled = false;
@@ -177,8 +176,8 @@ export class Occlusion {
       roots[0].add(im);
       return im;
     };
-    this.caps = make('stoneDark', solids.length);
-    for (const [role, n] of wide) this.tops.set(role, make(role, n));
+    this.caps = make(material('stoneDark'));
+    this.tops = make(FILL); // solid and dark, so a cut building never reads as a pale wash
   }
 
   /** Diablo view on or off: lowered walls, fades and silhouettes; off, every piece reads whole again. */
@@ -195,7 +194,7 @@ export class Occlusion {
     for (const g of this.groups) Object.assign(g, { on: false, seen: 0, k: 0, fade: 1, cut: FAR });
     this.clear();
     this.cull();
-    for (const im of [this.caps, ...this.tops.values()]) im.visible = false;
+    this.caps.visible = this.tops.visible = false;
   }
 
   get enabled(): boolean {
@@ -227,18 +226,21 @@ export class Occlusion {
     this.sweep.direction.subVectors(eye, this.mid).divideScalar(len);
 
     let changed = false;
-    for (const im of [this.caps, ...this.tops.values()]) im.count = 0;
-    this.lowered.length = 0;
-    for (const pass of [0, 1]) for (const g of this.groups) { // walls first: what rests on or hangs from a lowered wall goes with it
+    this.caps.count = this.tops.count = 0;
+    this.lowered.length = this.lifted.length = 0;
+    for (const pass of [0, 1, 2]) for (const g of this.groups) { // walls, roofs, the rest: what rests on a lowered wall or hangs under a hidden roof goes with it
       const b = g.box, wall = g.solids.length > 0 && b.max.y - b.min.y >= TALL && b.min.y < feet.y + 3; // walls on the church podium too
-      if (wall !== (pass === 0)) continue;
+      const roof = !wall && b.min.y > top && b.max.x - b.min.x >= ROOF && b.max.z - b.min.z >= ROOF;
+      if (pass !== (wall ? 0 : roof ? 1 : 2)) continue;
       const floor = g.floor = Math.max(b.min.y, feet.y) + STUB, r = REACH + (g.on ? GIVE : 0);
       let hit: boolean;
       if (wall) {
         hit = b.max.y > floor + 0.3 && this.ahead(b, feet) > (g.on ? SIDE.off : SIDE.on) && g.solids.some((s) => this.sweeps(s.box, r, len));
         if (hit || g.k > 0) this.lowered.push(g);
-      } else if (b.min.y > top && b.max.x - b.min.x >= ROOF && b.max.z - b.min.z >= ROOF) hit = this.sweeps(b, r, len) || this.carried(b, true);
-      else hit = this.carried(b, false) || g.solids.length === 0 && b.max.y > feet.y + LOW && this.sight.intersectsBox(g.wide) && this.crosses(eye, this.to, g.wide); // other architecture stays: the silhouettes show who it hides
+      } else if (roof) {
+        hit = this.sweeps(b, r, len) || this.carried(b, true);
+        if (hit || g.k > 0) this.lifted.push(b);
+      } else hit = this.carried(b, false) || b.min.y > top && this.hangs(b) || g.solids.length === 0 && b.max.y > feet.y + LOW && this.sight.intersectsBox(g.wide) && this.crosses(eye, this.to, g.wide); // other architecture stays: the silhouettes show who it hides
       g.seen = hit ? HOLD : g.seen - dt;
       g.on = g.seen > 0;
       const k = g.on ? Math.min(1, g.k + RATE.down * dt) : Math.max(0, g.k - RATE.up * dt);
@@ -260,7 +262,7 @@ export class Occlusion {
       this.tex.needsUpdate = true;
       this.cull();
     }
-    for (const im of [this.caps, ...this.tops.values()]) {
+    for (const im of [this.caps, this.tops]) {
       if (im.count || im.visible) im.instanceMatrix.needsUpdate = true;
       im.visible = im.count > 0;
     }
@@ -302,11 +304,11 @@ export class Occlusion {
     return false;
   }
 
-  /** Closes upright box `s` where the cut at `y` crosses it: a stone coping, and on a building a top in its wall colour inside a stone rim. */
+  /** Closes upright box `s` where the cut at `y` crosses it: a stone coping, and on a building a dark fill inside a stone rim. */
   private cap(s: Solid, y: number): void {
     if (s.box.min.y > y - 0.05 || s.box.max.y < y + 0.05) return;
     slab(this.caps, s.m.elements, LIP, COPING, y + 0.005);
-    if (s.role) slab(this.tops.get(s.role)!, s.m.elements, -RIM, 0.05, y + 0.012);
+    if (s.top) slab(this.tops, s.m.elements, -RIM, 0.05, y + 0.012);
   }
 
   /**
@@ -320,6 +322,12 @@ export class Occlusion {
         : b.min.y > w.floor - STUB + 0.3 && b.max.y > w.floor + 0.3 && b.min.y < l.max.y + 1.5 && Math.abs(b.min.x + b.max.x - l.min.x - l.max.x) < l.max.x - l.min.x + 2 * JOIN && Math.abs(b.min.z + b.max.z - l.min.z - l.max.z) < l.max.z - l.min.z + 2 * JOIN) return true;
     }
     return false;
+  }
+
+  /** Is `b` (all above the head) under a roof going or gone, within its plan: a chandelier, a rib, a lantern? */
+  private hangs(b: THREE.Box3): boolean {
+    const x = (b.min.x + b.max.x) / 2, z = (b.min.z + b.max.z) / 2;
+    return this.lifted.some((r) => b.max.y < r.max.y + 0.5 && x > r.min.x - 0.3 && x < r.max.x + 0.3 && z > r.min.z - 0.3 && z < r.max.z + 0.3);
   }
 
   /** How far towards the eye the nearest point of `b` lies from the hero (on the ground). */
@@ -374,9 +382,9 @@ export class Occlusion {
   /** Give a mesh its piece ids (a vertex or instance attribute) and patch its materials; noted bounds per piece. */
   private tag(mesh: Tagged): void {
     if (!mesh.isMesh || mesh.userData.occ === mesh.geometry || (mesh as unknown as THREE.SkinnedMesh).isSkinnedMesh) return;
-    const mats = [mesh.material].flat() as THREE.Material[];
-    if (!mats.some(fades)) return;
-    for (const m of mats) if (fades(m)) patch(m);
+    const mats = [mesh.material].flat() as THREE.Material[], inst = !!(mesh as unknown as THREE.InstancedMesh).isInstancedMesh;
+    if (!mats.some((m) => fades(m, inst))) return;
+    for (const m of mats) if (fades(m, inst)) patch(m);
     if (mats.some((m) => m.alphaToCoverage)) mesh.customDepthMaterial = DEPTH;
     const src = mesh.geometry, im = mesh as unknown as THREE.InstancedMesh;
     mesh.updateWorldMatrix(true, false);
@@ -482,6 +490,7 @@ export class Occlusion {
 }
 
 const SLAB = new THREE.BoxGeometry().translate(0, -0.5, 0); // top face at the origin
+const FILL = new THREE.MeshStandardMaterial({ color: 0x1d1814, roughness: 1 }); // a cut building's inside
 
 /** Instance `i` of `im`: box `e` (unit cube -> world) as a slab `h` thick, `out` wider all round (negative: inset), its top at `y`. */
 function slab(im: THREE.InstancedMesh, e: ArrayLike<number>, out: number, h: number, y: number): void {
@@ -489,9 +498,9 @@ function slab(im: THREE.InstancedMesh, e: ArrayLike<number>, out: number, h: num
   (im.instanceMatrix.array as Float32Array).set([e[0] * kx, 0, e[2] * kx, 0, 0, h, 0, 0, e[8] * kz, 0, e[10] * kz, 0, e[12], y, e[14], 1], 16 * im.count++);
 }
 
-/** Patched for fading: level materials, the Meshy props' own and the torch flames. Spell effects never fade. */
-function fades(m: THREE.Material): boolean {
-  return !(m as THREE.ShaderMaterial).isShaderMaterial && (m.blending === THREE.NormalBlending || m.blending === THREE.AdditiveBlending);
+/** Patched for fading: level materials, the Meshy props' own and the torch flames (instanced glows). Spell effects and light shafts never fade. */
+function fades(m: THREE.Material, instanced: boolean): boolean {
+  return !(m as THREE.ShaderMaterial).isShaderMaterial && (m.blending === THREE.NormalBlending || (instanced && m.blending === THREE.AdditiveBlending));
 }
 
 /** Wraps a material's own onBeforeCompile with the fade and the cut; solid ones turn alpha into coverage (programs recompile once). */

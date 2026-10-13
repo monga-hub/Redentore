@@ -78,13 +78,14 @@ com'è e passa alla visuale Diablo quando si prende il controllo.
   veli trasparenti. I muri dal lato della camera che coprono il pavimento attorno all'eroe (fino ai
   muri della stanza in cui si trova) scendono in un quarto di secondo a un moncone di un metro
   chiuso da una copertina di pietra (un muro con cornici e archi, un lato di chiostro, un edificio,
-  che sopra ha il colore dei suoi muri); quelli dal lato opposto restano interi. I tetti che coprono
-  quel pavimento, e quel che poggia o pende da un muro abbassato, svaniscono del tutto; alberi,
-  pergole e colonne tra la camera e l'eroe pure. Isteresi su distanza e lato, così camminare lungo
+  che dentro il bordo di pietra è pieno e scuro); quelli dal lato opposto restano interi. I tetti
+  che coprono quel pavimento, quel che poggia o pende da un muro abbassato e quel che pende sotto
+  un tetto sparito (lampadari, costoloni) svaniscono del tutto; alberi, pergole e colonne tra la
+  camera e l'eroe pure. Isteresi su distanza e lato, così camminare lungo
   un muro non lo fa lampeggiare. L'eroe e i nemici ancora coperti si vedono in sagoma luminosa
   (x-ray). I pezzi (`LevelBuilder.together`) scendono o sfumano senza draw call in più: una texture
-  di altezze di taglio e dissolvenze per pezzo; le copertine sono una draw call per colore, solo
-  mentre un muro è giù, e quel che è svanito del tutto non si disegna (ma fa ancora ombra).
+  di altezze di taglio e dissolvenze per pezzo; le copertine sono due draw call, solo mentre un
+  muro è giù, e quel che è svanito del tutto non si disegna (ma fa ancora ombra).
 - Comandi: WASD e stick relativi allo schermo; col mouse clic sul pavimento per andarci (tieni
   premuto per seguire il cursore), clic su un nemico per raggiungerlo e colpirlo finché cade
   (`src/player/diabloControls.ts`). I lanci girano l'eroe verso il bersaglio, altrimenti verso il

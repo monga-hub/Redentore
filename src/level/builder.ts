@@ -77,10 +77,10 @@ export class LevelBuilder {
   /** Candles, lamps and window glows placed by the zones; fx/torches.ts lights them. */
   readonly lights: LightSpot[] = [];
   /**
-   * Upright solid boxes at least a metre tall, by occlusion piece: [piece, unit cube -> world box, role].
+   * Upright solid boxes at least a metre tall, by occlusion piece: [piece, unit cube -> world box].
    * The Diablo view caps them with a coping where it lowers a wall (fx/occlusion.ts).
    */
-  readonly solids: [number, THREE.Matrix4, Role][] = [];
+  readonly solids: [number, THREE.Matrix4][] = [];
   private piece = 0; // occlusion piece open in together(), 0 = none
   private pieces = 0;
   private current!: THREE.Group;
@@ -131,7 +131,7 @@ export class LevelBuilder {
     if (collide) this.world.add(cx, cz, w / 2, d / 2, y0, y1, rot);
     if (o.camera ?? (collide && visible)) {
       this.cameraBlockers.push(mesh);
-      if (visible) this.solid(mesh.userData.piece, mesh.matrixWorld.clone().scale(new THREE.Vector3(w, h, d)), role);
+      if (visible) this.solid(mesh.userData.piece, mesh.matrixWorld.clone().scale(new THREE.Vector3(w, h, d)));
     }
     return mesh;
   }
@@ -244,13 +244,13 @@ export class LevelBuilder {
     const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
     const g = chamferBox(w, h, d, Math.min(0.06, 0.25 * Math.min(w, h, d))).clone().translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     const piece = this.decor(m ? g.applyMatrix4(m) : g, role, cam);
-    this.solid(piece, (m?.clone() ?? new THREE.Matrix4()).multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)).scale(new THREE.Vector3(w, h, d)), role);
+    this.solid(piece, (m?.clone() ?? new THREE.Matrix4()).multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)).scale(new THREE.Vector3(w, h, d)));
   }
 
   /** Notes an upright box (unit cube -> world) a metre or more tall for the Diablo view's copings. */
-  private solid(piece: number, m: THREE.Matrix4, role: Role): void {
+  private solid(piece: number, m: THREE.Matrix4): void {
     const e = m.elements; // column 1 is the box's height: vertical, or the box is not upright
-    if (e[5] >= 1 && Math.abs(e[4]) + Math.abs(e[6]) < 1e-3) this.solids.push([piece, m, role]);
+    if (e[5] >= 1 && Math.abs(e[4]) + Math.abs(e[6]) < 1e-3) this.solids.push([piece, m]);
   }
 
   /** Merges every decor() batch into one mesh per zone and role. Call once, after building. */

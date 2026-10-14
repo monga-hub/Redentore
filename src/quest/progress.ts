@@ -1,13 +1,18 @@
 // The dungeon's progression, as plain state over the collision World (no three.js, so
-// `npm run check` walks it in Node). The church is shut at the start: the player takes the
-// public route fondamenta -> calle -> convent corridor -> orto, finds the key in a chest at
-// the end of the pontile on the lagoon, unlocks the grates of the chiostro grande, opens the
-// choir door into the church and kills the Reverendissimo; then the main portone swings open
-// onto the fondamenta. quest/view.ts draws the gates, the chest and the prompts.
+// `npm run check` walks it in Node). The church is shut at the start: Fra' Zuane, the porter's
+// ghost on the fondamenta, gives the quest; the player takes the public route fondamenta ->
+// calle -> convent corridor -> orto, finds the key in a chest at the end of the pontile on the
+// lagoon (sealed until the quest is accepted), unlocks the grates of the chiostro grande, opens
+// the choir door into the church and kills the Reverendissimo; then the main portone swings open
+// onto the fondamenta and the player walks out. quest/view.ts draws the gates, the chest and the
+// prompts, quest/npc.ts the porter, quest/dialogue.ts what he says.
 import type { Box, World } from '../core/physics.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 
 export type Need = 'key' | 'boss';
+
+/** Where the quest stands, in order; derived from the flags, never stored. */
+export type Stage = 'talk' | 'key' | 'grate' | 'boss' | 'leave' | 'done';
 
 export interface Gate {
   id: string;
@@ -41,15 +46,23 @@ export const CHEST = { x: -35, z: -192.6, y: 0, w: 1.1, d: 0.7, h: 0.75 };
  */
 export const CHOIR_DOOR = { x: 0, z: -61, yaw: Math.PI } as const;
 
+/** Fra' Zuane, chained to the fondamenta a few steps ahead and right of the spawn, turned toward it. */
+export const NPC = { x: 3, z: 12.5, yaw: Math.atan2(-(SPAWN.x - 3), -(SPAWN.z - 12.5)), r: 0.35, name: "Fra' Zuane" } as const;
+
+/** z past which a player is back out on the fondamenta (the foot of the scalinata). */
+const OUTSIDE = 10;
+
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string }
+export interface Prompt { text: string; act?: () => string; talk?: true }
 
 export class Quest {
+  accepted = false; // Fra' Zuane's quest taken
   key = false;
   chestOpen = false;
   bossDead = false;
+  out = false; // back on the fondamenta after the boss
   readonly gates: Gate[];
   private world: World;
 
@@ -62,6 +75,22 @@ export class Quest {
       return { ...g, open: false, box: world.add(cx, cz, hx, hz, g.y0, g.y0 + g.h) };
     });
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
+    world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
+  }
+
+  get stage(): Stage {
+    if (!this.accepted) return 'talk';
+    if (!this.key) return 'key';
+    if (!this.gates.some((g) => g.kind === 'grate' && g.open)) return 'grate';
+    if (!this.bossDead) return 'boss';
+    return this.out ? 'done' : 'leave';
+  }
+
+  /** Per frame with the player's feet: walking out of the open portone ends the quest. */
+  update(p: { z: number }): boolean {
+    if (this.stage !== 'leave' || p.z < OUTSIDE) return false;
+    this.out = true;
+    return true;
   }
 
   centre(g: Gate): { x: number; z: number } {
@@ -96,7 +125,9 @@ export class Quest {
 
   /** The nearest thing to interact with around the player's feet `p`, if any. */
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
+    if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: true };
     if (!this.chestOpen && Math.hypot(p.x - CHEST.x, p.z - CHEST.z) < REACH && Math.abs(p.y - CHEST.y) < 1.5) {
+      if (!this.accepted) return { text: 'Un sigillo spettrale chiude il baule' };
       return { text: 'Apri il baule', act: () => { this.takeKey(); return 'Hai trovato la chiave del chiostro grande'; } };
     }
     for (const g of this.gates) {

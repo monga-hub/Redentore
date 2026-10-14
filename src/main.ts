@@ -17,7 +17,7 @@ import { Priests } from './enemies/priests.ts';
 import { Bees } from './enemies/bees.ts';
 import { FRIAR, GROUPS } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { CHEST, Quest } from './quest/progress.ts';
+import { CHEST, NPC, Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
 import { checkVersion } from './ui/version.ts';
 import { Minimap } from './ui/minimap.ts';
@@ -48,9 +48,7 @@ const discovery = new Discovery(level.areas); // fog of war: what the player has
 const fog = new FogLayer(discovery);
 const minimap = new Minimap(level.root, fog, () => openMap()); // top-down chart of the level, top right
 const worldMap = new WorldMap(discovery, fog, minimap, level.areas); // M: the whole map
-const quest = new Quest(level.world); // church shut, key in the chest on the pontile
-const questView = new QuestView(quest);
-scene.add(questView.root);
+const quest = new Quest(level.world); // church shut, key in the chest on the pontile, Fra' Zuane on the fondamenta
 
 const input = new Input(renderer.domElement);
 new TouchControls(renderer.domElement, input);
@@ -64,6 +62,8 @@ const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, 
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
 const kit = new Forsaken(player, playerStats); // abilities on 1..0 - =
 scene.add(kit.vfx.root);
+const questView = new QuestView(quest, kit.vfx); // gates, chest, Fra' Zuane and his dialogue, tracker
+scene.add(questView.root);
 const bar = new ActionBar(kit.system);
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
 scene.add(friars.root);
@@ -122,7 +122,7 @@ if (loaded) {
   cam.yaw = player.facing;
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: 'Partita caricata' });
-} else kit.system.notices.push({ kind: 'info', text: 'Il portone della chiesa è sbarrato: entra nel convento dalla calle' });
+} else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
 // A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
 cam.update(0, input, player.pos);
 const intro = loaded ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE));
@@ -178,7 +178,7 @@ onStyle((diablo) => { // the menu's "Stile Diablo" switch, applied mid-game with
   applyStyle(diablo);
   blend.start(cam.camera);
 });
-const goal = () => (!quest.key ? CHEST : !quest.bossDead ? priests.boss : undefined); // the key, then the Reverendissimo
+const goal = () => (!quest.accepted ? NPC : !quest.key ? CHEST : !quest.bossDead ? priests.boss : undefined); // Fra' Zuane, the key, then the Reverendissimo
 function openMap(): void {
   if (menu.paused) return;
   kit.system.cancel();
@@ -195,13 +195,14 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { intro, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, menu, game, discovery, worldMap });
+Object.assign(window, { intro, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.05);
-  if (menu.paused || worldMap.open) { // the world holds still behind the menu or map; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open || questView.talking) { // the world holds still behind the menu, map or dialogue; drags and wheel turns made meanwhile are dropped
+    if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but Fra' Zuane talks on
     input.consume();
     input.endFrame();
     fx.render();
@@ -215,6 +216,7 @@ renderer.setAnimationLoop(() => {
       friars.update(dt, unseen);
       priests.update(dt, unseen);
       bees.update(dt, unseen);
+      questView.idle(dt, player.pos);
       questView.peek(eye);
       fx.update(dt, eye);
       fx.render();
@@ -244,9 +246,8 @@ renderer.setAnimationLoop(() => {
   friars.update(dt, player.pos);
   priests.update(dt, player.pos);
   bees.update(dt, player.pos);
-  dfx.update(dt, !quest.key);
-  const notice = questView.update(dt, player.pos, pressed, priests.boss);
-  if (notice) kit.system.notices.push({ kind: 'info', text: notice });
+  dfx.update(dt, quest.accepted && !quest.key);
+  for (const text of questView.update(dt, player.pos, pressed, priests.boss)) kit.system.notices.push({ kind: 'info', text });
   if (!quest.bossDead && priests.boss.state === 'dead') { // victory: everyone falls, the portone opens
     quest.win();
     friars.killAll();

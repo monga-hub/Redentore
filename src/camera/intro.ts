@@ -8,6 +8,7 @@ import { CHURCH_FLOOR as F } from '../level/plan.ts';
 // portone, which shuts in front of the lens, landing on the follow camera behind the player.
 // A Catmull-Rom spline through hand-placed keys (`npm run check` flies it against every mesh of
 // the level), travelled at the keys' speeds. Esc, Space, Enter, a click or a tap skips it.
+// Over it, the backstory in cinematic captions, each timed to the place the lens is passing.
 
 type V = [number, number, number];
 /** Where the lens is, what it looks at, how fast it travels through there (m/s). */
@@ -62,6 +63,31 @@ export const KEYS: Key[] = [
   { at: [0, 4.6, 10], look: [0, F + 3.5, -2], v: 3 }, // it shuts; down the scalinata
 ];
 
+/**
+ * The backstory, one caption per beat of the take: `at`..`to` s, shown while the lens is over one
+ * of `where` (area labels; `npm run check` holds them to it). `vo` names the line's voice-over clip
+ * for when there is one (Intro.onLine). The title card comes first, the call to arms last.
+ */
+export interface Caption { at: number; to: number; where: string[]; text: string; sub?: string; kind?: 'title' | 'final'; vo: string }
+
+export const CAPTIONS: Caption[] = [
+  { at: 0.6, to: 5, where: [], kind: 'title', text: 'Il Voto Spezzato', sub: 'Giudecca, Venezia', vo: 'intro-00' },
+  { at: 5.4, to: 10.6, where: ['Pontile', 'Riva sulla laguna', 'Giardino dei pitosfori'], text: "Anno del Signore 1576. La peste divora Venezia: un'anima su tre finisce nelle fosse.", vo: 'intro-01' },
+  { at: 11, to: 16.2, where: ['Sale espositive (antiche officine)'], text: 'Il Doge fa voto al Redentore: una chiesa, se il morbo cesserà. Palladio la innalza sulla Giudecca.', vo: 'intro-02' },
+  { at: 16.6, to: 21.8, where: ['Orti coltivati', 'Frutteto', 'Uliveto'], text: "I frati cappuccini ne custodiscono l'orto. Di notte vi seppelliscono i morti che nessuno reclama.", vo: 'intro-03' },
+  { at: 22.2, to: 27, where: ['Orti coltivati'], text: 'Venezia rende grazie. Ma il Reverendissimo non crede nella grazia: crede nel prezzo.', vo: 'intro-04' },
+  { at: 27.4, to: 31.6, where: ['Corridoio del convento'], text: 'Sotto la prima pietra mura un secondo voto, scritto col sangue degli appestati.', vo: 'intro-05' },
+  { at: 31.9, to: 35.4, where: ['Chiostro mediano'], text: '«Nessun morto lascerà la Giudecca. Serviranno questa casa in eterno.»', vo: 'intro-06' },
+  { at: 35.8, to: 39.6, where: ['Chiostro grande'], text: 'Una notte di luglio, sul ponte di barche in festa, il voto si compie.', vo: 'intro-07' },
+  { at: 39.9, to: 44.6, where: ['Chiostro grande', 'Coro dei frati'], text: 'I frati si levano dalle zolle. I preti smettono di respirare, non di pregare.', vo: 'intro-08' },
+  { at: 45, to: 49.5, where: ['Presbiterio', 'Crociera e cupola'], text: 'E lui, sotto la cupola, attende.', vo: 'intro-09' },
+  { at: 50, to: 56.8, where: ['Crociera e cupola'], text: 'Finché il voto regge, il Reverendissimo non può morire. Né vivere.', vo: 'intro-10' },
+  { at: 57.4, to: 62.8, where: ['Chiesa del Redentore: navata'], text: 'Le porte si sbarrano dall\'interno. Da allora la Giudecca non restituisce i suoi morti.', vo: 'intro-11' },
+  { at: 63.2, to: 67.8, where: ['Sagrato e scalinata', 'Fondamenta San Giacomo'], text: "Ma la terra dell'orto ha restituito anche te, Risorto. E tu ricordi il tuo nome.", vo: 'intro-12' },
+  { at: 68.2, to: 73, where: ['Fondamenta San Giacomo'], kind: 'final', text: 'Spezza il voto.', vo: 'intro-13' },
+];
+const CAPTION_FADE = 0.6; // s in and out
+
 export interface IntroPath {
   duration: number; // s
   /** The lens and its aim `t` seconds into the take. */
@@ -112,6 +138,15 @@ body.cinema > :not(canvas, #cinema) { visibility: hidden !important; }
 #cinema::after { bottom: 0; }
 #cinema i { position: absolute; inset: 0; background: #000; animation: cinema-in 2.5s ease-in forwards; }
 @keyframes cinema-in { to { opacity: 0; } }
+#cinema .cap { position: absolute; z-index: 1; left: 50%; bottom: calc(9vh + 3.5vh); transform: translateX(-50%); box-sizing: border-box;
+  width: min(880px, 100% - 32px); text-align: center; opacity: 0; font: italic clamp(15px, min(2.5vw, 4.6vh), 25px)/1.4 Georgia, 'Times New Roman', serif;
+  color: #efe2c2; letter-spacing: .02em; text-shadow: 0 0 2px #000, 0 2px 6px #000, 0 0 22px rgba(0,0,0,.9); }
+#cinema .cap.title { bottom: auto; top: 36%; font: 700 clamp(30px, min(6vw, 11vh), 64px)/1.1 Georgia, serif; text-transform: uppercase; letter-spacing: .16em;
+  color: #f6d98a; text-shadow: 0 0 3px #000, 0 0 24px rgba(200,120,30,.7), 0 0 60px rgba(120,40,0,.6); }
+#cinema .cap.title small { display: block; margin-top: .7em; font: italic 400 clamp(13px, min(2vw, 3.6vh), 20px)/1 Georgia, serif; text-transform: none; letter-spacing: .3em; color: #d9c79a; }
+#cinema .cap.final { bottom: auto; top: 42%; font: 700 clamp(24px, min(4.6vw, 8vh), 48px)/1.1 Georgia, serif; font-style: normal; text-transform: uppercase; letter-spacing: .22em;
+  color: #ffd27a; text-shadow: 0 0 3px #000, 0 0 30px rgba(255,120,30,.75), 0 0 70px rgba(160,20,0,.7); }
+body.diablo #cinema .cap.final, body.diablo #cinema .cap.title { color: #ff9a6a; }
 #cinema span { position: absolute; z-index: 1; right: calc(16px + env(safe-area-inset-right)); bottom: calc(9vh - 32px); font: 600 14px/24px Georgia, serif;
   color: #f3e6c4; opacity: .7; text-shadow: 0 1px 2px #000; }
 #cinema kbd { margin-right: 6px; padding: 1px 5px; font: 700 12px/1.2 sans-serif; color: #1a1208; background: #e0b55a; border-radius: 3px; }
@@ -129,6 +164,10 @@ export class Intro {
   private el = document.createElement('div');
   private look = new THREE.Vector3();
   private skipped = false;
+  private cap = document.createElement('div');
+  private line = -1; // the caption up, by index in CAPTIONS
+  /** A caption comes up: the hook for its voice-over (`c.vo`). */
+  onLine?: (c: Caption) => void;
 
   constructor(camera: THREE.Camera, endAt: THREE.Vector3, endLook: THREE.Vector3) {
     this.camera = camera;
@@ -138,6 +177,9 @@ export class Intro {
     document.head.append(style);
     this.el.id = 'cinema';
     this.el.innerHTML = '<i></i><span><kbd>Esc</kbd>Salta</span>';
+    this.cap.className = 'cap';
+    this.cap.setAttribute('aria-live', 'polite');
+    this.el.append(this.cap);
     document.body.append(this.el);
     document.body.classList.add('cinema');
     // Capture: while the take runs, no key or press reaches the game (no menu, no pointer lock, no jump).
@@ -174,6 +216,20 @@ export class Intro {
     }
     this.path.sample(this.time, this.camera.position, this.look);
     this.camera.lookAt(this.look);
+    this.caption();
     return true;
+  }
+
+  /** The caption for this moment of the take, faded in and out at its ends. */
+  private caption(): void {
+    const i = CAPTIONS.findIndex((c) => this.time >= c.at && this.time < c.to), c = CAPTIONS[i];
+    if (i !== this.line) {
+      this.line = i;
+      this.cap.className = `cap ${c?.kind ?? ''}`;
+      this.cap.textContent = c?.text ?? '';
+      if (c?.sub) this.cap.append(Object.assign(document.createElement('small'), { textContent: c.sub }));
+      if (c) this.onLine?.(c); // audio: playVoice(c.vo) once the lines are recorded
+    }
+    this.cap.style.opacity = c ? String(Math.min(1, (this.time - c.at) / CAPTION_FADE, (c.to - this.time) / CAPTION_FADE)) : '0';
   }
 }

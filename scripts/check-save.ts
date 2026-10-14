@@ -1,5 +1,5 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
-// booted world comes back the same (player, charge, key, open gates and their colliders, the
+// booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
 // dead staying dead, play time, the explored map); slots and the reload handoff survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
@@ -28,6 +28,7 @@ const a = boot();
 Object.assign(a.player.pos, { x: -10, y: 0, z: -90 });
 a.player.facing = 1.25;
 a.stats.hp = 700; a.stats.mana = 123; a.kit.charge = 60;
+a.quest.accepted = true;
 a.quest.takeKey();
 const grata = a.quest.gates.find((g) => g.id === 'grata-nord')!;
 a.quest.open(grata);
@@ -49,6 +50,16 @@ deserialize(b, s);
 if (b.player.pos.x !== -10 || b.player.pos.z !== -90 || b.player.facing !== 1.25) fail('player position not restored');
 if (b.stats.hp !== 700 || b.stats.mana !== 123 || b.kit.charge !== 60) fail('player stats not restored');
 if (!b.quest.key || !b.quest.chestOpen || b.quest.bossDead) fail('quest flags not restored');
+if (b.quest.stage !== 'boss') fail(`quest stage ${b.quest.stage} after load, want boss`);
+// A fresh game saved before talking to Fra' Zuane loads before his quest; a save from before him loads with it taken.
+const fresh = boot(), early = boot();
+deserialize(early, JSON.parse(JSON.stringify(serialize(fresh))));
+if (early.quest.stage !== 'talk') fail(`a save before the quest loads at ${early.quest.stage}`);
+const before = boot();
+const { accepted: _a, out: _o, ...oldQuest } = s.quest;
+deserialize(before, { ...s, quest: { ...oldQuest, key: false, gates: [] } });
+if (before.quest.stage !== 'key') fail(`a save from before Fra' Zuane loads at ${before.quest.stage}, want key`);
+if (!valid({ ...s, quest: oldQuest }) || valid({ ...s, quest: { ...s.quest, accepted: 'yes' } })) fail('quest stage field validation');
 const open = b.quest.gates.filter((g) => g.open).map((g) => g.id);
 if (open.join() !== 'grata-nord') fail(`open gates ${open}`);
 if (b.quest.gates.some((g) => g.open && b.quest['world'].boxes.includes(g.box))) fail('an opened gate still blocks');

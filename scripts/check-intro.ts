@@ -1,11 +1,13 @@
 // Intro flythrough check (`npm run check`): the opening take (camera/intro.ts) flies its whole
 // path without the lens touching or crossing any visible mesh of the level, passes over or
 // around every mob instead of through it, visits the places it is meant to in order, and comes
-// to rest exactly on the follow camera's pose behind the player at the spawn.
+// to rest exactly on the follow camera's pose behind the player at the spawn. The lore captions
+// come in order, never overlap, fit the take, stay short enough to read on a phone, and each one
+// is up while the lens is over the place it is written for.
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { introPath } from '../src/camera/intro.ts';
+import { CAPTIONS, introPath } from '../src/camera/intro.ts';
 import { EYE, ThirdPersonCamera } from '../src/camera/thirdPersonCamera.ts';
 import type { Input } from '../src/core/input.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
@@ -119,10 +121,22 @@ let i = 0;
 for (const v of visited) if (v === ROUTE[i]) i++;
 if (i < ROUTE.length) fail(`route: never reaches "${ROUTE[i]}" in order; visited ${visited.join(' > ')}`);
 
+// Captions: in order, apart, inside the take, at most ~2 lines (110 characters), at least ~14 characters a second of reading time, over their places.
+CAPTIONS.forEach((c, k) => {
+  const prev = CAPTIONS[k - 1];
+  if (c.to <= c.at || (prev && c.at < prev.to) || c.to > path.duration) fail(`caption ${c.vo}: ${c.at}..${c.to} s out of order or past the ${path.duration.toFixed(1)} s take`);
+  if (c.text.length > 110) fail(`caption ${c.vo}: ${c.text.length} characters, too long for a phone`);
+  if (c.text.length / (c.to - c.at) > 21) fail(`caption ${c.vo}: ${(c.text.length / (c.to - c.at)).toFixed(0)} characters a second, too fast to read`);
+  if (!c.where.length) return;
+  const seen = new Set<string>();
+  for (let t = c.at; t <= c.to; t += 0.1) { path.sample(t, at, look); seen.add(level.areaAt(at.x, at.z)?.label ?? ''); }
+  if (!c.where.some((w) => seen.has(w))) fail(`caption ${c.vo} is meant for ${c.where.join(' / ')} but the lens is over ${[...seen].join(' / ')}`);
+});
+
 path.sample(path.duration, at, look);
 if (at.distanceTo(endAt) > 1e-3 || look.distanceTo(endLook) > 1e-3) fail(`the take ends at ${fmt(at)} looking at ${fmt(look)}, not on the follow camera ${fmt(endAt)} -> ${fmt(endLook)}`);
 
-console.log(`intro: ${path.duration.toFixed(1)} s, ${visited.length} areas crossed, ${mobs.length} mobs cleared, ${(performance.now() - t0).toFixed(0)} ms`);
+console.log(`intro: ${path.duration.toFixed(1)} s, ${CAPTIONS.length} captions, ${visited.length} areas crossed, ${mobs.length} mobs cleared, ${(performance.now() - t0).toFixed(0)} ms`);
 if (failed) {
   console.error(`${failed} intro check(s) failed`);
   process.exit(1);

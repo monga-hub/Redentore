@@ -14,10 +14,16 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
   cui scappare) con tre api operaie; fuori dalla portata dei sentieri lastricati. In chiesa due sacerdoti
   (bianco e viola, magia + mischia) con due preti ciascuno — a capo della navata e dietro l'altare —
   e il boss, il Reverendissimo, sotto la cupola (magia, mischia, nova d'ombra da cui scappare).
-- Progressione: il portone della chiesa è sbarrato. Dalla calle si attraversa il convento e l'orto
-  fino al pontile sulla laguna, dove un baule custodisce la chiave delle grate del chiostro grande;
-  dal chiostro si entra in chiesa dalla porta del coro. Morto il Reverendissimo, tutti i nemici
-  cadono e il portone si apre sulla fondamenta.
+- Progressione (missione "La chiave del portinaio"): il portone della chiesa è sbarrato. Sulla
+  fondamenta Fra' Zuane, il fantasma incatenato del portinaio dei cappuccini (punto esclamativo
+  dorato), affida la missione in una finestra di dialogo stile WoW (ritratto, testo scritto a
+  macchina, Accetta / Rifiuta); finché non la si accetta il baule resta sigillato. Dalla calle si
+  attraversa il convento e l'orto fino al pontile sulla laguna, dove un baule-reliquiario custodisce
+  la chiave delle grate del chiostro grande (il coperchio si spalanca in una pioggia d'oro e la
+  chiave sale dal baule); dal chiostro si entra in chiesa dalla porta del coro. Morto il
+  Reverendissimo, tutti i nemici cadono e il portone si apre: uscire sulla fondamenta chiude la
+  missione. L'obiettivo corrente sta sotto la minimappa (a sinistra su touch); Fra' Zuane ha una
+  battuta per ogni fase e nessuno può attaccarlo.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile
@@ -37,7 +43,10 @@ Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node)
 Una nuova partita si apre con un piano sequenza in tempo reale (`src/camera/intro.ts`):
 dalla laguna alle sale espositive, l'orto, il corridoio, i chiostri mediano e grande, la
 chiesa, un giro attorno al Reverendissimo e fuori dal portone che si chiude, fino alla
-camera dietro al personaggio. Esc, Spazio, Invio, clic o tap la saltano; una partita
+camera dietro al personaggio. Sopra scorre l'antefatto in didascalie cinematografiche, una per
+luogo (`CAPTIONS`: la peste del 1576, il voto e Palladio, i morti sepolti nell'orto, il secondo
+voto del Reverendissimo, la notte del Redentore, il Risorto), ciascuna con l'id della sua futura
+voce narrante (`Intro.onLine`). Esc, Spazio, Invio, clic o tap la saltano; una partita
 caricata parte senza intro.
 
 ## Controlli
@@ -54,7 +63,7 @@ caricata parte senza intro.
 | Q / E | ruota la camera |
 | 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti); 9 = pozione |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
-| F | interagisci (apri baule, grate, porte); su touch tocca il riquadro che appare |
+| F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
 trascina sul resto dello schermo per la camera, pizzica per lo zoom; a destra le
@@ -94,7 +103,7 @@ com'è e passa alla visuale Diablo quando si prende il controllo.
   una luce calda che segue l'eroe, torce più forti; all'aperto (orto, giardini, laguna) la notte
   si schiarisce quanto basta a leggere piante, sentieri e nemici, chiesa e chiostri restano bui
   (`src/fx/atmosphere.ts`); numeri di danno, scintille, sangue a terra che si asciuga e una colonna
-  di luce sui nemici caduti e sul baule della chiave (`src/fx/diabloFx.ts`); HUD in ferro scuro e
+  di luce sui nemici caduti e, a missione accettata, sul baule della chiave (`src/fx/diabloFx.ts`); HUD in ferro scuro e
   rosso sangue.
 - Arredo gotico Meshy, solo in questa modalità e caricato la prima volta che la si attiva
   (`src/level/gothic.ts`, `public/models/gotico.glb`): cumuli di teschi, ossa, candelabri,
@@ -179,9 +188,14 @@ src/
                              Reverendissimo arcivescovo-lich gigante (pastorale); animazioni
                              (reazioni, colpi alternati, morti varie), dardi d'ombra con scia,
                              nova del boss telegrafata a terra
-  quest/progress.ts          stato della progressione: grate e porte (collider rimovibili), baule
-                             con la chiave, prompt di interazione, vittoria. Nessuna dipendenza da three
-  quest/view.ts              grate e battenti animati, baule, prompt "F", barra del boss, banner di vittoria
+  quest/progress.ts          stato della progressione: fasi della missione, grate e porte (collider
+                             rimovibili), baule con la chiave, Fra' Zuane, prompt di interazione,
+                             vittoria. Nessuna dipendenza da three
+  quest/dialogue.ts          battute di Fra' Zuane per fase, obiettivi del tracker
+  quest/npc.ts               Fra' Zuane (Meshy, idle e gesti mentre parla, "!" sulla testa)
+  quest/view.ts              grate e battenti animati, baule Meshy col coperchio che si apre e il
+                             bottino, prompt "F", tracker della missione, barra del boss, banner di vittoria
+  ui/dialogue.ts             finestra di dialogo stile WoW (ritratto, testo a macchina, Accetta / Rifiuta)
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
                              pergole; registra collider e aree

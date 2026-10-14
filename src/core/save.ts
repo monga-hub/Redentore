@@ -1,9 +1,10 @@
 // Saved games: the state worth keeping as plain JSON (player, quest flags, who is dead, play
-// time, the map explored so far), three localStorage slots, and the handoff that carries a loaded game across a reload.
+// time, the map explored so far, level, XP and level-up picks), three localStorage slots, and the handoff that carries a loaded game across a reload.
 // Loading and "Nuova partita" reload the page so every system boots clean (no stray bolts,
 // cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
+import { CARD, levelOf } from '../player/levels.ts';
 import type { Quest } from '../quest/progress.ts';
 
 const VERSION = 1;
@@ -21,6 +22,10 @@ export interface GameState {
   dead: number[]; // indices into Game.mobs
   time: number; // s played
   fog?: string; // Discovery.encode(); absent in saves from before the fog of war, which load fully fogged
+  // Level-up cards in the order picked, XP and the level it makes (lv is for readers: XP decides). Absent in
+  // saves from before the levels: they load at level 1 with the starting kit, and as XP is the worth of the
+  // dead, the level-ups their kills earned are offered one after another right after the load.
+  build?: { xp: number; lv: number; picks: string[] };
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -28,6 +33,8 @@ export interface Game {
   player: { pos: { x: number; y: number; z: number }; facing: number };
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
   kit: { charge: number };
+  /** `apply` lays the picks on the kit and stats (raising hpMax), so a load runs it before restoring hp. */
+  levels: { xp: number; picks: string[]; apply(): void };
   quest: Quest;
   mobs: { state: string; hp: number; t: number }[];
   time: number;
@@ -43,6 +50,7 @@ export function serialize(g: Game): GameState {
     dead: g.mobs.flatMap((m, i) => (m.state === 'dead' ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
+    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks] },
   };
 }
 
@@ -51,6 +59,9 @@ export function deserialize(g: Game, s: GameState): void {
   const p = s.player;
   Object.assign(g.player.pos, { x: p.x, y: p.y, z: p.z });
   g.player.facing = p.yaw;
+  g.levels.xp = s.build?.xp ?? 0;
+  g.levels.picks = (s.build?.picks ?? []).filter((id) => CARD.has(id)); // a card from another build is dropped
+  g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
   g.stats.hp = Math.min(Math.max(p.hp, 1), g.stats.hpMax); // never wake up dead
   g.stats.mana = Math.min(Math.max(p.mana, 0), g.stats.manaMax);
   g.kit.charge = p.charge;
@@ -73,7 +84,8 @@ export function valid(s: unknown): s is GameState {
   return !!o && o.v === VERSION && !!o.player && ['x', 'y', 'z', 'yaw', 'hp', 'mana', 'charge'].every((k) => num(o.player[k as keyof GameState['player']]))
     && !!o.quest && typeof o.quest.key === 'boolean' && typeof o.quest.bossDead === 'boolean' && Array.isArray(o.quest.gates)
     && ['accepted', 'out'].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out']))
-    && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string');
+    && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
+    && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')));
 }
 
 export interface Slot { label: string; savedAt: number; state: GameState }

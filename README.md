@@ -35,7 +35,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti, boss e api + salvataggi + volo dell'intro senza compenetrazioni
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -61,7 +61,8 @@ caricata parte senza intro.
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato); 9 = pozione all'inizio |
+| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato). Si parte con Caduta d'ossa (1), Nube di peste (2) e la pozione (9); le altre arrivano coi livelli |
+| 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 
@@ -197,7 +198,10 @@ src/
                              tooltip, errori, testo di combattimento); ui/icons.ts icone SVG
   abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s, off-GCD,
                              lanci, canalizzate, interruzione al movimento. Nessun DOM/three
-  abilities/forsaken.ts      le 8 abilità del Reietto (tabella `ABILITIES`, ordine `BAR`)
+  abilities/forsaken.ts      le abilità del Reietto (tabella `ABILITIES`, ordine `BAR`), numeri vivi in `tune`
+  player/levels.ts           livelli d'esperienza: curva, XP dai morti, le carte (nuove abilità,
+                             potenziamenti, passivi, fusioni) e l'offerta da due. Nessun DOM/three
+  ui/levelUp.ts              finestra di scelta delle due carte, lampo "Livello N!"
   abilities/vfx.ts           effetti di tutti gli incantesimi, in pool e senza allocazioni per
                              frame: particelle su quad da un atlante procedurale (bagliori,
                              scintille stirate, fumo che si erode, schegge, fiamme), scie, decal
@@ -255,6 +259,7 @@ src/
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest
 scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sistema abilità
+scripts/check-levels.ts      curva XP, offerte delle carte su molte partite casuali, fusioni, slot riservati
 ```
 
 ### Dove agganciarsi (navi successive)

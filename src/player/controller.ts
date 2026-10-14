@@ -12,6 +12,8 @@ export class PlayerController {
   readonly model = new UndeadModel();
   /** Dead and falling: keys, stick and steering are ignored (gravity still applies). */
   frozen = false;
+  /** Run speed × (level-up card). */
+  speed = 1;
   readonly pos = new THREE.Vector3(); // feet position
   private vy = 0;
   grounded = true; // read by the footsteps (audio/director.ts)
@@ -54,7 +56,7 @@ export class PlayerController {
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward
     if (!f && !r) { f = -input.stickY; r = input.stickX; } // touch stick: analog, |v| <= 1
     if (this.frozen) { f = r = 0; steer = undefined; turnToCamera = false; }
-    const speed = (input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN);
+    const speed = input.down('ShiftLeft', 'ShiftRight') ? WALK : RUN * this.speed;
 
     // forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw)
     const sin = Math.sin(camYaw), cos = Math.cos(camYaw);

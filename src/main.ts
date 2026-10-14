@@ -8,7 +8,9 @@ import { Intro } from './camera/intro.ts';
 import { Hud } from './ui/hud.ts';
 import { TouchControls } from './ui/touch.ts';
 import { Atmosphere } from './fx/atmosphere.ts';
-import { Forsaken } from './abilities/forsaken.ts';
+import { ABILITIES, Forsaken, tune } from './abilities/forsaken.ts';
+import { CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
+import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
 import { PlayerStats } from './player/stats.ts';
 import { Targeting } from './ui/target.ts';
@@ -68,6 +70,18 @@ scene.add(kit.vfx.root);
 const questView = new QuestView(quest, kit.vfx); // gates, chest, Fra' Zuane and his dialogue, tracker
 scene.add(questView.root);
 const bar = new ActionBar(kit.system);
+const levels = new Levels(); // XP from the dead, the cards picked; laid on the kit by `apply`
+const levelUp = new LevelUp(); // the two-card window
+levels.apply = () => {
+  Object.assign(tune, tuneOf(levels.picks));
+  playerStats.grow(tune.hp, tune.mana);
+  playerStats.armor = tune.armor;
+  playerStats.regen = tune.regen;
+  player.speed = tune.speed;
+  kit.system.chargeMul = tune.fury;
+  kit.system.chargeAfter = tune.furyStart;
+  for (const id of tune.owned) kit.system.unlock(id);
+};
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
 scene.add(friars.root);
 const priests = new Priests(level.world, kit.vfx, playerStats, level.areas); // undead priests casting in the cloisters
@@ -102,13 +116,13 @@ function wake(): void {
   player.model.revive();
   kit.system.notices.push({ kind: 'error', text: at === SPAWN ? 'Sei caduto. Ti risvegli sulla fondamenta.' : 'Sei caduto. Ti risvegli alla porta del coro.' });
 }
-kit.hurt = (inside, n) => { friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
+kit.hurt = (inside, n) => { n *= tune.dmg; friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all];
 kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
-const MAIN = kit.system.slots[0]!; // Caduta d'ossa, the swing a click-attack repeats
-dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(0);
+const MAIN = ABILITIES.find((a) => a.id === 'fall')!; // Caduta d'ossa, the swing a click-attack repeats, wherever it sits on the bar
+dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(kit.system.slots.indexOf(MAIN));
 const AIMED = new Set(['fall', 'step', 'plague', 'strike']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
 const occlusion = new Occlusion([level.root, fx.torches.root], level, [ // walls drop, roofs and props in the way fade out, Diablo view
@@ -118,7 +132,8 @@ const head = new THREE.Vector3();
 // Saved games index the mobs: the original friars and every priest first, as before the new friar groups and the bees, which follow.
 const old = GROUPS.flat().length;
 const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all];
-const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery };
+const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels };
+const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
 if (loaded) {
   deserialize(game, loaded);
@@ -126,6 +141,26 @@ if (loaded) {
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: 'Partita caricata' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
+let kills = mobs.filter((m) => m.state === 'dead').length; // Sete d'anime heals on new ones only
+let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
+const picked = (id: string) => levels.picks.filter((p) => p === id).length;
+/** The next level-up's two cards; the world holds still until one is picked. */
+function openLevelUp(): void {
+  kit.system.cancel();
+  input.consume();
+  dctl.stop();
+  levelUp.show(levels.picks.length + 2, offer(levels.picks), picked, (c: Card) => {
+    levels.picks.push(c.id);
+    levels.apply();
+    if (c.id === 'linfa') {
+      const h = playerStats.heal(playerStats.hpMax * 0.3);
+      playerStats.restoreMana(playerStats.manaMax * 0.3);
+      if (h > 0) kit.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
+    }
+    kit.ascend();
+    kit.system.notices.push({ kind: 'info', text: c.kind === 'ability' ? `Nuova abilità: ${c.name}` : c.name });
+  });
+}
 // A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
 cam.update(0, input, player.pos);
 const intro = loaded ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE), audioReady);
@@ -202,14 +237,15 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.05);
-  if (menu.paused || worldMap.open || questView.talking) { // the world holds still behind the menu, map or dialogue; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but Fra' Zuane talks on
+    if (levelUp.open && !menu.paused) levelUp.update(dt);
     input.consume();
     input.endFrame();
     audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open, pressed); // the dialogue window ducks the music itself
@@ -265,6 +301,17 @@ renderer.setAnimationLoop(() => {
     questView.victory();
     player.model.play('victory', 0.4);
   }
+  if (!quest.bossDead) { // XP is the worth of the dead; the boss's fall takes everyone with it and ends the levelling
+    let xp = 0, dead = 0;
+    mobs.forEach((m, i) => { if (m.state === 'dead') { xp += worth[i]; dead++; } });
+    if (dead > kills && tune.leech) playerStats.heal(playerStats.hpMax * tune.leech * (dead - kills));
+    kills = dead;
+    levels.xp = xp;
+    if (levels.lv > shownLv) levelUp.flash((shownLv = levels.lv));
+    if (levels.pending > 0 && dying <= 0 && !playerStats.dead) openLevelUp();
+  }
+  const lv = levelOf(levels.xp);
+  hud.setLevel(lv.lv, lv.into, lv.next);
   if (diablo) dcam.update(dt, input, player.pos);
   else cam.update(dt, input, player.pos);
   blend.apply(cam.camera, dt);

@@ -9,7 +9,11 @@ const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
 const LAYOUT = 'redentore.bar';
 
-/** The player's arrangement of `def` if one is stored and still holds exactly the same abilities, else `def`. */
+/**
+ * The player's arrangement of `def` if one is stored and still holds exactly the same abilities, else `def`.
+ * The layout places every ability, owned or not (AbilitySystem shows the owned ones), so a slot the player
+ * gave an ability before it was unlocked is kept for it, and unlocks never disturb a dragged bar.
+ */
 export function loadBar(def: (string | null)[], store?: Storage): (string | null)[] {
   try {
     const s: unknown = JSON.parse((store ?? localStorage).getItem(LAYOUT) ?? 'null');
@@ -72,18 +76,28 @@ export class AbilitySystem<C extends Caster = Caster> {
   aim?: (a: Ability<C>) => void;
   /** Mana pool abilities with a `mana` cost draw from (player/stats.ts). Absent = free. */
   pool?: { mana: number; spendMana(n: number): boolean };
-  /** What each bar slot holds; the player rearranges it by dragging (`swap`). */
+  /** Charge gained per cast ×; after a special the bar restarts at `chargeAfter` (level-up cards). */
+  chargeMul = 1;
+  chargeAfter = 0;
+  /** What each bar slot shows: its ability once owned. The player rearranges it by dragging (`swap`). */
   readonly slots: (Ability<C> | undefined)[];
+  private bar: (string | null)[];
+  private byId: Map<string, Ability<C>>;
+  private owned: Set<string>;
   private cds = new Map<string, number>();
   private moving = false;
   private last: { x: number; y: number; z: number };
 
   readonly ctx: C;
 
-  constructor(abilities: Ability<C>[], bar: (string | null)[], ctx: C) {
+  /** `owned`: the abilities shown from the start (default all); `unlock` adds more. */
+  constructor(abilities: Ability<C>[], bar: (string | null)[], ctx: C, owned?: Iterable<string>) {
     this.ctx = ctx;
-    const byId = new Map(abilities.map((a) => [a.id, a]));
-    this.slots = KEYS.map((_, i) => (bar[i] ? byId.get(bar[i]!) : undefined));
+    this.byId = new Map(abilities.map((a) => [a.id, a]));
+    this.bar = KEYS.map((_, i) => bar[i] ?? null);
+    this.owned = new Set(owned ?? abilities.map((a) => a.id));
+    this.slots = [];
+    this.fill();
     const p = ctx.player.pos;
     this.last = { x: p.x, y: p.y, z: p.z };
   }
@@ -153,14 +167,29 @@ export class AbilitySystem<C extends Caster = Caster> {
     KEYS.forEach((k, i) => { if (pressed(k)) this.tryCast(i); });
   }
 
-  /** Exchange two bar slots (one may be empty): keys and buttons follow the slots, cooldowns the abilities. */
+  /** Exchange two bar slots (one may look empty): keys and buttons follow the slots, cooldowns the abilities. */
   swap(i: number, j: number): void {
-    [this.slots[i], this.slots[j]] = [this.slots[j], this.slots[i]];
+    [this.bar[i], this.bar[j]] = [this.bar[j], this.bar[i]];
+    this.fill();
   }
 
-  /** The bar as ability ids, the shape `loadBar` reads back. */
+  /** Show ability `id` on the bar, in the slot the layout keeps for it. */
+  unlock(id: string): void {
+    this.owned.add(id);
+    this.fill();
+  }
+
+  owns(id: string): boolean {
+    return this.owned.has(id);
+  }
+
+  /** The bar as ability ids, locked ones too: the shape `loadBar` reads back. */
   layout(): (string | null)[] {
-    return this.slots.map((a) => a?.id ?? null);
+    return [...this.bar];
+  }
+
+  private fill(): void {
+    this.bar.forEach((id, i) => { this.slots[i] = id && this.owned.has(id) ? this.byId.get(id) : undefined; });
   }
 
   /** Interrupt whatever is being cast (e.g. Esc). */
@@ -180,7 +209,7 @@ export class AbilitySystem<C extends Caster = Caster> {
   private start(a: Ability<C>): void {
     this.cds.set(a.id, a.cooldown);
     if (a.mana) this.pool?.spendMana(a.mana);
-    this.charge = a.special ? 0 : Math.min(CHARGE_MAX, this.charge + (a.charge ?? 0));
+    this.charge = a.special ? this.chargeAfter : Math.min(CHARGE_MAX, this.charge + (a.charge ?? 0) * this.chargeMul);
   }
 
   private stop(ok: boolean): void {

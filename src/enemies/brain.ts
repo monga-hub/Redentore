@@ -6,6 +6,7 @@ import { PLAYER, type World } from '../core/physics.ts';
 
 export const FRIAR = {
   hp: 60,
+  xp: 10, // experience for killing one (player/levels.ts)
   aggro: 9, // m: the player this close (and roughly level) pulls the group
   leash: 24, // m from home before the friar gives up and evades
   speed: 3.6, // chase m/s, under the player's 6 so they can be kited

@@ -13,7 +13,8 @@ import { ICONS } from './icons.ts';
 // them instead (`grab`), without casting; keys still cast on press and stay
 // with the slots, so the player's own arrangement is what 1..0 cast. Touch is unchanged.
 // A half-ring over the main button (slot 0, the big one on touch) shows the charge bar,
-// green → yellow → red when full; until then the specials stay greyed out.
+// green → yellow → red when full; until then the specials stay greyed out. It shows once a special
+// is on the bar; abilities unlocked by a level-up appear in their slot by themselves.
 
 /** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px]. */
 const RING: Record<number, [number, number, number]> = {
@@ -112,6 +113,9 @@ export class ActionBar<C extends Caster> {
 
   render(dt: number, pressed: (code: string) => boolean): void {
     const sys = this.sys;
+    this.slots.forEach((s, i) => { if (s.ability !== sys.slots[i]) this.paint(i); }); // unlocked meanwhile
+    const fury = sys.slots.some((a) => a?.special);
+    if (this.gauge && this.gauge.classList.contains('off') === fury) this.gauge.classList.toggle('off', !fury);
     if (sys.charge !== this.charge && this.gauge) {
       const full = sys.charge >= CHARGE_MAX, f = this.gauge.lastElementChild as SVGElement;
       if (full && this.charge >= 0) this.float('Furia piena!', 'fury');

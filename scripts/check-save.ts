@@ -1,21 +1,24 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
-// dead staying dead, play time, the explored map); slots and the reload handoff survive storage and refuse junk.
+// dead staying dead, play time, the explored map, level-up picks and XP); slots and the reload handoff survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
 import { deserialize, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
+import { PlayerStats } from '../src/player/stats.ts';
+import { tuneOf } from '../src/player/levels.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
 function boot(): Game {
-  const level = buildLevel();
+  const level = buildLevel(), stats = new PlayerStats();
   return {
     player: { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: SPAWN.yaw },
-    stats: { hp: 1280, mana: 400, hpMax: 1280, manaMax: 400 },
+    stats,
     kit: { charge: 0 },
+    levels: { xp: 0, picks: [], apply() { const t = tuneOf(this.picks); stats.grow(t.hp, t.mana); } }, // main.ts lays the rest on the kit
     quest: new Quest(level.world),
     mobs: spawnGroups(level.world).flat(),
     time: 0,
@@ -90,4 +93,25 @@ const list = slots(store);
 if (list.length !== 3 || list[0] || list[1]?.label !== 'Orti' || list[2]) fail('slots misread');
 setPending(s, store);
 if (!takePending(store) || takePending(store)) fail('pending state not taken exactly once');
+// Levels: picks and XP round-trip; an hp pick's raised max is in place before the saved hp is clamped to it.
+const lv = boot();
+lv.levels.picks = ['step', 'hp', 'dmg'];
+lv.levels.xp = 170;
+lv.levels.apply();
+lv.stats.hp = 1450;
+const ls = JSON.parse(JSON.stringify(serialize(lv)));
+if (ls.build.lv !== 5 || ls.build.picks.join() !== 'step,hp,dmg') fail(`build saved as ${JSON.stringify(ls.build)}`);
+const lb = boot();
+deserialize(lb, ls);
+if (lb.levels.picks.join() !== 'step,hp,dmg' || lb.levels.xp !== 170) fail('picks or XP not restored');
+if (lb.stats.hpMax !== 1472 || lb.stats.hp !== 1450) fail(`hp ${lb.stats.hp} / ${lb.stats.hpMax} after load, want 1450 / 1472`);
+// A save from before the levels loads at level 1 with the starting kit (main.ts then offers what its dead earned);
+// a card id this build doesn't know is dropped; a malformed build is refused.
+const pre = boot();
+deserialize(pre, s.build ? (({ build: _b, ...o }) => o)(s) : s);
+if (pre.levels.picks.length || pre.levels.xp || pre.stats.hpMax !== 1280) fail('a save from before the levels loads with a build');
+const odd = boot();
+deserialize(odd, { ...ls, build: { ...ls.build, picks: ['hp', 'from_the_future'] } });
+if (odd.levels.picks.join() !== 'hp') fail('unknown card kept');
+if (!valid({ ...s, build: undefined }) || valid({ ...s, build: { xp: 1, lv: 1, picks: [3] } }) || valid({ ...s, build: { xp: '1', lv: 1, picks: [] } })) fail('build field validation');
 console.log('save system ok');

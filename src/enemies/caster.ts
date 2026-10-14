@@ -9,7 +9,7 @@ import type { World } from '../core/physics.ts';
 import { face, feet, walk, type Target } from './brain.ts';
 
 export interface CasterKind {
-  hp: number; aggro: number; leash: number; blind: number; range: number; keep: number; backoff: number;
+  hp: number; xp: number; aggro: number; leash: number; blind: number; range: number; keep: number; backoff: number;
   speed: number; back: number; walk: number; cast: number; cooldown: number; bolt: number; life: number;
   damage: number; radius: number; margin: number;
   /** Staff swing when the player is in reach (sacerdoti, boss): rooted for `swing` s, lands at `windup` if still within `hit`. */
@@ -20,6 +20,7 @@ export interface CasterKind {
 
 export const PRIEST: CasterKind = {
   hp: 50, // casters are squishy: five bone slashes
+  xp: 10, // experience for killing one (player/levels.ts); every kind below sets its own
   aggro: 12, // m, and in line of sight
   leash: 26, // m between the player and the priest's spot before it gives up and evades
   blind: 6, // s without line of sight while pulled before evading
@@ -42,6 +43,7 @@ export const PRIEST: CasterKind = {
 export const SACERDOTE: CasterKind = {
   ...PRIEST,
   hp: 260, // ~10 s of the player's full rotation
+  xp: 40,
   aggro: 13, leash: 40, blind: 10,
   range: 18, keep: 0, // never backpedals: walks into melee
   speed: 3.4, cast: 1.8, cooldown: 3.2, damage: 45,
@@ -58,6 +60,7 @@ export const SACERDOTE: CasterKind = {
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
   hp: 1100,
+  xp: 0, // his fall ends the run
   aggro: 15, leash: 60, blind: 15,
   range: 22, keep: 0,
   speed: 3, walk: 6, cast: 2.2, cooldown: 4, bolt: 11, life: 5, damage: 55,
@@ -77,6 +80,7 @@ export const REVERENDISSIMO: CasterKind = {
 export const APE: CasterKind = {
   ...PRIEST,
   hp: 550,
+  xp: 80,
   aggro: 6, leash: 30, blind: Infinity, // off the paved paths' reach: the player steps into the frutteto to pull it
   range: 0, keep: 0,
   speed: 4.4, walk: 6,
@@ -88,6 +92,7 @@ export const APE: CasterKind = {
 export const APETTA: CasterKind = {
   ...APE,
   hp: 30,
+  xp: 5,
   aggro: 5,
   speed: 5.2, walk: 7,
   radius: 0.35, margin: 0.5,

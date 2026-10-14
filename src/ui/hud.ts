@@ -7,6 +7,9 @@ export class Hud {
   private last = '';
   private hp = new Bar(document.querySelector<HTMLElement>('#unit .hp')!);
   private mp = new Bar(document.querySelector<HTMLElement>('#unit .mp')!);
+  private xp = new Bar(document.querySelector<HTMLElement>('#unit .xp')!);
+  private lv = document.querySelector<HTMLElement>('#unit .lv')!;
+  private lastLv = 0;
   private lastHp = -1;
 
   constructor() {
@@ -21,6 +24,17 @@ export class Hud {
     this.zone.classList.remove('show');
     void this.zone.offsetWidth; // restart the fade animation
     if (text) this.zone.classList.add('show');
+  }
+
+  /** Level badge and the XP bar into the next level (full at the cap); the badge pops on a level-up. */
+  setLevel(lv: number, into: number, next: number): void {
+    if (next) this.xp.set(into, next);
+    else this.xp.set(1, 1);
+    if (lv === this.lastLv) return;
+    this.lv.textContent = String(lv);
+    this.lv.title = `Livello ${lv}`;
+    if (this.lastLv) { this.lv.classList.remove('up'); void this.lv.offsetWidth; this.lv.classList.add('up'); }
+    this.lastLv = lv;
   }
 
   setStats(s: PlayerStats): void {

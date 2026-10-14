@@ -60,6 +60,18 @@
       }
       .res.mp span { line-height: 12px; }
       .res.hp.low .fill { animation: lowhp .7s ease-in-out infinite alternate; }
+      /* Experience (src/player/levels.ts): a thin violet bar under mana, the level on a badge at the portrait's foot. */
+      .res.xp { height: 5px; margin-top: 3px; }
+      .res.xp .fill { background: linear-gradient(#e2b8ff, #9a4ae0 55%, #4a1080); }
+      .res.xp .lag { background: #f3e2ff; }
+      .res.xp span { display: none; }
+      #unit .lv {
+        position: absolute; left: 42px; top: 44px; z-index: 2; min-width: 24px; height: 24px; padding: 0 3px; box-sizing: border-box; border-radius: 12px;
+        background: radial-gradient(#4a3418, #120a04); border: 2px solid #c9a45c; box-shadow: 0 0 0 1px #000, 0 2px 6px #000;
+        color: #ffd75e; font: bold 12px/20px Georgia, serif; text-align: center; text-shadow: 0 1px 2px #000;
+      }
+      #unit .lv.up { animation: lvup 1.2s ease-out; }
+      @keyframes lvup { 0%, 40% { transform: scale(1.6); box-shadow: 0 0 0 1px #000, 0 0 18px 6px rgba(255,200,90,.9); } }
       @keyframes lowhp { to { filter: brightness(1.7) } }
 
       /* Minimap (src/ui/minimap.ts): round chart in a bronze ring, top right, zone name on a plate
@@ -177,6 +189,7 @@
       .slot.main { overflow: visible; }
       .slot.main .icon, .slot.main .sweep { overflow: hidden; border-radius: inherit; }
       .slot .charge { position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); overflow: visible; pointer-events: none; }
+      .slot .charge.off { display: none; }
       .charge path { fill: none; stroke: rgba(0,0,0,.75); stroke-width: 7; stroke-linecap: round; }
       .charge .fill { stroke-width: 4.5; stroke-dasharray: 0 100; transition: stroke-dasharray .25s; }
       .charge.full .fill { filter: drop-shadow(0 0 3px #ff3b2f); animation: proc .6s ease-in-out infinite alternate; }
@@ -286,6 +299,9 @@
       body.diablo .res.mp { height: 6px; margin-top: 5px; }
       body.diablo .res.mp span { display: none; }
       body.diablo .res.mp .fill { background: linear-gradient(#5a9cff, #1440b0); }
+      body.diablo .res.xp { height: 4px; margin-top: 4px; }
+      body.diablo .res.xp .fill { background: linear-gradient(#ffd27a, #b07a10); }
+      body.diablo #unit .lv { left: 46px; top: 48px; border-radius: 2px; border-color: #77705f; background: radial-gradient(#2b2520, #0b0908); color: #ff8a5a; }
       body.diablo .res .lag { background: #ffe0b8; }
       body.diablo .res span { line-height: 15px; }
       body.diablo .ring { border: 2px solid #15120f; background: radial-gradient(circle at 50% 40%, #2b1712, #070404);
@@ -338,8 +354,8 @@
   <body>
     <div id="zone"></div>
     <div id="unit">
-      <div class="portrait"></div>
-      <div class="frame"><div class="name">Risorto</div><div class="res hp"></div><div class="res mp"></div></div>
+      <div class="portrait"></div><b class="lv" title="Livello">1</b>
+      <div class="frame"><div class="name">Risorto</div><div class="res hp"></div><div class="res mp"></div><div class="res xp" title="Esperienza"></div></div>
       <div id="target" class="frame" hidden><div class="name"></div><div class="res hp"></div></div>
     </div>
     <div id="minimap">

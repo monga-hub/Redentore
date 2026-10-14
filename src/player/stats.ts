@@ -2,7 +2,6 @@
 // `takeDamage`, abilities `spendMana`/`heal`. No DOM and no three.js, so `npm run check`
 // exercises it in Node. Also exposed as `window.playerStats` (see main.ts).
 
-const MANA_REGEN = 2.5; // mana/s, always on
 export const VEIL_CUT = 0.5; // Velo spettrale: share of incoming damage it takes off
 
 export class PlayerStats {
@@ -16,12 +15,26 @@ export class PlayerStats {
   /** Called with the damage actually taken, before `onDeath` (the hero flinches). */
   onHurt?: (n: number) => void;
 
-  readonly hpMax: number;
-  readonly manaMax: number;
+  hpMax: number;
+  manaMax: number;
+  /** Level-up cards: share of incoming damage taken, and mana/s, always on. */
+  armor = 1;
+  regen = 2.5;
+  private base: [number, number];
 
   constructor(hpMax = 1280, manaMax = 400) {
     this.hp = this.hpMax = hpMax;
     this.mana = this.manaMax = manaMax;
+    this.base = [hpMax, manaMax];
+  }
+
+  /** Scale the maxima off the starting ones; what a raise adds is filled in at once. */
+  grow(hp: number, mana: number): void {
+    const h = Math.round(this.base[0] * hp), m = Math.round(this.base[1] * mana);
+    if (!this.dead) this.hp = Math.min(h, this.hp + Math.max(0, h - this.hpMax));
+    this.mana = Math.min(m, this.mana + Math.max(0, m - this.manaMax));
+    this.hpMax = h;
+    this.manaMax = m;
   }
 
   get dead(): boolean {
@@ -31,7 +44,7 @@ export class PlayerStats {
   /** Returns the damage actually taken. */
   takeDamage(n: number): number {
     if (this.dead || !(n > 0) || this.immune > 0) return 0;
-    const d = Math.min(this.veil > 0 ? n * (1 - VEIL_CUT) : n, this.hp);
+    const d = Math.min((this.veil > 0 ? n * (1 - VEIL_CUT) : n) * this.armor, this.hp);
     this.hp -= d;
     if (d > 0) this.onHurt?.(d);
     if (this.dead) this.onDeath?.();
@@ -67,7 +80,7 @@ export class PlayerStats {
   update(dt: number): void {
     this.veil = Math.max(0, this.veil - dt);
     this.immune = Math.max(0, this.immune - dt);
-    if (!this.dead) this.restoreMana(MANA_REGEN * dt);
+    if (!this.dead) this.restoreMana(this.regen * dt);
   }
 }
 

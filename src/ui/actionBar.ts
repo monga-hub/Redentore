@@ -9,7 +9,8 @@ import { ICONS } from './icons.ts';
 // one big button in the corner, an inner arc and an outer arc of smaller ones (RING).
 // There a quick tap casts on release and a press held for HOLD ms shows the tooltip
 // instead, until the finger lifts.
-// With a mouse, a filled slot can be dragged onto another one to swap them (`grab`); keys stay
+// With a mouse, a click casts on release and a filled slot can be dragged onto another one to swap
+// them instead (`grab`), without casting; keys still cast on press and stay
 // with the slots, so the player's own arrangement is what 1..0 cast. Touch is unchanged.
 // A half-ring over the main button (slot 0, the big one on touch) shows the charge bar,
 // green → yellow → red when full; until then the specials stay greyed out.
@@ -80,9 +81,8 @@ export class ActionBar<C extends Caster> {
           held = false;
           s.el.classList.add('down');
           hold = window.setTimeout(() => { held = true; this.showTip(s.el, s.ability!); }, HOLD);
-        } else if (e.pointerType !== 'touch') {
-          if (e.button === 0 && s.ability) this.grab(i, e);
-          if (sys.tryCast(i)) this.press(s);
+        } else if (e.pointerType !== 'touch' && e.button === 0 && s.ability) {
+          this.grab(i, e, () => { if (sys.tryCast(i)) this.press(s); });
         }
       });
       const lift = (cast: boolean) => (e: PointerEvent) => {
@@ -177,11 +177,12 @@ export class ActionBar<C extends Caster> {
   }
 
   /**
-   * Mouse press on a filled slot: once the pointer travels DRAG px it picks the ability up (the click
-   * itself has already cast, as always); the icon follows the cursor and dropping it on another slot
-   * swaps the two, anywhere else puts it back. The new bar is remembered for the next visit.
+   * Mouse press on a filled slot, WoW-style: released within DRAG px it is a click and casts (`click`);
+   * once the pointer travels further it picks the ability up instead, and never casts. The icon follows
+   * the cursor; dropping it on another slot swaps the two, anywhere else puts it back. The new bar is
+   * remembered for the next visit.
    */
-  private grab(from: number, down: PointerEvent): void {
+  private grab(from: number, down: PointerEvent, click: () => void): void {
     let over: HTMLElement | undefined;
     const target = (e: PointerEvent) => document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('.slot') ?? undefined;
     const move = (e: PointerEvent) => {
@@ -203,7 +204,7 @@ export class ActionBar<C extends Caster> {
       removeEventListener('pointermove', move, true);
       removeEventListener('pointerup', end);
       removeEventListener('pointercancel', end);
-      if (!this.ghost) return;
+      if (!this.ghost) { if (e.type === 'pointerup') click(); return; }
       this.ghost.remove();
       this.ghost = undefined;
       over?.classList.remove('drop');

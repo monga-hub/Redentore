@@ -118,6 +118,7 @@ const bar = new AbilitySystem([ab('x'), ab('y')], loadBar(def, mem), ctx);
 fired.length = 0;
 bar.swap(0, 1);
 bar.swap(0, 2); // onto an empty slot: a move
+if (fired.length || bar.gcd || bar.cooldown(bar.slots[1]!)) throw new Error('rearranging the bar must not cast');
 if (first3(bar.layout()) !== ',x,y') throw new Error(`layout after swaps: ${bar.layout()}`);
 bar.tryCast(2);
 if (fired.join() !== 'y' || bar.cooldown(bar.slots[2]!) !== 10) throw new Error('key 3 must cast y, now in slot 3, and y cools down');

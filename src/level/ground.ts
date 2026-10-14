@@ -58,6 +58,22 @@ class GroundPatch {
 }
 
 const PATCHES = new WeakMap<LevelBuilder, GroundPatch[]>();
+const SURFACES: GroundPatch[] = []; // kept after baking, for surfaceAt
+
+/** The layer painted under (x, z) (as laid out, before the edge warp), or undefined indoors and off every patch. */
+export function surfaceAt(x: number, z: number): Layer | undefined {
+  for (let k = SURFACES.length - 1; k >= 0; k--) {
+    const p = SURFACES[k];
+    if (x < p.x0 || x > p.x1 || z < p.z0 || z > p.z1) continue;
+    if (p.inHole(x, z)) return undefined;
+    for (let i = p.rects.length - 1; i > 0; i--) {
+      const r = p.rects[i];
+      if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return LAYERS[r.layer];
+    }
+    return LAYERS[p.rects[0].layer];
+  }
+  return undefined;
+}
 
 /** Ground mesh over x0..x1, z0..z1 in the builder's current zone, all `base` until painted. */
 export function groundPatch(b: LevelBuilder, x0: number, x1: number, z0: number, z1: number, base: Layer, o: PatchOpts = {}): GroundPatch {
@@ -81,6 +97,7 @@ export function finishGround(b: LevelBuilder): void {
     u.uMask.value = m.tex;
     u.uRect.value.set(p.x0, p.z0, 1 / (p.x1 - p.x0), 1 / (p.z1 - p.z0));
     grow(b, p, m);
+    SURFACES.push(p);
   }
   PATCHES.delete(b);
 }

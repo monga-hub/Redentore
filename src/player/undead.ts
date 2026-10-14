@@ -259,6 +259,12 @@ export class UndeadModel {
   }
 
   /** `speed`: horizontal m/s this frame; `grounded`: feet on the floor. */
+  /** Where the walk or run cycle is, 0..1 (a footfall each half), or -1 when not striding: the footsteps follow it. */
+  get gait(): number {
+    const a = (this.state === 'walk' || this.state === 'run') && this.actions[this.state];
+    return a ? (a.time / a.getClip().duration) % 1 : -1;
+  }
+
   animate(dt: number, speed: number, grounded: boolean): void {
     if (!this.mixer) return;
     const showAura = this.aura.update(dt) || this.priming-- > 0;

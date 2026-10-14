@@ -9,6 +9,8 @@ import { CHURCH_FLOOR as F } from '../level/plan.ts';
 // A Catmull-Rom spline through hand-placed keys (`npm run check` flies it against every mesh of
 // the level), travelled at the keys' speeds. Esc, Space, Enter, a click or a tap skips it.
 // Over it, the backstory in cinematic captions, each timed to the place the lens is passing.
+// When the browser holds the sound back until a gesture (iOS, a first visit), the take waits on
+// its first frame for a click or a tap, so the score starts with the picture.
 
 type V = [number, number, number];
 /** Where the lens is, what it looks at, how fast it travels through there (m/s). */
@@ -151,6 +153,10 @@ body.diablo #cinema .cap.final, body.diablo #cinema .cap.title { color: #ff9a6a;
   color: #f3e6c4; opacity: .7; text-shadow: 0 1px 2px #000; }
 #cinema kbd { margin-right: 6px; padding: 1px 5px; font: 700 12px/1.2 sans-serif; color: #1a1208; background: #e0b55a; border-radius: 3px; }
 body.touch #cinema kbd { display: none; }
+#cinema b { position: absolute; z-index: 1; left: 0; right: 0; top: 50%; text-align: center; font: 600 20px/1.4 Georgia, serif;
+  color: #f3e6c4; letter-spacing: 1px; text-shadow: 0 0 12px #000, 0 1px 2px #000; opacity: 0; transition: opacity .6s; }
+#cinema.wait b { opacity: .9; animation: cinema-wait 2.4s ease-in-out infinite; }
+@keyframes cinema-wait { 50% { opacity: .45; } }
 `;
 
 const SKIP = new Set(['Escape', 'Space', 'Enter']);
@@ -168,15 +174,21 @@ export class Intro {
   private line = -1; // the caption up, by index in CAPTIONS
   /** A caption comes up: the hook for its voice-over (`c.vo`). */
   onLine?: (c: Caption) => void;
+  private rolling = false; // past the wait for a gesture
+  private go = false;
+  private wait = 0;
+  private ready: () => boolean;
 
-  constructor(camera: THREE.Camera, endAt: THREE.Vector3, endLook: THREE.Vector3) {
+  /** `ready`: the sound can start without a gesture (audio/engine.ts audioReady). */
+  constructor(camera: THREE.Camera, endAt: THREE.Vector3, endLook: THREE.Vector3, ready: () => boolean = () => true) {
     this.camera = camera;
+    this.ready = ready;
     this.path = introPath(endAt, endLook);
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.append(style);
     this.el.id = 'cinema';
-    this.el.innerHTML = '<i></i><span><kbd>Esc</kbd>Salta</span>';
+    this.el.innerHTML = '<i></i><b>Tocca o premi un tasto per iniziare</b><span><kbd>Esc</kbd>Salta</span>';
     this.cap.className = 'cap';
     this.cap.setAttribute('aria-live', 'polite');
     this.el.append(this.cap);
@@ -193,17 +205,31 @@ export class Intro {
 
   private key = (e: KeyboardEvent) => {
     e.stopPropagation();
+    this.go = true;
     if (SKIP.has(e.code)) { e.preventDefault(); this.skipped = true; }
   };
 
   private press = (e: PointerEvent) => {
     e.stopPropagation();
-    this.skipped = true;
+    if (this.rolling) this.skipped = true;
+    this.go = true; // while waiting, the first press only starts it
   };
 
   /** Moves the lens; false once the take is over (or skipped) and the game has it back. */
   update(dt: number): boolean {
     if (this.done) return false;
+    if (!this.rolling) {
+      this.wait += dt;
+      if (this.go || this.ready()) {
+        this.rolling = true;
+        this.el.classList.remove('wait');
+      } else {
+        if (this.wait > 0.4) this.el.classList.add('wait');
+        this.path.sample(0, this.camera.position, this.look);
+        this.camera.lookAt(this.look);
+        return true;
+      }
+    }
     this.time += dt;
     if (this.skipped || this.time >= this.path.duration) {
       this.done = true;

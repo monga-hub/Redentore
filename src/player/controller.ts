@@ -14,7 +14,7 @@ export class PlayerController {
   frozen = false;
   readonly pos = new THREE.Vector3(); // feet position
   private vy = 0;
-  private grounded = true;
+  grounded = true; // read by the footsteps (audio/director.ts)
   facing = 0; // yaw, same convention as the camera (0 = facing -Z / north)
 
   readonly world: World;

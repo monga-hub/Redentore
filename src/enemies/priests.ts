@@ -291,7 +291,7 @@ export class Priests {
   readonly boss: Priest; // il Reverendissimo
   private views: View[] = [];
   private bolts: Bolt[] = [];
-  private spent: Bolt[] = [];
+  readonly spent: Bolt[] = []; // bolts that landed or fizzled this frame (the director's impact sounds)
   private flights = new Map<Bolt, Flight>();
   private sprites: THREE.Sprite[] = []; // free core/halo sprites, pooled
   private tele: Decal; // the boss's nova telegraph on the floor

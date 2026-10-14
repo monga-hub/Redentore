@@ -110,6 +110,38 @@ com'è e passa alla visuale Diablo quando si prende il controllo.
   bare, lapidi nel chiostro grande e nel cortile degli ulivi, colonne cadute, una gabbia, bracieri
   di ferro chiodato con teschi. Solo visivo: nessun collider, percorribilità invariata.
 
+## Audio
+
+Suono e musica stile WoW/Diablo su Web Audio (`src/audio/`), tutto in `public/audio/` (~5 MB di MP3).
+
+- **Motore** (`engine.ts`): un AudioContext avviato al primo gesto (iOS/Chrome), limiter sul master e
+  quattro bus — musica, effetti, ambiente, voci — regolati dal pannello Audio del menu (generale +
+  un cursore per bus, muto) e salvati nel browser. Effetti posizionati in 3D attorno all'eroe (alla
+  camera durante l'intro) con attenuazione per distanza, tetto di voci per suono e totale, variante,
+  intonazione e volume casuali a ogni colpo; la musica si abbassa sotto i colpi grossi e le battute
+  del boss; il mondo si ovatta quando il menu o la mappa sono aperti; scheda nascosta = silenzio.
+- **Mix** (`mix.ts`): livello, bus, variazione, voci massime, portata di ogni suono. Si ritocca lì,
+  senza ricompilare l'audio.
+- **Regia** (`director.ts`): legge il mondo a ogni frame e ne confronta lo stato col frame prima —
+  aggro, colpi, lanci, dardi, nova, morti dei mob, passi dell'eroe sul suolo dipinto (pietra, ghiaia,
+  erba, legno del pontile), salti, ferite, morte e risveglio, baule, chiave, grate e porte (anche
+  quelle che l'intro apre e richiude) — più i suoni di ambiente per area (laguna: acqua, gabbiani,
+  campane lontane; orto: grilli, foglie, civette, rane alla vasca, l'alveare; chiostri e chiesa:
+  pozzo, canto lontano, bordone d'organo, scricchiolii), torce che crepitano, preti che salmodiano.
+  Le abilità dell'eroe e le zappe dei frati suonano dove accadono (`forsaken.ts`, `friars.ts`).
+- **Musica** (`music.ts`): tema dell'intro sincronizzato al piano sequenza (in streaming), esplorazione
+  e strato di combattimento in loop sincroni (il combattimento aggiunge tamburi, ostinato e corni sugli
+  stessi accordi), tema del Reverendissimo, stacchi di vittoria e di morte; letti d'ambiente in
+  dissolvenza per area. Se il browser blocca l'audio, l'intro attende un tocco prima di partire.
+- **Sorgenti**: musica, ambienti, voci e quasi tutti gli effetti sono sintetizzati da
+  `scripts/audio/` (Python: numpy, scipy, soundfile); passi, impatti, porte, scricchiolii e clic
+  dell'interfaccia sono stratificati da pacchetti CC0 di Kenney (vedi `ATTRIBUTION.md`).
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install numpy scipy soundfile
+.venv/bin/python scripts/audio/build.py      # rigenera public/audio/ e src/audio/manifest.ts
+```
+
 ## Deploy
 
 Push su `main` → GitHub Actions (`.github/workflows/deploy.yml`) builda e pubblica
@@ -188,6 +220,11 @@ src/
                              Reverendissimo arcivescovo-lich gigante (pastorale); animazioni
                              (reazioni, colpi alternati, morti varie), dardi d'ombra con scia,
                              nova del boss telegrafata a terra
+  audio/engine.ts            motore audio: bus, impostazioni, sblocco, sprite MP3, voci 3D, ducking
+  audio/mix.ts               mix sheet: livello, bus, variazione e portata di ogni suono
+  audio/music.ts             musica adattiva (intro, esplorazione + combattimento, boss, stacchi) e letti d'ambiente
+  audio/director.ts          regia: dallo stato del mondo ai suoni, alla musica e all'ambiente
+  audio/manifest.ts          generato da scripts/audio/build.py: dove sta ogni suono
   quest/progress.ts          stato della progressione: fasi della missione, grate e porte (collider
                              rimovibili), baule con la chiave, Fra' Zuane, prompt di interazione,
                              vittoria. Nessuna dipendenza da three

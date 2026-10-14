@@ -1,5 +1,5 @@
 import attribution from '../../ATTRIBUTION.md?raw';
-import { getAudio, setAudio } from '../core/audio.ts';
+import { getAudio, setAudio, type AudioSettings } from '../audio/engine.ts';
 import { isDiablo, setDiablo } from '../core/style.ts';
 import { save, setPending, slots, type GameState, type Slot } from '../core/save.ts';
 
@@ -54,7 +54,8 @@ body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under 
 #menu .msg { min-height: 1.3em; margin: 8px 0 0; text-align: center; font: 13px system-ui, sans-serif; color: #7dff64; }
 #menu .msg.err { color: #ff6a5a; }
 #menu label { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
-#menu input[type=range] { flex: 1; accent-color: #c9a45c; }
+#menu input[type=range] { flex: 1; min-width: 0; accent-color: #c9a45c; }
+#menu label .name { flex: none; width: 5.2em; }
 #menu input[type=checkbox] { width: 20px; height: 20px; accent-color: #c9a45c; }
 #menu output { min-width: 3em; text-align: right; font: 13px system-ui, sans-serif; }
 #menu .credits { font: 13px/1.45 system-ui, sans-serif; color: #e8dcc0; }
@@ -68,6 +69,9 @@ body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under 
 const GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
 
 type View = 'main' | 'save' | 'load' | 'audio' | 'credits' | 'title';
+
+/** The audio panel's sliders: master, then each bus (audio/engine.ts). */
+const SLIDERS: Record<Exclude<keyof AudioSettings, 'muted'>, string> = { volume: 'Generale', music: 'Musica', sfx: 'Effetti', ambience: 'Ambiente', voice: 'Voci' };
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** Markdown inline bits ATTRIBUTION.md uses: [text](url), `code`, bare https links. Input already escaped. */
@@ -192,16 +196,17 @@ export class Menu {
       }
       case 'audio': {
         const a = getAudio();
+        const row = (k: keyof typeof SLIDERS) => `<label><span class="name">${SLIDERS[k]}</span><input type="range" name="${k}" min="0" max="100" step="1" value="${Math.round(a[k] * 100)}" aria-label="Volume ${SLIDERS[k].toLowerCase()}">
+            <output>${Math.round(a[k] * 100)}%</output></label>`;
         return `<div class="panel"><h2>Audio</h2>${x}
-          <label>Volume <input type="range" name="volume" min="0" max="100" step="1" value="${Math.round(a.volume * 100)}" aria-label="Volume generale">
-            <output>${Math.round(a.volume * 100)}%</output></label>
+          ${(Object.keys(SLIDERS) as (keyof typeof SLIDERS)[]).map(row).join('')}
           <label><input type="checkbox" name="muted" ${a.muted ? 'checked' : ''}> Disattiva audio</label>${back}</div>`;
       }
       case 'credits': return `<div class="panel wide"><h2>Crediti</h2>${this.from === 'main' ? x : ''}<div class="credits">
         <h3>Redentore Dungeon</h3>
         <p>Un dungeon nella Chiesa del Redentore e nell'Orto dei Frati, Giudecca, Venezia. Ispirato a World of Warcraft; nessun asset o logo Blizzard.</p>
         <p>Ideato da Daniele Sartori. Codice, livello, effetti e interfaccia costruiti con <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>, TypeScript e Vite, scritti con l'aiuto di Claude (Anthropic).</p>
-        <h3>Modelli e licenze</h3>${credits(attribution)}</div>${back}</div>`;
+        <h3>Modelli, suoni e licenze</h3>${credits(attribution)}</div>${back}</div>`;
     }
   }
 
@@ -258,8 +263,8 @@ export class Menu {
 
   private audioInput(e: Event): void {
     const t = e.target as HTMLInputElement;
-    if (t.name === 'volume') {
-      setAudio({ volume: +t.value / 100 });
+    if (t.name in SLIDERS) {
+      setAudio({ [t.name]: +t.value / 100 });
       t.nextElementSibling!.textContent = `${t.value}%`;
     } else if (t.name === 'muted') setAudio({ muted: t.checked });
   }

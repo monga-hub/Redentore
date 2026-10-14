@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
 import { VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import type { Mob } from '../ui/target.ts';
@@ -323,6 +324,8 @@ export class Forsaken {
       v.burst(droplet, c.x, c.y + 0.3, c.z, 30, 0.4, 4, 3);
       v.burst(toxic, c.x, c.y + 0.5, c.z, 4, 0.6, 1.2);
       v.pulse(c.x, c.y + 1, c.z, PLAGUE, 14);
+      playSfx('plague_hit', c);
+      playSfx('plague_cloud', c);
     }
   }
 
@@ -339,6 +342,7 @@ export class Forsaken {
     if (this.swing >= 0) v.ribbons.end(this.swing);
     this.swing = v.ribbons.begin(swingTrail, true);
     this.swingT = BLOW + 0.16;
+    playSfx('swing', chest(this), { variant: step });
     this.at(BLOW, () => {
       const q = this.player.pos, x = q.x + fx * 1.5, z = q.z + fz * 1.5;
       if (step < 2) { // shards flung along the sweep: right to left, then back
@@ -361,6 +365,7 @@ export class Forsaken {
       v.spawn(flareWhite, x, q.y + 0.5, z);
       v.pulse(x, q.y + 0.8, z, VIOLET, 35);
       v.shake(0.3);
+      playSfx('hit_big', { x, y: q.y + 0.3, z });
     });
   }
 
@@ -392,6 +397,7 @@ export class Forsaken {
     this.beam(x, m.y, z, VIOLET, 1.3);
     v.pulse(x, m.y + 1.2, z, VIOLET, 35);
     v.shake(0.4);
+    playSfx('strike_hit', { x, y: m.y + 1, z });
   }
 
   /** A column of light going up from (x,y,z) and fading. */
@@ -427,6 +433,7 @@ export class Forsaken {
     v.spawn(flareViolet, p.x, p.y + 0.6, p.z);
     v.pulse(p.x, p.y + 1, p.z, VIOLET, 40);
     v.shake(0.6);
+    playSfx('nova', { x: p.x, y: p.y + 0.5, z: p.z });
   }
 
   /** Draw every effect, the aura and the see-through hero once at nothing (see Vfx.prime). */
@@ -476,6 +483,7 @@ export class Forsaken {
     v.burst(wispMote, w.x, w.y, w.z, 40, 0.1, 3.5);
     v.decal(shockWisp, p.x, p.y + 0.05, p.z);
     v.pulse(w.x, w.y, w.z, WISP, 22);
+    playSfx('wisp_summon', w);
   }
 }
 
@@ -513,6 +521,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: `Ti dissolvi nell'ombra e riappari fino a 8 m più avanti, infliggendo ${STEP_DAMAGE} danni a chi attraversi. I muri ti fermano.`,
     fire(k) {
       const a = chest(k), v = k.vfx;
+      playSfx('blink');
       v.burst(shadowSmoke, a.x, a.y, a.z, 12, 0.5, 1.4);
       v.burst(violetSpark, a.x, a.y, a.z, 26, 0.4, 5);
       v.decal(scorch, a.x, k.player.pos.y + 0.03, a.z);
@@ -540,6 +549,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale che ristagna per 8 s e corrode i nemici che vi restano dentro (${PLAGUE_DPS} danni al secondo).`,
     fire(k) {
       k.player.model.play('throw', 0.12);
+      playSfx('plague_cast', chest(k));
       k.player.model.fight();
       k.plague();
       const h = k.player.model.hand(new THREE.Vector3());
@@ -572,6 +582,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: `Per ${VEIL_TIME} s diventi un'ombra sfuggente: i colpi ti attraversano e subisci il ${VEIL_CUT * 100}% di danni in meno.`,
     fire(k) {
       k.stats.veil = VEIL_TIME;
+      playSfx('veil', chest(k));
       k.player.model.play('spread', 0.2);
       const a = chest(k), v = k.vfx;
       for (let i = 0; i < 40; i++) { // the shroud gathers in
@@ -611,6 +622,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     fire(k) {
       const m = k.strikeTarget()!, p = k.player.pos, v = k.vfx;
       k.player.model.play('judgment', BLOW);
+      playSfx('strike_cast', chest(k));
       k.player.model.fight();
       k.hurt?.((_x, _z, mob) => mob === m, STRIKE_DAMAGE);
       // The smash runs along the floor to the mark, then the spear bursts out under it.
@@ -637,6 +649,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: `Speciale (barra della furia piena), fuori dal tempo di recupero globale. Per ${WARD_TIME} s nessun colpo può ferirti.`,
     fire(k) {
       k.stats.immune = WARD_TIME;
+      playSfx('ward', chest(k));
       k.player.model.play('scream', 0.25);
       const a = chest(k), v = k.vfx, y = k.player.pos.y + 0.05;
       v.decal(shockGold, a.x, y, a.z);
@@ -654,6 +667,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     desc: 'Fuori dal tempo di recupero globale. Ripristina il 30% della salute e il 30% del mana.',
     fire(k) {
       const s = k.stats, h = s.heal(s.hpMax * 0.3);
+      playSfx('potion', chest(k));
       s.restoreMana(s.manaMax * 0.3);
       const p = k.player.pos, v = k.vfx;
       for (let i = 0; i < 64; i++) { // two strands winding up the body

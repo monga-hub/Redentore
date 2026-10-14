@@ -106,7 +106,7 @@ export class Torches {
   /** Brazier flame bases, and the iron that holds them (swapped for a Meshy brazier in the Diablo view). */
   readonly braziers: { x: number; y: number; z: number }[];
   readonly brazierIron: THREE.InstancedMesh[];
-  private readonly em: Emitter[];
+  readonly em: Emitter[]; // every flame (audio/director.ts: the nearest crackle)
   private readonly flames: number[]; // emitters drawing a flame
   private readonly lit: number[]; // emitters competing for the light pool
   private readonly lights: THREE.PointLight[] = [];

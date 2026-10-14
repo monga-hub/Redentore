@@ -5,6 +5,7 @@ import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import type { World } from '../core/physics.ts';
 import { D, T, type DecalStyle, type RibbonStyle, type Style, type Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
+import { playSfx } from '../audio/engine.ts';
 import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
 import { killAll, wipe } from './caster.ts';
 
@@ -115,6 +116,7 @@ class View {
         const p = this.blade.getWorldPosition(this.v);
         vfx.burst(clod, p.x, Math.max(p.y, f.y + 0.1), p.z, 8, 0.15, 1.1, 2.2);
         vfx.spawn(dust, p.x, f.y + 0.15, p.z);
+        playSfx('hoe', p);
       }
       this.lastClip = a.time;
     }

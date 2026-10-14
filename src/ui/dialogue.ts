@@ -1,4 +1,5 @@
 import { DECLINE, QUEST_TITLE, TALK, type Talk } from '../quest/dialogue.ts';
+import { duck, playSfx, unduck } from '../audio/engine.ts';
 import type { Stage } from '../quest/progress.ts';
 
 // The quest-giver's window, WoW style: a parchment page in a gold frame with the speaker's
@@ -115,7 +116,8 @@ export class Dialogue {
     this.el.classList.add('show');
     document.body.classList.add('talking');
     if (document.pointerLockElement) document.exitPointerLock();
-    // audio: playSfx('dialogue-open'); duck the music under the voice while the window is up
+    playSfx('ui_open', null, { ui: true });
+    duck(6, 600); // the music under the speaker while the window is up
     this.say(0);
   }
 
@@ -154,7 +156,7 @@ export class Dialogue {
   }
 
   private choose(what: string): void {
-    // audio: playSfx('ui-click')
+    playSfx('ui_click', null, { ui: true });
     if (what === 'next') this.say(this.page + 1);
     else if (what === 'decline') this.say(this.page, DECLINE);
     else if (what === 'accept') {
@@ -168,7 +170,8 @@ export class Dialogue {
     cancelAnimationFrame(this.raf);
     this.el.classList.remove('show');
     document.body.classList.remove('talking');
-    // audio: playSfx('dialogue-close'); music back up
+    playSfx('ui_close', null, { ui: true });
+    unduck();
     this.onClose?.();
   }
 }

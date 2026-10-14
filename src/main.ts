@@ -32,9 +32,12 @@ import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
 import { DiabloFx } from './fx/diabloFx.ts';
 import { GothicDressing } from './level/gothic.ts';
+import { audioReady, initAudio, tap, voices } from './audio/engine.ts';
+import { Director } from './audio/director.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
+initAudio(); // before the intro, whose first press unlocks the sound
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
@@ -125,7 +128,11 @@ if (loaded) {
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
 // A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
 cam.update(0, input, player.pos);
-const intro = loaded ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE));
+const intro = loaded ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE), audioReady);
+const audio = new Director({ // sound and music, read off the world every frame
+  player, stats: playerStats, kit, quest, friars: friars.all, casters: priests.all, bees: bees.all, boss: priests.boss,
+  spent: priests.spent, fires: fx.torches.em, areaAt: (x, z) => level.areaAt(x, z),
+});
 const menu = new Menu({
   snapshot: () => serialize(game),
   where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
@@ -195,7 +202,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { intro, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -205,6 +212,7 @@ renderer.setAnimationLoop(() => {
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but Fra' Zuane talks on
     input.consume();
     input.endFrame();
+    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open, pressed); // the dialogue window ducks the music itself
     fx.render();
     return;
   }
@@ -218,6 +226,7 @@ renderer.setAnimationLoop(() => {
       bees.update(dt, unseen);
       questView.idle(dt, player.pos);
       questView.peek(eye);
+      audio.update(dt, cam.camera, intro, false, pressed);
       fx.update(dt, eye);
       fx.render();
       input.endFrame();
@@ -269,6 +278,7 @@ renderer.setAnimationLoop(() => {
   minimap.update(dt, player.pos, player.facing, area, foes, goal());
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
+  audio.update(dt, cam.camera, undefined, false, pressed); // before the bar drains this frame's notices
   fx.render();
   bar.render(dt, pressed);
   input.endFrame();

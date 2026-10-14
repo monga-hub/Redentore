@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Priest } from '../enemies/caster.ts';
 import { T, type Style, type Vfx } from '../abilities/vfx.ts';
 import { loadModel } from '../core/models.ts';
+import { playSfx } from '../audio/engine.ts';
 import { Dialogue } from '../ui/dialogue.ts';
 import { OBJECTIVE, QUEST_TITLE } from './dialogue.ts';
 import { Npc } from './npc.ts';
@@ -199,7 +200,7 @@ export class QuestView {
     const stage = this.quest.stage;
     if (stage !== this.stage) {
       if (this.stage) notices.push(this.stage === 'talk' ? `Missione accettata: ${QUEST_TITLE}` : stage === 'done' ? `Missione compiuta: ${QUEST_TITLE}` : OBJECTIVE[stage]);
-      // audio: playSfx(stage === 'done' ? 'quest-complete' : 'quest-update')
+      if (this.stage) playSfx('quest', null, stage === 'done' ? { rate: 0.84, gain: 1.3 } : {}); // complete: lower and fuller
       this.track(stage, !!this.stage);
       this.stage = stage;
     }
@@ -239,7 +240,7 @@ export class QuestView {
   /** The lid is thrown open: a flash and a fountain of gold out of the chest. */
   private loot(): void {
     const { x, y, z } = this.chest.position, top = y + this.lid.position.y;
-    // audio: playSfx('chest-open', this.chest.position)
+    playSfx('chest_open', { x, y: top, z });
     this.vfx.spawn(goldFlare, x, top + 0.2, z);
     this.vfx.burst(goldSpark, x, top, z, 40, 0.3, 4.5, 3);
     this.vfx.burst(goldGlow, x, top, z, 10, 0.3, 0.6, 0.8);
@@ -263,7 +264,7 @@ export class QuestView {
       for (let i = this.vfx.count(30, dt); i > 0; i--) this.vfx.spawn(goldMote, x + (Math.random() - 0.5) * 0.8, k.position.y - 0.2, z + (Math.random() - 0.5) * 0.5, 0, 0.6, 0);
     }
     if (t === LOOT) {
-      // audio: playSfx('key-pickup')
+      playSfx('key');
     }
   }
 

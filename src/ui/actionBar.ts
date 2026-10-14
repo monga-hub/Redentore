@@ -97,6 +97,7 @@ export class ActionBar<C extends Caster> {
       s.el.addEventListener('contextmenu', (e) => e.preventDefault()); // Android long-press menu
       s.el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && s.ability && !this.ghost) this.showTip(s.el, s.ability); });
       s.el.addEventListener('pointerleave', () => this.tip.classList.remove('show'));
+      s.el.append(s.cd, s.key);
       bar.append(s.el);
       this.slots.push(s);
       this.paint(i);

@@ -23,7 +23,7 @@ export const tune: Tune = tuneOf([]);
 const PLAGUE_RADIUS = 2.2, PLAGUE_RANGE = 20, PLAGUE_REACH = 6; // m: cloud size (looks; the live one is tune.plagueR), reach for a foe, throw with none
 const PLAGUE_POOLS = 6; // clouds at once; past that the oldest gives way
 const FUSION_CLOUD = 4; // s a cloud sown by a fusion lasts
-const WISP_RADIUS = 1.6, WISP_MOVING = 0.6; // m, m/s: the wisp only scorches while it drifts
+const WISP_MOVING = 0.6, WISP_REACH = 10, WISP_ORBIT = 0.7; // m/s: the wisp only scorches while it drifts; m: it goes for foes this near, circling them this close
 const STRIKE_RANGE = 30, STRIKE_ARC = 0.5; // no target: nearest foe within ~120° in front
 const NOVA_RADIUS = 6; // m, the looks' shock wave
 const BLOW = 0.1; // s from the press to the clip's blow (swings, slams)
@@ -292,10 +292,13 @@ export class Forsaken {
     const v = this.vfx, w = this.wispAt;
     this.wispCore.visible = this.wispHalo.visible = this.wisp > 0;
     if (this.wisp <= 0) return;
-    // Hovers off the right shoulder, lagging behind like something alive.
-    const p = this.player.pos, f = this.player.facing;
-    const tx = p.x + Math.cos(f) * 0.8 + Math.sin(f) * 0.5, tz = p.z - Math.sin(f) * 0.8 + Math.cos(f) * 0.5;
-    const ty = p.y + 2.1 + Math.sin(this.time * 2.3) * 0.15;
+    // Hovers off the right shoulder, lagging behind like something alive; in a fight it flies at the
+    // target (else the nearest foe fighting) and circles it, scorching.
+    const p = this.player.pos, f = this.player.facing, foe = wispFoe(p, this.aimed?.(), this.foes?.() ?? []);
+    const a = this.time * 2.4, bob = Math.sin(this.time * 2.3) * 0.15;
+    const tx = foe ? foe.x + Math.cos(a) * WISP_ORBIT : p.x + Math.cos(f) * 0.8 + Math.sin(f) * 0.5;
+    const tz = foe ? foe.z + Math.sin(a) * WISP_ORBIT : p.z - Math.sin(f) * 0.8 + Math.cos(f) * 0.5;
+    const ty = (foe ? foe.y + 1.4 : p.y + 2.1) + bob;
     this.wispVel.set(tx - w.x, ty - w.y, tz - w.z).multiplyScalar(4);
     w.addScaledVector(this.wispVel, Math.min(dt, 0.1));
     const flick = 1 + Math.sin(this.time * 23) * 0.08 + Math.sin(this.time * 37) * 0.06;
@@ -312,11 +315,11 @@ export class Forsaken {
       const g = this.player.world.groundAt(w.x, w.z, w.y);
       this.plague({ x: w.x, y: g > -Infinity ? g : this.player.pos.y, z: w.z }, FUSION_CLOUD + 2, w);
     }
-    if (tune.wispStill || this.wispVel.length() > WISP_MOVING) {
+    if (this.wispVel.length() > WISP_MOVING) {
       // On the move it sheds a scorching trail: everything it brushes past burns.
-      this.hurt?.((x, z) => Math.hypot(x - w.x, z - w.z) < WISP_RADIUS, tune.wispDps * dt);
+      this.hurt?.((x, z) => Math.hypot(x - w.x, z - w.z) < tune.wispR, tune.wispDps * dt);
       for (let n = v.count(40, dt); n > 0; n--) {
-        const a = rnd(0, Math.PI * 2), d = rnd(0.2, WISP_RADIUS * 0.6);
+        const a = rnd(0, Math.PI * 2), d = rnd(0.2, tune.wispR * 0.6);
         v.spawn(wispEmber, w.x + Math.cos(a) * d, w.y + rnd(-0.6, 0.2), w.z + Math.sin(a) * d, 0, -0.2, 0);
       }
     }
@@ -540,6 +543,15 @@ export class Forsaken {
   }
 }
 
+/** The foe Fuoco fatuo goes for: the target if it is fighting within WISP_REACH of `p`, else the nearest one fighting. */
+export function wispFoe(p: { x: number; z: number }, aimed: Mob | undefined, foes: Iterable<Mob>): Mob | undefined {
+  const fighting = (m: Mob) => m.state !== 'dead' && m.state !== 'pray' && m.state !== 'hoe' && m.state !== 'evade' && Math.hypot(m.x - p.x, m.z - p.z) < WISP_REACH;
+  if (aimed && fighting(aimed)) return aimed;
+  let best: Mob | undefined, bd = Infinity;
+  for (const m of foes) { const d = Math.hypot(m.x - p.x, m.z - p.z); if (fighting(m) && d < bd) { bd = d; best = m; } }
+  return best;
+}
+
 /**
  * Where Nube di peste lands: on the selected target if it is alive and within reach, else on the
  * nearest living foe within reach, else on the ground ahead, far enough that the caster stays out of it.
@@ -601,7 +613,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'plague', name: 'Nube di peste', icon: 'plague', mana: 20, charge: 10,
+    id: 'plague', name: 'Nube di peste', icon: 'plague', mana: 25, charge: 10,
     get cooldown() { return tune.plagueCd * tune.cdr; },
     get desc() { return `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale larga ${num(tune.plagueR)} m che ristagna per ${tune.plagueLife} s e corrode i nemici che vi restano dentro (${dmg(tune.plagueDps)} danni al secondo).`; },
     fire(k) {
@@ -614,10 +626,10 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', mana: 60, charge: 10,
+    id: 'wisp', name: 'Fuoco fatuo', icon: 'wisp', mana: 80, charge: 10,
     get cooldown() { return 30 * tune.cdr; },
     get cast() { return tune.wispCast || undefined; },
-    get desc() { return `Evoca un fuoco fatuo che ti segue per 60 s e rischiara il buio. ${tune.wispStill ? 'Brucia' : 'Mentre si sposta brucia'} chi sfiora (${dmg(tune.wispDps)} danni al secondo entro ${num(WISP_RADIUS)} m).${tune.fxWisp ? ' Ogni 6 s lascia cadere una nube di peste.' : ''}`; },
+    get desc() { return `Evoca un fuoco fatuo che per 60 s ti segue e rischiara il buio, e in battaglia si avventa sul bersaglio (o sul nemico più vicino) girandogli attorno. Mentre vola brucia chi sfiora (${dmg(tune.wispDps)} danni al secondo entro ${num(tune.wispR)} m).${tune.fxWisp ? ' Ogni 6 s lascia cadere una nube di peste.' : ''}`; },
     during(k, prog, dt) {
       k.player.model.channel(true); // arms raised over the cast bar
       const p = k.player.pos, v = k.vfx, hy = p.y + 2.1;

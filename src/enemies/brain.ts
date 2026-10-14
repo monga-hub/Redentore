@@ -5,7 +5,7 @@
 import { PLAYER, type World } from '../core/physics.ts';
 
 export const FRIAR = {
-  hp: 60,
+  hp: 120,
   xp: 10, // experience for killing one (player/levels.ts)
   aggro: 9, // m: the player this close (and roughly level) pulls the group
   leash: 24, // m from home before the friar gives up and evades
@@ -15,8 +15,8 @@ export const FRIAR = {
   hit: 2.2, // the swing lands if the player is still this close at impact
   windup: 0.62, // s from swing start to impact (the chop clip is timed onto it, SWING in friars.ts)
   swing: 1.15, // s the swing roots the friar
-  cooldown: 2.4, // s between swings
-  damage: 45, // against the player's 1280 hp: a pair kills in ~15 s if ignored
+  cooldown: 2.2, // s between swings
+  damage: 70, // against the player's 1280 hp: a group of three standing round you kills in ~13 s
   radius: 0.4,
 };
 const TURN = 8; // 1/s

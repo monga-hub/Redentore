@@ -77,6 +77,8 @@ export class Director {
   private engaged = 99; // s since the last mob was fighting the hero
   private bossT = 20; // s to the boss's next taunt
   private bossWalk = 0;
+  private bossPhase = 0;
+  private marks = 0; // the boss's marks on the floor last frame
   private gait = -1;
   private air = 0;
   private grounded = true;
@@ -281,8 +283,8 @@ export class Director {
           else stop(s.cast, 0.1);
           s.cast = undefined;
         }
-        if (now === 'nova') playSfx(k === 'boss' ? 'boss_nova_cast' : 'bee_swarm_cast', this.at(m, k));
-        if (was === 'nova' && now !== 'dead') playSfx(k === 'boss' ? 'boss_nova' : 'bee_swarm', this.at(m, k, 0.3));
+        if (now === 'nova') playSfx(k === 'queen' ? 'bee_swarm_cast' : 'boss_nova_cast', this.at(m, k), k === 'boss' ? {} : { rate: 1.2, gain: 0.7 });
+        if (was === 'nova' && now !== 'dead') playSfx(k === 'queen' ? 'bee_swarm' : 'boss_nova', this.at(m, k, 0.3), k === 'boss' ? {} : { rate: 1.2, gain: 0.7 });
         if (now === 'dead' && (!victory || k === 'boss')) {
           stop(s.cast, 0.1);
           playSfx(v.death, this.at(m, k, 0.8));
@@ -312,11 +314,17 @@ export class Director {
       }
       s.x = m.x; s.z = m.z;
     }
-    // His taunts through the fight.
+    // His taunts through the fight, a laugh at each new act, and his marks: branded with a hiss, erupting with a roar.
     const b = w.boss;
     if (FIGHTING.has(b.state) && b.state !== 'nova') {
       if ((this.bossT -= dt) <= 0) { playSfx('boss_line', this.at(b, 'boss', 0.9)); this.bossT = rnd(16, 26); }
     }
+    if (b.phase > this.bossPhase) playSfx('boss_laugh', this.at(b, 'boss', 0.9));
+    this.bossPhase = b.phase;
+    const marks = b.marks.length;
+    if (marks > this.marks) playSfx('boss_nova_cast', b.marks[0], { rate: 1.5, gain: 0.6 });
+    else if (marks < this.marks && FIGHTING.has(b.state)) playSfx('boss_nova', p, { rate: 1.4, gain: 0.7 });
+    this.marks = marks;
     // Shadow bolts striking or fizzling.
     for (const bolt of w.spent) playSfx(bolt.hit ? 'bolt_hit' : 'bolt_fizzle', bolt);
   }

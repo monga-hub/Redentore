@@ -14,12 +14,31 @@ export interface CasterKind {
   damage: number; radius: number; margin: number;
   /** Staff swing when the player is in reach (sacerdoti, boss): rooted for `swing` s, lands at `windup` if still within `hit`. */
   melee?: { reach: number; hit: number; windup: number; swing: number; cooldown: number; damage: number };
-  /** Boss only: every `every` s in melee range, channel `cast` s, then hit everything within `radius`. */
+  /** Every `every` s of fighting with the player within `radius`, channel `cast` s, then hit everything within `radius`. */
   nova?: { every: number; cast: number; radius: number; damage: number };
+  /** Boss only: phases below each `at` share of health. */
+  phases?: Phases;
 }
 
+/**
+ * The boss's fight in three acts. Below `at[0]` of its health it brands the floor every `marks.every` s:
+ * `marks.n` circles, one under the player and the rest scattered round them, that erupt `marks.cast` s
+ * later. Below `at[1]` it rages: every cooldown runs `haste` times as fast. `berserk` s into a fight
+ * everything it deals is multiplied by `rage`, a wall for a build that can't bring it down in time.
+ */
+export interface Phases {
+  at: [number, number];
+  marks: { every: number; n: number; cast: number; radius: number; spread: number; damage: number };
+  haste: number;
+  berserk: number;
+  rage: number;
+}
+
+/** A branded circle on the floor at the player's feet height `y`: erupts when `t` runs out (the boss's marks). */
+export interface Mark { x: number; y: number; z: number; t: number }
+
 export const PRIEST: CasterKind = {
-  hp: 50, // casters are squishy: five bone slashes
+  hp: 90, // casters are squishy: nine bone slashes
   xp: 10, // experience for killing one (player/levels.ts); every kind below sets its own
   aggro: 12, // m, and in line of sight
   leash: 26, // m between the player and the priest's spot before it gives up and evades
@@ -31,72 +50,84 @@ export const PRIEST: CasterKind = {
   back: 2.4, // backpedal m/s, well under the player's 6
   walk: 5, // evade m/s (immune meanwhile)
   cast: 1.6, // s cast time; breaking line of sight meanwhile interrupts it
-  cooldown: 2.4, // s after a cast before the next one starts
+  cooldown: 2.2, // s after a cast before the next one starts
   bolt: 13, // m/s, homing like a WoW shadow bolt
   life: 4, // s before a bolt that never reached the player fizzles out
-  damage: 30, // magic, per bolt: a group of three ~22 dps against the player's 1280 hp
+  damage: 55, // magic, per bolt: a group of three ~43 dps against the player's 1280 hp, so they are run down, not traded with
   radius: 0.4,
   margin: 0.8, // m kept from the cloister's walls
 };
 
-/** Sacerdote: a tall white-and-violet high priest leading two priests in the church. Stands its ground. */
+/**
+ * Sacerdote: a tall white-and-violet high priest leading two priests. Stands its ground, hits hard
+ * with the mace and every so often calls down a shadow ring round itself to step out of: an elite to
+ * open with a cooldown or two, kill its priests first or fight in the ring at a price.
+ */
 export const SACERDOTE: CasterKind = {
   ...PRIEST,
-  hp: 260, // ~10 s of the player's full rotation
+  hp: 950, // ~15 s of a level-6 rotation
   xp: 40,
   aggro: 13, leash: 40, blind: 10,
   range: 18, keep: 0, // never backpedals: walks into melee
-  speed: 3.4, cast: 1.8, cooldown: 3.2, damage: 45,
+  speed: 3.4, cast: 1.8, cooldown: 3.2, damage: 75,
   radius: 0.55,
-  melee: { reach: 2, hit: 2.8, windup: 0.55, swing: 1.2, cooldown: 2.2, damage: 60 },
+  melee: { reach: 2, hit: 2.8, windup: 0.7, swing: 1.3, cooldown: 2.2, damage: 105 },
+  nova: { every: 11, cast: 1.8, radius: 4, damage: 220 },
 };
 
 /**
- * Il Reverendissimo: the boss under the dome. Huge and slow, hits hard, and a nova to run out of.
- * Tuned against the player's 1280 hp and ~18 dps in melee (bone slash, plague, wisp): about a
- * minute to kill; ~19 dps from the staff if the novas are dodged, ~30 if they are eaten, which
- * the potion and Velo spettrale cover only just.
+ * Il Reverendissimo: the boss under the dome. Huge and slow, hits hard, a nova to run out of and,
+ * as it weakens, branded floor and rage (`phases`). Tuned with scripts/balance.ts: a level 8-9 build
+ * that dodges brings it down in 2-3 minutes; one that eats the novas and the marks dies, and so does
+ * the starting kit, which can't beat the berserk.
  */
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
-  hp: 1100,
+  hp: 8500,
   xp: 0, // his fall ends the run
   aggro: 15, leash: 60, blind: 15,
   range: 22, keep: 0,
-  speed: 3, walk: 6, cast: 2.2, cooldown: 4, bolt: 11, life: 5, damage: 55,
+  speed: 3, walk: 6, cast: 2.2, cooldown: 4, bolt: 11, life: 5, damage: 90,
   radius: 1.1,
   margin: 1.6, // m kept from BOSS_BOUNDS' edges: its 1.1 m bulk clears pews, columns and the pilasters at |x| 6.58
   // reach + radius stops it ~2 m from the player, inside the bone slash's 2.6 m
-  melee: { reach: 1.5, hit: 3.5, windup: 0.8, swing: 1.6, cooldown: 3.2, damage: 60 },
-  nova: { every: 15, cast: 2.6, radius: 6, damage: 160 },
+  melee: { reach: 1.5, hit: 4.5, windup: 0.8, swing: 1.6, cooldown: 3.4, damage: 75 }, // the crozier's sweep: taken, not dodged
+  nova: { every: 13, cast: 2.6, radius: 6, damage: 420 },
+  phases: {
+    at: [0.6, 0.3],
+    marks: { every: 9, n: 3, cast: 1.8, radius: 2.2, spread: 3.5, damage: 280 },
+    haste: 1.25,
+    berserk: 240, rage: 3,
+  },
 };
 /**
  * L'ape gigante: a giant hornet guarding the apiary, an elite between a sacerdote and the boss.
  * The caster brain without bolts (`range` 0: it never casts, so it never loses sight either):
  * a stinger dive in melee and, every `nova.every` s of fighting, a poison swarm round itself to
  * run out of. It flies, but its brain walks the ground like everyone else (bees.ts lifts the body).
- * Against the player's 1280 hp: ~25 dps from the stinger if the swarm is dodged, about 40 s to kill.
+ * Against the player's 1280 hp: ~40 dps from the stinger if the swarm is dodged, and a swarm eaten
+ * costs a fifth of it; about 30 s to kill at level 5.
  */
 export const APE: CasterKind = {
   ...PRIEST,
-  hp: 550,
+  hp: 1500,
   xp: 80,
   aggro: 6, leash: 30, blind: Infinity, // off the paved paths' reach: the player steps into the frutteto to pull it
   range: 0, keep: 0,
   speed: 4.4, walk: 6,
   radius: 0.9, margin: 1,
-  melee: { reach: 1.3, hit: 2.6, windup: 0.75, swing: 1.4, cooldown: 2.2, damage: 55 },
-  nova: { every: 9, cast: 1.8, radius: 4.5, damage: 90 },
+  melee: { reach: 1.3, hit: 3.4, windup: 0.6, swing: 1.3, cooldown: 2.4, damage: 70 }, // a lunging dive: too long to step out of
+  nova: { every: 9, cast: 2, radius: 4.5, damage: 260 },
 };
 /** Worker bees round the hives, pulled with the giant: quick, frail, small stings. */
 export const APETTA: CasterKind = {
   ...APE,
-  hp: 30,
+  hp: 60,
   xp: 5,
   aggro: 5,
   speed: 5.2, walk: 7,
   radius: 0.35, margin: 0.5,
-  melee: { reach: 0.7, hit: 1.6, windup: 0.35, swing: 0.8, cooldown: 1.8, damage: 8 },
+  melee: { reach: 0.7, hit: 1.6, windup: 0.35, swing: 0.8, cooldown: 1.8, damage: 22 },
   nova: undefined,
 };
 /** The apiary (zones/orto.ts, hives at z -130): the giant and her workers on the hives' north side, away from the paved paths. */
@@ -130,8 +161,12 @@ export interface Priest {
   t: number; // s in the current state
   cd: number; // cast cooldown left
   melee: number; // swing cooldown left
-  nova: number; // s until the next nova (boss)
+  nova: number; // s until the next nova
   struck: boolean; // this swing or nova already resolved
+  phase: number; // the boss's act: 0, then 1 and 2 past `phases.at` (kept until it evades)
+  fight: number; // s fighting since the pull (the boss's berserk)
+  brand: number; // s until the next marks
+  marks: Mark[]; // branded circles waiting to erupt
   backoff: number; // backpedal budget left until the next cast
   blind: number; // s pulled without line of sight
   los: { ok: boolean; t: number }; // line of sight to the player, re-traced every LOS_EVERY s
@@ -247,7 +282,8 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
     const mates: Priest[] = [];
     g.forEach(([x, z, yaw], k) => {
       const kind = kinds[i]?.[k] ?? PRIEST;
-      mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false, backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates });
+      mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false,
+        phase: 0, fight: 0, brand: kind.phases?.marks.every ?? 0, marks: [], backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates });
     });
     return mates;
   });
@@ -278,6 +314,20 @@ export function spawnChurch(world: World): { all: Priest[]; boss: Priest } {
   const kinds = [[SACERDOTE], [SACERDOTE], [REVERENDISSIMO]];
   const all = spawnPriests(world, groups, [CHURCH, CHURCH, BOSS_BOUNDS], kinds).flat();
   return { all, boss: all[all.length - 1] };
+}
+
+/** Every caster on the map, in the order saved games index them: cloisters, gardens, the church (boss last), the lagoon. */
+export function spawnCasters(world: World, areas: (Bounds & { label: string })[]): { all: Priest[]; boss: Priest } {
+  const plan = cloisterPlan(world, areas), gardens = gardenPlan(world, areas), church = spawnChurch(world), lagoon = lagoonPlan(areas);
+  return {
+    boss: church.boss,
+    all: [
+      ...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.court))).flat(),
+      ...spawnPriests(world, gardens.map((g) => g.group), gardens.map((g) => g.area), gardens.map(() => [SACERDOTE])).flat(),
+      ...church.all,
+      ...spawnPriests(world, lagoon.map((g) => g.group), lagoon.map((g) => g.area), lagoon.map((g) => g.kinds)).flat(), // last: saved games keep their indices
+    ],
+  };
 }
 
 /** Everyone drops dead at once (the boss's fall). */
@@ -338,11 +388,47 @@ function go(f: Priest, x: number, z: number, speed: number, stop: number, world:
  * (swing or nova) damage it lands on the player this frame.
  */
 export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[]): number {
+  const P = f.kind.phases;
+  if (!P) return act(f, p, world, dt, bolts, 1, 1);
+  if (f.state === 'dead') { f.marks.length = 0; return 0; }
+  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova';
+  if (fighting) {
+    f.fight += dt;
+    while (f.phase < P.at.length && f.hp <= f.kind.hp * P.at[f.phase]) f.phase++;
+  }
+  const haste = f.phase >= 2 ? P.haste : 1, rage = f.fight >= P.berserk ? P.rage : 1;
+  const level = Math.abs(p.y - f.y) < 2.5;
+  return (act(f, p, world, dt, bolts, haste, rage) + brand(f, P, p, level, dt * haste, fighting)) * rage;
+}
+
+/** The boss's marks: erupt the due ones (returns their damage on the player), brand new ones on schedule. */
+function brand(f: Priest, P: Phases, p: Target, level: boolean, dt: number, fighting: boolean): number {
+  let dmg = 0;
+  for (let i = f.marks.length - 1; i >= 0; i--) {
+    const m = f.marks[i];
+    if ((m.t -= dt) > 0) continue;
+    f.marks.splice(i, 1);
+    if (level && Math.hypot(p.x - m.x, p.z - m.z) < P.marks.radius) dmg += P.marks.damage;
+  }
+  if (f.phase >= 1 && fighting && f.state !== 'nova' && (f.brand -= dt) <= 0) {
+    // One under the player, the rest round them on a line: a step aside clears them all.
+    f.brand = P.marks.every;
+    const a0 = Math.random() * Math.PI * 2, M = P.marks;
+    for (let i = 0; i < M.n; i++) {
+      const a = a0 + Math.PI * (i % 2), r = Math.ceil(i / 2) * M.spread;
+      f.marks.push({ x: p.x + Math.cos(a) * r, y: p.y, z: p.z + Math.sin(a) * r, t: M.cast });
+    }
+  }
+  return dmg;
+}
+
+/** One caster's frame: `haste` × on its cooldowns, `rage` × on what it deals (the boss's phases; 1 for everyone else). */
+function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], haste: number, rage: number): number {
   const K = f.kind;
   f.t += dt;
-  f.cd = Math.max(0, f.cd - dt);
-  f.melee = Math.max(0, f.melee - dt);
-  if (K.nova && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.nova -= dt;
+  f.cd = Math.max(0, f.cd - dt * haste);
+  f.melee = Math.max(0, f.melee - dt * haste);
+  if (K.nova && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.nova -= dt * haste;
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
   const toPlayer = Math.atan2(f.x - p.x, f.z - p.z);
   const reach = K.melee ? K.melee.reach + K.radius : 0;
@@ -382,7 +468,7 @@ export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bol
       face(f, toPlayer, dt);
       if (!level || !look(f, p, world, dt)) { enter(f, 'chase'); f.cd = 0.5; return 0; } // interrupted
       if (f.t < K.cast) return 0;
-      bolts.push({ x: f.x - Math.sin(f.yaw) * 0.5, y: f.y + CHEST + 0.4, z: f.z - Math.cos(f.yaw) * 0.5, t: 0, hit: false, dmg: K.damage, speed: K.bolt, life: K.life });
+      bolts.push({ x: f.x - Math.sin(f.yaw) * 0.5, y: f.y + CHEST + 0.4, z: f.z - Math.cos(f.yaw) * 0.5, t: 0, hit: false, dmg: K.damage * rage, speed: K.bolt, life: K.life });
       f.cd = K.cooldown;
       f.backoff = K.backoff;
       enter(f, 'chase');
@@ -408,6 +494,9 @@ export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bol
       f.move = 1;
       if (f.t > EVADE_MAX) { f.x = f.home.x; f.z = f.home.z; f.y = feet(world, f.x, f.z); }
       if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
+      f.phase = f.fight = 0; // a fresh fight next time
+      f.brand = K.phases?.marks.every ?? 0;
+      f.marks.length = 0;
       return 0;
     case 'dead': // for good: nobody respawns
       return 0;

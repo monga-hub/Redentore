@@ -19,7 +19,7 @@ export class PlayerStats {
   manaMax: number;
   /** Level-up cards: share of incoming damage taken, and mana/s, always on. */
   armor = 1;
-  regen = 2.5;
+  regen = 2;
   private base: [number, number];
 
   constructor(hpMax = 1280, manaMax = 400) {

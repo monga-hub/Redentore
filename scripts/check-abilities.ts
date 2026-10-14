@@ -61,7 +61,7 @@ mana(20, 'instant pays');
 pay.tryCast(0);
 eq(['m'], 'not enough mana blocks the cast');
 if (!pay.notices.some((n) => n.text === 'Mana insufficiente.')) throw new Error('no mana error');
-stats.update(10);
+stats.update(12.5); // 2 mana/s
 mana(45, 'regen');
 pay.tryCast(1);
 mana(45, 'cast-time ability pays when the bar fills, not on press');

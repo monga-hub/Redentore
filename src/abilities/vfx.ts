@@ -764,7 +764,7 @@ export class Vfx {
     const dmap = decalAtlas();
     this.glow = new Particles(2560, this.map, THREE.AdditiveBlending);
     this.smoke = new Particles(1024, this.map, THREE.NormalBlending);
-    this.floorGlow = new Decals(56, dmap, THREE.AdditiveBlending);
+    this.floorGlow = new Decals(72, dmap, THREE.AdditiveBlending); // the casters hold 18 for their telegraphs
     this.floorDark = new Decals(24, dmap, THREE.NormalBlending);
     const beam = document.createElement('canvas');
     beam.width = 4; beam.height = 128;

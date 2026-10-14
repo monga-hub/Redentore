@@ -5,7 +5,7 @@ import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type V
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, cloisterPlan, fly, gardenPlan, hurt, lagoonPlan, killAll, spawnChurch, spawnPriests, think, wipe, type Bolt, type CasterKind, type CasterState, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, fly, hurt, killAll, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Mark, type Priest } from './caster.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
 
@@ -16,8 +16,9 @@ import { barMat, flash, ownMaterials } from './friars.ts';
 // battle priests in violet and gold with a winged mace. Il Reverendissimo: a giant lich
 // archbishop in white, violet and gold under a rayed mitre, with a crozier. The AI lives in
 // caster.ts. Spells are drawn with the shared effects (abilities/vfx.ts): bolts with a hot core,
-// a halo, a trail and a spiral of motes; the crystal charging; the boss's nova telegraphed on
-// the floor as a sigil filling up to its edge, then going off in a ring of shadow flame.
+// a halo, a trail and a spiral of motes; the crystal charging; the boss's and the sacerdoti's
+// novas telegraphed on the floor as a sigil filling up to its edge, then going off in a ring of
+// shadow flame; the boss's marks as crimson brands that fill the same way and erupt.
 
 const FADE = 0.2;
 const BAR_W = 0.07;
@@ -89,6 +90,19 @@ const novaCracks: DecalStyle = { life: 4, size: 8, tile: D.cracks, color: 0x0704
 const novaScar: DecalStyle = { life: 1.4, size: 8, tile: D.cracks, color: SHADOW, hdr: 2.2, fadeOut: 0.8 };
 const tele: DecalStyle = { life: 0, size: REVERENDISSIMO.nova!.radius * 2, tile: D.ring, color: SHADOW, hdr: 1.8 };
 const teleSigil: DecalStyle = { life: 0, size: 4.5, tile: D.sigil, color: SHADOW, hdr: 1.6 };
+/** The shock wave, cracks and scorch of a nova of radius `r` (the boss's 6 m, a sacerdote's smaller ring, a mark). */
+const sized = new Map<number, [DecalStyle, DecalStyle, DecalStyle]>();
+const blastOf = (r: number) => {
+  let b = sized.get(r);
+  if (!b) sized.set(r, (b = [{ ...novaWave, grow: r }, { ...novaCracks, size: r * 1.35 }, { ...novaScar, size: r * 1.35 }]));
+  return b;
+};
+// The boss's marks (caster.ts Phases): a crimson brand that fills to its edge, then erupts in a column of flame.
+const BRAND = 0xff2f6e, MARK = REVERENDISSIMO.phases!.marks;
+const brandRing: DecalStyle = { life: 0, size: MARK.radius * 2, tile: D.ring, color: BRAND, hdr: 2.2 };
+const brandRunes: DecalStyle = { life: 0, size: MARK.radius * 1.7, tile: D.runes, color: BRAND, hdr: 1.3 };
+const brandFlame: Style = { ...novaFlame, color: 0xff8ab4, color2: 0x4a0618 };
+const brandBlast: Style = { ...novaBlast, color: 0xffd0e0, color2: BRAND };
 const darkSoul: Style = { life: [1.6, 2], size: 0.55, grow: 1.5, color: 0xd0a0ff, hdr: 1.2, alpha: 0.6, tex: T.skull, grav: -1.1, fadeIn: 0.25 };
 const deathSmoke: Style = { life: [1, 1.5], size: [0.6, 1], grow: 2, color: SMOKE, alpha: 0.75, tex: T.smoke2, erode: true, dark: true, drag: 2, grav: -0.6 };
 const swingTrail: RibbonStyle = { color: 0xf0e0ff, color2: SHADOW, hdr: 1.8, alpha: 0.7, width: 0, life: 0.14 };
@@ -294,8 +308,9 @@ export class Priests {
   readonly spent: Bolt[] = []; // bolts that landed or fizzled this frame (the director's impact sounds)
   private flights = new Map<Bolt, Flight>();
   private sprites: THREE.Sprite[] = []; // free core/halo sprites, pooled
-  private tele: Decal; // the boss's nova telegraph on the floor
-  private teleSigil: Decal;
+  private teles: [Decal, Decal][] = []; // nova telegraphs (ring, sigil) on the floor, lent to whoever channels one
+  private brands: [Decal, Decal][] = []; // the boss's marks (ring, runes)
+  private branded = new Set<Mark>(); // marks seen last frame: the ones gone with their time run out erupted
   private world: World;
   private vfx: Vfx;
   private stats: PlayerStats;
@@ -305,19 +320,11 @@ export class Priests {
     this.world = world;
     this.vfx = vfx;
     this.stats = stats;
-    const plan = cloisterPlan(world, areas);
-    const gardens = gardenPlan(world, areas);
-    const church = spawnChurch(world);
-    const lagoon = lagoonPlan(areas);
-    this.boss = church.boss;
-    this.all = [
-      ...spawnPriests(world, plan.flatMap((c) => c.groups), plan.flatMap((c) => c.groups.map(() => c.court))).flat(),
-      ...spawnPriests(world, gardens.map((g) => g.group), gardens.map((g) => g.area), gardens.map(() => [SACERDOTE])).flat(),
-      ...church.all,
-      ...spawnPriests(world, lagoon.map((g) => g.group), lagoon.map((g) => g.area), lagoon.map((g) => g.kinds)).flat(), // last: saved games keep their indices
-    ];
-    this.tele = vfx.hold(tele);
-    this.teleSigil = vfx.hold(teleSigil);
+    const casters = spawnCasters(world, areas);
+    this.boss = casters.boss;
+    this.all = casters.all;
+    for (let i = 0; i < 3; i++) this.teles.push([vfx.hold(tele), vfx.hold(teleSigil)]); // ponytail: three rings at once, a fourth nova goes unmarked
+    for (let i = 0; i < MARK.n * 2; i++) this.brands.push([vfx.hold(brandRing), vfx.hold(brandRunes)]);
     const looks = [...LOOKS];
     Promise.all(looks.flatMap(([, l]) => [loadModel(l.body), loadModel(l.prop)])).then((gltfs) => {
       const templates = new Map<CasterKind, Template>();
@@ -366,8 +373,11 @@ export class Priests {
     separate(this.all, this.world);
     dmg += fly(this.bolts, player, dt, this.spent);
     for (const b of this.spent) this.land(b, b.hit);
+    const boss = this.boss;
+    for (const m of this.branded) if (m.t <= 0 && !boss.marks.includes(m)) this.erupt(m, Math.hypot(player.x - m.x, player.z - m.z) < MARK.radius);
+    this.branded = new Set(boss.marks);
     this.drawBolts(dt);
-    this.drawTelegraph(dt);
+    this.drawTelegraphs(dt);
     this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, Math.hypot(f.x - player.x, f.z - player.z)));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
@@ -417,44 +427,84 @@ export class Priests {
     }
   }
 
-  /** The nova's sigil fills the floor out to its edge while the boss channels it; shadow flames lick the edge. */
-  private drawTelegraph(dt: number): void {
-    const f = this.boss, on = f.state === 'nova', t = this.tele, s = this.teleSigil;
-    t.on = s.on = on;
-    if (!on) return;
-    const n = f.kind.nova!, p = Math.min(f.t / n.cast, 1);
-    t.x = s.x = f.x; t.y = s.y = f.y + 0.06; t.z = s.z = f.z;
-    t.fill = 0.08 + 0.92 * p;
-    t.alpha = 0.55 + 0.45 * p;
-    t.rot += dt * 0.3;
-    s.rot -= dt * (0.6 + p * 2);
-    s.alpha = Math.min(1, f.t * 3);
-    s.size = 4.5 + p * 1.5;
+  /**
+   * A nova's sigil fills the floor out to its edge while the caster (the boss, a sacerdote) channels it,
+   * shadow flames licking the edge; the boss's marks fill the same way, in crimson.
+   */
+  private drawTelegraphs(dt: number): void {
     const v = this.vfx;
-    for (let i = v.count(40 + p * 120, dt); i > 0; i--) {
-      const a = Math.random() * Math.PI * 2, r = n.radius * (0.97 + Math.random() * 0.06);
-      v.spawn(novaFlame, f.x + Math.cos(a) * r, f.y + 0.1, f.z + Math.sin(a) * r, 0, 0.6 + p, 0);
+    let k = 0;
+    for (const f of this.all) {
+      if (f.state !== 'nova' || !f.kind.nova || k >= this.teles.length) continue;
+      const [t, s] = this.teles[k++], n = f.kind.nova, p = Math.min(f.t / n.cast, 1), r = n.radius;
+      t.on = s.on = true;
+      t.x = s.x = f.x; t.y = s.y = f.y + 0.06; t.z = s.z = f.z;
+      t.size = r * 2;
+      t.fill = 0.08 + 0.92 * p;
+      t.alpha = 0.55 + 0.45 * p;
+      t.rot += dt * 0.3;
+      s.rot -= dt * (0.6 + p * 2);
+      s.alpha = Math.min(1, f.t * 3);
+      s.size = (4.5 + p * 1.5) * r / 6;
+      for (let i = v.count((40 + p * 120) * r / 6, dt); i > 0; i--) {
+        const a = Math.random() * Math.PI * 2, e = r * (0.97 + Math.random() * 0.06);
+        v.spawn(novaFlame, f.x + Math.cos(a) * e, f.y + 0.1, f.z + Math.sin(a) * e, 0, 0.6 + p, 0);
+      }
     }
+    for (; k < this.teles.length; k++) this.teles[k][0].on = this.teles[k][1].on = false;
+
+    const marks = this.boss.marks;
+    this.brands.forEach(([ring, runes], i) => {
+      const m = marks[i];
+      ring.on = runes.on = !!m;
+      if (!m) return;
+      const p = 1 - Math.max(m.t, 0) / MARK.cast;
+      ring.x = runes.x = m.x; ring.y = runes.y = m.y + 0.07; ring.z = runes.z = m.z;
+      ring.fill = 0.1 + 0.9 * p;
+      ring.alpha = 0.6 + 0.4 * p;
+      runes.alpha = Math.min(1, p * 4) * 0.85;
+      runes.rot += dt * (1 + p * 4);
+      for (let j = v.count(25 + p * 70, dt); j > 0; j--) {
+        const a = Math.random() * Math.PI * 2, e = MARK.radius * (0.95 + Math.random() * 0.08);
+        v.spawn(brandFlame, m.x + Math.cos(a) * e, m.y + 0.1, m.z + Math.sin(a) * e, 0, 0.5 + p * 1.5, 0);
+      }
+    });
   }
 
-  /** The nova goes off: a shock wave racing out to its radius, a ring of shadow flame, scorched cracks. */
+  /** A mark erupts: a column of crimson flame out of the brand, a shock wave to its edge. */
+  private erupt(m: Mark, hit: boolean): void {
+    const v = this.vfx, r = MARK.radius, [wave, cracks, scar] = blastOf(r);
+    v.decal(wave, m.x, m.y + 0.07, m.z);
+    v.decal(cracks, m.x, m.y + 0.05, m.z);
+    v.decal(scar, m.x, m.y + 0.06, m.z);
+    for (let k = 0; k < 28; k++) {
+      const a = (k / 28) * Math.PI * 2, d = Math.random() * r * 0.8;
+      v.spawn(brandBlast, m.x + Math.cos(a) * d, m.y + 0.2, m.z + Math.sin(a) * d, Math.cos(a) * 1.5, 6 + Math.random() * 4, Math.sin(a) * 1.5);
+    }
+    v.burst(brandFlame, m.x, m.y + 0.4, m.z, 24, r * 0.7, 1.5, 3);
+    v.ring(novaSmoke, m.x, m.y + 0.3, m.z, 8, 0.6, r, 0.4);
+    v.pulse(m.x, m.y + 1, m.z, BRAND, hit ? 45 : 30);
+    v.shake(hit ? 0.45 : 0.15);
+  }
+
+  /** A nova goes off: a shock wave racing out to its radius, a ring of shadow flame, scorched cracks. */
   private nova(f: Priest, hit: boolean): void {
-    const r = f.kind.nova!.radius, v = this.vfx, y = f.y + 0.05;
-    v.decal(novaWave, f.x, y + 0.02, f.z);
-    v.decal(novaCracks, f.x, y, f.z);
-    v.decal(novaScar, f.x, y + 0.01, f.z);
-    for (let k = 0; k < 72; k++) {
-      const a = (k / 72) * Math.PI * 2, s = r * 2.6;
+    const r = f.kind.nova!.radius, v = this.vfx, y = f.y + 0.05, k = r / 6, [wave, cracks, scar] = blastOf(r);
+    v.decal(wave, f.x, y + 0.02, f.z);
+    v.decal(cracks, f.x, y, f.z);
+    v.decal(scar, f.x, y + 0.01, f.z);
+    for (let i = 0; i < Math.round(72 * k); i++) {
+      const a = (i / Math.round(72 * k)) * Math.PI * 2, s = r * 2.6;
       v.spawn(novaBlast, f.x + Math.cos(a) * 0.8, f.y + 0.3, f.z + Math.sin(a) * 0.8, Math.cos(a) * s, 1.5, Math.sin(a) * s);
     }
-    for (let k = 0; k < 10; k++) { // columns of flame at the edge
-      const a = (k / 10) * Math.PI * 2;
+    for (let i = 0; i < 10; i++) { // columns of flame at the edge
+      const a = (i / 10) * Math.PI * 2;
       v.burst(novaFlame, f.x + Math.cos(a) * r, f.y + 0.3, f.z + Math.sin(a) * r, 6, 0.3, 1, 4);
     }
     v.ring(novaSmoke, f.x, f.y + 0.4, f.z, 20, 1, r * 1.2, 0.5);
-    v.burst(boltSpark, f.x, f.y + 2, f.z, 40, 1, 7);
-    v.pulse(f.x, f.y + 2, f.z, SHADOW, hit ? 70 : 50);
-    v.shake(hit ? 0.7 : 0.35);
+    v.burst(boltSpark, f.x, f.y + 2 * k, f.z, Math.round(40 * k), 1, 7 * k);
+    v.pulse(f.x, f.y + 2, f.z, SHADOW, (hit ? 70 : 50) * k);
+    v.shake((hit ? 0.7 : 0.35) * k);
   }
 
   /** Damage every priest for which `inside(x, z)` holds (abilities). */

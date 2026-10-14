@@ -1,15 +1,16 @@
 // Experience levels and the choose-a-card upgrades, Vampire Survivors style but on a finite budget:
 // nobody respawns, so XP is the worth of the mobs lying dead (main.ts derives it every frame) and the
-// curve is tuned to it. Full clear before the boss: 1145 XP, level 12; the quest route alone ~650, level 9.
+// curve is tuned to it. Full clear before the boss: 1145 XP, level 11; the quest route with the apiary
+// ~870 (scripts/balance.ts), level 9: the boss is tuned for 8-9.
 // Each level offers two cards. Even levels up to 10 offer two new abilities (the specials from level 6);
 // the others a modifier of an owned ability (or a fusion) against a stat passive. The run starts with
 // Caduta d'ossa and Nube di peste, the potion stays as an item. Everything an upgrade changes is a field
 // of `Tune`, replayed from the picks (`tuneOf`), so a save only needs the pick list.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
-export const MAX_LEVEL = 15; // out of reach today (L12 is everything), safe if mobs are added
+export const MAX_LEVEL = 15; // out of reach today (L11 is everything), safe if mobs are added
 /** XP from level `lv` to `lv + 1`. */
-export const need = (lv: number) => 20 + 15 * (lv - 1);
+export const need = (lv: number) => 20 * lv;
 
 /** Level reached with `xp`, XP gathered into it and XP the next one needs (0 at the cap). */
 export function levelOf(xp: number): { lv: number; into: number; next: number } {
@@ -25,7 +26,7 @@ export interface Tune {
   fury: number; furyStart: number; // charge gain ×, and where the bar restarts after a special
   fallDmg: number; fallRange: number; fallArc: number; fallThird: number; fallMana: number;
   plagueDps: number; plagueR: number; plagueCd: number; plagueLife: number;
-  wispDps: number; wispStill: boolean; wispCast: number;
+  wispDps: number; wispR: number; wispCast: number;
   veilTime: number; veilHeal: number;
   stepDmg: number; stepCd: number;
   strikeDmg: number; novaR: number; novaDmg: number; wardTime: number; wardHeal: number;
@@ -37,10 +38,10 @@ export const START = ['fall', 'plague', 'potion'];
 export const SPECIALS = ['strike', 'nova', 'ward'];
 const BASE: Tune = {
   owned: START,
-  dmg: 1, hp: 1, mana: 1, armor: 1, regen: 2.5, speed: 1, cdr: 1, leech: 0, fury: 1, furyStart: 0,
+  dmg: 1, hp: 1, mana: 1, armor: 1, regen: 2, speed: 1, cdr: 1, leech: 0, fury: 1, furyStart: 0,
   fallDmg: 10, fallRange: 2.6, fallArc: Math.cos(1.1), fallThird: 1, fallMana: 0,
   plagueDps: 12, plagueR: 2.2, plagueCd: 5, plagueLife: 8,
-  wispDps: 15, wispStill: false, wispCast: 1.5,
+  wispDps: 15, wispR: 1.6, wispCast: 1.5,
   veilTime: 5, veilHeal: 0,
   stepDmg: 25, stepCd: 12,
   strikeDmg: 50, novaR: 6, novaDmg: 20, wardTime: 5, wardHeal: 0,
@@ -69,7 +70,7 @@ const passive = (id: string, name: string, text: string, max: number, apply: (t:
 export const CARDS: Card[] = [
   ability('step', "Passo d'ombra", 'A', 'Scatto di 8 m nell’ombra: 25 danni a chi attraversi. 40 mana, recupero 12 s.'),
   ability('veil', 'Velo spettrale', 'A', 'Per 5 s subisci il 50% di danni in meno. 50 mana, recupero 30 s.'),
-  ability('wisp', 'Fuoco fatuo', 'A', 'Un fuoco fatuo ti segue per 60 s e brucia chi sfiora: 15 danni al secondo.'),
+  ability('wisp', 'Fuoco fatuo', 'A', 'Per 60 s un fuoco fatuo si avventa su chi combatti e brucia chi sfiora: 15 danni al secondo.'),
   ability('strike', 'Sentenza del sepolcro', 'B', 'Speciale: con la barra della furia piena, una lancia d’ossa da 50 danni.'),
   ability('nova', 'Lamento della cripta', 'B', 'Speciale: con la barra della furia piena, 20 danni a tutti entro 6 m.'),
   ability('ward', 'Patto della tomba', 'B', 'Speciale: con la barra della furia piena, 5 s di immunità a ogni danno.'),
@@ -78,7 +79,7 @@ export const CARDS: Card[] = [
   passive('hp', 'Carne di tomba', '+15% di salute massima (+192), e la recuperi subito.', 3, (t) => { t.hp += 0.15; }),
   passive('armor', 'Pelle di lapide', '−8% ai danni che subisci.', 2, (t) => { t.armor -= 0.08; }),
   passive('mana', "Pozzo d'anime", '+20% di mana massimo (+80).', 2, (t) => { t.mana += 0.2; }),
-  passive('regen', 'Linfa nera', 'Rigenerazione del mana +1 al secondo (base 2,5).', 2, (t) => { t.regen += 1; }),
+  passive('regen', 'Linfa nera', 'Rigenerazione del mana +1 al secondo (base 2).', 2, (t) => { t.regen += 1; }),
   passive('speed', 'Passo del morto', '+8% alla velocità di corsa.', 2, (t) => { t.speed += 0.08; }),
   passive('cdr', 'Gelo della cripta', '−10% ai tempi di recupero (non a Caduta d’ossa).', 2, (t) => { t.cdr -= 0.1; }),
   passive('leech', "Sete d'anime", 'Ogni nemico che uccidi ti cura del 3% della salute massima.', 2, (t) => { t.leech += 0.03; }),
@@ -93,7 +94,7 @@ export const CARDS: Card[] = [
   mod('plague', 'plague_cd', 'Contagio', 'Nube di peste: recupero da 5 a 3,5 s.', 1, (t) => { t.plagueCd = 3.5; }),
   mod('plague', 'plague_long', 'Ristagno', 'Nube di peste: dura 12 s invece di 8.', 1, (t) => { t.plagueLife = 12; }),
   mod('wisp', 'wisp_dps', 'Fiamma vorace', 'Fuoco fatuo: da 15 a 23 danni al secondo.', 1, (t) => { t.wispDps = 23; }),
-  mod('wisp', 'wisp_still', 'Fuoco inquieto', 'Fuoco fatuo: brucia anche quando stai fermo.', 1, (t) => { t.wispStill = true; }),
+  mod('wisp', 'wisp_still', 'Fuoco inquieto', 'Fuoco fatuo: brucia entro 2,4 m invece di 1,6.', 1, (t) => { t.wispR = 2.4; }),
   mod('wisp', 'wisp_fast', 'Evocazione rapida', 'Fuoco fatuo: si evoca all’istante (era 1,5 s).', 1, (t) => { t.wispCast = 0; }),
   mod('veil', 'veil_long', 'Velo più lungo', 'Velo spettrale: dura 8 s invece di 5.', 1, (t) => { t.veilTime = 8; }),
   mod('veil', 'veil_heal', 'Velo rigenerante', 'Velo spettrale: mentre dura ti cura del 3% della salute al secondo.', 1, (t) => { t.veilHeal = 0.03; }),

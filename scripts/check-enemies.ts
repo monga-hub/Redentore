@@ -316,6 +316,55 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   if (!novas) fail('boss: no nova in melee range');
   if (melee < n.damage) fail(`boss: the nova did not land (${melee} melee damage)`);
 
+  // Sacerdoti call a smaller ring of their own.
+  let rings = 0;
+  was = sac.state;
+  tick(sac, SACERDOTE.nova!.every + SACERDOTE.nova!.cast + 2, () => { pl.x = sac.x; pl.z = sac.z - 1.5; if (sac.state === 'nova' && was !== 'nova') rings++; was = sac.state; });
+  if (!rings || SACERDOTE.nova!.radius >= n.radius) fail('sacerdote: no ring of its own, smaller than the boss\'s');
+
+  // The boss's phases. Untouched it stays in the first act: no marks.
+  const P = REVERENDISSIMO.phases!, M = P.marks;
+  if (boss.phase !== 0 || boss.marks.length) fail('boss: a phase before losing health');
+  // Below the first threshold it brands the floor: a mark under the player and the rest round them. The
+  // boss is held 12 m off (out of its swing and nova) so only the marks can land.
+  boss.hp = REVERENDISSIMO.hp * P.at[0] - 1;
+  const away = () => { boss.x = pl.x + 12; boss.z = pl.z; };
+  let marked = false;
+  tick(boss, M.every + 1, () => { away(); if (!marked && boss.marks.length) marked = true; });
+  if (boss.phase !== 1 || !marked) fail(`boss: no marks below ${P.at[0] * 100}% (phase ${boss.phase})`);
+  if (!boss.marks.some((k) => Math.hypot(k.x - pl.x, k.z - pl.z) < 0.01) || boss.marks.length !== M.n) fail('boss: the marks are not round the player');
+  melee = 0;
+  tick(boss, M.cast, away);
+  if (melee !== M.damage || boss.marks.length) fail(`boss: standing on a mark cost ${melee}, want ${M.damage}`);
+  // A step aside, across the line of marks, and they erupt on nothing.
+  let stepped = false;
+  tick(boss, M.every + 1, () => {
+    away();
+    if (stepped || !boss.marks.length) return;
+    stepped = true;
+    const [a, b] = boss.marks, dx = (b.x - a.x) / M.spread, dz = (b.z - a.z) / M.spread; // along the line of marks
+    pl.x -= dz * (M.radius + 0.5); pl.z += dx * (M.radius + 0.5);
+  });
+  melee = 0;
+  tick(boss, M.cast, away);
+  if (melee) fail(`boss: dodged marks still hit for ${melee}`);
+  // Below the second threshold its cooldowns run `haste` times as fast; past the berserk it hits `rage` times as hard.
+  boss.hp = REVERENDISSIMO.hp * P.at[1] - 1;
+  tick(boss, 0.1, away);
+  if (boss.phase !== 2) fail(`boss: phase ${boss.phase} below ${P.at[1] * 100}%`);
+  boss.fight = P.berserk;
+  boss.marks.length = 0;
+  Object.assign(boss, { state: 'chase', t: 0, nova: 99, brand: 99 });
+  pl.x = boss.x; pl.z = boss.z - 1.5;
+  melee = 0;
+  tick(boss, REVERENDISSIMO.melee!.cooldown, () => { boss.nova = 99; boss.brand = 99; pl.x = boss.x; pl.z = boss.z - 1.5; });
+  if (!melee || melee % (REVERENDISSIMO.melee!.damage * P.rage)) fail(`boss: berserk swings landed ${melee}, want multiples of ${REVERENDISSIMO.melee!.damage * P.rage}`);
+  // A wipe resets the fight: full health, first act, no marks, no berserk.
+  wipe([boss]);
+  pl.x = 300; pl.z = 300;
+  tick(boss, 30);
+  if (boss.state !== 'pray' || boss.hp !== REVERENDISSIMO.hp || boss.phase || boss.fight || boss.marks.length) fail(`boss: wipe left phase ${boss.phase}, fight ${boss.fight}`);
+
   // The boss falls: everyone dies and stays dead.
   const crowd = [sac, ...spawnGroups(fl, [[[5, 5, 0]]])[0]];
   casterHurt(boss, boss.hp);
@@ -333,7 +382,7 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   const apiario = level.areas.find((a) => a.label === 'Apiario')!;
   if (queen.kind !== APE || all.filter((f) => f.kind === APETTA).length !== 3) fail('apiary: want the giant bee and three workers');
   if (new Set(all.map((f) => f.mates)).size !== 1) fail('apiary: the bees are pulled together');
-  if (!(APE.hp > SACERDOTE.hp && APE.hp < REVERENDISSIMO.hp && APE.melee!.damage >= SACERDOTE.melee!.damage * 0.8)) fail('apiary: the giant should sit between a sacerdote and the boss');
+  if (!(APE.hp > SACERDOTE.hp && APE.hp < REVERENDISSIMO.hp && APE.nova!.damage > SACERDOTE.nova!.damage && APE.nova!.damage < REVERENDISSIMO.nova!.damage)) fail('apiary: the giant should sit between a sacerdote and the boss');
   for (const f of all) {
     const at = `bee spot (${f.x}, ${f.z})`;
     if (f.x < apiario.x0 || f.x > apiario.x1 || f.z < apiario.z0 || f.z > apiario.z1) fail(`${at} outside the apiario`);

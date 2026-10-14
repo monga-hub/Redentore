@@ -1,5 +1,5 @@
 // Levels check (`npm run check`): the XP curve against the mobs' worth (first level after two friars, the quest
-// route ~level 9, a full clear level 12), the two-card offers over many random runs (never an owned or maxed card,
+// route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11), the two-card offers over many random runs (never an owned or maxed card,
 // never a mod for a locked ability, new abilities on even levels with the specials from level 6, fusions only
 // with both parents), the heal when everything is taken, the replay of picks into numbers, and the bar keeping
 // a slot for an ability until it is unlocked.
@@ -12,15 +12,15 @@ import { buildLevel } from '../src/level/index.ts';
 const fail = (why: string) => { throw new Error(why); };
 
 // Curve and budget. The kinds' counts are the spawn plans' (check-intro counts all 89 on the map).
-if (need(1) !== 20 || need(2) !== 35) fail('curve');
+if (need(1) !== 20 || need(2) !== 40) fail('curve');
 const friars = spawnGroups(buildLevel().world).flat().length;
 if (friars !== 32) fail(`${friars} friars`);
 const full = friars * FRIAR.xp + 45 * PRIEST.xp + 7 * SACERDOTE.xp + APE.xp + 3 * APETTA.xp + REVERENDISSIMO.xp;
-if (full !== 1145 || levelOf(full).lv !== 12) fail(`full clear ${full} XP is level ${levelOf(full).lv}, want 1145 / 12`);
+if (full !== 1145 || levelOf(full).lv !== 11) fail(`full clear ${full} XP is level ${levelOf(full).lv}, want 1145 / 11`);
 if (levelOf(FRIAR.xp).lv !== 1 || levelOf(2 * FRIAR.xp).lv !== 2) fail('the first level must come with the second friar');
-for (const [xp, lv] of [[550, 8], [650, 9], [19, 1], [20, 2], [1e9, MAX_LEVEL]]) if (levelOf(xp).lv !== lv) fail(`${xp} XP is level ${levelOf(xp).lv}, want ${lv}`);
-const l = levelOf(60);
-if (l.lv !== 3 || l.into !== 5 || l.next !== 50) fail(`levelOf(60) = ${JSON.stringify(l)}`);
+for (const [xp, lv] of [[560, 8], [720, 9], [875, 9], [900, 10], [19, 1], [20, 2], [1e9, MAX_LEVEL]]) if (levelOf(xp).lv !== lv) fail(`${xp} XP is level ${levelOf(xp).lv}, want ${lv}`);
+const l = levelOf(70);
+if (l.lv !== 3 || l.into !== 10 || l.next !== 60) fail(`levelOf(70) = ${JSON.stringify(l)}`);
 if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 33) fail('33 cards');
 
 // Offers over many seeded runs, picking at random among the two, up to the cap.

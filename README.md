@@ -12,8 +12,12 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
   sale espositive, caffè, cappella di meditazione, laboratori, frantoio. All'apiario un'ape gigante
   (élite tra sacerdote e boss: pungiglione in picchiata e uno sciame velenoso telegrafato a terra da
   cui scappare) con tre api operaie; fuori dalla portata dei sentieri lastricati. In chiesa due sacerdoti
-  (bianco e viola, magia + mischia) con due preti ciascuno — a capo della navata e dietro l'altare —
-  e il boss, il Reverendissimo, sotto la cupola (magia, mischia, nova d'ombra da cui scappare).
+  (bianco e viola, magia + mischia + un anello d'ombra telegrafato a terra) con due preti ciascuno — a
+  capo della navata e dietro l'altare — e il boss, il Reverendissimo, sotto la cupola: magia, mischia,
+  nova d'ombra da cui scappare, sotto il 60% marchi cremisi a terra (uno sotto i piedi, due ai lati:
+  un passo di lato e li eviti), sotto il 30% furia (tutto più rapido), dopo 4 minuti di lotta ogni
+  colpo triplica. Pensato per il livello 8-9: 2-3 minuti con una build sensata che schiva; con il kit
+  iniziale o al livello 6 è quasi impossibile. Una morte ti risveglia al checkpoint senza perdere carte.
 - Progressione (missione "La chiave del portinaio"): il portone della chiesa è sbarrato. Sulla
   fondamenta Fra' Zuane, il fantasma incatenato del portinaio dei cappuccini (punto esclamativo
   dorato), affida la missione in una finestra di dialogo stile WoW (ritratto, testo scritto a
@@ -35,6 +39,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione (3 build + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni
 ```
 
@@ -225,7 +230,7 @@ src/
                              cristallo), sacerdote corazzato viola e oro (mazza alata),
                              Reverendissimo arcivescovo-lich gigante (pastorale); animazioni
                              (reazioni, colpi alternati, morti varie), dardi d'ombra con scia,
-                             nova del boss telegrafata a terra
+                             nova del boss e dei sacerdoti telegrafata a terra, marchi del boss
   audio/engine.ts            motore audio: bus, impostazioni, sblocco, sprite MP3, voci 3D, ducking
   audio/mix.ts               mix sheet: livello, bus, variazione e portata di ogni suono
   audio/music.ts             musica adattiva (intro, esplorazione + combattimento, boss, stacchi) e letti d'ambiente
@@ -260,6 +265,7 @@ src/
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest
 scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sistema abilità
 scripts/check-levels.ts      curva XP, offerte delle carte su molte partite casuali, fusioni, slot riservati
+scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e carte veri, giocati da un bot sul percorso della missione
 ```
 
 ### Dove agganciarsi (navi successive)

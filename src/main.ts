@@ -141,6 +141,7 @@ if (loaded) {
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: 'Partita caricata' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
+let bossAct = 0, bossRage = false;
 let kills = mobs.filter((m) => m.state === 'dead').length; // Sete d'anime heals on new ones only
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
 const picked = (id: string) => levels.picks.filter((p) => p === id).length;
@@ -293,6 +294,11 @@ renderer.setAnimationLoop(() => {
   bees.update(dt, player.pos);
   dfx.update(dt, quest.accepted && !quest.key);
   for (const text of questView.update(dt, player.pos, pressed, priests.boss)) kit.system.notices.push({ kind: 'info', text });
+  const boss = priests.boss, rage = boss.fight >= REVERENDISSIMO.phases!.berserk; // the boss's acts and berserk, called out as they come
+  if (boss.phase > bossAct) kit.system.notices.push({ kind: 'error', text: boss.phase === 1 ? 'Il Reverendissimo marchia il pavimento: esci dai cerchi!' : 'Il Reverendissimo è furibondo: colpisce sempre più spesso!' });
+  if (rage && !bossRage) kit.system.notices.push({ kind: 'error', text: 'La pazienza del Reverendissimo è finita: ora ogni colpo è mortale!' });
+  bossAct = boss.phase;
+  bossRage = rage;
   if (!quest.bossDead && priests.boss.state === 'dead') { // victory: everyone falls, the portone opens
     quest.win();
     friars.killAll();

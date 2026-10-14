@@ -96,14 +96,14 @@ if (!takePending(store) || takePending(store)) fail('pending state not taken exa
 // Levels: picks and XP round-trip; an hp pick's raised max is in place before the saved hp is clamped to it.
 const lv = boot();
 lv.levels.picks = ['step', 'hp', 'dmg'];
-lv.levels.xp = 170;
+lv.levels.xp = 200;
 lv.levels.apply();
 lv.stats.hp = 1450;
 const ls = JSON.parse(JSON.stringify(serialize(lv)));
 if (ls.build.lv !== 5 || ls.build.picks.join() !== 'step,hp,dmg') fail(`build saved as ${JSON.stringify(ls.build)}`);
 const lb = boot();
 deserialize(lb, ls);
-if (lb.levels.picks.join() !== 'step,hp,dmg' || lb.levels.xp !== 170) fail('picks or XP not restored');
+if (lb.levels.picks.join() !== 'step,hp,dmg' || lb.levels.xp !== 200) fail('picks or XP not restored');
 if (lb.stats.hpMax !== 1472 || lb.stats.hp !== 1450) fail(`hp ${lb.stats.hp} / ${lb.stats.hpMax} after load, want 1450 / 1472`);
 // A save from before the levels loads at level 1 with the starting kit (main.ts then offers what its dead earned);
 // a card id this build doesn't know is dropped; a malformed build is refused.

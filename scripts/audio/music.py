@@ -8,7 +8,7 @@ pontile and gardens 5-11, sale espositive 11-16, the orto sweep 16-26.5, corrido
 26.5-42.4 (the grate at 35.35), the choir door at 42.45, the orbit round the boss 47.5-57.75, back
 down the nave to the portone (63.45; the game slams it ~66 s), the fondamenta 66.8 to the end."""
 from dsp import *
-from sfx import chant_phrase
+import sfx
 
 # Chords: midi notes, mid register.
 DM, BB, GM, A_, C_, EB, F_ = [50, 53, 57, 62], [46, 50, 53, 58], [43, 50, 55, 58], [45, 52, 57, 61], [48, 52, 55, 60], [51, 55, 58, 63], [41, 48, 53, 57]
@@ -21,6 +21,24 @@ def chord(c, t, d, g=1.0, oct=0):
 
 def hall(x, rt=3.0, w=0.35, damp=5000, dry=1.0):
     return reverb(x, rt, w, dry=dry, damp=damp)
+
+
+def chant_phrase(seed, f0=130, d=7.0):
+    """A line of plainchant, four voices in unison, sung far off in a stone space."""
+    r = np.random.default_rng(seed)
+    scale = [0, 2, 3, 5, 7, 8, 10, 12]  # D aeolian, around the reciting tone
+    out = np.zeros(n_(d + 0.5))
+    notes, t, deg = [], 0.0, 4
+    while t < d - 0.6:
+        deg = int(np.clip(deg + r.choice([-1, 0, 0, 1, 1, -2]), 0, 7))
+        dur = r.choice([0.35, 0.5, 0.5, 0.7, 1.0])
+        notes.append((r.choice(list('aaeiou')), dur, 2 ** (scale[deg] / 12)))
+        t += dur
+    notes[-1] = (notes[-1][0], 1.2, 1.0)
+    for v in range(4):
+        y = speak([(ph, dur, pm) for ph, dur, pm in notes], f0 * 2 ** (r.uniform(-8, 8) / 1200), 'tenor', breath=0.08)
+        out[:len(y)] += y[:len(out)]
+    return out
 
 
 def place(parts, d):
@@ -257,7 +275,9 @@ def death():
 
 # ================================================================ ambience beds (24 s loops)
 
-AMB = 24.0
+# ---------------------------------------------------------------- ambience beds: field recordings
+
+AMB = 30.0  # s, one seamless period of a bed
 
 
 def xloop2(x, L, X=1.5):
@@ -268,83 +288,51 @@ def xloop2(x, L, X=1.5):
     return y
 
 
-def lfo(d, rate, lo=0.0, hi=1.0, seed=None):
-    r = np.random.default_rng(seed)
-    w = sum(np.sin(2 * np.pi * rate * f * t_(d) + r.uniform(0, 6.3)) for f in (1, 1.618, 2.414))
-    w = (w / 3 + 1) / 2
-    return lo + (hi - lo) * w
+def take(key, a, d, X=1.0):
+    """`d` s of a stereo recording from `a` s, its own start crossfaded on when it runs short."""
+    x = sfx.REC(key, stereo=True)
+    y = x[n_(a):n_(a + d)]
+    while len(y) < n_(d):
+        m = n_(X)
+        nxt = x[:n_(d) - len(y) + m]
+        f = np.sqrt(np.linspace(0, 1, m))[:, None]
+        y = np.concatenate([y[:-m], y[-m:] * np.sqrt(1 - f ** 2) + nxt[:m] * f, nxt[m:]])
+    return y
 
 
-def water(d, seed):
-    waves = lfo(d, 0.13, 0.2, 1.0, seed) ** 2
-    y = lp(brown(d), 650) * waves * 0.9
-    slaps = np.zeros(n_(d))
-    r = np.random.default_rng(seed)
-    for s in r.uniform(0, d, int(d * 2.5)):
-        L = r.uniform(0.05, 0.2)
-        p = bp(white(L), 300, 1600) * expdec(L, L / 3)
-        i = n_(s)
-        k = min(len(p), len(slaps) - i)
-        slaps[i:i + k] += p[:k] * r.uniform(0.2, 0.7) * waves[i]
-    return y + slaps * 0.6 + hp(pink(d), 2500) * 0.02
+def level(x, db):
+    """A bed at an RMS level (dBFS), its peaks kept under -1 dBFS."""
+    x = x * 10 ** ((db - rms_db(x)) / 20)
+    return norm(x, -1.0) if np.abs(x).max() > 10 ** (-1 / 20) else x
 
 
-def wind(d, seed, lo=150, hi=1200, gust=0.08):
-    g = lfo(d, gust, 0.15, 1.0, seed)
-    y = bp(pink(d), lo, hi) * g
-    leaves = hp(white(d), 2500) * (g ** 3) * np.clip(lp(rng.standard_normal(n_(d)), 12) * 40, 0, 1)
-    return y, leaves
-
-
-def crickets(d, n=6, far=False):
-    out = np.zeros((n_(d), 2))
-    for c in range(n):
-        f = rng.uniform(4200, 5300)
-        period = rng.uniform(0.45, 0.9)
-        pulses = rng.integers(2, 5)
-        y = np.zeros(n_(d))
-        tone = osc(f, 0.02)
-        for s in np.arange(rng.uniform(0, period), d, period):
-            for p in range(pulses):
-                i = n_(s + p * 0.035)
-                k = min(len(tone), len(y) - i)
-                if k > 0:
-                    y[i:i + k] += tone[:k] * np.hanning(len(tone))[:k]
-        y *= rng.uniform(0.3, 1.0)
-        if far:
-            y = lp(y, 3500)
-        out += pan(y, rng.uniform(-0.9, 0.9))
-    return out * 0.15
-
-
-def amb_laguna():
+def amb_laguna():  # water burbling against the fondamenta, boats knocking at their moorings, a breeze
     d = AMB + 1.5
-    L, R = water(d, 1), water(d, 2)
-    w, leaves = wind(d, 3, 100, 700, 0.05)
-    x = np.stack([L, R], 1) + pan(w, -0.2) * 0.5 + pan(w[::-1].copy(), 0.3) * 0.3 + pan(lp(brown(d), 120), 0) * 0.3
-    return xloop2(x, AMB)
+    water = take('venice_canal', 4, d)
+    boats = take('gondolas', 60, d) * 0.45
+    air = lp(take('leaves_gusts', 0, d), 700) * 0.4
+    return level(xloop2(water + boats + air, AMB), -23)
 
 
-def amb_orto():
+def amb_orto():  # wind in the orchard's leaves, the lagoon beyond the wall; no insects
     d = AMB + 1.5
-    w, leaves = wind(d, 4, 200, 1500, 0.07)
-    x = crickets(d, 7) + pan(w, -0.3) * 0.35 + pan(leaves, 0.4) * 0.4 + pan(leaves[::-1].copy(), -0.5) * 0.3
-    return xloop2(x, AMB)
+    leaves = take('breeze_tree', 2, d)
+    gusts = take('leaves_gusts', 0, d) * 0.6
+    lagoon = lp(take('venice_canal', 30, d), 500) * 0.25
+    return level(xloop2(leaves + gusts + lagoon, AMB), -27)
 
 
-def amb_chiostro():
+def amb_chiostro():  # the cloister well's fountain, stone all round, the garden's air over the roofs
     d = AMB + 1.5
-    w, leaves = wind(d, 5, 120, 800, 0.05)
-    room = lp(brown(d), 200) * 0.25
-    trickle = lp(bubbles(d, 25, 600, 1500, 0.6), 2500) * 0.25  # the cloister well
-    x = crickets(d, 3, far=True) * 0.6 + pan(w, 0.2) * 0.35 + pan(leaves, -0.3) * 0.15 + pan(room, 0) + pan(trickle, 0.25)
-    return xloop2(hall(x, 1.8, 0.3)[:len(x)], AMB)
+    fountain = take('fountain', 0, d)
+    air = lp(take('breeze_tree', 12, d), 1500) * 0.35
+    x = fountain + air
+    return level(xloop2(hall(x, 1.8, 0.25)[:len(x)], AMB), -27)
 
 
-def amb_chiesa():
+def amb_chiesa():  # the empty church: its own room tone, nothing else
     d = AMB + 1.5
-    air = np.stack([lp(brown(d), 180), lp(brown(d), 180)], 1) * 0.35
-    drone = organ([(0, d, 26, 0.5), (0, d, 33, 0.35), (0, d, 38, 0.25)], 'pedal', attack=0.01, release=0.01, d=d)
-    drone *= lfo(d, 0.04, 0.6, 1.0, 9)[:, None]
-    x = air + drone * 0.8
-    return xloop2(hall(x, 4.5, 0.5, damp=3000)[:len(x)], AMB)
+    a, b, m = take('cathedral', 5, 24.5), take('cathedral', 33, d - 23.5), n_(1.0)  # two quiet stretches, crossed
+    f = np.sqrt(np.linspace(0, 1, m))[:, None]
+    room = np.concatenate([a[:-m], a[-m:] * np.sqrt(1 - f ** 2) + b[:m] * f, b[m:]])
+    return level(xloop2(room, AMB), -34)

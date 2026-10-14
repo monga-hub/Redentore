@@ -1,14 +1,64 @@
-"""Every sound effect, voice and world one-shot of the game, as code. Each entry of SOUNDS is
+"""Every sound effect, voice and world one-shot of the game. Each entry of SOUNDS is
 (bank, variants, loop, maker): `maker(i)` returns variant i as a mono array (loops: exactly one
-seamless period). Recorded layers come from Kenney's CC0 packs via `kenney()` (see build.py)."""
+seamless period). The body of every sound is a real recording (sources.py: Kenney, OpenGameArt
+and Freesound, all CC0), cut, pitched, layered and put in a room here; the undead speak with
+real voices slowed and roughened. Code-made layers are kept only for the magic's sparkle."""
 from dsp import *
 
-KENNEY = None  # set by build.py: name -> mono array at SR
+REC = None  # set by build.py: (key, stereo=False) -> array at SR, the recordings of sources.py
 
 
-def k(name, rate=1.0):
-    x = KENNEY(name)
+def r(key, rate=1.0, a=0.0, d=None):
+    """A recording from `a` s, played `rate` times faster (below 1: deeper and slower), `d` s of the result."""
+    x = REC(key)[n_(a):n_(a + d * rate) if d else None]
+    if a or d:
+        x = fade(x, 0.004, 0.004)  # no click where it was cut
     return resample(x, rate) if rate != 1 else x
+
+
+k = r  # Kenney's sounds go by their bare names
+
+
+def tail(x, t=0.3):
+    """A cut-off stretch of a long recording, let go gently instead of stopping dead."""
+    return fade(x, 0.004, min(t, len(x) / SR / 2))
+
+
+GUST = 44.0  # s into `gusts`: one strong gust swelling in and dying away
+
+
+def gust(rate=1.0, a=0.0, d=3.8):
+    """A real gust of wind (the mic's rumble taken off)."""
+    return hp(r('gusts', rate, GUST + a, d), 120)
+
+
+def events(x, n, gap=0.25):
+    """Onsets (s) of the `n` loudest separate events of a recording, loudest first."""
+    hop = n_(0.01)
+    e = np.sqrt(np.convolve(x ** 2, np.ones(hop) / hop, 'same'))[::hop]
+    left = e.copy()
+    out = []
+    for _ in range(n):
+        i = int(np.argmax(left))
+        if left[i] <= 0:
+            break
+        j = i
+        while j > 0 and e[j - 1] > e[i] * 0.1 and i - j < 30:
+            j -= 1
+        m = i
+        while m < len(e) - 1 and e[m + 1] > e[i] * 0.1:
+            m += 1
+        out.append(j * hop / SR)
+        left[max(0, j - int(gap * 100)):m + int(gap * 100)] = 0
+    return out
+
+
+def ev(key, i, d, rate=1.0, gap=0.25, pre=0.01):
+    """The `i`-th loudest event of a recording, `d` s of it from its onset."""
+    x = REC(key)
+    t = events(x, i + 1, gap)[i]
+    y = x[max(0, n_(t - pre)):n_(t - pre + d)]
+    return fade(resample(y, rate) if rate != 1 else y, 0.003, d * 0.3)
 
 
 def xloop(x, L, X=0.25):
@@ -16,8 +66,33 @@ def xloop(x, L, X=0.25):
     n, m = n_(L), n_(X)
     y = x[:n].copy()
     a = np.sqrt(np.linspace(0, 1, m))
+    if x.ndim == 2:
+        a = a[:, None]
     y[:m] = x[:m] * a + x[n:n + m] * np.sqrt(1 - a ** 2)
     return y
+
+
+def tile(parts, d, X=0.08):
+    """Pieces laid end to end with short crossfades until `d` s: a continuous sound out of bursts."""
+    out, i = np.zeros(0), 0
+    while len(out) < n_(d):
+        p = parts[i % len(parts)]
+        i += 1
+        if not len(out):
+            out = p.copy()
+            continue
+        m = min(n_(X), len(p), len(out))
+        a = np.sqrt(np.linspace(0, 1, m))
+        out[-m:] = out[-m:] * np.sqrt(1 - a ** 2) + p[:m] * a
+        out = np.concatenate([out, p[m:]])
+    return out[:n_(d)]
+
+
+def loud_parts(x, d=0.4, keep=0.5):
+    """The louder `keep` share of a recording's `d`-s slices (a bee's flight without its pauses)."""
+    s = [x[j:j + n_(d)] for j in range(0, len(x) - n_(d), n_(d))]
+    lv = np.array([np.sqrt(np.mean(p ** 2)) for p in s])
+    return [p for p, v in zip(s, lv) if v >= np.quantile(lv, 1 - keep)]
 
 
 def wet(x, rt=1.2, w=0.25, damp=5000):
@@ -28,7 +103,21 @@ def dist(x, drive=2.0):
     return np.tanh(x * drive) / np.tanh(drive)
 
 
-V = lambda *ph: list(ph)  # phones: (phone, dur, pitch)
+def undead(x, rate=0.82, drive=1.8, rt=0.9, w=0.15):
+    """A real voice made dead: slowed and lowered, roughened, heard in stone."""
+    y = dist(norm(resample(x, rate)), drive)
+    return norm(wet(hp(y, 60), rt, w, damp=4500))
+
+
+def bowl(rate=1.0, a=0.0, d=2.5):
+    """The brass singing bowl struck: its warm body, the whistling upper partials taken off."""
+    return fade(lp(r('singing_bowl', rate, a, d), 1800, 4), 0.002, d * 0.5)
+
+
+def sparkle(d, notes, rate=10, tau=0.25):
+    """The magic's glitter (the one code-made layer): sine pings kept low and below 4 kHz."""
+    return lp(shimmer(d, [m for m in notes if m <= 95], rate, tau), 4000)
+
 
 SOUNDS = {}
 
@@ -40,628 +129,540 @@ def sound(name, bank, variants=1, loop=0.0):
     return reg
 
 
-# ================================================================ UI (core)
+# ================================================================ UI (core): paper, leather, wood
 
 @sound('ui_click', 'core', 3)
-def _(i):
-    return mix((k(['click_002', 'click_003', 'click_004'][i]), 0, 0.8), (k('bookPlace1', 1.4)[:n_(0.08)], 0, 0.3))
+def _(i):  # a soft tap of leather and paper, no electronic tick
+    tap = lp(k(['bookPlace1', 'bookPlace2', 'bookPlace3'][i], 1.15)[:n_(0.09)], 5000)
+    return fade(mix(tap, (k(['handleSmallLeather', 'handleSmallLeather2', 'handleSmallLeather'][i])[:n_(0.07)], 0, 0.4)), 0.001, 0.03)
 
 
 @sound('ui_hover', 'core', 2)
-def _(i):
-    return k(['tick_001', 'tick_002'][i], 0.9)
+def _(i):  # a page edge brushed
+    return fade(lp(k(['bookFlip1', 'bookFlip2'][i], 1.3)[:n_(0.05)], 4000), 0.002, 0.03)
 
 
 @sound('ui_open', 'core')
 def _(i):
-    return mix(k('bookOpen'), (k('bookFlip2'), 0.12, 0.6))
+    return lp(mix(k('bookOpen'), (k('bookFlip2'), 0.12, 0.6)), 10000)
 
 
 @sound('ui_close', 'core')
 def _(i):
-    return k('bookClose')
+    return lp(k('bookClose'), 10000)
 
 
 @sound('ui_page', 'core', 2)
 def _(i):
-    return k(['bookFlip1', 'bookFlip3'][i])
+    return lp(k(['bookFlip1', 'bookFlip3'][i]), 10000)
 
 
 @sound('ui_error', 'core')
-def _(i):
-    return k('error_004', 0.85) * 0.7
+def _(i):  # a dull knock on wood instead of a buzzer
+    return lp(mix(k('impactWood_light_001', 0.8), (k('impactWood_light_003', 0.75), 0.11, 0.7)), 3500)
 
 
 @sound('quest', 'core')
-def _(i):  # objective updated: a soft pluck and two bells
-    return mix(k('confirmation_002', 0.9) * 0.6, (wet(chime(74, 2.0) + chime(81, 2.0) * 0.6, 1.5, 0.3), 0.05, 0.8))
+def _(i):  # objective updated: the book set down and a brass bowl struck twice
+    return norm(mix(k('bookPlace2') * 0.6, (bowl(1.0, 0, 2.6), 0.05, 0.8), (bowl(1.335, 0, 2.4), 0.3, 0.55)))
 
 
-# ================================================================ hero (core)
+# ================================================================ the hero (core)
 
-for surf, src in [('stone', 'footstep_concrete'), ('gravel', 'footstep_snow'), ('grass', 'footstep_grass'), ('wood', 'footstep_wood')]:
+for surf, src in [('stone', 'footstep_concrete'), ('grass', 'footstep_grass'), ('wood', 'footstep_wood')]:
     def make(i, src=src, surf=surf):
-        x = trim(k(f'{src}_00{i}'))
-        if surf == 'wood':  # the pontile's planks: a hollower knock under the step
-            x = mix(x, thump(110, 0.2, 0.05) * 0.25)
-        if surf == 'gravel':
-            x = mix(x, hp(k(f'footstep_concrete_00{i}'), 2000) * 0.3)
+        x = lp(trim(k(f'{src}_00{i}')), 9000)
+        if surf == 'wood':  # the pontile's planks: a hollow knock under the step
+            x = mix(x, k(f'impactPlank_medium_00{i % 5}', 0.8) * 0.2)
         return fade(x, 0.001, 0.03)
     sound(f'step_{surf}', 'core', 5)(make)
 
 
+@sound('step_gravel', 'core', 5)
+def _(i):  # real gravel underfoot
+    return fade(hp(ev('gravel_steps', i + 2, 0.32, gap=0.3), 80), 0.001, 0.06)
+
+
 @sound('land', 'core', 2)
 def _(i):
-    return mix(thump(65, 0.4, 0.09), k(['cloth2', 'cloth4'][i]) * 0.7, k('impactSoft_medium_00%d' % (i + 1)) * 0.6)
+    return mix(k('impactSoft_heavy_00%d' % (i + 1), 0.8) * 0.8, k(['cloth2', 'cloth4'][i]) * 0.7, k('impactSoft_medium_00%d' % (i + 1)) * 0.6)
 
 
 @sound('jump', 'core', 2)
-def _(i):
-    return mix(k(['cloth1', 'cloth3'][i]), speak(V(('h', 0.06, 1), ('u', 0.1, 1.1), ('h', 0.08, 0.9)), 120, 'bass', whisper=True) * 0.5)
+def _(i):  # cloth and a short breath
+    return mix(k(['cloth1', 'cloth3'][i]), lp(r('creature:breath', 1.1), 3000) * 0.25)
 
 
 @sound('swing', 'core', 3)
-def _(i):  # the bone club: a heavy whoosh with a rattle of bone
-    d = [0.3, 0.32, 0.45][i]
-    w = whoosh(d, [260, 240, 140][i], [1500, 1300, 900][i], 400, peak=0.5, q=1.4)
-    rattle = crack(d, 2500, 7000, 0.004, 3) * 0.08
-    return norm(w + rattle)
+def _(i):  # the bone club through the air: a stick's whoosh made heavier
+    w = [r('woosh_stick', 0.8), r('bamboo4', 0.72), r('bamboo5', 0.7)][i]
+    return norm(lp(trim(w, -45), 6000))
 
 
 @sound('hit_flesh', 'core', 4)
-def _(i):
-    p = k(f'impactPunch_heavy_00{i}')
-    return norm(mix(p, crack(0.15, 900, 3000, 0.01, 1) * 0.25, thump(85, 0.25, 0.05) * 0.5, bubbles(0.15, 60, 200, 500) * 0.2))
+def _(i):  # the club in flesh: a punch and something wet
+    return norm(mix(k(f'impactPunch_heavy_00{i}'), (lp(r(f'mud:mud_{[3, 7, 12, 18][i]:02d}'), 3000) * 0.45, 0.005)))
+
+
+def bone(i, rate=1.0):
+    return [r('bone_break', rate), r('bone_break2', rate), r('bone_crack', rate), r('bone_crack2', rate), r('celery', rate)][i % 5]
 
 
 @sound('hit_bone', 'core', 4)
-def _(i):
-    p = k(f'impactPunch_medium_00{i}', 0.85)
-    return norm(mix(p * 0.8, crack(0.2, 1200, 5000, 0.01, 4) * 0.6, thump(70, 0.3, 0.06) * 0.5))
+def _(i):  # bone and gristle cracking under the blow
+    return norm(mix(k(f'impactPunch_medium_00{i}', 0.85) * 0.8, (bone(i, 0.85) * 0.8, 0.005)))
 
 
 @sound('hit_big', 'core', 2)
-def _(i):  # the overhead smash and other heavy blows: a cracking floor under the blow
-    return norm(mix(boom(1.2, 48, 0.3) * 0.8, crack(0.4, 600, 4000, 0.02, 6), k(f'impactMining_00{i}', 0.7) * 0.7))
+def _(i):  # the overhead smash: the floor cracks and gives
+    debris = tail(r(['debris', 'debris_big'][i], 0.85, 0, 1.4), 0.6)
+    return norm(mix(k(f'impactMining_00{i}', 0.7) * 0.8, tail(lp(r('debris_big', 0.5, 0, 1.0), 400), 0.5) * 0.7, (debris * 0.6, 0.02), (bone(i + 2, 0.7) * 0.5, 0.01)))
 
 
 @sound('hit_player', 'core', 3)
 def _(i):
-    return norm(mix(k(f'impactPunch_medium_00{i + 2}'), k(['cloth2', 'clothBelt', 'cloth4'][i]) * 0.5, thump(90, 0.2, 0.04) * 0.4))
-
-
-def undead(phones, f0, rasp=0.7, sub=0.35, reg='bass'):
-    return norm(dist(speak(phones, f0, reg, rasp=rasp, breath=0.08, sub=sub) * 1.5, 1.5))
+    return norm(mix(k(f'impactPunch_medium_00{i + 2}'), k(['cloth2', 'clothBelt', 'cloth4'][i]) * 0.5))
 
 
 @sound('player_hurt', 'core', 4)
-def _(i):
-    v = 'auoa'[i]
-    return undead(V(('h', 0.03, 1.0), (v, [0.18, 0.22, 0.16, 0.25][i], 1.05), ('h', 0.07, 0.8)), [108, 100, 115, 96][i])
+def _(i):  # the Forsaken grunts: a real voice, lowered and dried out
+    return undead(ev('grunts_unfa', [0, 2, 4, 6][i], 0.55, gap=0.6), 0.86, 1.6, 0.6, 0.08)
 
 
 @sound('player_death', 'core')
 def _(i):
-    v = undead(V(('h', 0.05, 1), ('o', 0.45, 1.05), ('a', 0.9, 0.85), ('h', 0.5, 0.6)), 98, 0.9, 0.5)
-    return norm(mix(wet(v, 1.5, 0.3), (k('impactSoft_heavy_002', 0.8), 1.1, 0.9), (crack(0.5, 1500, 6000, 0.01, 8) * 0.3, 1.15)))
+    groan = undead(r('zombie_dying', 0.85, 6.0, 3.0), 1.0, 1.5, 1.4, 0.25)
+    return norm(mix(fade(groan, 0.01, 1.2), (k('impactSoft_heavy_002', 0.8), 1.6, 0.9), (bone(1, 0.8) * 0.4, 1.62)))
 
 
 @sound('player_revive', 'core')
-def _(i):  # the Forsaken gets up again: a breath drawn backwards and a grave chime
-    swell = reverse(mono(reverb(white(0.4) * expdec(0.4, 0.05), 0.8, 1.0, dry=0)))
-    return norm(mix(lp(swell, 3000) * 0.6, (wet(chime(62, 2.0, 0.8) + chime(69, 2.0, 0.8) * 0.5, 1.5, 0.3), len(swell) / SR - 0.05)))
+def _(i):  # he gets up again: a breath drawn backwards and a low bowl
+    breath = reverse(lp(r('ghost_breath', 1.0, 0, 1.6), 3000))
+    return norm(mix(fade(breath, 0.3, 0.05) * 0.8, (bowl(0.75, 0, 3.0), len(breath) / SR - 0.05)))
 
 
-# ---------------------------------------------------------------- abilities
+# ---------------------------------------------------------------- abilities: real elements, layered
 
 @sound('plague_cast', 'core')
-def _(i):
-    gurgle = formant(glottal(np.full(n_(0.35), 70.0), 0.9, 0.3) * expdec(0.35, 0.12), 'o', 'bass')
-    return norm(mix(whoosh(0.35, 200, 900, 300, 0.5, 1.2), bubbles(0.4, 70, 250, 900) * 0.8, gurgle * 0.5))
+def _(i):  # a retch of rot thrown forward
+    return norm(mix(r('creature:burble_01', 0.8) * 0.8, (r('swoosh_low', 1.1) * 0.6, 0.05), (lp(r('water:bubble_02'), 2500) * 0.5, 0.1)))
 
 
 @sound('plague_hit', 'core')
 def _(i):
-    splat = lp(white(0.3), 1400) * expdec(0.3, 0.05)
-    hiss = bp(white(1.2), 2000, 7000) * expdec(1.2, 0.35) * 0.25
-    return norm(mix(splat, thump(55, 0.4, 0.08) * 0.7, bubbles(0.9, 60, 200, 800) * 0.8, hiss))
+    hiss = bp(gust(1.4, 0, 1.2), 1500, 6000) * env(1.2, [(0, 0), (0.05, 1), (1.2, 0)]) * 0.3
+    return norm(mix(r('water:splash_04', 0.8), (r('mud:mud_21', 0.8) * 0.8, 0.02), (lp(r('water:bubble_01'), 2000) * 0.5, 0.15), (hiss, 0.05)))
 
 
 @sound('plague_cloud', 'core')
 def _(i):  # the cloud stews for 8 s
     d = 7.6
-    bed = bp(pink(d), 150, 900) * 0.5 * (0.8 + 0.2 * np.sin(2 * np.pi * 0.6 * t_(d)))
-    y = bed + bubbles(d, 18, 120, 600) + hp(white(d), 3000) * 0.04
-    return norm(y * env(d, [(0, 0), (0.4, 1), (d - 1.5, 1), (d, 0)]))
+    stew = lp(tile([r('water:loop_bubbles_1'), r('water:loop_bubbles_02')], d, 0.3), 1500)
+    gas = bp(tile([gust(0.6)], d, 0.5), 200, 1200) * 0.35
+    return norm((stew + gas) * env(d, [(0, 0), (0.4, 1), (d - 1.5, 1), (d, 0)]))
 
 
 @sound('wisp_cast', 'core')
-def _(i):  # 1.5 s cast: motes spiral up into the raised hands
+def _(i):  # 1.5 s cast: flame drawn up into the raised hands
     d = 1.6
-    rise = sum(osc(mtof(m) * (1 + 0.5 * t_(d) / d), d, 'sine', rng.uniform()) for m in (62, 69, 74)) * (t_(d) / d) ** 1.5 * 0.3
-    return norm(mix(rise, shimmer(d, [74, 77, 81, 86], 18) * (t_(d) / d), riser(d, 300, 4000, 3) * 0.6))
+    fire = fit(reverse(r('rpg:spell_fire_03', 0.9)), d)
+    rise = (t_(d) / d) ** 1.5
+    return norm(mix(fire * 0.9, r('fire_roar', 1.2, 2, d) * rise * 0.5, sparkle(d, [74, 77, 81, 86], 10) * rise * 0.25))
 
 
 @sound('wisp_summon', 'core')
 def _(i):
-    flare = whoosh(0.5, 400, 3000, 2000, 0.3, 2)
-    return norm(mix(flare * 0.7, *[(chime(m, 2.0, 0.7) * 0.6, t, 1) for m, t in ((74, 0), (81, 0.06), (86, 0.12))], (crackle(1.2, 40, 3500) * expdec(1.2, 0.5), 0.05, 0.6)))
+    flare = r('rpg:spell_fire_06')
+    return norm(mix(flare, (r('torch', 1.1, 3.3, 0.9) * 0.7, 0.02), (bowl(1.5, 0, 1.6) * 0.3, 0.05), (sparkle(1.2, [74, 81, 86], 14) * expdec(1.2, 0.5) * 0.3, 0.05)))
 
 
 @sound('wisp_loop', 'core', loop=3.0)
-def _(i):  # the wisp's flame: a soft crackle and a ghostly hum
-    d = 3.4
-    hum = (osc(293.7, d) + osc(440.5, d) * 0.6 + osc(587.0, d) * 0.3) * (0.7 + 0.3 * np.sin(2 * np.pi * 1.0 * t_(d)))
-    return norm(xloop(crackle(d, 25, 2800) * 1.5 + hum * 0.12 + bp(pink(d), 300, 1500) * 0.15, 3.0, 0.4))
+def _(i):  # the wisp's flame: a soft real fire, no hum
+    return norm(xloop(lp(r('fire', 1.0, 10, 3.4), 6000) + lp(r('fire_roar', 1.0, 6, 3.4), 900) * 0.25, 3.0, 0.4))
 
 
 @sound('wisp_end', 'core')
-def _(i):
-    return norm(mix(whoosh(0.4, 1500, 2500, 300, 0.2, 1.5) * 0.6, chime(81, 1.5, 0.4) * 0.5, (chime(74, 1.5, 0.4) * 0.4, 0.08)))
+def _(i):  # the flame gutters out
+    return norm(mix(fade(r('torch', 1.2, 3.4, 0.7), 0.01, 0.5), (bowl(1.5, 0, 1.4) * 0.25, 0.04)))
 
 
 @sound('veil', 'core')
-def _(i):  # Velo spettrale: the shroud rushing in, a whisper drawn backwards, a sour choir
-    swirl = whoosh(0.9, 300, 2200, 600, 0.6, 3)
-    whisper = reverse(mono(reverb(speak(V(('h', 0.1, 1), ('u', 0.25, 1), ('s', 0.2, 1)), 160, 'tenor', whisper=True), 1.2, 0.8)))
-    ghost = choir([(0.1, 0.8, 74, 1), (0.1, 0.8, 75, 0.7), (0.1, 0.8, 81, 0.6)], 'u', 'soprano', voices=3, attack=0.15, release=0.5)
-    return norm(mix(swirl, whisper * 0.6, mono(ghost) * 0.7))
+def _(i):  # Velo spettrale: a gust rushing in, whispers drawn backwards, a ghost's moan
+    whisper = reverse(wet(r('whispers', 1.0, 2.0, 1.2), 1.2, 0.6))
+    moan = lp(r('ghost:qubodup-GhostMoan05', 1.1), 2500)
+    return norm(mix(tail(gust(1.15), 0.8), (whisper * 0.6, 0.1), (tail(moan, 0.6) * 0.5, 0.35)))
 
 
 @sound('blink', 'core')
 def _(i):  # Passo d'ombra: sucked out, popped back in
-    out = reverse(whoosh(0.3, 400, 2500, 1200, 0.3, 2))
-    pop = mix(thump(80, 0.3, 0.05), (crack(0.1, 3000, 8000, 0.006, 2), 0, 0.4))
-    return norm(mix(out, (pop, 0.28, 1), (shimmer(0.6, [79, 82, 86], 30) * expdec(0.6, 0.2), 0.28, 0.5)))
+    out = reverse(r('woosh_stick', 0.9))
+    pop = mix(k('impactSoft_medium_002', 1.2), (k('cloth3')[:n_(0.12)] * 0.5, 0))
+    return norm(mix(out, (pop, len(out) / SR - 0.02, 1), (tail(lp(gust(1.6, 0.3, 0.6), 3000)) * 0.4, len(out) / SR)))
 
 
 @sound('strike_cast', 'core')
-def _(i):  # Sentenza del sepolcro: the leap and the club hammering the floor toward the mark
-    return norm(mix(whoosh(0.45, 150, 900, 300, 0.6, 1.2), (riser(0.4, 60, 400, 2) * 0.6, 0)))
+def _(i):  # Sentenza del sepolcro: the leap and the club swung down
+    return norm(mix(r('swoosh_low', 0.75), (tail(gust(1.3, 0.2, 0.5)) * 0.4, 0)))
 
 
 @sound('strike_hit', 'core')
 def _(i):  # the bone spear bursting out of the floor
-    spikes = mix(*[(crack(0.25, 800, 5000, 0.015, 3), t, 1) for t in (0, 0.05, 0.09, 0.15)])
-    return norm(mix(boom(1.6, 45, 0.45), spikes * 0.9, (crackle(0.8, 90, 2000) * expdec(0.8, 0.25) * 2, 0.05)))
+    spikes = mix(*[(bone(j, rate), t, 0.8) for j, (t, rate) in enumerate([(0, 0.8), (0.05, 0.95), (0.09, 0.7), (0.15, 0.85)])])
+    return norm(mix(tail(r('debris_big', 0.75, 0, 1.6), 0.6), (spikes, 0.01), (lp(k('impactMining_002', 0.5), 500), 0)))
 
 
 @sound('nova', 'core')
-def _(i):  # Lamento della cripta: the slam, the wave and two rings of bone spikes
-    ring = mix(*[(crack(0.2, 700, 4500, 0.012, 2), 0.06 + j * 0.025, 1) for j in range(10)])
-    wave = whoosh(0.7, 120, 2500, 300, 0.25, 1.0)
-    return norm(mix(boom(2.6, 38, 0.7) * 1.1, (wave, 0.02, 0.8), (ring, 0.05, 0.7), taiko(45, 1.5, 0.4) * 0.6))
+def _(i):  # Lamento della cripta: the slam, the blast of air and rings of bone spikes
+    ring = mix(*[(bone(j, 0.7 + 0.04 * (j % 5)) * 0.6, 0.06 + j * 0.025, 1) for j in range(10)])
+    return norm(mix(tail(lp(r('debris_big', 0.5, 0, 2.6), 1200), 1.0), (tail(r('debris', 0.8, 0, 2.0), 0.8) * 0.6, 0.03), (tail(gust(0.9), 0.8) * 0.6, 0.02), (ring, 0.05, 0.8)))
 
 
 @sound('ward', 'core')
-def _(i):  # Patto della tomba: a grave gong and a bright sour-sweet chord
+def _(i):  # Patto della tomba: a grave bowl struck low, a ghost's breath, faint glitter
     d = 3.5
-    gong = sum(osc(110 * r, d, 'sine', rng.uniform()) * a * expdec(d, tau) for r, a, tau in
-               ((1, 1, 2.2), (1.47, 0.6, 1.6), (2.09, 0.5, 1.2), (2.56, 0.35, 0.9), (3.0, 0.3, 0.7), (3.7, 0.2, 0.5)))
-    gong += bp(white(d), 200, 2000) * expdec(d, 0.04) * 0.5
-    ch = mono(choir([(0.05, 1.4, m, 1) for m in (62, 66, 69, 74)], 'a', 'soprano', voices=3, attack=0.2, release=1.0))
-    return norm(wet(mix((gong, 0, 0.5), (ch, 0, 0.8), (shimmer(d, [74, 78, 81, 86], 10) * expdec(d, 1.5), 0, 0.5)), 2.0, 0.3))
+    return norm(wet(mix(bowl(0.5, 0, d), (lp(r('ghost_breath', 1.0, 0, 2.0), 2500) * 0.5, 0.05), (sparkle(d, [74, 78, 81, 86], 8) * expdec(d, 1.5) * 0.3, 0)), 2.0, 0.3))
 
 
 @sound('potion', 'core')
-def _(i):
-    t = t_(0.06)
-    pop = osc(900 * np.exp(-t / 0.02) + 300, kind='sine') * expdec(0.06, 0.015) + crack(0.06, 2000, 6000, 0.003) * 0.5
-    gulp = lambda: lp(formant(glottal(np.full(n_(0.16), 90.0), 0.2, 0.4), 'o', 'bass') * env(0.16, [(0, 0), (0.03, 1), (0.16, 0)]), 1200) + bubbles(0.16, 60, 150, 400)
-    heal = mix(*[(chime(m, 1.2, 0.5), j * 0.07, 1) for j, m in enumerate((62, 65, 69, 74, 77))])
-    return norm(mix(pop, (gulp(), 0.18, 0.7), (gulp(), 0.4, 0.7), (gulp(), 0.62, 0.6), (wet(heal, 1.5, 0.3) * 0.5, 0.75), (shimmer(1.0, [74, 77, 81], 20) * expdec(1.0, 0.4), 0.8, 0.5)))
+def _(i):  # the stopper, three gulps, a sigh of glitter
+    gulp = lambda rate: lp(r('gulp', rate), 3000)
+    return norm(mix(r('cork'), (gulp(1.0), 0.18), (gulp(0.95), 0.42), (gulp(1.05), 0.66), (sparkle(1.0, [74, 77, 81], 6) * expdec(1.0, 0.3) * 0.15, 0.85)))
 
 
 @sound('charge_ready', 'core')
-def _(i):  # the fury bar is full: the specials are unlocked
-    bells = mix(*[(bell(m, 2.5, 0.8), j * 0.09, 1) for j, m in enumerate((62, 69, 74, 81))])
-    return norm(wet(mix(bells, (shimmer(1.5, [81, 86, 89], 14) * expdec(1.5, 0.6), 0, 0.5)), 1.8, 0.3))
+def _(i):  # the fury bar is full: the bowl struck, a fifth above it answering
+    return norm(wet(mix(bowl(0.75, 0, 2.5), (bowl(1.12, 0, 2.2) * 0.6, 0.12)), 1.8, 0.3))
 
 
 @sound('loot', 'core')
-def _(i):  # a loot beam, Diablo's legendary drop
-    d = 2.2
-    pillar = sum(osc(mtof(m), d, 'sine', rng.uniform()) * a for m, a in ((74, 1), (81, 0.7), (86, 0.5), (90, 0.3))) * env(d, [(0, 0), (0.05, 1), (0.6, 0.6), (d, 0)]) * 0.25
-    return norm(mix(k('dropLeather') * 0.7, (wet(pillar + shimmer(d, [86, 89, 93], 16) * expdec(d, 0.8), 2.0, 0.35), 0.03)))
+def _(i):  # a drop: leather and coins, a little glitter
+    return norm(mix(k('dropLeather') * 0.8, (r('rpg:item_coins_02') * 0.6, 0.04), (sparkle(1.4, [81, 86, 89, 93], 10) * expdec(1.4, 0.5) * 0.2, 0.05)))
 
 
 # ---------------------------------------------------------------- quest: chest, key, gates, doors
 
 @sound('chest_open', 'core')
 def _(i):
-    return norm(mix(k('metalLatch'), (k('creak1', 0.75), 0.18, 0.9), (k('impactWood_light_002', 0.8), 0.95, 0.8),
-                    (wet(shimmer(1.4, [74, 78, 81, 86], 16) * expdec(1.4, 0.6), 1.5, 0.3), 0.5, 0.5)))
+    return norm(mix(k('metalLatch'), (lp(k('creak1', 0.75), 3000, 4), 0.18, 0.9), (k('impactWood_light_002', 0.8), 0.95, 0.8),
+                    (sparkle(1.4, [74, 78, 81, 86], 10) * expdec(1.4, 0.6) * 0.2, 0.5)))
 
 
 @sound('key', 'core')
-def _(i):
-    return norm(mix(k('handleCoins', 1.1) * 0.7, (k('metalClick', 0.8), 0.05, 0.6), (wet(bell(86, 2.5, 0.8) + bell(93, 2.5, 0.6) * 0.5, 1.8, 0.3), 0.12, 0.9)))
-
-
-def grind(d, lo=300, hi=1100, rate=14):
-    t = t_(d)
-    return bp(white(d), lo, hi) * (0.6 + 0.4 * np.abs(np.sin(np.pi * rate * t))) * 0.5
+def _(i):  # the key lifted from the chest: real keys and a click
+    return norm(mix(r('keys', 0.9, 1.0, 1.4) * fade(np.ones(n_(1.4)), 0.02, 0.6), (k('metalClick', 0.8) * 0.5, 0.05), (bowl(1.5, 0, 2.0) * 0.3, 0.15)))
 
 
 @sound('grate_open', 'core')
-def _(i):  # an iron grate sliding up into the wall (1.6 s)
+def _(i):  # an iron grate hauled up into the wall (1.6 s): chains, rattling bars, the stop
     d = 1.7
-    clinks = mix(*[(k(f'impactMetal_light_00{j % 5}', rng.uniform(0.8, 1.1)) * 0.5, t, 1) for j, t in enumerate(np.cumsum(rng.uniform(0.08, 0.16, 12)))], d=d)
-    return norm(mix(grind(d) * env(d, [(0, 0), (0.1, 1), (1.5, 1), (d, 0)]), clinks, (k('impactMetal_heavy_001', 0.8), 1.55, 0.9)))
+    chains = r('chains', 0.85, 1.0, d) * env(d, [(0, 0), (0.1, 1), (1.5, 1), (d, 0)])
+    rattle = r('gate_rattle', 0.8, 15.5, d) * 0.6
+    return norm(mix(chains, rattle, (ev('iron_gate', 0, 0.6, 0.8), 1.5, 0.9), (k('impactMetal_heavy_001', 0.7) * 0.5, 1.55)))
 
 
 @sound('grate_close', 'core')
 def _(i):
     d = 1.4
-    return norm(mix(grind(d, 250, 900) * env(d, [(0, 0), (0.1, 1), (1.2, 1), (d, 0)]), (k('impactMetal_heavy_003', 0.7), 1.25, 1), (thump(70, 0.4, 0.1) * 0.6, 1.27)))
+    chains = r('chains', 0.8, 5.0, d) * env(d, [(0, 0), (0.1, 1), (1.2, 1), (d, 0)])
+    return norm(mix(chains, (ev('iron_gate', 1, 0.6, 0.75), 1.22, 1), (k('impactMetal_heavy_003', 0.6), 1.25, 0.8)))
 
 
 @sound('door_open', 'core')
 def _(i):  # the heavy church doors swinging in
-    return norm(wet(mix(k('doorOpen_2', 0.65), (k('creak2', 0.55), 0.15, 0.9), (lp(white(1.6), 300) * env(1.6, [(0, 0), (0.3, 1), (1.6, 0)]) * 0.4, 0)), 1.8, 0.3))
+    return norm(wet(lp(mix(k('doorOpen_2', 0.65), (k('creak2', 0.55), 0.15, 0.9)), 3000, 4), 1.8, 0.3))
 
 
 @sound('door_close', 'core')
 def _(i):  # ...and slamming shut (the portone in the intro)
-    return norm(mix(wet(mix(k('creak3', 0.6) * 0.6, (k('doorClose_4', 0.6), 0.35, 1), (k('impactWood_heavy_001', 0.7), 0.38, 1)), 2.5, 0.35), (boom(2.5, 50, 0.6) * 0.8, 0.37)))
+    slam = mix(lp(k('creak3', 0.6), 3000, 4) * 0.6, (k('doorClose_4', 0.6), 0.35, 1), (k('impactWood_heavy_001', 0.7), 0.38, 1), (lp(k('impactWood_heavy_002', 0.45), 400) * 0.8, 0.37))
+    return norm(wet(slam, 2.5, 0.35))
 
 
 @sound('locked', 'core')
 def _(i):
-    return norm(mix(k('metalLatch', 0.9), (k('metalLatch', 0.85), 0.16, 0.8), (k('impactMetal_light_002', 0.7) * 0.5, 0.18)))
+    return norm(lp(mix(k('metalLatch', 0.9), (k('metalLatch', 0.85), 0.16, 0.8), (k('impactMetal_light_002', 0.7) * 0.5, 0.18)), 4000))
 
 
-# ================================================================ enemies (mobs)
+# ================================================================ enemies (mobs): real voices, made dead
 
 @sound('friar_aggro', 'mobs', 3)
 def _(i):
-    ph = [V(('h', 0.08, 0.9), ('u', 0.3, 1.0), ('a', 0.35, 1.15), ('h', 0.1, 0.8)),
-          V(('r', 0.12, 0.9), ('a', 0.45, 1.1), ('u', 0.2, 0.8)),
-          V(('h', 0.05, 1), ('o', 0.25, 1.2), ('a', 0.4, 1.0), ('r', 0.15, 0.8))][i]
-    return undead(ph, [88, 95, 82][i], 0.9, 0.5)
+    return undead(ev('zombie_growls', [0, 3, 6][i], 1.4, gap=0.6), [0.85, 0.8, 0.9][i])
 
 
 @sound('friar_hurt', 'mobs', 3)
 def _(i):
-    return undead(V(('h', 0.02, 1), ('uoe'[i], 0.16, 1.1), ('h', 0.05, 0.8)), [92, 100, 86][i], 0.8, 0.4)
+    return undead(ev('grunts', [1, 4, 7][i], 0.4, gap=0.2), [0.8, 0.76, 0.84][i], 2.0, 0.6, 0.08)
 
 
 @sound('friar_death', 'mobs', 3)
 def _(i):
-    moan = undead(V(('o', 0.3, 1.1), ('a', 0.6, 0.85), ('u', 0.4, 0.6), ('h', 0.3, 0.5)), [90, 84, 96][i], 1.0, 0.5)
-    return norm(mix(moan, (crack(0.4, 1500, 6000, 0.01, 7) * 0.4, 0.9), (k(f'impactSoft_heavy_00{i}', 0.85) * 0.8, 1.0)))
+    moan = undead(ev('zombie_moan', [0, 2, 4][i], 2.0, gap=0.8), 0.92, 1.4, 1.0, 0.2)
+    return norm(mix(fade(moan, 0.01, 0.8), (bone(i, 0.85) * 0.35, 0.9), (k(f'impactSoft_heavy_00{i}', 0.85) * 0.8, 1.0)))
 
 
 @sound('friar_swing', 'mobs', 2)
-def _(i):
-    return norm(whoosh(0.42, 180, 1000, 300, 0.55, 1.3))
+def _(i):  # the hoe through the air
+    return norm(trim(r(['bamboo3', 'bamboo5'][i], 0.78), -45))
 
 
 @sound('friar_hit', 'mobs', 2)
 def _(i):  # the hoe bites
-    return norm(mix(k(f'impactPunch_heavy_00{i + 1}'), k(f'impactMetal_light_00{i}', 0.6) * 0.5, thump(80, 0.25, 0.05) * 0.5))
+    return norm(mix(k(f'impactPunch_heavy_00{i + 1}'), k(f'impactMetal_light_00{i}', 0.6) * 0.4))
 
 
 @sound('hoe', 'mobs', 3)
-def _(i):  # a friar at work: the hoe in the earth
-    return norm(mix(k(f'impactSoft_medium_00{i}', 0.9), k(f'footstep_snow_00{i}', 0.8) * 0.6, k(f'impactMetal_light_00{i + 1}', 0.5) * 0.15))
+def _(i):  # a friar at work: the blade in the earth, quiet
+    return norm(lp(mix(r(f'mud:mud_{[2, 9, 15][i]:02d}', 0.9), k(f'impactSoft_medium_00{i}', 0.9) * 0.5, k(f'footstep_snow_00{i}', 0.8) * 0.4), 5000))
 
 
 @sound('priest_aggro', 'mobs', 2)
-def _(i):
-    ph = [V(('a', 0.3, 1.0), ('m', 0.14, 0.95), ('e', 0.4, 0.9), ('n', 0.2, 0.85)),
-          V(('m', 0.08, 1.0), ('i', 0.18, 1.05), ('s', 0.1, 1), ('e', 0.22, 1.0), ('r', 0.06, 1), ('e', 0.4, 0.9))][i]
-    voiced = speak(ph, 150, 'tenor', rasp=0.3, breath=0.1)
-    hiss = speak(ph, 150, 'tenor', whisper=True)
-    return norm(wet(voiced * 0.7 + hiss * 0.6, 1.2, 0.3))
+def _(i):  # a hissed curse and a ghost's moan behind it
+    hiss = r('whisper_demon', 0.95, [0.0, 2.0][i], 1.8)
+    moan = lp(r('ghost:qubodup-GhostMoan0%d' % [1, 4][i], 1.05, 0, 1.8), 3000)
+    return norm(wet(mix(fade(hiss, 0.01, 0.5), (moan * 0.6, 0.15)), 1.2, 0.3))
 
 
 @sound('priest_cast', 'mobs')
 def _(i):  # the shadow bolt gathering in the crystal (1.6 s; sacerdoti and the boss play it slower)
     d = 1.6
-    f = mtof(38) * (1 + 0.5 * (t_(d) / d) ** 2)
-    drone = sum(osc(f * r * (1 + rng.uniform(-0.01, 0.01)), kind='saw') for r in (1, 1.5, 2.01)) / 3
-    drone = sweep_lp(drone, 200 + 2500 * (t_(d) / d) ** 2) * (t_(d) / d)
-    whisper = speak(V(('s', 0.2, 1), ('i', 0.6, 1), ('h', 0.4, 1), ('a', 0.4, 1)), 170, 'tenor', whisper=True)
-    return norm(mix(drone, whisper * 0.4, crackle(d, 20, 3000) * (t_(d) / d) * 0.8))
+    rise = (t_(d) / d) ** 1.5
+    whisper = r('whispers', 0.9, 4.0, d)
+    return norm(mix(whisper * 0.6, r('fire_roar', 0.7, 4, d) * rise * 0.8, reverse(fit(r('rpg:spell_fire_04'), d)) * 0.6))
 
 
 @sound('bolt_cast', 'mobs', 2)
-def _(i):
-    return norm(mix(whoosh(0.55, 150, 900, 250, 0.3, 1.4), lp(white(0.4), 600) * expdec(0.4, 0.08) * 0.6, crackle(0.5, 40, 2500) * expdec(0.5, 0.2)))
+def _(i):  # the bolt let fly: a torch whooshing past
+    return norm(fade(r('torch', [1.0, 1.1][i], [0.2, 1.8][i], 0.55), 0.005, 0.25))
 
 
 @sound('bolt_hit', 'mobs', 2)
 def _(i):
-    d = 0.9
-    sour = (osc(mtof(50), d) + osc(mtof(51), d)) * expdec(d, 0.25) * 0.4
-    return norm(mix(boom(d, 70, 0.15) * 0.8, crackle(d, 80, 2500) * expdec(d, 0.2) * 1.5, sour))
+    return norm(mix(r(['rpg:spell_fire_06', 'rpg:spell_fire_03'][i], 0.85, 0, 0.9), k('impactSoft_heavy_00%d' % (i + 2), 0.8) * 0.6, (r('rpg:stones_0%d' % (i + 1), 0.9) * 0.3, 0.02)))
 
 
 @sound('bolt_fizzle', 'mobs')
 def _(i):
-    return norm(bp(white(0.4), 1500, 6000) * expdec(0.4, 0.1) + crackle(0.4, 40, 3000) * expdec(0.4, 0.15))
+    return norm(fade(hp(r('rpg:spell_fire_07', 1.1), 600), 0.003, 0.2))
 
 
 @sound('priest_hurt', 'mobs', 2)
 def _(i):
-    return norm(speak(V(('h', 0.04, 1), ('ae'[i], 0.14, 1.2), ('h', 0.06, 0.9)), [150, 165][i], 'tenor', rasp=0.4, breath=0.15))
+    return undead(ev('grunts', [2, 9][i], 0.4, gap=0.2), [0.95, 0.9][i], 1.3, 0.7, 0.12)
 
 
 @sound('priest_death', 'mobs', 2)
-def _(i):
-    wail = speak(V(('a', 0.4, 1.0), ('i', 0.6, 1.5), ('h', 0.5, 1.4)), [155, 140][i], 'tenor', rasp=0.3, breath=0.15)
-    return norm(mix(wet(wail, 2.0, 0.45), (whoosh(0.8, 300, 2500, 3000, 0.7, 2) * 0.3, 0.6), (k(f'impactSoft_heavy_00{i + 3}', 0.9) * 0.6, 0.9)))
+def _(i):  # a wail of agony, in stone, and the body falling
+    wail = lp(undead(r('agony', 0.9, [3.65, 5.0][i], [1.2, 2.0][i]), 0.95, 1.2, 2.0, 0.4), 6000)
+    return norm(mix(fade(wail, 0.01, 0.6), (k(f'impactSoft_heavy_00{i + 3}', 0.9) * 0.6, 0.9)))
 
 
 @sound('pray', 'mobs', loop=6.0)
-def _(i):  # a group at prayer: three voices murmuring a psalm tone
-    d = 6.6
-    out = np.zeros(n_(d))
-    for v in range(3):
-        ph, t = [], 0.0
-        while t < d:
-            dur = rng.uniform(0.12, 0.3)
-            ph.append(('aeoum'[rng.integers(0, 5)], dur, 1.0 if rng.random() < 0.8 else 0.94))
-            t += dur
-        y = speak(ph, [118, 124, 112][v], 'tenor', breath=0.2)
-        out += fit(y, d) * (0.8 + 0.2 * np.sin(2 * np.pi * 0.3 * t_(d) + v))
-    return norm(xloop(lp(out, 2500), 6.0, 0.6))
+def _(i):  # a group at prayer: real whispers, murmured low
+    w = r('whispers', 0.8)
+    return norm(xloop(lp(tile([w, reverse(w)], 6.6, 0.4), 2200), 6.0, 0.6))
 
 
 @sound('sacerdote_aggro', 'mobs')
 def _(i):
-    shout = speak(V(('h', 0.06, 1), ('a', 0.75, 1.0), ('h', 0.15, 0.85)), 128, 'bass', rasp=0.6, sub=0.2)
-    low = speak(V(('h', 0.06, 1), ('a', 0.75, 1.0), ('h', 0.15, 0.85)), 64, 'bass', rasp=0.6)
-    return norm(wet(dist(shout + low * 0.6, 2.5), 1.6, 0.3))
+    return norm(wet(lp(dist(norm(fade(r('demon_roar', 0.9, 0.8, 2.4), 0.05, 0.6)), 1.5), 5000), 1.6, 0.3))
 
 
 @sound('heavy_swing', 'mobs', 2)
 def _(i):
-    return norm(whoosh(0.5, 130, 700, 250, 0.55, 1.2))
+    return norm(trim(r(['swoosh_low', 'woosh_stick'][i], [0.7, 0.62][i]), -45))
 
 
 @sound('heavy_hit', 'mobs', 2)
 def _(i):
-    return norm(mix(k(f'impactPunch_heavy_00{i + 2}'), k(f'impactMetal_heavy_00{i}', 0.7) * 0.6, thump(60, 0.4, 0.08) * 0.7))
+    return norm(mix(k(f'impactPunch_heavy_00{i + 2}'), lp(k(f'impactMetal_heavy_00{i}', 0.7), 2500) * 0.6, (bone(i + 1, 0.75) * 0.3, 0.005)))
 
 
 @sound('sacerdote_hurt', 'mobs', 2)
 def _(i):
-    return undead(V(('h', 0.03, 1), ('uo'[i], 0.2, 1.05), ('h', 0.06, 0.8)), 118, 0.5, 0.2)
+    return undead(ev('grunts_unfa', [1, 3][i], 0.7, gap=0.6), 0.7, 2.0, 1.0, 0.15)
 
 
 @sound('sacerdote_death', 'mobs')
 def _(i):
-    cry = undead(V(('a', 0.5, 1.15), ('o', 0.7, 0.8), ('h', 0.4, 0.6)), 120, 0.6, 0.3)
-    return norm(mix(wet(cry, 2.0, 0.35), (k('impactMetal_medium_002', 0.7) * 0.6, 1.0), (k('impactSoft_heavy_001', 0.8), 1.15)))
+    cry = undead(r('zombie_dying', 0.75, 0, 3.0), 1.0, 1.4, 2.0, 0.35)
+    return norm(mix(fade(cry, 0.01, 1.0), (k('impactMetal_medium_002', 0.7) * 0.6, 1.6), (k('impactSoft_heavy_001', 0.8), 1.75)))
 
 
-def bee_wings(f, d):
-    return buzz(f, d) + buzz(f * 1.01, d) * 0.6
+def flight(key, rate):
+    """A bee's buzz without its pauses, at `rate` (lower: a bigger insect)."""
+    return resample(tile(loud_parts(REC(key), 0.35, 0.25), 3.0, 0.1), rate)
 
 
 @sound('bee_queen', 'mobs', loop=2.0)
-def _(i):
-    return norm(xloop(bee_wings(118, 2.4), 2.0, 0.4))
+def _(i):  # the giant: a bumblebee's flight, slowed to a drone
+    return norm(xloop(lp(flight('bumblebee', 0.62), 4000), 2.0, 0.4))
 
 
 @sound('bee_worker', 'mobs', loop=2.0)
 def _(i):
-    return norm(xloop(bee_wings(215, 2.4), 2.0, 0.4))
+    return norm(xloop(lp(flight('bumblebee', 1.15), 6000), 2.0, 0.4))
 
 
 @sound('bee_sting', 'mobs', 2)
-def _(i):
-    surge = bee_wings(160, 0.6) * env(0.6, [(0, 0.3), (0.35, 1), (0.6, 0)])
-    return norm(mix(surge, (whoosh(0.3, 400, 2500, 800, 0.6, 2), 0.2, 0.6), (crack(0.08, 3000, 9000, 0.004, 2) * 0.8, 0.45)))
+def _(i):  # the dive: a bee passing close and the sting going in
+    dive = r('bee_pass', [0.75, 0.85][i])
+    return norm(mix(dive, (k('impactPunch_medium_00%d' % i, 1.3) * 0.4, 0.45)))
 
 
 @sound('bee_swarm_cast', 'mobs')
 def _(i):  # the poison swarm gathering (1.8 s)
     d = 1.9
-    y = sum(buzz(rng.uniform(150, 320) * (1 + 0.4 * t_(d) / d), d) * rng.uniform(0.3, 1) for _ in range(8))
-    return norm(y * (t_(d) / d) ** 1.2)
+    return norm(r('beehive_close', 1.15, 3, d) * (t_(d) / d) ** 1.2)
 
 
 @sound('bee_swarm', 'mobs')
 def _(i):
     d = 1.6
-    y = sum(buzz(rng.uniform(180, 380), d) for _ in range(8)) * expdec(d, 0.5)
-    return norm(mix(y, whoosh(0.6, 200, 2500, 400, 0.2, 1) * 0.7, (bubbles(0.6, 60, 200, 700) * 0.6, 0.05)))
+    return norm(mix(r('beehive_close', 1.25, 8, d) * expdec(d, 0.6), tail(gust(1.2, 0.2, 0.8)) * 0.5, (lp(r('water:bubble_03'), 2000) * 0.4, 0.05)))
 
 
 @sound('bee_hurt', 'mobs', 2)
 def _(i):
-    stutter = bee_wings([150, 230][i], 0.3) * (np.sin(2 * np.pi * 18 * t_(0.3)) > 0)
-    return norm(mix(crack(0.12, 1500, 6000, 0.006, 3), stutter * 0.6))
+    stutter = flight('bumblebee', [1.0, 1.25][i])[:n_(0.3)] * (np.sin(2 * np.pi * 18 * t_(0.3)) > 0)
+    return norm(mix(bone(i + 2, 1.3) * 0.6, lp(stutter, 5000) * 0.6))
 
 
 @sound('bee_death', 'mobs', 2)
-def _(i):
+def _(i):  # wings failing, a fall into the grass
     d = 0.8
-    f = [140, 230][i] * np.exp(-t_(d) / 0.35)
-    fall = bp(osc(np.maximum(f, 30), kind='saw'), 100, 3000) * expdec(d, 0.35)
-    return norm(mix(fall, (crack(0.2, 1200, 5000, 0.01, 4) * 0.6, 0.55), (lp(white(0.2), 1000) * expdec(0.2, 0.04), 0.6, 0.6)))
+    wings = flight('bumblebee', [1.1, 0.8][i])[:n_(d)]
+    rate = np.exp(-t_(d) / 0.5)  # the buzz slowing as it falls
+    idx = np.cumsum(0.4 + 0.6 * rate)
+    fall = np.interp(idx[idx < len(wings) - 1], np.arange(len(wings)), wings)
+    return norm(mix(tail(fall * expdec(len(fall) / SR, 0.35), 0.2), (bone(i, 1.2) * 0.5, 0.5), (k('footstep_grass_00%d' % i) * 0.6, 0.6)))
 
 
 # ================================================================ the Reverendissimo (boss)
 
-def lich(phones, f0=66):
-    """The boss's voice: a low voice, the same an octave down, and a whisper, in the church."""
-    v = speak(phones, f0, 'bass', rasp=0.5, breath=0.06, sub=0.3)
-    o = speak(phones, f0 / 2, 'bass', rasp=0.8)
-    w = speak(phones, f0, 'bass', whisper=True)
-    return norm(wet(dist(v + o * 0.7, 2.0) + w * 0.5, 3.0, 0.35, damp=3500))
-
-
-LINES = [  # Latin, the only language he still speaks
-    V(('m', 0.12, 1.1), ('o', 0.2, 1.1), ('r', 0.07, 1.05), ('i', 0.12, 1.0), ('e', 0.18, 1.0), ('r', 0.07, 0.95), ('i', 0.15, 0.9), ('s', 0.25, 0.85)),  # morieris
-    V(('r', 0.08, 1.1), ('e', 0.14, 1.1), ('k', 0.08, 1), ('u', 0.1, 1.05), ('i', 0.12, 1.0), ('e', 0.25, 0.95), ('m', 0.35, 0.85)),  # requiem
-    V(('i', 0.12, 1.0), ('n', 0.08, 1.0), ('t', 0.06, 1), ('e', 0.18, 1.1), ('n', 0.08, 1.05), ('e', 0.14, 1.0), ('b', 0.06, 1), ('r', 0.06, 0.95), ('i', 0.14, 0.9), ('s', 0.3, 0.85)),  # in tenebris
-    V(('v', 0.01, 1), ('e', 0.25, 1.15), ('n', 0.1, 1.05), ('i', 0.55, 0.85)),  # veni
-]
+def lich(x, rate=0.7, room=3.0):
+    """His voice: a real one slowed far down, doubled an octave below, a whisper over it, in the church."""
+    v = dist(norm(resample(x, rate)), 2.0)
+    o = dist(norm(resample(x, rate / 2)), 2.0)[:len(v)]
+    y = mix(v, o * 0.5)
+    return norm(wet(lp(y, 5000), room, 0.35, damp=3500))
 
 
 @sound('boss_aggro', 'boss')
-def _(i):  # "Veni... morieris." and a roar
-    return norm(mix(lich(LINES[3], 70), (lich(LINES[0], 64), 1.25, 1.0), (boss_roar(1.6), 2.7, 0.9)))
+def _(i):  # he rises from prayer: a moan, a whispered curse, a roar
+    moan = lich(r('ghost:qubodup-GhostMoan02', 1.0), 0.8)
+    return norm(mix(moan, (lich(r('whisper_demon', 1.0, 0, 2.0), 0.8) * 0.6, 1.0), (boss_roar(0), 2.7, 0.9)))
 
 
 @sound('boss_line', 'boss', 3)
-def _(i):
-    return lich(LINES[i], [64, 62, 66][i])
+def _(i):  # his taunts: words long past understanding
+    src = [r('ghost:qubodup-GhostMoan01', 1.0), r('ghost:qubodup-GhostMoan04', 1.0, 0, 3.0), r('ghost:qubodup-GhostMoan03', 1.0, 0.5, 3.0)][i]
+    return norm(mix(lich(src, [0.85, 0.8, 0.9][i]), lp(r('whisper_demon', 0.9, i * 0.8, 2.6), 4000) * 0.3))
 
 
-def boss_roar(d=1.4, f0=58):
-    ph = V(('h', 0.1, 0.9), ('a', d * 0.6, 1.1), ('o', d * 0.3, 0.8))
-    r = speak(ph, f0, 'bass', rasp=1.0, sub=0.6) + speak(ph, f0 * 0.5, 'bass', rasp=1.0)
-    growl = lp(white(d + 0.1), 600) * env(d + 0.1, [(0, 0), (0.15, 1), (d, 0.5), (d + 0.1, 0)]) * 0.4
-    return norm(wet(dist(fit(r, d + 0.1) + growl, 3.0), 3.0, 0.35, damp=3500))
+def boss_roar(i):
+    x = [ev('troll_roars', 0, 1.7, 0.8, gap=0.5), ev('monster_growls', 1, 3.0, gap=1.0)][i]
+    return norm(wet(lp(dist(norm(trim(x, -40)), 1.6), 5000), 3.0, 0.35, damp=3500))
 
 
 @sound('boss_roar', 'boss', 2)
 def _(i):
-    return boss_roar([1.4, 1.0][i], [58, 64][i])
+    return boss_roar(i)
 
 
 @sound('boss_hurt', 'boss', 3)
 def _(i):
-    return lich(V(('h', 0.05, 1), ('auo'[i], 0.25, 1.1), ('h', 0.1, 0.8)), [70, 64, 74][i])
+    return lich(ev('grunts_unfa', [5, 7, 1][i], 0.7, gap=0.6), [0.62, 0.58, 0.66][i], 2.5)
 
 
 @sound('boss_nova_cast', 'boss')
-def _(i):  # 2.6 s: "Dies irae" chanted as the shadow gathers
-    chant = lich(V(('d', 0.08, 1), ('i', 0.3, 1.0), ('e', 0.35, 1.0), ('s', 0.2, 1), ('i', 0.3, 1.06), ('r', 0.08, 1.0), ('a', 0.35, 0.95), ('e', 0.5, 0.9)), 66)
+def _(i):  # 2.6 s: whispers gathering into a howl of wind and fire
     d = 2.7
-    return norm(mix(chant, riser(d, 80, 1500, 2.5) * 1.2, sweep_lp(osc(mtof(26) * (1 + 0.3 * t_(d) / d), kind='saw'), 100 + 1000 * t_(d) / d) * (t_(d) / d) * 0.6))
+    rise = (t_(d) / d) ** 1.5
+    whispers = lich(r('whispers', 0.9, 0, d), 0.95, 2.0)
+    return norm(mix(fit(whispers, d) * 0.8, r('fire_roar', 0.6, 8, d) * rise, fit(reverse(gust(0.7)), d) * 0.6))
 
 
 @sound('boss_nova', 'boss')
 def _(i):
-    ch = mono(choir([(0, 0.4, m, 1) for m in (50, 51, 57, 62)], 'a', 'bass', voices=3, attack=0.02, release=1.5))
-    return norm(mix(boom(3.0, 34, 0.9) * 1.2, whoosh(0.8, 100, 3000, 300, 0.2, 1), ch * 0.5, crackle(1.5, 60, 2000) * expdec(1.5, 0.6)))
+    return norm(mix(tail(lp(r('debris_big', 0.45, 0, 3.0), 900), 1.2), (r('debris_big', 0.8) * 0.5, 0.02), (tail(gust(0.8), 0.8) * 0.7, 0.01), (lich(r('ghost:qubodup-GhostMoan05', 1.0), 0.7) * 0.4, 0.1)))
 
 
 @sound('boss_swing', 'boss', 2)
 def _(i):
-    return norm(whoosh(0.7, 80, 500, 150, 0.6, 1.0) + lp(white(0.7), 120) * env(0.7, [(0, 0), (0.4, 1), (0.7, 0)]) * 0.5)
+    return norm(mix(trim(r(['swoosh_low', 'bamboo4'][i], [0.55, 0.5][i]), -45), tail(lp(gust(1.4, 0.3, 0.7), 600)) * 0.4))
 
 
 @sound('boss_hit', 'boss', 2)
 def _(i):
-    return norm(mix(boom(1.0, 55, 0.2), k(f'impactPunch_heavy_00{i}', 0.6), crack(0.3, 600, 3000, 0.02, 4) * 0.5))
+    return norm(mix(k(f'impactPunch_heavy_00{i}', 0.6), (tail(lp(r('debris', 0.6, 0, 1.0), 2500), 0.5) * 0.6, 0.01), (bone(i, 0.6) * 0.4, 0.01)))
 
 
 @sound('boss_step', 'boss', 3)
-def _(i):
-    return norm(mix(thump(42, 0.5, 0.12), k(f'footstep_concrete_00{i}', 0.5) * 0.6))
+def _(i):  # a tread that shakes the floor
+    return norm(mix(lp(k(f'impactWood_heavy_00{i}', 0.45), 500), k(f'footstep_concrete_00{i}', 0.5) * 0.6))
 
 
 @sound('boss_death', 'boss')
-def _(i):  # the Reverendissimo falls: a scream that sinks into the floor
-    d = 3.5
-    ph = V(('a', d * 0.5, 1.4), ('o', d * 0.3, 0.9), ('h', d * 0.2, 0.5))
-    scream = speak(ph, 80, 'bass', rasp=1.0, sub=0.5) + speak(ph, 40, 'bass', rasp=1.0) * 0.6
-    collapse = mix(boom(3.0, 36, 1.0), (crack(0.6, 800, 4000, 0.02, 10), 0.05, 0.6))
-    return norm(mix(wet(dist(scream, 2.5), 4.0, 0.4, damp=3500), (collapse, 2.6, 1.0)))
+def _(i):  # the Reverendissimo falls: a long moan that sinks into the floor
+    moan = lich(r('ghost:qubodup-GhostMoan03', 1.0), 0.7, 4.0)
+    collapse = mix(lp(r('debris_big', 0.5), 1500), (r('debris', 0.7) * 0.6, 0.1))
+    return norm(mix(moan, (collapse, 2.6, 1.0)))
 
 
 @sound('boss_laugh', 'boss')
 def _(i):
-    ph = []
-    for j in range(4):
-        ph += [('h', 0.06, 1.0 - j * 0.05), ('a', 0.16, 1.0 - j * 0.06), ('h', 0.05, 0.9 - j * 0.06)]
-    return lich(ph, 72)
+    return lich(mix(r('laugh_deep', 0.9), (r('evil_laugh', 0.85) * 0.4, 0.05)), 0.85, 2.5)
 
 
 # ================================================================ world: ambient one-shots and emitters
 
-def gull_call(d, f0, rise=1.6, rasp=0.5):
-    t = t_(d)
-    k_ = t / d
-    f = f0 * np.where(k_ < 0.25, 1 + (rise - 1) * k_ / 0.25, rise * (1 / rise) ** ((k_ - 0.25) / 0.75) * 0.85 + 0.15 * rise)
-    src = osc(f, kind='saw') + 0.6 * osc(f * 2, kind='saw')
-    src *= 1 + rasp * lp(rng.standard_normal(len(t)), 120) * 8
-    y = bp(src, 900, 4500) * env(d, [(0, 0), (0.02, 1), (d * 0.6, 0.7), (d, 0)])
-    return y
-
-
 @sound('gull', 'world', 3)
-def _(i):
-    calls = [[(0, 0.35, 1100), (0.45, 0.3, 1200), (0.85, 0.12, 1300), (1.0, 0.12, 1300), (1.15, 0.12, 1250)],
-             [(0, 0.45, 1000), (0.6, 0.4, 1050)],
-             [(0, 0.2, 1250), (0.26, 0.2, 1300), (0.5, 0.5, 1050)]][i]
-    y = mix(*[(gull_call(d, f), t, 1) for t, d, f in calls])
-    return norm(wet(y, 1.0, 0.2))
+def _(i):  # yellow-legged gulls over the lagoon
+    a, d = [(3.1, 2.2), (5.6, 1.8), (8.0, 1.6)][i]
+    return norm(wet(hp(fade(r('gulls', 1.0, a, d), 0.03, 0.4), 300), 1.0, 0.15))
 
 
 @sound('bell_far', 'world', 2)
-def _(i):  # the bell tower across the Giudecca
-    b = bell([50, 45][i], 7.0, 3.5)
-    return norm(lp(mono(reverb(b, 3.0, 0.6, damp=3000)), 2500))
+def _(i):  # the bell towers across the Giudecca
+    x = r('bells_italy', 1.0, [30, 62][i], 8.5)
+    return norm(lp(fade(x, 0.8, 3.0), [2600, 2200][i]))
 
 
 @sound('owl', 'world', 2)
-def _(i):
-    def hoot(d, f):
-        t = t_(d)
-        return osc(f * (1 - 0.06 * t / d) * (1 + 0.01 * np.sin(2 * np.pi * 9 * t)), kind='sine') * env(d, [(0, 0), (0.05, 1), (d * 0.7, 0.8), (d, 0)]) + lp(white(d), 900) * 0.04
-    y = mix((hoot(0.45, 400), 0), (hoot(0.18, 380), 1.1), (hoot(0.7, 390), 1.4)) if i == 0 else mix((hoot(0.6, 420), 0), (hoot(0.25, 400), 0.9))
-    return norm(wet(y, 1.6, 0.35))
+def _(i):  # a tawny owl in the gardens
+    x = [r('owl', 1.0, 0, 1.8), r('owl', 1.0, 4.6, 2.4)][i]
+    return norm(wet(lp(fade(x, 0.02, 0.3), 3000), 1.6, 0.3))
 
 
 @sound('frog', 'world', 3)
-def _(i):
-    d = [0.35, 0.5, 0.25][i]
-    t = t_(d)
-    y = osc(np.full(len(t), [110.0, 95.0, 130.0][i]), kind='saw') * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * [28, 22, 34][i] * t)))
-    y = reson(y, 600, 4) + reson(y, 1300, 6) * 0.4
-    return norm(y * env(d, [(0, 0), (0.02, 1), (d * 0.8, 0.8), (d, 0)]))
-
-
-def chant_phrase(seed, f0=130, d=7.0):
-    """A line of plainchant, four voices in unison, sung far off in a stone space."""
-    r = np.random.default_rng(seed)
-    scale = [0, 2, 3, 5, 7, 8, 10, 12]  # D aeolian, around the reciting tone
-    out = np.zeros(n_(d + 0.5))
-    notes, t, deg = [], 0.0, 4
-    while t < d - 0.6:
-        deg = int(np.clip(deg + r.choice([-1, 0, 0, 1, 1, -2]), 0, 7))
-        dur = r.choice([0.35, 0.5, 0.5, 0.7, 1.0])
-        notes.append((r.choice(list('aaeiou')), dur, 2 ** (scale[deg] / 12)))
-        t += dur
-    notes[-1] = (notes[-1][0], 1.2, 1.0)
-    for v in range(4):
-        y = speak([(ph, dur, pm) for ph, dur, pm in notes], f0 * 2 ** (r.uniform(-8, 8) / 1200), 'tenor', breath=0.08)
-        out[:len(y)] += y[:len(out)]
-    return out
+def _(i):  # a frog in the vasca
+    return norm(lp(fade(ev('frog', [1, 5, 9][i], 0.2, [1.0, 0.94, 1.06][i], gap=0.5), 0.002, 0.08), 5000))  # the croak only: the pond's hum behind it stays out
 
 
 @sound('chant_far', 'world', 3)
-def _(i):
-    y = chant_phrase(10 + i, [123, 131, 116][i])
-    return norm(lp(mono(reverb(y, 3.5, 0.9, dry=0.3, damp=3000)), 2200))
+def _(i):  # plainchant from deep in the church
+    x = [r('chant_spain', 1.0, 0.5, 10), r('chant_rome', 1.0, 2, 10), r('chant_rome', 1.0, 22, 10)][i]
+    return norm(lp(mono(reverb(fade(x, 1.5, 3.0), 3.5, 0.5, dry=0.7, damp=3000)), 2200))
 
 
 @sound('creak', 'world', 2)
 def _(i):
-    return norm(wet(k(['creak2', 'creak3'][i], 0.7), 2.5, 0.4))
+    return norm(wet(lp(k(['creak2', 'creak3'][i], 0.7), 2500, 4), 2.5, 0.4))
 
 
-@sound('fire', 'world', loop=3.0)
+@sound('fire', 'world', loop=6.0)
+def _(i):  # a torch or brazier: real crackle, its roar low under it
+    return norm(xloop(lp(r('fire', 1.0, 20, 6.5), 7000) + lp(r('fire_roar', 1.0, 10, 6.5), 500) * 0.3, 6.0, 0.4))
+
+
+@sound('hives', 'world', loop=6.0)
 def _(i):
-    return norm(xloop(crackle(3.4, 35, 2600) + lp(brown(3.4), 400) * 0.3, 3.0, 0.4))
-
-
-@sound('hives', 'world', loop=4.0)
-def _(i):
-    y = sum(buzz(rng.uniform(190, 260), 4.5, drift=0.04) * rng.uniform(0.2, 0.6) for _ in range(10))
-    return norm(xloop(y, 4.0, 0.5))
+    return norm(xloop(lp(r('beehive', 1.0, 5, 6.6), 5000), 6.0, 0.5))
 
 
 @sound('glint', 'world', loop=4.0)
-def _(i):  # the chest's gold glint: a faint magic hum
+def _(i):  # the chest's gold glint: now and then coins settling, faint; never a hum or a ring
     d = 4.5
-    hum = (osc(587.3, d) + osc(880.0, d) * 0.5 + osc(1174.7, d) * 0.25) * (0.7 + 0.3 * np.sin(2 * np.pi * 0.5 * t_(d)))
-    return norm(xloop(hum * 0.3 + shimmer(d, [86, 89, 93, 98], 6), 4.0, 0.5))
+    y = mix(*[(lp(r(f'rpg:item_coins_0{j}', 1.1), 4000) * g, t, 1) for j, t, g in ((1, 0.4, 0.6), (3, 2.5, 0.4))], d=d)
+    return norm(xloop(y, 4.0, 0.5))

@@ -1,7 +1,7 @@
 """Small offline DSP kit for the game's audio (scripts/audio/build.py): oscillators, filters,
 envelopes, a formant voice, convolution reverb, and the instruments the score is played on.
-Everything is synthesised from scratch with numpy/scipy; the only recorded material comes from
-Kenney's CC0 packs (see build.py). Mono signals are 1-D arrays, stereo ones (n, 2)."""
+The score is synthesised from scratch with numpy/scipy; the recordings the effects and beds are
+made of are listed in sources.py. Mono signals are 1-D arrays, stereo ones (n, 2)."""
 import numpy as np
 import scipy.signal as ss
 

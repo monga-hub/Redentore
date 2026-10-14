@@ -54,7 +54,7 @@ const HIVES = { x: 0, y: 1, z: -130 };
 const PLACES: Record<string, Place> = {
   laguna: { bed: 'laguna', level: 1, lowpass: 20000, shots: [['gull', 5, 13, 'near'], ['bell_far', 30, 60, 'flat']] },
   interno: { bed: 'laguna', level: 0.55, lowpass: 650, shots: [['creak', 25, 45, 'near']] },
-  orto: { bed: 'orto', level: 1, lowpass: 20000, shots: [['owl', 18, 35, 'near'], ['frog', 2, 6, VASCA], ['gull', 20, 40, 'near']] },
+  orto: { bed: 'orto', level: 1, lowpass: 20000, shots: [['owl', 18, 35, 'near'], ['frog', 8, 20, VASCA], ['gull', 20, 40, 'near']] },
   chiostro: { bed: 'chiostro', level: 1, lowpass: 20000, shots: [['chant_far', 20, 40, 'flat'], ['bell_far', 45, 80, 'flat'], ['owl', 30, 60, 'near']] },
   chiesa: { bed: 'chiesa', level: 1, lowpass: 20000, shots: [['chant_far', 25, 45, 'flat'], ['creak', 15, 30, 'near']] },
 };

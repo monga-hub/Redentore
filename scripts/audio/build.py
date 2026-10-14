@@ -5,9 +5,9 @@
     .venv/bin/python scripts/audio/build.py            # everything
     .venv/bin/python scripts/audio/build.py sfx        # only the effect banks (or: music, amb)
 
-Music, ambiences, voices and most effects are synthesised here (dsp.py, sfx.py, music.py);
-footsteps, impacts, doors, creaks and UI clicks are layered from Kenney's CC0 packs, downloaded
-once into node_modules/.cache/kenney. Effects are packed per bank into one mono MP3 "sprite"
+The score is synthesised here (dsp.py, music.py); the ambience beds and effects are built from
+real recordings (CC0 and CC-BY, listed with their licences in sources.py and ATTRIBUTION.md),
+downloaded once into node_modules/.cache/audio, cut, layered and processed in sfx.py and music.py. Effects are packed per bank into one mono MP3 "sprite"
 each (a calibration click at MARK s lets the game find the decoder's offset); loops carry a
 copy of their own head and tail around them so they stay seamless whatever the decoder trims."""
 import io
@@ -28,12 +28,7 @@ from dsp import SR, n_, norm, resample  # noqa: E402
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / 'public' / 'audio'
 MANIFEST = ROOT / 'src' / 'audio' / 'manifest.ts'
-CACHE = pathlib.Path(os.environ.get('KENNEY_CACHE', ROOT / 'node_modules' / '.cache' / 'kenney'))
-KENNEY_PACKS = {  # CC0, https://kenney.nl
-    'impact-sounds': 'https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip',
-    'rpg-audio': 'https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip',
-    'interface-sounds': 'https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip',
-}
+CACHE = pathlib.Path(os.environ.get('AUDIO_CACHE', ROOT / 'node_modules' / '.cache' / 'audio'))
 
 MARK = 0.1  # s: calibration click at the head of each bank
 GAP = 0.08  # s of silence between sounds in a bank
@@ -41,31 +36,47 @@ WRAP = 0.05  # s of a loop's own tail/head kept around it
 PAD = 0.5  # s, the same for music and ambience loops (whole files)
 
 
-def kenney_index():
+def recordings():
+    """The recorded sources of sources.py, downloaded once into CACHE: a loader name -> array at SR
+    (mono unless stereo=True). Kenney's sounds go by their bare stem, the other packs' by
+    'pack:stem', single files by their key."""
+    import sources
     CACHE.mkdir(parents=True, exist_ok=True)
-    files = {}
-    for pack, url in KENNEY_PACKS.items():
-        z = CACHE / f'{pack}.zip'
-        if not z.exists():
+
+    def get(url):
+        f = CACHE / url.rsplit('/', 1)[1]
+        if not f.exists():
             print('downloading', url)
-            urllib.request.urlretrieve(url, z)
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            f.write_bytes(urllib.request.urlopen(req, timeout=600).read())
+        return f
+
+    files = {}
+    for pack, (url, *_) in sources.PACKS.items():
+        z = get(url)
         with zipfile.ZipFile(z) as zf:
             for name in zf.namelist():
-                if name.endswith('.ogg'):
-                    files[pathlib.Path(name).stem] = (z, name)
+                if name.endswith(('.ogg', '.wav', '.flac')) and '__MACOSX' not in name:
+                    stem = pathlib.Path(name).stem
+                    files[stem if sources.KENNEY in url else f'{pack}:{stem}'] = (z, name)
+    for key, (url, *_) in sources.FILES.items():
+        files[key] = (get(url), None)
     cache = {}
 
-    def load(stem):
-        if stem not in cache:
-            z, name = files[stem]
-            with zipfile.ZipFile(z) as zf:
-                x, sr = sf.read(io.BytesIO(zf.read(name)), dtype='float64')
-            if x.ndim == 2:
-                x = x.mean(1)
+    def load(key, stereo=False):
+        if key not in cache:
+            z, name = files[key]
+            if name:
+                with zipfile.ZipFile(z) as zf:
+                    x, sr = sf.read(io.BytesIO(zf.read(name)), dtype='float64', always_2d=True)
+            else:
+                x, sr = sf.read(z, dtype='float64', always_2d=True)
+            x = np.stack([x[:, 0], x[:, -1]], 1)
             if sr != SR:
-                x = resample(x, sr / SR)
-            cache[stem] = x
-        return cache[stem].copy()
+                x = np.stack([resample(x[:, 0], sr / SR), resample(x[:, 1], sr / SR)], 1)
+            cache[key] = x
+        x = cache[key]
+        return x.copy() if stereo else x.mean(1)
     return load
 
 
@@ -77,7 +88,7 @@ def mp3(path, x, quality):
 
 def build_sfx():
     import sfx
-    sfx.KENNEY = kenney_index()
+    sfx.REC = recordings()
     banks = {}
     for name, (bank, variants, loop, make) in sfx.SOUNDS.items():
         banks.setdefault(bank, []).append((name, variants, loop, make))
@@ -116,6 +127,9 @@ def build_sfx():
 
 def build_tracks(which):
     import music
+    import sfx
+    if sfx.REC is None:
+        sfx.REC = recordings()
     tracks = {}
     spec = {
         'music': [('intro', music.intro, False), ('explore', music.explore, True), ('combat', music.combat, True),
@@ -127,8 +141,6 @@ def build_tracks(which):
         for name, make, loop in spec[kind]:
             x = make()
             assert np.all(np.isfinite(x)), name
-            if kind == 'amb':
-                x = norm(x, -3.0)
             file = f'{"mus" if kind == "music" else "amb"}-{name}.mp3'
             entry = {'file': file}
             if loop:

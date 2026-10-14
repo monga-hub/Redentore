@@ -126,16 +126,18 @@ Suono e musica stile WoW/Diablo su Web Audio (`src/audio/`), tutto in `public/au
   aggro, colpi, lanci, dardi, nova, morti dei mob, passi dell'eroe sul suolo dipinto (pietra, ghiaia,
   erba, legno del pontile), salti, ferite, morte e risveglio, baule, chiave, grate e porte (anche
   quelle che l'intro apre e richiude) — più i suoni di ambiente per area (laguna: acqua, gabbiani,
-  campane lontane; orto: grilli, foglie, civette, rane alla vasca, l'alveare; chiostri e chiesa:
-  pozzo, canto lontano, bordone d'organo, scricchiolii), torce che crepitano, preti che salmodiano.
+  campane lontane; orto: vento tra le foglie, civette, rane alla vasca, l'alveare; chiostri e chiesa:
+  fontana del pozzo, canto lontano, silenzio della navata, scricchiolii), torce che crepitano, preti
+  che pregano sottovoce.
   Le abilità dell'eroe e le zappe dei frati suonano dove accadono (`forsaken.ts`, `friars.ts`).
 - **Musica** (`music.ts`): tema dell'intro sincronizzato al piano sequenza (in streaming), esplorazione
   e strato di combattimento in loop sincroni (il combattimento aggiunge tamburi, ostinato e corni sugli
   stessi accordi), tema del Reverendissimo, stacchi di vittoria e di morte; letti d'ambiente in
   dissolvenza per area. Se il browser blocca l'audio, l'intro attende un tocco prima di partire.
-- **Sorgenti**: musica, ambienti, voci e quasi tutti gli effetti sono sintetizzati da
-  `scripts/audio/` (Python: numpy, scipy, soundfile); passi, impatti, porte, scricchiolii e clic
-  dell'interfaccia sono stratificati da pacchetti CC0 di Kenney (vedi `ATTRIBUTION.md`).
+- **Sorgenti**: la musica è sintetizzata da `scripts/audio/` (Python: numpy, scipy, soundfile);
+  ambienti, voci ed effetti sono registrazioni reali CC0 (Kenney, OpenGameArt, Freesound: elenco in
+  `scripts/audio/sources.py` e `ATTRIBUTION.md`) scaricate dalla build, tagliate, intonate,
+  stratificate e messe in ambiente; il codice aggiunge solo lo scintillio delle magie.
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install numpy scipy soundfile

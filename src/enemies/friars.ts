@@ -116,7 +116,7 @@ class View {
         const p = this.blade.getWorldPosition(this.v);
         vfx.burst(clod, p.x, Math.max(p.y, f.y + 0.1), p.z, 8, 0.15, 1.1, 2.2);
         vfx.spawn(dust, p.x, f.y + 0.15, p.z);
-        playSfx('hoe', p);
+        if (Math.random() < 0.35) playSfx('hoe', p); // a field of friars: only now and then a stroke is heard
       }
       this.lastClip = a.time;
     }

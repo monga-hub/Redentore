@@ -1,0 +1,75 @@
+"""Every recorded source of the game's sound, with where it comes from and its licence (the
+build downloads them once, build.py `recordings()`; ATTRIBUTION.md credits them). All CC0:
+public domain, credit given anyway. Freesound sounds are fetched as the site's public HQ MP3
+preview (no account needed); a CC0 sound is public domain in that copy too."""
+
+KENNEY = 'kenney.nl'  # Kenney's sounds are loaded by their bare names, the other packs' as 'pack:name'
+
+# pack: (zip, page, author, licence)
+PACKS = {
+    'impact': ('https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip', 'https://kenney.nl/assets/impact-sounds', 'Kenney', 'CC0'),
+    'rpg-audio': ('https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip', 'https://kenney.nl/assets/rpg-audio', 'Kenney', 'CC0'),
+    'creature': ('https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip', 'https://opengameart.org/content/80-cc0-creature-sfx', 'rubberduck', 'CC0'),
+    'rpg': ('https://opengameart.org/sites/default/files/80-CC0-RPG-SFX_0.zip', 'https://opengameart.org/content/80-cc0-rpg-sfx', 'rubberduck', 'CC0'),
+    'mud': ('https://opengameart.org/sites/default/files/25-CC0-mud-sfx.zip', 'https://opengameart.org/content/25-cc0-mud-sfx', 'rubberduck', 'CC0'),
+    'water': ('https://opengameart.org/sites/default/files/water-splash-slime-sfx.zip', 'https://opengameart.org/content/40-cc0-water-splash-slime-sfx', 'rubberduck', 'CC0'),
+    'ghost': ('https://opengameart.org/sites/default/files/qubodup-GhostMoans.zip', 'https://opengameart.org/content/ghost-monster-voice-moaning-growling', 'qubodup', 'CC0'),
+}
+
+# key: (file, page, author, licence, title)
+FILES = {
+    'troll_roars': ('https://opengameart.org/sites/default/files/troll-roars_0.ogg', 'https://opengameart.org/content/big-scary-troll-sounds', 'Darsycho', 'CC0', 'Big scary troll sounds (roars)'),
+    'evil_laugh': ('https://opengameart.org/sites/default/files/laugh-evil-1_0.ogg', 'https://opengameart.org/content/evil-laugh', 'AntumDeluge', 'CC0', 'Evil Laugh'),
+    'ghost_breath': ('https://opengameart.org/sites/default/files/ghostbreath.flac', 'https://opengameart.org/content/ghost-breath', 'qubodup', 'CC0', 'Ghost breath'),
+    'venice_canal': ('https://cdn.freesound.org/previews/638/638067_6974482-hq.mp3', 'https://freesound.org/people/krakenkraft/sounds/638067/', 'krakenkraft', 'CC0', 'Nice burbling water in a canale in Venice'),
+    'gondolas': ('https://cdn.freesound.org/previews/351/351654_1153764-hq.mp3', 'https://freesound.org/people/JoseDu/sounds/351654/', 'JoseDu', 'CC0', 'Parked Gondolas - Venice, Italy'),
+    'breeze_tree': ('https://cdn.freesound.org/previews/402/402794_7743891-hq.mp3', 'https://freesound.org/people/Lisework/sounds/402794/', 'Lisework', 'CC0', 'breeze tree.wav'),
+    'leaves_gusts': ('https://cdn.freesound.org/previews/848/848978_12606846-hq.mp3', 'https://freesound.org/people/gsparrysound/sounds/848978/', 'gsparrysound', 'CC0', 'Wind rustling leaves through tree Cardiff'),
+    'fountain': ('https://cdn.freesound.org/previews/738/738777_13230621-hq.mp3', 'https://freesound.org/people/CheatinSloth/sounds/738777/', 'CheatinSloth', 'CC0', 'Fountain Babbling'),
+    'cathedral': ('https://cdn.freesound.org/previews/483/483127_10201334-hq.mp3', 'https://freesound.org/people/Astounded/sounds/483127/', 'Astounded', 'CC0', 'Gap Cathedral France'),
+    'gulls': ('https://cdn.freesound.org/previews/510/510917_11157357-hq.mp3', 'https://freesound.org/people/Lydmakeren/sounds/510917/', 'Lydmakeren', 'CC0', 'Seagulls_short.wav'),
+    'owl': ('https://cdn.freesound.org/previews/655/655380_12156778-hq.mp3', 'https://freesound.org/people/faxfaxfax/sounds/655380/', 'faxfaxfax', 'CC0', 'Tawny Owl'),
+    'frog': ('https://cdn.freesound.org/previews/397/397568_5477651-hq.mp3', 'https://freesound.org/people/Sojan/sounds/397568/', 'Sojan', 'CC0', 'Frog Croak Ambient'),
+    'bells_italy': ('https://cdn.freesound.org/previews/411/411489_109726-hq.mp3', 'https://freesound.org/people/mikewest/sounds/411489/', 'mikewest', 'CC0', 'Italian bells mid distant.wav'),
+    'chant_spain': ('https://cdn.freesound.org/previews/787/787598_2902186-hq.mp3', 'https://freesound.org/people/Elmer_Tom/sounds/787598/', 'Elmer_Tom', 'CC0', 'Gregorian Chant in a Church in spain'),
+    'chant_rome': ('https://cdn.freesound.org/previews/780/780488_264532-hq.mp3', 'https://freesound.org/people/tullio/sounds/780488/', 'tullio', 'CC0', 'Gregorian choir & organ in Rome'),
+    'fire': ('https://cdn.freesound.org/previews/563/563766_6253486-hq.mp3', 'https://freesound.org/people/florianreichelt/sounds/563766/', 'florianreichelt', 'CC0', 'fire crackles'),
+    'fire_roar': ('https://cdn.freesound.org/previews/387/387924_4082837-hq.mp3', 'https://freesound.org/people/Aegersum/sounds/387924/', 'Aegersum', 'CC0', 'Fire -massive no cracking.wav'),
+    'torch': ('https://cdn.freesound.org/previews/249/249809_3756348-hq.mp3', 'https://freesound.org/people/spookymodem/sounds/249809/', 'spookymodem', 'CC0', 'Waving Torch.wav'),
+    'beehive': ('https://cdn.freesound.org/previews/467/467224_2573247-hq.mp3', 'https://freesound.org/people/derjuli/sounds/467224/', 'derjuli', 'CC0', 'Beehive'),
+    'beehive_close': ('https://cdn.freesound.org/previews/574/574698_1756543-hq.mp3', 'https://freesound.org/people/monotraum/sounds/574698/', 'monotraum', 'CC0', 'bees.wav'),
+    'bumblebee': ('https://cdn.freesound.org/previews/397/397113_2247456-hq.mp3', 'https://freesound.org/people/Kinoton/sounds/397113/', 'Kinoton', 'CC0', 'Bumblebee In Lavender'),
+    'bee_pass': ('https://cdn.freesound.org/previews/519/519503_6667441-hq.mp3', 'https://freesound.org/people/Profispiesser/sounds/519503/', 'Profispiesser', 'CC0', 'FXSaSc Bee Wasp Passing on Field'),
+    'woosh_stick': ('https://cdn.freesound.org/previews/352/352719_6513636-hq.mp3', 'https://freesound.org/people/Dalesome/sounds/352719/', 'Dalesome', 'CC0', 'Woosh (stick swung in the air)'),
+    'bamboo3': ('https://cdn.freesound.org/previews/850/850166_3552348-hq.mp3', 'https://freesound.org/people/Evan_McLoud/sounds/850166/', 'Evan_McLoud', 'CC0', 'swoosh_bamboo_03'),
+    'bamboo4': ('https://cdn.freesound.org/previews/850/850167_3552348-hq.mp3', 'https://freesound.org/people/Evan_McLoud/sounds/850167/', 'Evan_McLoud', 'CC0', 'swoosh_bamboo_04'),
+    'bamboo5': ('https://cdn.freesound.org/previews/850/850168_3552348-hq.mp3', 'https://freesound.org/people/Evan_McLoud/sounds/850168/', 'Evan_McLoud', 'CC0', 'swoosh_bamboo_05'),
+    'swoosh_low': ('https://cdn.freesound.org/previews/475/475135_2927958-hq.mp3', 'https://freesound.org/people/bolkmar/sounds/475135/', 'bolkmar', 'CC0', 'FX - Swoosh - Low Pitch'),
+    'bone_break': ('https://cdn.freesound.org/previews/630/630594_8207611-hq.mp3', 'https://freesound.org/people/Vinni_R/sounds/630594/', 'Vinni_R', 'CC0', 'bone break_5.wav'),
+    'bone_break2': ('https://cdn.freesound.org/previews/449/449615_9348290-hq.mp3', 'https://freesound.org/people/dasBUTCHER84/sounds/449615/', 'dasBUTCHER84', 'CC0', 'BONE_BREAK_01'),
+    'bone_crack': ('https://cdn.freesound.org/previews/869/869107_15176424-hq.mp3', 'https://freesound.org/people/Robo9418/sounds/869107/', 'Robo9418', 'CC0', 'Bone Crack!'),
+    'bone_crack2': ('https://cdn.freesound.org/previews/145/145363_2611120-hq.mp3', 'https://freesound.org/people/kleanthism/sounds/145363/', 'kleanthism', 'CC0', 'KleAudio_CrackingBone2_msST.wav'),
+    'celery': ('https://cdn.freesound.org/previews/388/388020_7280678-hq.mp3', 'https://freesound.org/people/saturdaysoundguy/sounds/388020/', 'saturdaysoundguy', 'CC0', 'Celery Snap 2.wav'),
+    'debris': ('https://cdn.freesound.org/previews/703/703248_13504080-hq.mp3', 'https://freesound.org/people/xkeril/sounds/703248/', 'xkeril', 'CC0', 'Fall debris (crash)'),
+    'debris_big': ('https://cdn.freesound.org/previews/703/703247_13504080-hq.mp3', 'https://freesound.org/people/xkeril/sounds/703247/', 'xkeril', 'CC0', 'Big falling debris (crash)'),
+    'singing_bowl': ('https://cdn.freesound.org/previews/59/59159_333271-hq.mp3', 'https://freesound.org/people/Coleco/sounds/59159/', 'Coleco', 'CC0', 'singingbowlstruck2.wav'),
+    'gusts': ('https://cdn.freesound.org/previews/565/565140_5487341-hq.mp3', 'https://freesound.org/people/SamsterBirdies/sounds/565140/', 'SamsterBirdies', 'CC0', 'Heavy gusts of wind'),
+    'whispers': ('https://cdn.freesound.org/previews/193/193812_2000738-hq.mp3', 'https://freesound.org/people/geoneo0/sounds/193812/', 'geoneo0', 'CC0', 'Four_Voices_Whispering_6.wav'),
+    'whisper_demon': ('https://cdn.freesound.org/previews/438/438989_2008500-hq.mp3', 'https://freesound.org/people/Magnesus/sounds/438989/', 'Magnesus', 'CC0', 'Demonic Whisper'),
+    'cork': ('https://cdn.freesound.org/previews/757/757257_10938187-hq.mp3', 'https://freesound.org/people/HenKonen/sounds/757257/', 'HenKonen', 'CC0', 'Wine cork'),
+    'gulp': ('https://cdn.freesound.org/previews/534/534336_11867884-hq.mp3', 'https://freesound.org/people/Defaultv/sounds/534336/', 'Defaultv', 'CC0', 'Drink_Gulp.mp3'),
+    'iron_gate': ('https://cdn.freesound.org/previews/460/460556_1287465-hq.mp3', 'https://freesound.org/people/nickmaysoundmusic/sounds/460556/', 'nickmaysoundmusic', 'CC0', 'Iron_gate_courtyard_abbey_gardens_open_close_latch_mono.wav'),
+    'gate_rattle': ('https://cdn.freesound.org/previews/274/274766_389377-hq.mp3', 'https://freesound.org/people/launemax/sounds/274766/', 'launemax', 'CC0', 'Rattling at an iron gate'),
+    'chains': ('https://cdn.freesound.org/previews/794/794214_13973196-hq.mp3', 'https://freesound.org/people/Vrymaa/sounds/794214/', 'Vrymaa', 'CC0', 'Light chains - Prison slavery'),
+    'keys': ('https://cdn.freesound.org/previews/443/443863_9034957-hq.mp3', 'https://freesound.org/people/bwarpus99/sounds/443863/', 'bwarpus99', 'CC0', 'Keys Jingling'),
+    'gravel_steps': ('https://cdn.freesound.org/previews/352/352870_4187409-hq.mp3', 'https://freesound.org/people/PotatokingXII/sounds/352870/', 'PotatokingXII', 'CC0', 'Footsteps Dirt Gravel'),
+    'grunts_unfa': ('https://cdn.freesound.org/previews/610/610998_1038806-hq.mp3', 'https://freesound.org/people/unfa/sounds/610998/', 'unfa', 'CC0', 'Medium Male Pain Grunts'),
+    'grunts': ('https://cdn.freesound.org/previews/727/727827_3712959-hq.mp3', 'https://freesound.org/people/abraksil/sounds/727827/', 'abraksil', 'CC0', 'Male Grunts'),
+    'zombie_growls': ('https://cdn.freesound.org/previews/769/769200_16391898-hq.mp3', 'https://freesound.org/people/Xfrtrex/sounds/769200/', 'Xfrtrex', 'CC0', 'zombie-growls'),
+    'zombie_moan': ('https://cdn.freesound.org/previews/58/58626_211893-hq.mp3', 'https://freesound.org/people/kathol/sounds/58626/', 'kathol', 'CC0', 'A Moaning Zombie.wav'),
+    'zombie_dying': ('https://cdn.freesound.org/previews/612/612699_11113354-hq.mp3', 'https://freesound.org/people/spootyskater/sounds/612699/', 'spootyskater', 'CC0', 'INFECTED ZOMBIE MAN DYING GROWL'),
+    'agony': ('https://cdn.freesound.org/previews/166/166943_71257-hq.mp3', 'https://freesound.org/people/qubodup/sounds/166943/', 'qubodup', 'CC0', 'Moans and screams of agony of military soldiers.flac'),
+    'laugh_deep': ('https://cdn.freesound.org/previews/350/350679_5106192-hq.mp3', 'https://freesound.org/people/DRFX/sounds/350679/', 'DRFX', 'CC0', 'Deep Evil Laugh'),
+    'demon_roar': ('https://cdn.freesound.org/previews/469/469123_4996003-hq.mp3', 'https://freesound.org/people/Manim8/sounds/469123/', 'Manim8', 'CC0', 'Demon_Lion_Monster_Growl_Roar'),
+    'monster_growls': ('https://cdn.freesound.org/previews/393/393518_2824308-hq.mp3', 'https://freesound.org/people/DMDoom/sounds/393518/', 'DMDoom', 'CC0', 'Monster-Growls.mp3'),
+}

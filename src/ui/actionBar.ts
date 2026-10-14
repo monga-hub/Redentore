@@ -1,4 +1,4 @@
-import { CHARGE_MAX, GCD, KEYS, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
+import { CHARGE_MAX, GCD, KEYS, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { ICONS } from './icons.ts';
 
 // WoW-style action bar overlay: 12 square buttons on 1..0 - =, clockwise cooldown sweep
@@ -9,6 +9,8 @@ import { ICONS } from './icons.ts';
 // one big button in the corner, an inner arc and an outer arc of smaller ones (RING).
 // There a quick tap casts on release and a press held for HOLD ms shows the tooltip
 // instead, until the finger lifts.
+// With a mouse, a filled slot can be dragged onto another one to swap them (`grab`); keys stay
+// with the slots, so the player's own arrangement is what 1..0 cast. Touch is unchanged.
 // A half-ring over the main button (slot 0, the big one on touch) shows the charge bar,
 // green → yellow → red when full; until then the specials stay greyed out.
 
@@ -30,6 +32,7 @@ interface Slot<C extends Caster> {
 }
 
 const HOLD = 450; // ms
+const DRAG = 6; // px a mouse press travels before it becomes a drag
 
 const secs = (t: number) => (t >= 60 ? `${Math.ceil(t / 60)}m` : t >= 3 ? `${Math.ceil(t)}` : t.toFixed(1));
 const num = (t: number) => t.toLocaleString('it', { maximumFractionDigits: 1 });
@@ -47,6 +50,7 @@ export class ActionBar<C extends Caster> {
   private gauge?: SVGElement;
   private charge = -1;
   private sys: AbilitySystem<C>;
+  private ghost?: HTMLElement; // the icon being dragged
 
   constructor(sys: AbilitySystem<C>) {
     this.sys = sys;
@@ -56,17 +60,12 @@ export class ActionBar<C extends Caster> {
     document.body.append(this.root, this.errors, this.tip);
 
     KEYS.forEach((code, i) => {
-      const a = sys.slots[i];
-      const s: Slot<C> = { el: el('button', 'slot'), cd: el('span', 'cd'), key: el('span', 'key'), ability: a, p: '', text: '', wasCd: false };
-      s.el.innerHTML = a ? `<div class="icon">${ICONS[a.icon] ?? ''}</div><div class="sweep"></div>` : '';
-      s.el.classList.toggle('empty', !a);
-      s.el.append(s.cd, s.key);
+      const s: Slot<C> = { el: el('button', 'slot'), cd: el('span', 'cd'), key: el('span', 'key'), p: '', text: '', wasCd: false };
       if (i === 0) {
         s.el.classList.add('main');
         s.el.insertAdjacentHTML('beforeend', '<svg class="charge" viewBox="0 0 100 100"><path d="M6 50 A44 44 0 0 1 94 50"/><path class="fill" pathLength="100" d="M6 50 A44 44 0 0 1 94 50"/></svg>');
         this.gauge = s.el.querySelector('.charge')!;
       }
-      s.el.classList.toggle('special', !!a?.special);
       const ring = RING[i];
       if (ring) {
         s.el.classList.add('ring');
@@ -77,11 +76,14 @@ export class ActionBar<C extends Caster> {
       let hold = 0, held = false;
       s.el.addEventListener('pointerdown', (e) => {
         e.preventDefault(); // no focus, no text selection, no double-tap zoom
-        if (e.pointerType === 'touch' && a) {
+        if (e.pointerType === 'touch' && s.ability) {
           held = false;
           s.el.classList.add('down');
-          hold = window.setTimeout(() => { held = true; this.showTip(s.el, a); }, HOLD);
-        } else if (sys.tryCast(i)) this.press(s);
+          hold = window.setTimeout(() => { held = true; this.showTip(s.el, s.ability!); }, HOLD);
+        } else if (e.pointerType !== 'touch') {
+          if (e.button === 0 && s.ability) this.grab(i, e);
+          if (sys.tryCast(i)) this.press(s);
+        }
       });
       const lift = (cast: boolean) => (e: PointerEvent) => {
         if (e.pointerType !== 'touch' || !s.el.classList.contains('down')) return;
@@ -93,12 +95,11 @@ export class ActionBar<C extends Caster> {
       s.el.addEventListener('pointerup', lift(true));
       s.el.addEventListener('pointercancel', lift(false));
       s.el.addEventListener('contextmenu', (e) => e.preventDefault()); // Android long-press menu
-      if (a) {
-        s.el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') this.showTip(s.el, a); });
-        s.el.addEventListener('pointerleave', () => this.tip.classList.remove('show'));
-      }
+      s.el.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && s.ability && !this.ghost) this.showTip(s.el, s.ability); });
+      s.el.addEventListener('pointerleave', () => this.tip.classList.remove('show'));
       bar.append(s.el);
       this.slots.push(s);
+      this.paint(i);
     });
 
     // Physical-key labels: on an Italian keyboard Minus is ' and Equal is ì.
@@ -160,6 +161,63 @@ export class ActionBar<C extends Caster> {
     } else if (this.castHold > 0 && (this.castHold -= dt) <= 0) {
       this.castbar.classList.remove('show');
     }
+  }
+
+  /** Show what slot `i` holds now: icon, empty/special look, and no stale cooldown text or "ready" shine. */
+  private paint(i: number): void {
+    const s = this.slots[i], a = (s.ability = this.sys.slots[i]);
+    s.el.querySelector('.icon')?.remove();
+    s.el.querySelector('.sweep')?.remove();
+    if (a) s.el.insertAdjacentHTML('afterbegin', `<div class="icon">${ICONS[a.icon] ?? ''}</div><div class="sweep"></div>`);
+    s.el.classList.toggle('empty', !a);
+    s.el.classList.toggle('special', !!a?.special);
+    s.el.classList.remove('active', 'casting', 'oom', 'locked');
+    s.p = s.text = '';
+    s.wasCd = !!a && this.sys.cooldown(a) > 0;
+  }
+
+  /**
+   * Mouse press on a filled slot: once the pointer travels DRAG px it picks the ability up (the click
+   * itself has already cast, as always); the icon follows the cursor and dropping it on another slot
+   * swaps the two, anywhere else puts it back. The new bar is remembered for the next visit.
+   */
+  private grab(from: number, down: PointerEvent): void {
+    let over: HTMLElement | undefined;
+    const target = (e: PointerEvent) => document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('.slot') ?? undefined;
+    const move = (e: PointerEvent) => {
+      e.stopPropagation(); // captured ahead of core/input.ts: a held button over the bar must not orbit the camera
+      if (!this.ghost) {
+        if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < DRAG) return;
+        this.ghost = el('div', 'drag-ghost');
+        this.ghost.innerHTML = this.slots[from].el.querySelector('.icon')!.outerHTML;
+        document.body.append(this.ghost);
+        this.slots[from].el.classList.add('lifted');
+        this.tip.classList.remove('show');
+      }
+      this.ghost.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+      const t = target(e);
+      if (t !== over) { over?.classList.remove('drop'); over = t; over?.classList.add('drop'); }
+    };
+    const end = (e: PointerEvent) => {
+      if (e.pointerId !== down.pointerId) return;
+      removeEventListener('pointermove', move, true);
+      removeEventListener('pointerup', end);
+      removeEventListener('pointercancel', end);
+      if (!this.ghost) return;
+      this.ghost.remove();
+      this.ghost = undefined;
+      over?.classList.remove('drop');
+      this.slots[from].el.classList.remove('lifted');
+      const to = this.slots.findIndex((s) => s.el === over);
+      if (e.type !== 'pointerup' || to < 0 || to === from) return;
+      this.sys.swap(from, to);
+      this.paint(from);
+      this.paint(to);
+      saveBar(this.sys.layout());
+    };
+    addEventListener('pointermove', move, true);
+    addEventListener('pointerup', end);
+    addEventListener('pointercancel', end);
   }
 
   private press(s: Slot<C>): void {

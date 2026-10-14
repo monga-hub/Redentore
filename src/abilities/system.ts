@@ -7,6 +7,22 @@ export const GCD = 1.5;
 export const CHARGE_MAX = 100;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
+const LAYOUT = 'redentore.bar';
+
+/** The player's arrangement of `def` if one is stored and still holds exactly the same abilities, else `def`. */
+export function loadBar(def: (string | null)[], store?: Storage): (string | null)[] {
+  try {
+    const s: unknown = JSON.parse((store ?? localStorage).getItem(LAYOUT) ?? 'null');
+    const ids = (b: unknown[]) => b.filter((x) => x !== null).map(String).sort().join();
+    return Array.isArray(s) && s.length === def.length && s.every((x) => x === null || typeof x === 'string') && ids(s) === ids(def) ? s : def;
+  } catch { return def; } // blocked storage or junk: the default bar
+}
+
+/** Remember the bar for `loadBar`. */
+export function saveBar(layout: (string | null)[], store?: Storage): void {
+  try { (store ?? localStorage).setItem(LAYOUT, JSON.stringify(layout)); } catch { /* not persisted, still applied */ }
+}
+
 export interface Caster {
   player: { pos: { x: number; y: number; z: number } };
 }
@@ -56,6 +72,7 @@ export class AbilitySystem<C extends Caster = Caster> {
   aim?: (a: Ability<C>) => void;
   /** Mana pool abilities with a `mana` cost draw from (player/stats.ts). Absent = free. */
   pool?: { mana: number; spendMana(n: number): boolean };
+  /** What each bar slot holds; the player rearranges it by dragging (`swap`). */
   readonly slots: (Ability<C> | undefined)[];
   private cds = new Map<string, number>();
   private moving = false;
@@ -134,6 +151,16 @@ export class AbilitySystem<C extends Caster = Caster> {
     }
 
     KEYS.forEach((k, i) => { if (pressed(k)) this.tryCast(i); });
+  }
+
+  /** Exchange two bar slots (one may be empty): keys and buttons follow the slots, cooldowns the abilities. */
+  swap(i: number, j: number): void {
+    [this.slots[i], this.slots[j]] = [this.slots[j], this.slots[i]];
+  }
+
+  /** The bar as ability ids, the shape `loadBar` reads back. */
+  layout(): (string | null)[] {
+    return this.slots.map((a) => a?.id ?? null);
   }
 
   /** Interrupt whatever is being cast (e.g. Esc). */

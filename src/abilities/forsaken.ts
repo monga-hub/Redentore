@@ -3,7 +3,7 @@ import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
 import { VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import type { Mob } from '../ui/target.ts';
-import { AbilitySystem, type Ability } from './system.ts';
+import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
 
 // The Forsaken kit: six abilities and a potion, plus three specials that unlock when the charge
@@ -141,7 +141,7 @@ export class Forsaken {
   constructor(player: PlayerController, stats: PlayerStats) {
     this.player = player;
     this.stats = stats;
-    this.system = new AbilitySystem(ABILITIES, BAR, this);
+    this.system = new AbilitySystem(ABILITIES, loadBar(BAR), this);
     this.system.pool = stats;
     const v = this.vfx;
     this.pools = [v.hold(pool), v.hold(pool), v.hold(pool)];

@@ -1,7 +1,7 @@
 // Headless ability-system check (`npm run check`): GCD, off-GCD, cooldowns, one cast per
 // key press, cast completion and movement interrupts, channel ticks, mana costs, charge bar and
-// specials, player stats (Velo spettrale, immunity).
-import { AbilitySystem, CHARGE_MAX, GCD, type Ability } from '../src/abilities/system.ts';
+// specials, player stats (Velo spettrale, immunity), dragging slots around the bar and remembering it.
+import { AbilitySystem, CHARGE_MAX, GCD, loadBar, saveBar, type Ability } from '../src/abilities/system.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { plagueSpot } from '../src/abilities/forsaken.ts';
 
@@ -109,4 +109,22 @@ spot(near, plagueSpot(at, 0, mob(0, 5, 'dead'), [far, near]), 'dead target falls
 spot(far, plagueSpot(at, 0, undefined, [mob(1, 0, 'dead'), far]), 'dead foes ignored');
 const ahead = plagueSpot(at, 0, undefined, [mob(0, 100)]);
 if (ahead.z > -4 || Math.abs(ahead.x) > 1e-6) throw new Error(`no foe in reach: cloud must land well ahead (-Z), got ${ahead.x},${ahead.z}`);
+// Rearranging the bar: keys follow the slots, cooldowns the abilities; the layout survives storage and refuses junk.
+const store = new Map<string, string>();
+const mem = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } } as Storage;
+const def = ['x', 'y', ...Array<null>(10).fill(null)];
+const first3 = (b: (string | null)[]) => b.slice(0, 3).join();
+const bar = new AbilitySystem([ab('x'), ab('y')], loadBar(def, mem), ctx);
+fired.length = 0;
+bar.swap(0, 1);
+bar.swap(0, 2); // onto an empty slot: a move
+if (first3(bar.layout()) !== ',x,y') throw new Error(`layout after swaps: ${bar.layout()}`);
+bar.tryCast(2);
+if (fired.join() !== 'y' || bar.cooldown(bar.slots[2]!) !== 10) throw new Error('key 3 must cast y, now in slot 3, and y cools down');
+saveBar(bar.layout(), mem);
+if (first3(loadBar(def, mem)) !== ',x,y') throw new Error('saved layout not restored');
+for (const junk of [JSON.stringify([1, ...def.slice(1)]), JSON.stringify(['x', 'x', ...def.slice(2)]), JSON.stringify(['x', 'y', 'z', ...def.slice(3)]), '["y","x"]', 'nope']) {
+  store.set('redentore.bar', junk);
+  if (loadBar(def, mem) !== def) throw new Error(`junk layout ${junk} accepted`);
+}
 console.log('abilities ok');

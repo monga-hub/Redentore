@@ -71,6 +71,73 @@ export const ICONS: Record<string, string> = {
     <circle cx="27" cy="45" r="2" fill="#d8ffe4"/><circle cx="36" cy="48" r="1.4" fill="#d8ffe4"/>
     <path d="M22 32 q2 -4 6 -5" stroke="#fff" stroke-width="2" fill="none" opacity=".6"/>`),
 
+  // --- fire, frost, lightning ---
+  // a roaring ball of candle-fire with a votive candle's drip
+  pyre: icon('pyre', '#b8460a', '#1a0402', `
+    <path d="M30 56 C16 54 10 42 14 32 C16 26 20 24 20 18 C26 22 26 28 26 30 C28 22 34 16 34 8 C42 16 46 24 46 32 C48 28 48 24 46 20 C54 28 56 40 50 48 C46 54 38 57 30 56 Z" fill="#ff7a1a" stroke="#ffd890" stroke-width="2"/>
+    <path d="M31 50 C24 49 21 43 23 37 C25 33 28 32 28 28 C32 31 33 35 33 37 C35 33 38 31 38 27 C42 32 43 38 41 43 C39 47 35 50 31 50 Z" fill="#fff0b0"/>
+    <path d="M8 12 l4 6 M56 10 l-3 6 M58 30 l-5 1" stroke="#ffc060" stroke-width="2.5"/>`),
+  // a dart of ice trailing rime
+  frost: icon('frost', '#2a6aaa', '#030c1a', `
+    <path d="M10 54 L40 24" stroke="#9fe8ff" stroke-width="4" opacity=".6"/>
+    <path d="M36 28 L54 10 L50 30 Z M36 28 L54 10 L34 14 Z" fill="#e8fbff" stroke="#ffffff" stroke-width="1.5"/>
+    <path d="M14 42 l-6 2 M20 48 l-1 7 M22 36 l-7 -3 M28 44 l2 7" stroke="#d8f4ff" stroke-width="2"/>
+    <circle cx="16" cy="50" r="2" fill="#ffffff"/><circle cx="26" cy="40" r="1.5" fill="#ffffff"/>`),
+  // a holy-water font frozen over, rime bursting out of it
+  font: icon('font', '#3a7ab8', '#04101e', `
+    <path d="M32 6 v12 M32 6 l-4 4 M32 6 l4 4 M12 14 l8 8 M52 14 l-8 8 M6 34 h10 M58 34 h-10" stroke="#e8fbff" stroke-width="2.5"/>
+    <path d="M14 30 H50 C50 42 42 48 32 48 C22 48 14 42 14 30 Z" fill="#1a3a5a" stroke="#cfeaff" stroke-width="2.2"/>
+    <path d="M26 48 h12 l2 8 h-16 z" fill="#1a3a5a" stroke="#cfeaff" stroke-width="2"/>
+    <path d="M18 31 l4 -6 3 6 4 -9 4 9 3 -7 4 7 4 -5 2 5" fill="#e8fbff" stroke="#ffffff" stroke-width="1.2"/>`),
+  // a Venetian stiletto of ice
+  lance: icon('lance', '#4a8ac0', '#040c18', `
+    <path d="M50 10 L22 38 L26 42 Z" fill="#e8fbff" stroke="#ffffff" stroke-width="1.5"/>
+    <path d="M16 38 l10 10 M20 42 l-8 8" stroke="#9fc4e8" stroke-width="4"/>
+    <circle cx="11" cy="53" r="3" fill="#9fc4e8"/>
+    <path d="M44 22 l8 4 M38 18 l4 -8 M50 30 l6 -2" stroke="#9fe8ff" stroke-width="2" opacity=".8"/>`),
+  // a forked bolt jumping between three skulls' eyes
+  chain: icon('chain', '#3a3aa8', '#05051a', `
+    <path d="M10 14 L24 26 L18 30 L34 40 L28 44 L52 56" fill="none" stroke="#dfe8ff" stroke-width="3.5"/>
+    <path d="M10 14 L24 26 L18 30 L34 40 L28 44 L52 56" fill="none" stroke="#8ab4ff" stroke-width="8" opacity=".35"/>
+    <circle cx="10" cy="14" r="4" fill="#ffffff"/><circle cx="34" cy="40" r="4" fill="#ffffff"/><circle cx="52" cy="56" r="4" fill="#ffffff"/>
+    <path d="M24 26 L40 16 L36 12 M34 40 L50 30" stroke="#dfe8ff" stroke-width="2" fill="none"/>`),
+  // a bell struck by lightning
+  toll: icon('toll', '#4a4a9a', '#06061a', `
+    <path d="M20 46 C20 30 22 20 32 18 C42 20 44 30 44 46 L48 50 H16 Z" fill="#6a5a2a" stroke="#ffe2a0" stroke-width="2"/>
+    <circle cx="32" cy="54" r="3.5" fill="#ffe2a0"/>
+    <path d="M36 2 L28 14 L34 15 L26 28" fill="none" stroke="#ffffff" stroke-width="3"/>
+    <path d="M36 2 L28 14 L34 15 L26 28" fill="none" stroke="#8ab4ff" stroke-width="7" opacity=".4"/>
+    <path d="M8 40 q-2 6 2 10 M56 40 q2 6 -2 10" stroke="#dfe8ff" stroke-width="2" fill="none" opacity=".7"/>`),
+  // --- the new blows ---
+  // a figure in mid-leap over cracked ground
+  leap: icon('leap', '#6a4a8a', '#0c0612', `
+    <path d="M8 54 h48" stroke="#4a4038" stroke-width="3"/>
+    <path d="M24 54 l4 -6 4 4 4 -7 3 9" stroke="#a45cff" stroke-width="2" fill="none"/>
+    <path d="M14 34 q12 -26 34 -18" stroke="#efe6d2" stroke-width="2" stroke-dasharray="3 4" fill="none" opacity=".7"/>
+    <circle cx="44" cy="14" r="5" fill="#cfc2a6"/>
+    <path d="M44 19 l-2 12 -8 6 M42 25 l-9 -2 M42 25 l8 6 M42 31 l6 8" stroke="#cfc2a6" stroke-width="3.5"/>
+    <path d="M33 23 l-4 -12" stroke="#efe6d2" stroke-width="4"/>`),
+  // the club whirling in a ring of bone shards
+  whirl: icon('whirl', '#5a4a3a', '#0c0806', `
+    <path d="M32 10 A22 22 0 1 1 10 32" fill="none" stroke="#efe6d2" stroke-width="4"/>
+    <path d="M32 18 A14 14 0 1 0 46 32" fill="none" stroke="#a45cff" stroke-width="3" opacity=".8"/>
+    <path d="M10 32 l-4 -6 M10 32 l6 -4" stroke="#efe6d2" stroke-width="3"/>
+    <path d="M32 32 L52 14" stroke="#cfc2a6" stroke-width="5"/>
+    <circle cx="53" cy="13" r="4.5" fill="#efe6d2"/>`),
+  // an executioner's two-handed blow and a drop of blood
+  grace: icon('grace', '#7a1a1a', '#140303', `
+    <path d="M12 52 C18 30 34 14 56 10 C42 20 30 34 24 54 Z" fill="#efe6d2" fill-opacity=".9" stroke="#fff6e0" stroke-width="1.5"/>
+    <path d="M8 58 L20 46" stroke="#8a6a44" stroke-width="5"/>
+    <path d="M44 38 C40 44 40 48 44 50 C48 48 48 44 44 38 Z" fill="#c0202a"/>
+    <path d="M50 46 C48 50 48 52 50 53 C52 52 52 50 50 46 Z" fill="#c0202a"/>`),
+  // a skull rushing head-down, shadow streaming behind
+  charge: icon('charge', '#4a2a6a', '#08040e', `
+    <path d="M6 22 h16 M4 32 h18 M6 42 h16" stroke="#a45cff" stroke-width="3" opacity=".75"/>
+    <path d="M28 24 C30 16 44 14 50 20 C56 26 56 36 50 40 L48 46 H36 L34 40 C28 36 26 30 28 24 Z" fill="#cfc2a6" stroke="#efe6d2" stroke-width="1.5"/>
+    <path d="M38 26 q4 -2 6 2 q-2 4 -6 2 z M48 28 q2 0 2 3 q-2 2 -3 0 z" fill="#120a06"/>
+    <path d="M38 46 v4 M42 46 v5 M46 46 v4" stroke="#3a2a1c" stroke-width="1.5"/>
+    <path d="M56 30 l4 -2 M56 34 l5 1" stroke="#efe6d2" stroke-width="2"/>`),
+
   // --- level-up passives (player/levels.ts) ---
   // a cracked bone over a red glow
   dmg: icon('dmg', '#8a2a1a', '#140403', `

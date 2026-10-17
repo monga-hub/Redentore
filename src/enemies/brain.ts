@@ -3,6 +3,7 @@
 // far. Pure math on the collision World, no three.js, so `npm run check` drives it in Node
 // (scripts/check-enemies.ts). friars.ts puts models on top.
 import { PLAYER, type World } from '../core/physics.ts';
+import { clear, control, pace, tick, type Control } from './control.ts';
 
 export const FRIAR = {
   hp: 120,
@@ -33,6 +34,7 @@ export interface Friar {
   struck: boolean; // this swing already resolved
   home: { x: number; z: number; yaw: number };
   mates: Friar[]; // the hoeing group, pulled together
+  cc: Control; // slows, roots, stuns laid by the hero's spells (control.ts)
 }
 
 export interface Target { x: number; y: number; z: number }
@@ -73,7 +75,7 @@ export function spawnGroups(world: World, groups = [...GROUPS, ...MORE]): Friar[
   return groups.map((g) => {
     const mates: Friar[] = [];
     for (const [x, z, yaw] of g) {
-      mates.push({ x, y: feet(world, x, z), z, yaw, hp: FRIAR.hp, state: 'hoe', t: 0, cd: 0, struck: false, home: { x, z, yaw }, mates });
+      mates.push({ x, y: feet(world, x, z), z, yaw, hp: FRIAR.hp, state: 'hoe', t: 0, cd: 0, struck: false, home: { x, z, yaw }, mates, cc: control() });
     }
     return mates;
   });
@@ -117,6 +119,12 @@ export function walk(f: Mob, x: number, z: number, speed: number, stop: number, 
 
 /** Advance one friar by `dt`. Returns the damage it lands on the player this frame. */
 export function think(f: Friar, p: Target, world: World, dt: number): number {
+  tick(f.cc, dt);
+  if (f.state === 'evade' || f.state === 'dead') clear(f.cc);
+  else if (f.cc.stun > 0) { // stunned: the swing is lost, nothing else moves
+    if (f.state === 'swing') enter(f, 'chase');
+    return 0;
+  }
   f.t += dt;
   f.cd = Math.max(0, f.cd - dt);
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
@@ -130,7 +138,7 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
     case 'chase':
       if (fromHome > FRIAR.leash || dist > FRIAR.leash) { enter(f, 'evade'); return 0; }
       if (dist <= FRIAR.reach && f.cd === 0 && level) { enter(f, 'swing'); f.cd = FRIAR.cooldown; return 0; }
-      walk(f, p.x, p.z, FRIAR.speed, FRIAR.reach * 0.7, world, dt);
+      walk(f, p.x, p.z, FRIAR.speed * pace(f.cc), FRIAR.reach * 0.7, world, dt);
       return 0;
     case 'swing':
       face(f, Math.atan2(f.x - p.x, f.z - p.z), dt * 0.5); // tracks a little, can be sidestepped

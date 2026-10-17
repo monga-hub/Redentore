@@ -44,12 +44,19 @@ const MOVES = {
   slam: { clip: 'Ground_Slam', from: 1.5, hit: 1.72, stop: 2.55, in: 0.06, out: 0.35 }, // Lamento della cripta
   scream: { clip: 'Scream', from: 0.55, hit: 1.0, stop: 1.95, in: 0.1, out: 0.35 }, // Patto della tomba
   roll: { clip: 'Roll', from: 1.12, hit: 1.3, stop: 1.8, in: 0.03, out: 0.25, whole: true }, // out of Passo d'ombra
+  push: { clip: 'Cast_Push', from: 0.75, hit: 1.2, stop: 2.0, in: 0.06, out: 0.3 }, // a bolt leaves the hands: fire, frost, lightning
+  raise: { clip: 'Cast_Raise', from: 1.45, hit: 1.9, stop: 2.55, in: 0.08, out: 0.3 }, // Rintocco: the club called up to the bell tower
+  execute: { clip: 'Execute', from: 0.6, hit: 1.1, stop: 1.9, in: 0.06, out: 0.3 }, // Colpo di grazia: a two-handed cleave
+  leap: { clip: 'Leap', from: 1.45, hit: 1.95, stop: 2.3, in: 0.05, out: 0.15, whole: true }, // Balzo del sepolcro, in the air
   victory: { clip: 'Victory', from: 0.05, hit: 0.4, stop: 1.5, in: 0.15, out: 0.3 },
   hitLight: { clip: 'Hit_Light', from: 0.12, hit: 0.3, stop: 0.8, in: 0.05, out: 0.2 },
   hitHeavy: { clip: 'Hit_Heavy', from: 0.45, hit: 0.8, stop: 1.4, in: 0.06, out: 0.3 },
 } satisfies Record<string, Move>;
 export type MoveName = keyof typeof MOVES;
-const CHANNEL = 'Cast_Channel'; // Fuoco fatuo's cast bar: both arms raised, looped
+/** Poses held while something lasts, looped: Fuoco fatuo's raised arms, a fireball gathered between the hands, the whirl, the charge. */
+const HOLDS = { channel: 'Cast_Channel', gather: 'Cast_Gather', spin: 'Spin', rush: 'Rush' } as const;
+export type Hold = keyof typeof HOLDS;
+const SPIN = 13; // rad/s the whirl turns the body
 const DEATH = 'Death';
 const HEAVY = 50; // damage that doubles the hero over instead of a flinch
 
@@ -135,8 +142,9 @@ export class UndeadModel {
   private state?: State;
   private layers = new Map<string, Layer>();
   private playing?: Shot;
-  private channelK = 0;
-  private channelOn = false;
+  private holdK = new Map<Hold, number>();
+  private holdOn = new Set<Hold>();
+  private spin = 0;
   private still = 1; // 0..1, eased: how much of the legs a move takes over
   private combatT = 0;
   private calm = 0; // s standing calm, toward the next fidget
@@ -167,12 +175,14 @@ export class UndeadModel {
         this.actions[s].setLoop(THREE.LoopOnce, 1);
         this.actions[s].clampWhenFinished = true;
       }
-      for (const name of [...new Set(Object.values(MOVES).map((m) => m.clip)), CHANNEL]) {
+      const held: string[] = Object.values(HOLDS);
+      for (const name of [...new Set(Object.values(MOVES).map((m) => m.clip)), ...held]) {
         const c = clip(name);
         if (!c) continue;
         const layer = (part: string, keep: boolean) => {
           const a = mixer.clipAction(new THREE.AnimationClip(`${c.name}_${part}`, c.duration, c.tracks.filter((t) => UPPER.test(t.name) === keep)));
-          if (name !== CHANNEL) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+          if (!held.includes(name)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+          else if (name === HOLDS.gather || name === HOLDS.spin) a.setLoop(THREE.LoopPingPong, Infinity); // cut from longer clips: swayed to and fro
           return a;
         };
         this.layers.set(name, { upper: layer('upper', true), lower: layer('lower', false) });
@@ -208,9 +218,14 @@ export class UndeadModel {
     this.playing = { layer, move: m, t: 0, rate, hitAt: after, end: after + (m.stop - m.hit) / post, flinch: name === 'hitLight' || name === 'hitHeavy' };
   }
 
-  /** Fuoco fatuo's raised arms, held while `on`. */
-  channel(on: boolean): void {
-    this.channelOn = on;
+  /** A held pose (Fuoco fatuo's raised arms by default), on while `on`. */
+  channel(on: boolean, which: Hold = 'channel'): void {
+    if (on) this.holdOn.add(which);
+    else this.holdOn.delete(which);
+  }
+
+  private get channelOn(): boolean {
+    return this.holdOn.size > 0;
   }
 
   /** The hero took `damage`: a flinch (unless a move is under way) and a red flash. */
@@ -231,7 +246,7 @@ export class UndeadModel {
     this.playing?.layer.upper.stop();
     this.playing?.layer.lower.stop();
     this.playing = undefined;
-    this.channelOn = false;
+    this.holdOn.clear();
     this.dying.reset().play();
     if (this.state) this.dying.crossFadeFrom(this.actions[this.state], 0.2, false);
   }
@@ -296,15 +311,22 @@ export class UndeadModel {
     if (next === 'run') this.actions.run.timeScale = speed / PACE.run;
     this.still += ((standing ? 1 : 0) - this.still) * Math.min(1, dt / FADE);
 
-    // Fuoco fatuo's channel, under any move.
-    const ch = this.layers.get(CHANNEL);
-    this.channelK = Math.max(0, Math.min(1, this.channelK + (this.channelOn ? dt / 0.2 : -dt / 0.25)));
-    if (ch) {
-      if (this.channelK > 0 && !ch.upper.isRunning()) { ch.upper.reset().play(); ch.lower.reset().play(); }
-      if (this.channelK === 0 && ch.upper.isRunning()) { ch.upper.stop(); ch.lower.stop(); }
-      ch.upper.setEffectiveWeight(over(this.channelK));
-      ch.lower.setEffectiveWeight(over(this.channelK * this.still));
+    // Held poses, under any move; the whirl and the charge take the legs too.
+    for (const h of Object.keys(HOLDS) as Hold[]) {
+      const ch = this.layers.get(HOLDS[h]);
+      const k = Math.max(0, Math.min(1, (this.holdK.get(h) ?? 0) + (this.holdOn.has(h) ? dt / 0.15 : -dt / 0.25)));
+      this.holdK.set(h, k);
+      if (!ch) continue;
+      if (k > 0 && !ch.upper.isRunning()) { ch.upper.reset().play(); ch.lower.reset().play(); }
+      if (k === 0 && ch.upper.isRunning()) { ch.upper.stop(); ch.lower.stop(); }
+      if (h === 'rush') ch.upper.timeScale = ch.lower.timeScale = Math.max(1, speed / 8); // a head-down sprint
+      ch.upper.setEffectiveWeight(over(k));
+      ch.lower.setEffectiveWeight(over(k * (h === 'spin' || h === 'rush' ? 1 : this.still)));
     }
+    // The whirl turns the whole body round; after it, back to facing ahead the short way.
+    if (this.holdOn.has('spin')) this.spin = (this.spin + dt * SPIN) % (Math.PI * 2);
+    else if (this.spin) { const d = Math.atan2(Math.sin(-this.spin), Math.cos(-this.spin)); this.spin = Math.abs(d) < 0.05 ? 0 : this.spin + d * Math.min(1, dt * 10); }
+    this.root.rotation.y = this.spin;
 
     const s = this.playing;
     if (s) {

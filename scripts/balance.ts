@@ -10,9 +10,9 @@
 //
 // Every run is seeded (the bot's picks and dodges, and Math.random for the mobs), so a run replays exactly.
 //
-//   node scripts/balance.ts [runs]                 every build on the route (3 runs each), then the boss alone at levels 1, 6, 8, 9
+//   node scripts/balance.ts [runs]                 every build on the route (3 runs each; arcane and storm take fire/frost and lightning/new blows first), then the boss alone at levels 1, 6, 8, 9
 //   node scripts/balance.ts route melee [runs]     one build on the route (NODODGE=1: the bot that dodges nothing)
-//   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken)
+//   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks)
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
@@ -22,6 +22,8 @@ import { FRIAR, separate, spawnGroups, think as friarThink, hurt as friarHurt, t
 import { APE, APETTA, APIARY, BOSS_AT, REVERENDISSIMO, fly, hurt as casterHurt, spawnApiary, spawnCasters, think as casterThink, wipe, type Bolt, type Priest } from '../src/enemies/caster.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { ABILITIES, BAR, plagueSpot, tune, wispFoe, type Forsaken } from '../src/abilities/forsaken.ts';
+import { Grimoire } from '../src/abilities/grimoire.ts';
+import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { START, levelOf, offer, tuneOf } from '../src/player/levels.ts';
 
@@ -39,6 +41,11 @@ export const BUILDS: Record<string, string[]> = {
     'nova_big', 'dmg', 'fury', 'fx_fallplague', 'hp', 'armor', 'wisp_fast', 'potion_big', 'fury_start', 'veil_heal', 'ward', 'step', 'fx_stepplague'],
   mixed: ['fall_dmg', 'plague_dps', 'veil', 'wisp', 'ward', 'dmg', 'hp', 'fall_third', 'plague_size', 'armor', 'wisp_still', 'leech', 'ward_long', 'potion_big',
     'fury', 'plague_cd', 'fx_fallplague', 'veil_heal', 'fall_reach', 'potion_cd', 'strike', 'nova', 'step', 'regen'],
+  // the new schools: a fire-and-frost caster, and a brawler of lightning and heavy blows
+  arcane: ['pyre', 'veil', 'frost', 'ward', 'font', 'lance', 'fx_shatter', 'pyre_fast', 'regen', 'mana', 'frost_fast', 'pyre_big', 'font_long', 'lance_split', 'dmg', 'hp', 'armor',
+    'frost_deep', 'font_cd', 'lance_dmg', 'potion_big', 'cdr', 'veil_heal', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
+  storm: ['chain', 'veil', 'toll', 'ward', 'leap', 'whirl', 'grace', 'fx_storm', 'charge', 'chain_fast', 'toll_long', 'whirl_dmg', 'grace_mul', 'leap_big', 'dmg', 'hp', 'armor', 'regen',
+    'mana', 'chain_long', 'toll_big', 'leap_cd', 'whirl_long', 'grace_cd', 'charge_stun', 'potion_big', 'leech', 'fury', 'ward_long', 'fall_dmg'],
 };
 
 let seed = 1;
@@ -202,6 +209,7 @@ class Run {
   player = { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: 0, world: this.world, model: NOOP, mesh: NOOP, blink: (d: number) => this.blink(d) };
   vfx = NOOP;
   system: AbilitySystem<Forsaken>;
+  magic: Grimoire = new Grimoire(this, tune);
   wisp = 0;
   wispAt = new THREE.Vector3();
   private wispVel = new THREE.Vector3();
@@ -215,6 +223,7 @@ class Run {
   target?: Mob;
   src = '';
   dealt = new Map<string, number>(); // on the boss, by source
+  casts = new Map<string, number>(); // abilities started, by id
   taken = new Map<string, number>(); // from the boss, by attack (before the hp floor)
   hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number) => {
     n *= tune.dmg;
@@ -262,6 +271,12 @@ class Run {
   at(t: number, f: () => void): void { this.later.push({ t, f }); }
   impale(): void {}
   nova(): void {}
+  front(): { x: number; y: number; z: number } { const p = this.player.pos; return { x: p.x, y: p.y + 1.35, z: p.z }; }
+  clouded(x: number, z: number): boolean { return this.clouds.some((c) => Math.hypot(x - c.x, z - c.z) < tune.plagueR); }
+  faceMark(): void {}
+  gather(): void {}
+  whirling(): void {}
+  swingTrail(): void {}
   blinkHide(): void {}
   beam(): void {}
   summonWisp(): void { const p = this.player.pos; this.wispAt.set(p.x, p.y + 2.2, p.z); this.wisp = 60; }
@@ -283,8 +298,11 @@ class Run {
   private kit(dt: number): void {
     this.comboT += dt;
     this.fallSow -= dt;
+    this.src = 'spells'; // casts finishing, channel ticks, blows landing late, bolts, burning, thunderbolts, landings
     this.system.update(dt, () => false);
     for (let i = this.later.length - 1; i >= 0; i--) if ((this.later[i].t -= dt) <= 0) this.later.splice(i, 1)[0].f();
+    this.magic.update(dt);
+    this.magic.events.length = 0;
     if (this.stats.veil > 0 && tune.veilHeal) this.stats.heal(this.stats.hpMax * tune.veilHeal * dt);
     const immune = this.stats.immune > 0;
     if (this.immune && !immune && tune.wardHeal) this.stats.heal(this.stats.hpMax * tune.wardHeal);
@@ -401,9 +419,11 @@ class Run {
   }
 
   private cast(id: string): boolean {
-    const i = BAR.indexOf(id);
+    const i = this.system.slots.findIndex((a) => a?.id === id);
     this.src = id;
-    return i >= 0 && this.system.owns(id) && this.system.tryCast(i);
+    const ok = i >= 0 && this.system.owns(id) && this.system.tryCast(i);
+    if (ok) this.casts.set(id, (this.casts.get(id) ?? 0) + 1);
+    return ok;
   }
   private ready(id: string): boolean {
     const a = ABILITIES.find((b) => b.id === id)!;
@@ -426,6 +446,7 @@ class Run {
     if (engaged.length && low < 0.4 && this.ready('ward')) this.cast('ward');
     if (engaged.length && low < 0.6 && s.veil <= 0 && this.ready('veil')) this.cast('veil');
 
+    if (this.magic.dashing) { this.tickWorld(dt, hp0, t); return; } // carried by a leap or a charge
     const danger = this.dodge ? dangers(this.casters, this.friars, p) : undefined;
     if (danger) {
       if (this.system.casting) this.system.cancel();
@@ -440,6 +461,19 @@ class Run {
         if (this.wisp <= 0 && this.ready('wisp') && d > 3) { if (this.cast('wisp') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('plague') && d < 20) this.cast('plague');
         if (this.ready('strike') && d < 30) this.cast('strike');
+        // fire, frost, lightning and the new blows: long casts only standing, the stiletto on the frozen
+        const around = (r: number) => engaged.filter((m) => Math.hypot(m.x - p.x, m.z - p.z) < r).length;
+        const cool = s.mana > s.manaMax * 0.35; // keeps a reserve for the frost nova and the stiletto
+        if (this.ready('font') && (around(4.5) >= 2 || (big && d < 4.5))) this.cast('font');
+        if (this.ready('lance') && t.cc && frozen(t.cc) && d < 30) this.cast('lance');
+        if (this.ready('toll') && d < 25 && (around(8) >= 2 || big)) this.cast('toll');
+        if (this.ready('charge') && d > 5 && d < 18) this.cast('charge');
+        if (!this.magic.dashing && this.ready('leap') && d > 4 && d < 11) this.cast('leap');
+        if (this.ready('whirl') && (around(3) >= 2 || (big && d < 3))) this.cast('whirl');
+        if (this.ready('grace') && d < 2.8 && t.hp < (isCaster(t) ? t.kind.hp : FRIAR.hp) * 0.6) this.cast('grace');
+        if (this.ready('chain') && d < 28 && (cool || around(10) >= 2)) { if (this.cast('chain') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
+        if (this.ready('pyre') && d < 28 && cool) { if (this.cast('pyre') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
+        if (this.ready('frost') && d < 28 && d > tune.fallRange && cool) { if (this.cast('frost') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         const near = engaged.filter((m) => Math.hypot(m.x - p.x, m.z - p.z) < tune.novaR).length;
         if (this.ready('nova') && (near >= 2 || (big && d < tune.novaR))) this.cast('nova');
         const wait = this.dodge && isCaster(t) && t.state === 'nova'; // don't walk back into a ring still filling
@@ -486,6 +520,7 @@ class Run {
     wipe(this.casters);
     this.bolts.length = 0;
     this.system.cancel();
+    this.magic.reset();
     this.target = undefined;
     // lie there FALLEN s while the world plays on, then wake at the checkpoint
     for (let k = 0; k < 2.6 / DT; k++) {
@@ -535,14 +570,14 @@ export function playRoute(build: string, dodge: boolean, s = 1, apiary = true): 
   return { build, dodge, won: r.boss.state === 'dead', time: r.time, deaths: r.deaths, lv: r.lv, xp: r.xp, zones: r.zones, picks: r.picks, boss: bossT };
 }
 
-export interface BossResult { build: string; lv: number; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dealt: Map<string, number>; taken: Map<string, number> }
+export interface BossResult { build: string; lv: number; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dealt: Map<string, number>; taken: Map<string, number>; casts: Map<string, number> }
 
 /** The boss alone: the church cleared, the choir door open, a build at level `lv`, five tries at most. */
 export function playBoss(build: string, lv: number, dodge: boolean, s = 1): BossResult {
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919; // after the level is built: its first build draws on Math.random more than the next ones
-  r.picks = lv > 1 ? picksTo(build, lv) : [];
+  r.picks = process.env.PICKS ? process.env.PICKS.split(',') : lv > 1 ? picksTo(build, lv) : []; // PICKS=a,b,c: a fixed build
   r.apply();
   r.stats.revive();
   r.quest.accepted = true;
@@ -567,7 +602,7 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1): Boss
     }
     if ((r.boss.state as string) === 'dead') tries.push({ time: r.time - t0, left: 0, potions: pots });
   }
-  return { build, lv, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dealt: r.dealt, taken: r.taken };
+  return { build, lv, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dealt: r.dealt, taken: r.taken, casts: r.casts };
 }
 
 // --- reports ---
@@ -599,7 +634,7 @@ export function bossTable(rs: BossResult[]): string {
     out.push(`${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 6)}${pad(won.length ? f1(mean(won.map((r) => r.tries.length))) : '-', 7)}` +
       `${pad(won.length ? mean(kills.map((t) => t.time)).toFixed(0) : '-', 8)}${pad(won.length ? f1(mean(kills.map((t) => t.potions))) : '-', 6)}  ` +
       g.flatMap((r) => r.tries.filter((t) => t.left).map((t) => t.time.toFixed(0))).join(' '));
-    if (process.env.DEALT) for (const r of g) out.push(`    ${r.picks.join(' ')}\n    dealt: ${[...r.dealt].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}; taken: ${[...r.taken].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}`);
+    if (process.env.DEALT) for (const r of g) out.push(`    ${r.picks.join(' ')}\n    dealt: ${[...r.dealt].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}; taken: ${[...r.taken].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}\n    casts: ${[...r.casts].map(([d, v]) => `${d} ${v}`).join(', ')}`);
   }
   return out.join('\n');
 }

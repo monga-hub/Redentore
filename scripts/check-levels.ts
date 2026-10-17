@@ -1,9 +1,9 @@
-// Levels check (`npm run check`): the XP curve against the mobs' worth (first level after two friars, the quest
+// Levels check (`npm run check`): the 56 upgrade cards (every ability with a school and its modifiers), the XP curve against the mobs' worth (first level after two friars, the quest
 // route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11), the two-card offers over many random runs (never an owned or maxed card,
 // never a mod for a locked ability, new abilities on even levels with the specials from level 6, fusions only
-// with both parents), the heal when everything is taken, the replay of picks into numbers, and the bar keeping
-// a slot for an ability until it is unlocked.
-import { CARD, CARDS, MAX_LEVEL, SPECIALS, START, eligible, levelOf, need, offer, tuneOf, type Card } from '../src/player/levels.ts';
+// with both parents, the second ability card leaning to the schools owned), the heal when everything is taken, the
+// replay of picks into numbers, and the bar keeping a slot for an ability until it is unlocked, or finding one.
+import { CARD, CARDS, MAX_LEVEL, SCHOOL, SPECIALS, START, eligible, levelOf, need, offer, tuneOf, type Card } from '../src/player/levels.ts';
 import { FRIAR, spawnGroups } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from '../src/enemies/caster.ts';
 import { AbilitySystem, type Ability } from '../src/abilities/system.ts';
@@ -21,7 +21,14 @@ if (levelOf(FRIAR.xp).lv !== 1 || levelOf(2 * FRIAR.xp).lv !== 2) fail('the firs
 for (const [xp, lv] of [[560, 8], [720, 9], [875, 9], [900, 10], [19, 1], [20, 2], [1e9, MAX_LEVEL]]) if (levelOf(xp).lv !== lv) fail(`${xp} XP is level ${levelOf(xp).lv}, want ${lv}`);
 const l = levelOf(70);
 if (l.lv !== 3 || l.into !== 10 || l.next !== 60) fail(`levelOf(70) = ${JSON.stringify(l)}`);
-if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 33) fail('33 cards');
+if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 56) fail('56 upgrade cards');
+// Every ability card has a school, an icon of its own and two modifiers; the new ten are offered from level 2.
+const NEW = ['pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge'];
+for (const c of CARDS.filter((c) => c.kind === 'ability')) {
+  if (!c.school || SCHOOL[c.id] !== c.school) fail(`${c.id} has no school`);
+  if (CARDS.filter((m) => m.kind === 'mod' && m.of === c.id).length < (NEW.includes(c.id) ? 2 : 1)) fail(`${c.id} lacks modifiers`);
+}
+for (const id of NEW) if (CARD.get(id)?.tier !== 'A') fail(`${id} must be a tier A ability`);
 
 // Offers over many seeded runs, picking at random among the two, up to the cap.
 let seed = 1;
@@ -59,13 +66,28 @@ for (let run = 0; run < 400; run++) {
   if (t.owned.length !== START.length + 5) fail(`run ${run}: ${t.owned} owned after the cap, want 5 unlocks`);
   if (t.fury === 0 && SPECIALS.some((s) => t.owned.includes(s))) fail('a special owned but the charge bar off');
 }
-if (fusionsSeen.size !== 3) fail(`fusions offered: ${[...fusionsSeen]}`);
+if (fusionsSeen.size !== 6) fail(`fusions offered: ${[...fusionsSeen]}`);
+// The second card of an ability level leans toward the schools owned: frost after frost comes more often than chance.
+{
+  let kin = 0, n = 0;
+  for (let run = 0; run < 2000; run++) {
+    const at4 = offer(['frost', 'dmg'], rnd); // level 4: two new abilities
+    n++;
+    if (at4.some((c) => c.school === 'frost')) kin++;
+  }
+  const share = kin / n, open = CARDS.filter((c) => c.kind === 'ability' && c.tier === 'A' && c.id !== 'frost');
+  const chance = 1 - (1 - open.filter((c) => c.school === 'frost').length / open.length) ** 2;
+  if (share < chance + 0.1) fail(`frost offered after frost ${share.toFixed(2)} of the time, chance alone ${chance.toFixed(2)}`);
+}
 
 // Fusions need both parents; charge cards a special.
 const has = (picks: string[], id: string) => eligible(picks).some((c) => c.id === id);
 if (has(['wisp'], 'fx_wispplague') !== true || has([], 'fx_wispplague') || has(['step'], 'fx_wispplague')) fail('Fuoco pestilente needs the wisp');
 if (has([], 'fx_fallplague') || !has(['plague_dps'], 'fx_fallplague')) fail('Ossa appestate needs Peste virulenta');
 if (has(['step'], 'fury') || has(['step'], 'fury_start') || !has(['nova'], 'fury')) fail('charge cards need a special');
+if (has(['pyre'], 'fx_shatter') || has(['frost'], 'fx_shatter') || !has(['pyre', 'lance'], 'fx_shatter')) fail('Frantumazione needs fire and frost');
+if (!has(['chain'], 'fx_storm') || !has(['toll'], 'fx_storm') || has(['frost'], 'fx_storm')) fail('Miasma elettrico needs lightning (plague is owned)');
+if (has(['whirl'], 'fx_frostwhirl') || !has(['whirl', 'font'], 'fx_frostwhirl')) fail('Turbine di brina needs the whirl and frost');
 if (has([], 'wisp_dps') || !has(['wisp'], 'wisp_dps') || !has([], 'potion_big')) fail('mods need their ability (the potion is owned)');
 
 // Everything taken: the heal alone is offered.
@@ -90,4 +112,11 @@ sys.swap(0, 3); // fall dragged onto step's (empty-looking) slot
 if (sys.slots[3]?.id !== 'fall' || sys.slots[0]) fail('drag onto a locked slot');
 sys.unlock('step');
 if (sys.slots[0]?.id !== 'step' || sys.slots[3]?.id !== 'fall' || sys.slots[1]?.id !== 'plague') fail(`unlock moved the bar: ${sys.layout()}`);
+// More abilities than slots: an unlock takes the first slot that is empty or only remembers one not owned now.
+const names = ['fall', 'plague', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'potion', 'new1', 'new2'];
+const big = new AbilitySystem(names.map(ab), names.slice(0, 12), { player: { pos: { x: 0, y: 0, z: 0 } } }, ['fall', 'plague', 'potion']);
+big.unlock('new1');
+if (big.slots[2]?.id !== 'new1' || big.layout().includes('a')) fail(`unlock without a slot: ${big.layout()}`);
+big.unlock('a'); // its old slot went to new1: the next free one
+if (big.slots[3]?.id !== 'a' || big.slots[2]?.id !== 'new1') fail(`re-placed: ${big.layout()}`);
 console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 400 runs offered cleanly)`);

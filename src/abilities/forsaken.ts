@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
-import { VEIL_CUT, type PlayerStats } from '../player/stats.ts';
+import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import { START, tuneOf, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
+import { Grimoire, type Bolt, type SpellEvent } from './grimoire.ts';
 
-// The Forsaken kit: six abilities and a potion, plus three specials that unlock when the charge
-// bar fills (system.ts). Names are our own; flavour after the undead racials and shadow/plague classes.
+// The Forsaken kit: sixteen abilities and a potion, three of them specials that unlock when the charge
+// bar fills (system.ts): bone, plague and shadow, and fire, frost and lightning (their rules in grimoire.ts). Names are our own; flavour after the undead racials and shadow/plague classes.
 // The run starts with Caduta d'ossa, Nube di peste and the potion; level-ups (player/levels.ts) unlock
 // the rest and change the numbers, which every ability reads live from `tune` (tooltips too).
 // Each one has its own clip on the Reietto (player/undead.ts) and layered effects (vfx.ts); a
@@ -100,12 +101,80 @@ const healGlow: Style = { life: [0.7, 1], size: [0.5, 0.8], grow: 1.6, color: GR
 const healRing: DecalStyle = { life: 0.7, size: 0.8, grow: 3, tile: D.shock, color: GRAVE, hdr: 1.4, fadeOut: 0.6 };
 const healRunes: DecalStyle = { life: 1.4, size: 2.4, tile: D.runes, color: GRAVE, hdr: 1.2, spin: 1.5, fadeIn: 0.15, fadeOut: 0.5 };
 
+// fire: Rogo dell'eretico, the ceri's flame
+const FIRE = 0xff4a06, EMBERC = 0xff9a28, CINDER = 0x5a0800;
+const pyreCore: Style = { life: 0.1, size: 0.55, color: 0xffd070, color2: FIRE, hdr: 3, tex: T.glow };
+const pyreFlame: Style = { life: [0.25, 0.45], size: [0.25, 0.45], grow: 0.3, color: 0xffa030, color2: CINDER, hdr: 2.4, tex: T.flame, upright: true, grav: -2, fadeIn: 0.1 };
+const pyreEmber: Style = { life: [0.6, 1.1], size: [0.04, 0.08], color: EMBERC, color2: FIRE, hdr: 3.2, tex: T.ember, drag: 1.2, grav: -0.6 };
+const pyreSpark: Style = { life: [0.3, 0.6], size: 0.06, color: 0xffb040, color2: FIRE, hdr: 3, tex: T.spark, stretch: 0.05, drag: 2.5, grav: 4 };
+const pyreSmoke: Style = { life: [1.2, 1.8], size: [0.8, 1.3], grow: 2.2, color: 0x241510, alpha: 0.6, tex: T.smoke, erode: true, dark: true, drag: 2, grav: -0.8, spin: [0.2, 0.6] };
+const flareFire: Style = { life: 0.28, size: 2.2, grow: 0.6, color: 0xffa030, color2: FIRE, hdr: 1.6, tex: T.star, fadeIn: 0.04 };
+const fireTrail: RibbonStyle = { color: 0xffb040, color2: CINDER, hdr: 2.2, width: 0.85, life: 0.35 };
+const fireShock: DecalStyle = { life: 0.45, size: 1, grow: 5, tile: D.shock, color: 0xffa030, color2: FIRE, hdr: 1.5, fadeOut: 0.6 };
+const firePool: DecalStyle = { life: 4, size: 4.4, tile: D.scorch, color: 0xff6a10, hdr: 0.5, alpha: 0.5, fadeIn: 0.15, fadeOut: 0.3 };
+const fireScar: DecalStyle = { life: 7, size: 4, tile: D.scorch, color: 0x0a0503, alpha: 0.85, fadeOut: 0.4, dark: true };
+const burnFlame: Style = { ...pyreFlame, size: [0.2, 0.34], life: [0.3, 0.5] };
+const pyreBall: Style = { ...pyreFlame, color: 0xff8a20, hdr: 1.7, size: [0.35, 0.6], life: [0.18, 0.32], upright: false, spin: [1, 3], grav: 0 };
+
+// frost: Dardo di brina, Acquasantiera gelata, Stiletto di ghiaccio
+const ICE = 0x9fe8ff, DEEP = 0x2a6aff, RIME = 0xe8fbff;
+const frostCore: Style = { life: 0.08, size: 0.42, color: 0xffffff, color2: ICE, hdr: 3, tex: T.glow };
+const snow: Style = { life: [0.6, 1.1], size: [0.06, 0.12], color: RIME, color2: ICE, hdr: 1.6, tex: T.flake, spin: [1, 4], drag: 1.5, grav: 0.8 };
+const frostMote: Style = { life: [0.4, 0.8], size: 0.05, color: 0xffffff, color2: ICE, hdr: 3.5, tex: T.spark, stretch: 0.03, drag: 2 };
+const iceShard: Style = { life: [0.5, 0.9], size: [0.14, 0.26], color: RIME, color2: ICE, hdr: 2, tex: T.shard, spin: [6, 14], drag: 1.2, grav: 10, fadeIn: 0.02 };
+const frostMist: Style = { life: [1, 1.6], size: [0.7, 1.1], grow: 2, color: 0x6fa8d8, hdr: 0.5, alpha: 0.45, tex: T.smoke2, erode: true, drag: 2.5, spin: [0.1, 0.4] };
+const flareIce: Style = { life: 0.25, size: 1.6, grow: 0.5, color: 0xd8f4ff, color2: ICE, hdr: 2, tex: T.star, fadeIn: 0.04 };
+const frostTrail: RibbonStyle = { color: 0xe8fbff, color2: DEEP, hdr: 2.2, width: 0.32, life: 0.35 };
+const lanceTrail: RibbonStyle = { color: 0xffffff, color2: ICE, hdr: 2.6, width: 0.14, life: 0.18 };
+const frostRing: DecalStyle = { life: 0.6, size: 1, grow: 4, tile: D.shock, color: ICE, color2: DEEP, hdr: 1.1, fadeOut: 0.6 };
+const frostFloor: DecalStyle = { life: 3.5, size: 3, tile: D.frost, color: ICE, hdr: 0.7, alpha: 0.7, fadeIn: 0.1, fadeOut: 0.5 };
+const fontFloor: DecalStyle = { ...frostFloor, life: 4.5, size: 10, alpha: 0.6 };
+const fontRing: DecalStyle = { life: 0.7, size: 2, grow: 5.2, tile: D.shock, color: ICE, color2: DEEP, hdr: 1.1, fadeOut: 0.6 };
+const iceCase: DecalStyle = { life: 0, size: 2, tile: D.frost, color: ICE, hdr: 0.9 };
+
+// lightning: Catena di saette, Rintocco del campanile
+const STORM = 0x8ab4ff, VOLT = 0xdfe8ff;
+const boltCore: RibbonStyle = { color: 0xeef2ff, color2: STORM, hdr: 2.4, width: 0.09, life: 0.2 };
+const boltGlow: RibbonStyle = { color: STORM, color2: 0x3a2aff, hdr: 0.8, alpha: 0.3, width: 0.4, life: 0.28 };
+const crackle: Style = { life: [0.08, 0.16], size: [0.25, 0.45], color: 0xdfe8ff, color2: STORM, hdr: 1.8, tex: T.crack, fadeIn: 0.05 };
+const voltSpark: Style = { life: [0.2, 0.45], size: 0.05, color: 0xffffff, color2: STORM, hdr: 4, tex: T.spark, stretch: 0.04, drag: 3 };
+const flareVolt: Style = { life: 0.16, size: 1.2, grow: 0.5, color: 0xdfe8ff, color2: STORM, hdr: 2.2, tex: T.star, fadeIn: 0.04 };
+const tollShock: DecalStyle = { life: 0.55, size: 1, grow: 7, tile: D.shock, color: VOLT, color2: STORM, hdr: 2, fadeOut: 0.6 };
+const tollScar: DecalStyle = { life: 5, size: 3.6, tile: D.cracks, color: ABYSS, alpha: 0.9, fadeOut: 0.4, dark: true };
+const tollGlow: DecalStyle = { life: 0.9, size: 3.6, tile: D.cracks, color: STORM, color2: 0x2a1a80, hdr: 2.4, fadeOut: 0.7 };
+const tollMark: DecalStyle = { life: 0, size: 4, tile: D.glyph, color: STORM, hdr: 0.8 };
+const stunStar: Style = { life: 0.22, size: 0.16, color: 0xfff2a0, color2: 0xffc040, hdr: 3, tex: T.star, fadeIn: 0.1 };
+
+// the new blows
+const dustRing: DecalStyle = { life: 0.7, size: 1, grow: 5, tile: D.shock, color: DUST, alpha: 0.7, fadeOut: 0.6, dark: true };
+const whirlTrail: RibbonStyle = { color: 0xfff6e8, color2: VIOLET, hdr: 1.6, alpha: 0.55, width: 0, life: 0.22 };
+const rushDust: Style = { ...graveDust, life: [0.5, 0.8], size: [0.4, 0.7] };
+const graceTrail: RibbonStyle = { color: 0xffe0d0, color2: 0xc0202a, hdr: 2, alpha: 0.8, width: 0, life: 0.2 };
+const bloodSpark: Style = { life: [0.25, 0.45], size: 0.07, color: 0xffd0c0, color2: 0xc0202a, hdr: 3, tex: T.spark, stretch: 0.05, drag: 3, grav: 6 };
+
 interface Cloud { x: number; y: number; z: number; t: number; life: number; pool: Decal }
 interface Glob { ax: number; ay: number; az: number; bx: number; by: number; bz: number; t: number; trail: number; cloud: Cloud }
 interface Later { t: number; f: () => void }
 
+interface Flight { core: THREE.Sprite; halo: THREE.Sprite; trail: number }
+const BOLT_LOOK = { pyre: [0xffb040, FIRE, 0.6, 2.2], frost: [0xc8eeff, DEEP, 0.32, 1.3], lance: [0xffffff, ICE, 0.18, 0.6] } as const; // core, halo, core size, halo size
+const CASES = 6, MARKS = 3;
+
+/** How tall a foe stands (status looks sit on it): friars and priests, sacerdoti, the hornets, the boss. */
+function tall(m: Mob): number {
+  const r = 'kind' in m ? (m as unknown as { kind: { radius: number } }).kind.radius : 0.4;
+  return r >= 1 ? 4.6 : r >= 0.8 ? 2.2 : r >= 0.5 ? 2.5 : r < 0.38 ? 1.1 : 1.8;
+}
+
 export class Forsaken {
   readonly vfx = new Vfx();
+  /** The rules of fire, frost, lightning and the new blows (grimoire.ts); this class draws them. */
+  readonly magic: Grimoire;
+  private flights = new Map<Bolt, Flight>();
+  private spare: THREE.Sprite[] = [];
+  private cases: Decal[]; // rime under the frozen
+  private marks: Decal[]; // Rintocco's bell glyphs, filling until the bolt falls
+  private whirl = -1; // the club's trail while whirling
   readonly system: AbilitySystem<Forsaken>;
   readonly player: PlayerController;
   readonly stats: PlayerStats;
@@ -151,7 +220,8 @@ export class Forsaken {
   constructor(player: PlayerController, stats: PlayerStats) {
     this.player = player;
     this.stats = stats;
-    this.system = new AbilitySystem(ABILITIES, loadBar(BAR), this, START);
+    this.system = new AbilitySystem(ABILITIES, loadBar(BAR, undefined, ABILITIES.map((a) => a.id)), this, START);
+    this.magic = new Grimoire(this, tune);
     this.system.pool = stats;
     const v = this.vfx;
     this.pools = Array.from({ length: PLAGUE_POOLS }, () => v.hold(pool));
@@ -159,6 +229,8 @@ export class Forsaken {
     this.swirl = v.hold(wispSwirl);
     this.sigil = v.hold(sigil);
     this.veilFloor = v.hold(ghostFloor);
+    this.cases = Array.from({ length: CASES }, () => v.hold(iceCase));
+    this.marks = Array.from({ length: MARKS }, () => v.hold(tollMark));
     this.wispCore = v.sprite(T.star, 0xeafffa, 2.2, 0.45);
     this.wispHalo = v.sprite(T.glow, WISP, 0.7, 1);
     this.wispCore.visible = this.wispHalo.visible = false;
@@ -185,6 +257,16 @@ export class Forsaken {
     }
 
     if (this.hidden > 0 && (this.hidden -= dt) <= 0) this.player.mesh.visible = true;
+
+    const m = this.magic;
+    m.update(dt);
+    this.player.carried = m.dash?.kind ?? '';
+    this.player.model.channel(m.dash?.kind === 'charge', 'rush');
+    if (m.dash?.kind === 'charge') for (let n = v.count(30, dt); n > 0; n--) v.spawn(rushDust, p.x + rnd(-0.3, 0.3), p.y + 0.15, p.z + rnd(-0.3, 0.3), 0, 0.4, 0);
+    for (const e of m.events) this.spell(e);
+    m.events.length = 0;
+    this.drawSpells(dt);
+    this.statuses(dt);
 
     // The club's arc, drawn while a swing is on.
     if (this.swing >= 0) {
@@ -353,6 +435,271 @@ export class Forsaken {
       playSfx('plague_hit', c);
       playSfx('plague_cloud', c);
     }
+  }
+
+  /** Turbine d'ossa: the club's trail while it whirls; `stop` closes it. */
+  whirling(stop = false): void {
+    if (stop) { this.vfx.ribbons.end(this.whirl); this.whirl = -1; return; }
+    if (this.whirl < 0) this.whirl = this.vfx.ribbons.begin(whirlTrail, true);
+    if (this.player.model.edges(this.a, this.b)) this.vfx.ribbons.push(this.whirl, this.a.x, this.a.y, this.a.z, this.b.x, this.b.y, this.b.z);
+  }
+
+  /** A swing's club trail in `style`, drawn for `t` s. */
+  swingTrail(style: RibbonStyle, t: number): void {
+    if (this.swing >= 0) this.vfx.ribbons.end(this.swing);
+    this.swing = this.vfx.ribbons.begin(style, true);
+    this.swingT = t;
+  }
+
+  /** Plague covers (x, z): Miasma elettrico. */
+  clouded(x: number, z: number): boolean {
+    return this.clouds.some((c) => Math.hypot(x - c.x, z - c.z) < tune.plagueR);
+  }
+
+  /** Where a bolt leaves: between the hands, held out in front. */
+  front(): { x: number; y: number; z: number } {
+    const p = this.player.pos, f = this.player.facing;
+    return { x: p.x - Math.sin(f) * 0.6, y: p.y + 1.35, z: p.z - Math.cos(f) * 0.6 };
+  }
+
+  /** Turn toward the spell's mark while casting at it. */
+  faceMark(dt: number): void {
+    const t = this.magic.target(), p = this.player.pos;
+    if (!t) return;
+    const want = Math.atan2(-(t.x - p.x), -(t.z - p.z)), d = Math.atan2(Math.sin(want - this.player.facing), Math.cos(want - this.player.facing));
+    this.player.facing += d * Math.min(1, dt * 10);
+  }
+
+  /** A cast gathering between the hands: `style` motes drawn in from round the body. */
+  gather(style: Style, core: Style, prog: number, dt: number): void {
+    const c = this.front(), v = this.vfx;
+    for (let n = v.count(30 + prog * 70, dt); n > 0; n--) {
+      const a = rnd(0, Math.PI * 2), r = rnd(0.6, 1.3), y = c.y + rnd(-0.6, 0.6);
+      const x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
+      v.spawn(style, x, y, z, (c.x - x) * 2.6, (c.y - y) * 2.6, (c.z - z) * 2.6);
+    }
+    if (prog > 0.05 && Math.random() < dt * 14) v.spawn({ ...core, size: (core.size as number) * (0.3 + 0.5 * prog) }, c.x, c.y, c.z);
+  }
+
+  /** A jagged stroke of lightning from a to b, `w` wide. */
+  lightning(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, w = 1): void {
+    const v = this.vfx, n = 10, dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, j = Math.min(0.7, Math.hypot(dx, dy, dz) * 0.07) * w;
+    const core = v.ribbons.begin(boltCore), glow = v.ribbons.begin(boltGlow);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, o = i === 0 || i === n ? 0 : 1, x = a.x + dx * t + rnd(-j, j) * o, y = a.y + dy * t + rnd(-j, j) * o, z = a.z + dz * t + rnd(-j, j) * o;
+      v.ribbons.push(core, x, y, z);
+      v.ribbons.push(glow, x, y, z);
+      if (o && Math.random() < 0.5) v.spawn(crackle, x, y, z);
+    }
+    v.ribbons.end(core);
+    v.ribbons.end(glow);
+  }
+
+  /** What a spell left this frame (grimoire.ts events), drawn and heard where it happened. */
+  private spell(e: SpellEvent): void {
+    const v = this.vfx;
+    if (e.type === 'chain') {
+      for (let i = 1; i < e.pts.length; i++) {
+        const a = e.pts[i - 1], b = e.pts[i];
+        this.lightning(a, b, i === 1 ? 1.2 : 1);
+        if (i === 1) v.spawn(flareVolt, b.x, b.y, b.z);
+        v.burst(voltSpark, b.x, b.y, b.z, 12, 0.2, 5);
+      }
+      const b = e.pts[1];
+      if (b) { v.pulse(b.x, b.y, b.z, STORM, 28); playSfx('zap', b); }
+      v.shake(0.12);
+      return;
+    }
+    const { x, y, z } = e, g = y + 0.04;
+    switch (e.type) {
+      case 'pyre':
+        v.spawn(flareFire, x, y + 1.2, z);
+        v.burst(pyreSpark, x, y + 1.2, z, 46, 0.3, 7, 2);
+        v.burst(pyreFlame, x, y + 0.9, z, 26, tune.pyreR * 0.4, 2.5, 2);
+        v.burst(pyreEmber, x, y + 1, z, 34, 0.5, 3, 2);
+        v.burst(pyreSmoke, x, y + 1.2, z, 7, 0.6, 1.2);
+        v.decal(fireShock, x, g + 0.02, z);
+        v.decal({ ...firePool, size: tune.pyreR * 1.8 }, x, g + 0.03, z);
+        v.decal(fireScar, x, g, z);
+        v.pulse(x, y + 1.2, z, FIRE, 38);
+        v.shake(0.35);
+        playSfx('fire_hit', { x, y: y + 1, z });
+        break;
+      case 'frost':
+        v.spawn({ ...flareIce, size: 1.2 }, x, y + 1.2, z);
+        v.burst(iceShard, x, y + 1.2, z, 14, 0.2, 4, 2);
+        v.burst(snow, x, y + 1.2, z, 22, 0.4, 2.5);
+        v.burst(frostMist, x, y + 0.8, z, 3, 0.4, 0.6);
+        v.decal(frostRing, x, g + 0.02, z);
+        v.decal(frostFloor, x, g, z);
+        v.pulse(x, y + 1.2, z, ICE, 25);
+        playSfx('frost_hit', { x, y: y + 1, z });
+        break;
+      case 'lance':
+        v.burst(frostMote, x, y + 1.2, z, 14, 0.15, 4);
+        v.burst(iceShard, x, y + 1.2, z, 6, 0.15, 3, 1);
+        playSfx('frost_hit', { x, y: y + 1, z }, { gain: -5 });
+        break;
+      case 'shatter':
+        v.spawn(flareIce, x, y + 1.2, z);
+        v.burst(iceShard, x, y + 1, z, 42, 0.5, 6, 3);
+        v.burst(snow, x, y + 1, z, 30, 0.6, 3);
+        v.burst(frostMist, x, y + 0.8, z, 5, 0.5, 1);
+        v.decal(frostRing, x, g + 0.02, z);
+        v.pulse(x, y + 1.2, z, ICE, 45);
+        v.shake(0.22);
+        playSfx('ice_shatter', { x, y: y + 1, z });
+        break;
+      case 'thaw':
+        v.spawn(flareIce, x, y + 1.2, z);
+        v.burst(iceShard, x, y + 1, z, 30, 0.5, 6, 3);
+        v.burst(frostMist, x, y + 1, z, 8, 0.6, 1.5);
+        playSfx('ice_shatter', { x, y: y + 1, z });
+        break;
+      case 'font':
+        v.decal(fontRing, x, g + 0.03, z);
+        v.decal({ ...fontFloor, life: tune.fontRoot + 0.5 }, x, g + 0.01, z);
+        v.decal(dustRing, x, g, z);
+        v.ring(iceShard, x, y + 0.3, z, 44, 0.6, 9, 2.5);
+        v.ring(snow, x, y + 0.4, z, 34, 0.5, 6, 1);
+        v.ring(frostMist, x, y + 0.3, z, 16, 0.8, 4, 0.2);
+        v.spawn({ ...flareIce, size: 1 }, x, y + 1, z);
+        v.pulse(x, y + 1, z, ICE, 28);
+        v.shake(0.3);
+        playSfx('frost_nova', { x, y: y + 1, z });
+        break;
+      case 'toll': {
+        const top = { x: x + rnd(-1, 1), y: y + 18, z: z + rnd(-1, 1) }, foot = { x, y: y + 0.1, z };
+        this.lightning(top, foot, 1.6);
+        this.lightning({ x: (top.x + x) / 2 + rnd(-2, 2), y: y + 9, z: (top.z + z) / 2 + rnd(-2, 2) }, { x: x + rnd(-2, 2), y: y + 0.1, z: z + rnd(-2, 2) }, 1.2);
+        v.decal(tollShock, x, g + 0.03, z);
+        v.decal(tollScar, x, g, z);
+        v.decal(tollGlow, x, g + 0.01, z);
+        v.burst(voltSpark, x, y + 0.5, z, 60, 0.4, 9, 3);
+        v.ring(graveDust, x, y + 0.2, z, 12, 0.6, 3, 0.4);
+        v.spawn({ ...flareVolt, size: 2.2 }, x, y + 1, z);
+        this.beam(x, y, z, STORM, 1.6);
+        v.pulse(x, y + 2, z, STORM, 70);
+        v.shake(0.5);
+        playSfx('thunder', { x, y: y + 1, z });
+        break;
+      }
+      case 'leap':
+        this.player.model.play('slam', 0.05);
+        v.decal({ ...dustRing, grow: tune.leapR * 1.8 }, x, g, z);
+        v.decal({ ...shockBone, grow: tune.leapR * 1.5 }, x, g + 0.02, z);
+        v.decal(crackDark, x, g, z);
+        v.decal(crackGlow, x, g + 0.01, z);
+        v.burst(shard, x, y + 0.3, z, 18, 0.4, 5, 4);
+        v.ring(graveDust, x, y + 0.2, z, 14, 0.6, 4, 0.4);
+        v.spawn(flareWhite, x, y + 0.5, z);
+        v.pulse(x, y + 1, z, VIOLET, 40);
+        v.shake(0.45);
+        playSfx('leap_land', { x, y, z });
+        break;
+      case 'charge':
+        this.player.model.play('slash3', 0.08);
+        if (e.big) { v.spawn(flareWhite, x, y + 1.2, z); v.burst(shard, x, y + 1, z, 14, 0.3, 4, 2); v.shake(0.3); }
+        v.decal(dustRing, this.player.pos.x, this.player.pos.y + 0.04, this.player.pos.z);
+        playSfx('charge_hit', { x, y: y + 1, z });
+        break;
+      case 'grace':
+        if (e.big) {
+          v.burst(bloodSpark, x, y + 1, z, 30, 0.4, 5, 1);
+          v.decal(crackGlow, x, g + 0.01, z);
+          v.spawn(flareWhite, x, y + 1, z);
+          v.shake(0.3);
+        }
+        v.decal(shockBone, x, g + 0.02, z);
+        playSfx('execute', { x, y: y + 1, z });
+        break;
+      case 'fizzle':
+        v.burst(pyreSmoke, x, y, z, 3, 0.2, 0.5);
+        break;
+    }
+  }
+
+  /** Bolts in flight, burning floors, Rintocco's marks. */
+  private drawSpells(dt: number): void {
+    const v = this.vfx, m = this.magic;
+    for (const [b, f] of this.flights) if (!m.bolts.includes(b)) { // landed or fizzled
+      v.ribbons.end(f.trail);
+      f.core.visible = f.halo.visible = false;
+      this.spare.push(f.core, f.halo);
+      this.flights.delete(b);
+    }
+    for (const b of m.bolts) {
+      const [core, halo, cs, hs] = BOLT_LOOK[b.kind];
+      let f = this.flights.get(b);
+      if (!f) {
+        f = { core: this.bolt(core, b.kind === 'pyre' ? 1.6 : 2.2), halo: this.bolt(halo, b.kind === 'pyre' ? 1.2 : 1.8), trail: v.ribbons.begin(b.kind === 'pyre' ? fireTrail : b.kind === 'frost' ? frostTrail : lanceTrail) };
+        this.flights.set(b, f);
+      }
+      const pulse = 1 + Math.sin(b.t * 30) * 0.1;
+      f.core.position.set(b.x, b.y, b.z); f.core.scale.setScalar(cs * pulse);
+      f.halo.position.set(b.x, b.y, b.z); f.halo.scale.setScalar(hs * pulse);
+      v.ribbons.push(f.trail, b.x, b.y, b.z);
+      if (b.kind === 'pyre') {
+        for (let n = v.count(220, dt); n > 0; n--) v.spawn(pyreBall, b.x + rnd(-0.25, 0.25), b.y + rnd(-0.2, 0.25), b.z + rnd(-0.25, 0.25), rnd(-0.4, 0.4), 0.6, rnd(-0.4, 0.4));
+        for (let n = v.count(30, dt); n > 0; n--) v.spawn(pyreEmber, b.x, b.y, b.z, rnd(-1, 1), rnd(-0.5, 1), rnd(-1, 1));
+        for (let n = v.count(14, dt); n > 0; n--) v.spawn(pyreSmoke, b.x, b.y, b.z, 0, 0.5, 0);
+        v.pulse(b.x, b.y, b.z, FIRE, 12);
+      } else for (let n = v.count(b.kind === 'frost' ? 40 : 25, dt); n > 0; n--) v.spawn(b.kind === 'frost' ? snow : frostMote, b.x + rnd(-0.1, 0.1), b.y + rnd(-0.1, 0.1), b.z + rnd(-0.1, 0.1), rnd(-0.5, 0.5), rnd(-0.5, 0.5), rnd(-0.5, 0.5));
+    }
+    for (const f of m.fires) { // the floor burns on, dying down at the end
+      const k = Math.min(1, f.t / 1.2), area = f.r * f.r;
+      for (let n = v.count(26 * area * k, dt); n > 0; n--) {
+        const a = rnd(0, Math.PI * 2), d = Math.sqrt(Math.random()) * f.r;
+        v.spawn(pyreFlame, f.x + Math.cos(a) * d, f.y + 0.1, f.z + Math.sin(a) * d, 0, 0.6, 0);
+      }
+      for (let n = v.count(8 * area * k, dt); n > 0; n--) v.spawn(pyreEmber, f.x + rnd(-f.r, f.r) * 0.7, f.y + 0.2, f.z + rnd(-f.r, f.r) * 0.7, 0, rnd(0.5, 1.5), 0);
+    }
+    this.marks.forEach((d, i) => {
+      const t = m.tolls[i];
+      d.on = !!t;
+      if (!t) return;
+      const p = 1 - Math.max(0, t.t) / 0.6;
+      d.x = t.x; d.y = t.y + 0.06; d.z = t.z;
+      d.size = tune.tollR * 2 * (0.7 + 0.3 * p);
+      d.alpha = 0.4 + 0.6 * p;
+      d.rot += dt * (1 + p * 5);
+      for (let n = v.count(30 + p * 80, dt); n > 0; n--) {
+        const a = rnd(0, Math.PI * 2), r = tune.tollR * rnd(0.85, 1);
+        v.spawn(voltSpark, t.x + Math.cos(a) * r, t.y + 0.1, t.z + Math.sin(a) * r, 0, rnd(2, 5), 0);
+      }
+    });
+  }
+
+  private bolt(color: number, hdr: number): THREE.Sprite {
+    const s = this.spare.pop() ?? this.vfx.sprite(T.glow, 0xffffff, 1, 1);
+    s.material.color.setHex(color).multiplyScalar(hdr);
+    s.visible = true;
+    if (!s.parent) this.vfx.root.add(s);
+    return s;
+  }
+
+  /** Burning, chilled, frozen and stunned foes show it: flames, falling rime, ice under the feet, stars round the head. */
+  private statuses(dt: number): void {
+    const v = this.vfx;
+    let ci = 0;
+    for (const m of this.foes?.() ?? []) {
+      const c = m.cc;
+      if (!c || m.state === 'dead') continue;
+      const h = tall(m), r = h * 0.17;
+      if (c.burn > 0) for (let n = v.count(26, dt); n > 0; n--) v.spawn(burnFlame, m.x + rnd(-r, r), m.y + rnd(0.2, h * 0.75), m.z + rnd(-r, r), 0, 0.8, 0);
+      if (c.slow > 0 || c.root > 0) for (let n = v.count(c.root > 0 ? 14 : 7, dt); n > 0; n--) v.spawn(snow, m.x + rnd(-r, r) * 1.5, m.y + rnd(0.3, h), m.z + rnd(-r, r) * 1.5, 0, -0.3, 0);
+      if (c.root > 0 && ci < CASES) {
+        const d = this.cases[ci++];
+        d.on = true; d.x = m.x; d.y = m.y + 0.05; d.z = m.z;
+        d.size = h * 1.1; d.alpha = Math.min(1, c.root * 2) * 0.9;
+        for (let n = v.count(10, dt); n > 0; n--) v.spawn(frostMote, m.x + rnd(-r, r), m.y + rnd(0, h), m.z + rnd(-r, r));
+      }
+      if (c.stun > 0) for (let k = 0; k < 3; k++) {
+        const a = this.time * 7 + (k * Math.PI * 2) / 3, sr = 0.3 + h * 0.06;
+        v.spawn(stunStar, m.x + Math.cos(a) * sr, m.y + h + 0.15 + Math.sin(a * 2) * 0.05, m.z + Math.sin(a) * sr);
+      }
+    }
+    for (; ci < CASES; ci++) this.cases[ci].on = false;
   }
 
   // --- helpers the ability table uses ---
@@ -671,7 +1018,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     // The main attack: off the GCD so the 0.3 s cooldown is the real swing rate, WoW auto-attack style.
-    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 0.3, offGcd: true, charge: 3,
+    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 0.3, offGcd: true, swing: true, charge: 3,
     get desc() {
       return `Un fendente di schegge d'ossa davanti a te: ${dmg(tune.fallDmg)} danni a tutti i nemici entro ${num(tune.fallRange)} m.`
         + (tune.fallThird > 1 ? ` Il terzo colpo della combo ne infligge ${dmg(tune.fallDmg * tune.fallThird)}.` : '')
@@ -691,6 +1038,155 @@ export const ABILITIES: Ability<Forsaken>[] = [
       }, third ? tune.fallDmg * tune.fallThird : tune.fallDmg);
       if (hit && tune.fallMana) k.stats.restoreMana(tune.fallMana);
       if (third && tune.fxFall) k.sowFall();
+    },
+  },
+  // --- fire, frost, lightning (rules in grimoire.ts) ---
+  {
+    id: 'pyre', name: "Rogo dell'eretico", icon: 'pyre', mana: 45, charge: 12,
+    get cooldown() { return 4 * tune.cdr; },
+    get cast() { return tune.pyreCast; },
+    get desc() { return `Raccogli tra le mani il fuoco dei ceri votivi e lo scagli sul bersaglio (o sul nemico più vicino davanti a te): ${dmg(tune.pyreDmg)} danni, metà a chi gli sta entro ${num(tune.pyreR)} m; il bersaglio brucia per 4 s e il pavimento arde per 4 s. Muoverti interrompe il lancio.${tune.fxShatter ? ' Su un nemico rallentato o congelato: +60% e il ghiaccio esplode in schegge.' : ''}`; },
+    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    during(k, prog, dt) {
+      k.player.model.channel(true, 'gather');
+      k.faceMark(dt);
+      k.gather(pyreEmber, pyreCore, prog, dt);
+      const c = k.front();
+      for (let n = k.vfx.count(30 + 120 * prog, dt); n > 0; n--) { const r = 0.08 + 0.25 * prog; k.vfx.spawn(pyreBall, c.x + rnd(-r, r), c.y + rnd(-r, r), c.z + rnd(-r, r), 0, 0.3, 0); }
+      k.vfx.pulse(c.x, c.y, c.z, FIRE, 2 + prog * 5);
+    },
+    fire(k) {
+      k.player.model.play('push', BLOW);
+      k.player.model.fight();
+      playSfx('fire_cast', chest(k));
+      k.at(BLOW, () => k.magic.shoot('pyre', k.front()));
+    },
+    end(k) { k.player.model.channel(false, 'gather'); },
+  },
+  {
+    id: 'frost', name: 'Dardo di brina', icon: 'frost', mana: 22, cooldown: 0, charge: 8,
+    get cast() { return tune.frostCast; },
+    get desc() { return `Un dardo dell'acqua gelata della laguna sul bersaglio: ${dmg(tune.frostDmg)} danni, e per 6 s cammina del ${Math.round((1 - tune.frostSlow) * 100)}% più lento. Muoverti interrompe il lancio.`; },
+    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    during(k, prog, dt) {
+      k.player.model.channel(true, 'gather');
+      k.faceMark(dt);
+      k.gather(frostMote, frostCore, prog, dt);
+    },
+    fire(k) {
+      k.player.model.play('push', BLOW);
+      k.player.model.fight();
+      playSfx('frost_cast', chest(k));
+      k.at(BLOW, () => k.magic.shoot('frost', k.front()));
+    },
+    end(k) { k.player.model.channel(false, 'gather'); },
+  },
+  {
+    id: 'font', name: 'Acquasantiera gelata', icon: 'font', mana: 40, charge: 10,
+    get cooldown() { return tune.fontCd * tune.cdr; },
+    get desc() { return `L'acqua santa ghiaccia di colpo attorno a te: ${dmg(tune.fontDmg)} danni a chi è entro 5 m, che resta congelato sul posto per ${tune.fontRoot} s (meno sui più forti, e sempre meno se li congeli di nuovo).`; },
+    fire(k) {
+      k.player.model.play('spread', 0.15);
+      k.player.model.fight();
+      k.at(0.15, () => k.magic.font());
+    },
+  },
+  {
+    id: 'lance', name: 'Stiletto di ghiaccio', icon: 'lance', mana: 12, cooldown: 0, charge: 6,
+    get desc() { return `Istantaneo. Uno stiletto di ghiaccio sul bersaglio: ${dmg(tune.lanceDmg)} danni, ${dmg(tune.lanceDmg * 3)} se è congelato.${tune.lanceSplit ? ' Chi è congelato va in frantumi: metà dei danni a chi gli sta entro 3 m.' : ''}`; },
+    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    fire(k) {
+      k.player.model.play('throw', BLOW);
+      k.player.model.fight();
+      playSfx('frost_cast', chest(k), { gain: -4 });
+      k.at(BLOW, () => k.magic.shoot('lance', k.player.model.hand(new THREE.Vector3())));
+    },
+  },
+  {
+    id: 'chain', name: 'Catena di saette', icon: 'chain', mana: 35, charge: 12,
+    get cooldown() { return 5 * tune.cdr; },
+    get cast() { return tune.chainCast; },
+    get desc() { return `Una saetta sul bersaglio: ${dmg(tune.chainDmg)} danni, poi salta di nemico in nemico (entro 8 m) per altre ${tune.chainHops} volte, un quarto più debole a ogni salto.${tune.fxStorm ? ' Chi sta in una nube di peste prende +50% e attira la catena (fino a 3 salti in più).' : ''} Muoverti interrompe il lancio.`; },
+    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    during(k, prog, dt) {
+      k.player.model.channel(true, 'gather');
+      k.faceMark(dt);
+      k.gather(voltSpark, { ...frostCore, color2: STORM }, prog, dt);
+      const c = k.front();
+      if (Math.random() < dt * (6 + prog * 20)) k.vfx.spawn(crackle, c.x + rnd(-0.3, 0.3), c.y + rnd(-0.3, 0.3), c.z + rnd(-0.3, 0.3));
+    },
+    fire(k) {
+      k.player.model.play('push', BLOW);
+      k.player.model.fight();
+      k.at(BLOW, () => k.magic.chain(k.front()));
+    },
+    end(k) { k.player.model.channel(false, 'gather'); },
+  },
+  {
+    id: 'toll', name: 'Rintocco del campanile', icon: 'toll', mana: 45, charge: 12,
+    get cooldown() { return 18 * tune.cdr; },
+    get desc() { return `Chiami il fulmine dal campanile: un segno si accende sotto il bersaglio (o 8 m davanti a te) e dopo un rintocco il fulmine cade, ${dmg(tune.tollDmg)} danni entro ${num(tune.tollR)} m e storditi per ${num(tune.tollStun)} s (meno sui più forti).`; },
+    fire(k) {
+      k.player.model.play('raise', 0.2);
+      k.player.model.fight();
+      playSfx('toll_bell', chest(k));
+      k.at(0.2, () => k.magic.toll());
+    },
+  },
+  // --- the new blows ---
+  {
+    id: 'leap', name: 'Balzo del sepolcro', icon: 'leap', mana: 30, charge: 10,
+    get cooldown() { return tune.leapCd * tune.cdr; },
+    get desc() { return `Un balzo fino a 12 m sul nemico (senza nemico, davanti a te): all'atterraggio ${dmg(tune.leapDmg)} danni entro ${num(tune.leapR)} m e un attimo di stordimento. I muri ti fermano.`; },
+    check: (k) => (k.magic.dashing ? "Un'altra azione è in corso." : undefined),
+    fire(k) {
+      k.player.model.play('leap', 0.3);
+      k.player.model.fight();
+      playSfx('blink', chest(k), { gain: -4 });
+      k.magic.go('leap');
+    },
+  },
+  {
+    id: 'whirl', name: "Turbine d'ossa", icon: 'whirl', mana: 35, charge: 10, mobile: true,
+    get cooldown() { return 10 * tune.cdr; },
+    get channel() { return { duration: tune.whirlTime, tick: 0.5 }; },
+    get desc() { return `Per ${num(tune.whirlTime)} s giri su te stesso con la clava, anche correndo: ${dmg(tune.whirlDmg)} danni ogni mezzo secondo a chi è entro 3 m, e la clava che gira para il ${GUARD_CUT * 100}% dei colpi che subisci.${tune.fxFrostWhirl ? ' Gela chi colpisce (40% più lento) e fa il doppio a chi è congelato.' : ''}`; },
+    during(k) {
+      k.stats.guard = 0.1; // the whirling club parries
+      k.player.model.channel(true, 'spin');
+      k.player.model.fight();
+      k.whirling();
+    },
+    fire(k) {
+      k.magic.whirl();
+      const p = k.player.pos;
+      k.vfx.ring(tune.fxFrostWhirl ? snow : boneSpark, p.x, p.y + 1, p.z, 18, 1.6, 4, 0.5);
+      k.vfx.decal(dustRing, p.x, p.y + 0.04, p.z);
+      playSfx('whirl', chest(k));
+    },
+    end(k) { k.player.model.channel(false, 'spin'); k.whirling(true); },
+  },
+  {
+    id: 'grace', name: 'Colpo di grazia', icon: 'grace', mana: 20, charge: 10,
+    get cooldown() { return tune.graceCd * tune.cdr; },
+    get desc() { return `Un fendente a due mani davanti a te: ${dmg(tune.graceDmg)} danni, che crescono con le ferite di ciascun nemico, fino a ${dmg(tune.graceDmg * (1 + tune.graceMul))} su chi è quasi morto.`; },
+    fire(k) {
+      k.player.model.play('execute', 0.15);
+      k.player.model.fight();
+      k.swingTrail(graceTrail, 0.3);
+      playSfx('swing', chest(k), { variant: 2 });
+      k.at(0.15, () => k.magic.grace());
+    },
+  },
+  {
+    id: 'charge', name: 'Carica del dannato', icon: 'charge', charge: 25,
+    get cooldown() { return tune.chargeCd * tune.cdr; },
+    get desc() { return `Ti scagli a testa bassa sul nemico tra 4 e 20 m: ${dmg(tune.chargeDmg)} danni e stordito per ${num(tune.chargeStun)} s (meno sui più forti). Riempie la barra della furia.`; },
+    check: (k) => (k.magic.dashing ? "Un'altra azione è in corso." : k.magic.reach('charge')),
+    fire(k) {
+      k.player.model.fight();
+      playSfx('blink', chest(k));
+      k.magic.go('charge');
     },
   },
   // Specials: locked until the charge bar around Caduta d'ossa is full; using one empties it.

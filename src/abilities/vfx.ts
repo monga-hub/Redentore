@@ -14,9 +14,9 @@ import * as THREE from 'three';
 // so emitting is allocation-free.
 
 /** Particle atlas tiles (4×4). */
-export const T = { glow: 0, spark: 1, star: 2, smoke: 3, smoke2: 4, wisp: 5, shard: 6, ring: 7, flame: 8, ember: 9, drop: 10, rune: 11, skull: 12, streak: 13 } as const;
+export const T = { glow: 0, spark: 1, star: 2, smoke: 3, smoke2: 4, wisp: 5, shard: 6, ring: 7, flame: 8, ember: 9, drop: 10, rune: 11, skull: 12, streak: 13, flake: 14, crack: 15 } as const;
 /** Decal atlas tiles (4×4). */
-export const D = { disc: 0, shock: 1, runes: 2, cracks: 3, scorch: 4, pool: 5, ring: 6, sigil: 7, splash: 8, swirl: 9 } as const;
+export const D = { disc: 0, shock: 1, runes: 2, cracks: 3, scorch: 4, pool: 5, ring: 6, sigil: 7, splash: 8, swirl: 9, frost: 10, glyph: 11 } as const;
 
 type Range = number | [number, number];
 const pick = (r: Range) => (typeof r === 'number' ? r : r[0] + Math.random() * (r[1] - r[0]));
@@ -153,6 +153,23 @@ function particleAtlas(): THREE.Texture {
       for (let i = -2; i <= 2; i++) g.fillRect(i * 9 - 1.5, 32, 3, 14);
     }),
     (_, px) => field(px, (u, v) => [1, Math.exp(-u * u * 60) * smooth(1, 0.3, Math.abs(v))]), // streak (vertical)
+    draw((g) => { // snowflake: six barbed arms
+      g.lineWidth = 6;
+      for (let i = 0; i < 6; i++) {
+        g.save(); g.rotate((i / 6) * Math.PI * 2);
+        g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -54); g.moveTo(0, -24); g.lineTo(-13, -36); g.moveTo(0, -24); g.lineTo(13, -36); g.moveTo(0, -40); g.lineTo(-9, -49); g.moveTo(0, -40); g.lineTo(9, -49); g.stroke();
+        g.restore();
+      }
+    }),
+    draw((g) => { // crackle: a forked spark of lightning
+      seed = 61;
+      g.lineWidth = 5;
+      for (let k = 0; k < 3; k++) {
+        let x = 0, y = -56; g.beginPath(); g.moveTo(x, y);
+        while (y < 56) { y += 10 + rand() * 8; x = (rand() - 0.5) * (k ? 50 : 26); g.lineTo(x, y); }
+        g.globalAlpha = k ? 0.55 : 1; g.lineWidth = k ? 3 : 5; g.stroke();
+      }
+    }),
   ]);
 }
 
@@ -216,6 +233,31 @@ function decalAtlas(): THREE.Texture {
     draw((g) => { // swirl: four arms spiralling in
       g.lineWidth = 7;
       for (let k = 0; k < 4; k++) { g.beginPath(); for (let i = 0; i <= 40; i++) { const t = i / 40, a = k * Math.PI / 2 + t * 4, r = 118 * (1 - t * 0.85); g[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); } g.stroke(); }
+    }),
+    draw((g) => { // frost: a patch of rime, fine crystals feathering out from a frozen core
+      seed = 71;
+      const grd = g.createRadialGradient(0, 0, 0, 0, 0, 120); grd.addColorStop(0, 'rgba(255,255,255,.45)'); grd.addColorStop(0.6, 'rgba(255,255,255,.18)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.beginPath(); g.arc(0, 0, 120, 0, Math.PI * 2); g.fill();
+      const branch = (x: number, y: number, a: number, len: number, w: number, depth: number): void => {
+        const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+        g.globalAlpha = 0.35 + 0.2 * depth; g.lineWidth = w; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
+        if (depth <= 0) return;
+        for (let i = 1; i <= 2; i++) {
+          const f = 0.3 + i * 0.25 + rand() * 0.1, bx = x + (x2 - x) * f, by = y + (y2 - y) * f, l = len * (0.35 + rand() * 0.15);
+          branch(bx, by, a + 0.9 + rand() * 0.4, l, w * 0.6, depth - 1);
+          branch(bx, by, a - 0.9 - rand() * 0.4, l, w * 0.6, depth - 1);
+        }
+      };
+      for (let k = 0; k < 14; k++) branch(0, 0, (k / 14) * Math.PI * 2 + (rand() - 0.5) * 0.4, 70 + rand() * 50, 2.2, 2);
+      g.globalAlpha = 1;
+    }),
+    draw((g) => { // glyph: a bell inside a ring of runes (Rintocco del campanile's mark)
+      circle(g, 118, 5); circle(g, 96, 2);
+      g.lineWidth = 7;
+      g.beginPath(); g.moveTo(-34, 28); g.quadraticCurveTo(-34, -40, 0, -46); g.quadraticCurveTo(34, -40, 34, 28); g.lineTo(46, 40); g.lineTo(-46, 40); g.closePath(); g.stroke();
+      g.beginPath(); g.arc(0, 52, 9, 0, Math.PI * 2); g.fill();
+      g.lineWidth = 3;
+      for (let i = 0; i < 16; i++) { g.save(); g.rotate((i / 16) * Math.PI * 2); g.beginPath(); g.moveTo(0, -100); g.lineTo(4, -112); g.lineTo(-4, -112); g.closePath(); g.stroke(); g.restore(); }
     }),
   ]);
 }
@@ -349,7 +391,7 @@ class Particles {
 
 // --- ribbons -----------------------------------------------------------------------------------
 
-const R_SLOTS = 32, R_PTS = 24, R_SUB = 3, R_RP = (R_PTS - 1) * R_SUB + 1;
+const R_SLOTS = 48, R_PTS = 24, R_SUB = 3, R_RP = (R_PTS - 1) * R_SUB + 1;
 const R_VERT = /* glsl */ `
   attribute vec4 rgba;
   attribute float side;
@@ -762,7 +804,7 @@ export class Vfx {
   constructor() {
     this.map = particleAtlas();
     const dmap = decalAtlas();
-    this.glow = new Particles(2560, this.map, THREE.AdditiveBlending);
+    this.glow = new Particles(3072, this.map, THREE.AdditiveBlending);
     this.smoke = new Particles(1024, this.map, THREE.NormalBlending);
     this.floorGlow = new Decals(72, dmap, THREE.AdditiveBlending); // the casters hold 18 for their telegraphs
     this.floorDark = new Decals(24, dmap, THREE.NormalBlending);

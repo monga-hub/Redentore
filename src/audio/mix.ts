@@ -39,6 +39,10 @@ const TABLE: Record<string, Partial<Mix>> = {
   veil: { gain: -10 }, blink: { gain: -6 }, strike_cast: { gain: -6 }, strike_hit: { gain: -6, duck: 4 },
   nova: { gain: -5, duck: 5 }, ward: { gain: -5 }, potion: { gain: -1 }, charge_ready: { gain: -12, gap: 1 },
   loot: { gain: -4, ref: 4, max: 3 },
+  // fire, frost, lightning and the new blows (forsaken.ts)
+  fire_cast: { gain: -7 }, fire_hit: { gain: -4, duck: 4, ref: 5, far: 60 }, frost_cast: { gain: -9 }, frost_hit: { gain: -8, max: 3 },
+  ice_shatter: { gain: -5, duck: 3 }, frost_nova: { gain: -4, duck: 4 }, zap: { gain: -7, max: 3 }, thunder: { gain: -2, duck: 7, ref: 8, far: 90, pitch: 0.4 },
+  toll_bell: { gain: -8, ref: 6, far: 60, pitch: 0.3 }, whirl: { gain: -10, max: 2 }, leap_land: { gain: -6, duck: 3 }, charge_hit: { gain: -6 }, execute: { gain: -6 },
   // quest
   chest_open: { gain: -4, ref: 4, duck: 4 }, key: { gain: -1, duck: 4 },
   grate_open: { gain: -6, ref: 5, far: 50 }, grate_close: { gain: -2, ref: 5, far: 50 },

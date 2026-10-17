@@ -8,17 +8,20 @@ export const CHARGE_MAX = 100;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
 const LAYOUT = 'redentore.bar';
+/** Where a newly unlocked ability without a slot of its own goes, best first: the touch fan has slots 0-8. */
+const SPARE = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 8, 0];
 
 /**
- * The player's arrangement of `def` if one is stored and still holds exactly the same abilities, else `def`.
- * The layout places every ability, owned or not (AbilitySystem shows the owned ones), so a slot the player
- * gave an ability before it was unlocked is kept for it, and unlocks never disturb a dragged bar.
+ * The player's arrangement if one is stored and sound (12 slots, each empty or a distinct ability of `known`),
+ * else `def`. The layout keeps abilities owned in earlier runs in their slots too (AbilitySystem shows only
+ * the owned ones), so a slot the player gave an ability is kept for it, and unlocks never disturb a dragged bar.
  */
-export function loadBar(def: (string | null)[], store?: Storage): (string | null)[] {
+export function loadBar(def: (string | null)[], store?: Storage, known: readonly string[] = def.filter((x): x is string => !!x)): (string | null)[] {
   try {
     const s: unknown = JSON.parse((store ?? localStorage).getItem(LAYOUT) ?? 'null');
-    const ids = (b: unknown[]) => b.filter((x) => x !== null).map(String).sort().join();
-    return Array.isArray(s) && s.length === def.length && s.every((x) => x === null || typeof x === 'string') && ids(s) === ids(def) ? s : def;
+    if (!Array.isArray(s) || s.length !== def.length) return def;
+    const ids = s.filter((x) => x !== null);
+    return ids.every((x) => typeof x === 'string' && known.includes(x)) && new Set(ids).size === ids.length ? s : def;
   } catch { return def; } // blocked storage or junk: the default bar
 }
 
@@ -40,6 +43,10 @@ export interface Ability<C extends Caster = Caster> {
   cast?: number; // cast time in s; absent = instant
   channel?: { duration: number; tick: number };
   offGcd?: boolean;
+  /** A channel that goes on while the caster runs (Turbine d'ossa). */
+  mobile?: boolean;
+  /** A blow of the club (Caduta d'ossa): off the GCD, but the hands are busy while a cast or a channel runs. */
+  swing?: boolean;
   mana?: number; // cost, paid when the cooldown starts (instant/channel: on press; cast: when the bar fills)
   charge?: number; // added to the charge bar when the cooldown starts
   special?: boolean; // needs a full charge bar and empties it
@@ -96,6 +103,7 @@ export class AbilitySystem<C extends Caster = Caster> {
     this.byId = new Map(abilities.map((a) => [a.id, a]));
     this.bar = KEYS.map((_, i) => bar[i] ?? null);
     this.owned = new Set(owned ?? abilities.map((a) => a.id));
+    for (const id of this.owned) this.place(id);
     this.slots = [];
     this.fill();
     const p = ctx.player.pos;
@@ -112,8 +120,8 @@ export class AbilitySystem<C extends Caster = Caster> {
     if (!a) return false;
     if (this.cooldown(a) > 0) return this.fail('Abilità non ancora pronta.');
     if (!a.offGcd && this.gcd > 0) return false; // WoW stays silent on the GCD
-    if (this.casting && !a.offGcd) return this.fail("Un'altra azione è in corso.");
-    if ((a.cast || a.channel) && this.moving) return this.fail('Non puoi farlo mentre ti muovi.');
+    if (this.casting && (!a.offGcd || a.swing)) return this.fail("Un'altra azione è in corso.");
+    if ((a.cast || (a.channel && !a.mobile)) && this.moving) return this.fail('Non puoi farlo mentre ti muovi.');
     if (!this.affordable(a)) return this.fail('Mana insufficiente.');
     if (!this.charged(a)) return this.fail('La barra della furia non è piena.');
     this.aim?.(a);
@@ -146,7 +154,7 @@ export class AbilitySystem<C extends Caster = Caster> {
 
     const c = this.casting;
     if (c) {
-      if (this.moving) {
+      if (this.moving && !c.ability.mobile) {
         this.stop(false);
       } else {
         c.t = Math.min(c.total, c.t + dt);
@@ -173,10 +181,21 @@ export class AbilitySystem<C extends Caster = Caster> {
     this.fill();
   }
 
-  /** Show ability `id` on the bar, in the slot the layout keeps for it. */
+  /**
+   * Show ability `id` on the bar: in the slot the layout keeps for it, else the first slot that is empty or
+   * only remembers an ability not owned now (SPARE order: the touch ring's slots first). There are more
+   * abilities than slots, never more owned ones.
+   */
   unlock(id: string): void {
     this.owned.add(id);
+    this.place(id);
     this.fill();
+  }
+
+  private place(id: string): void {
+    if (this.bar.includes(id)) return;
+    const i = SPARE.find((k) => !this.bar[k] || !this.owned.has(this.bar[k]!));
+    if (i !== undefined) this.bar[i] = id;
   }
 
   owns(id: string): boolean {

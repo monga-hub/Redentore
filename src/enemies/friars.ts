@@ -8,6 +8,7 @@ import type { PlayerStats } from '../player/stats.ts';
 import { playSfx } from '../audio/engine.ts';
 import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
 import { killAll, wipe } from './caster.ts';
+import { still, type Control } from './control.ts';
 
 // Frati non-morti: a gaunt Forsaken monk in a torn brown habit, generated, rigged and animated
 // with Meshy AI (see ATTRIBUTION.md), a hoe in the right fist; it works the soil
@@ -136,10 +137,10 @@ class View {
     }
 
     this.overlay.update(dt, f.state === 'swing' || f.state === 'dead');
-    if (d < FAR || f.state !== 'hoe') this.mixer.update(dt);
+    if (d < FAR || f.state !== 'hoe') this.mixer.update(dt * still(f.cc));
     this.shadows.update(d);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
-    flash(this.mats, this.flash);
+    flash(this.mats, this.flash, f.cc);
 
     let sink = 0;
     if (f.state === 'dead') sink = THREE.MathUtils.clamp((f.t - SINK.after) / SINK.time, 0, 1);
@@ -189,9 +190,12 @@ export function ownMaterials(model: THREE.Object3D): THREE.MeshStandardMaterial[
   return [...own.values()];
 }
 
-/** Hit flash: `k` 0..1 of red-hot over each material's own glow. */
-export function flash(mats: THREE.MeshStandardMaterial[], k: number): void {
-  for (const m of mats) { const g = m.userData.glow as number; m.emissive.setRGB(g + 0.9 * k, g + 0.15 * k, g + 0.1 * k); }
+/** Hit flash: `k` 0..1 of red-hot over each material's own glow; `cc` tints it: icy blue while chilled or frozen, flickering orange while burning. */
+export function flash(mats: THREE.MeshStandardMaterial[], k: number, cc?: Control): void {
+  let r = 0.9 * k, g = 0.15 * k, b = 0.1 * k;
+  if (cc?.root) { r += 0.12; g += 0.34; b += 0.6; } else if (cc?.slow) { r += 0.04; g += 0.12; b += 0.26; }
+  if (cc?.burn) { const f = 0.7 + 0.3 * Math.sin(performance.now() * 0.023); r += 0.5 * f; g += 0.17 * f; b += 0.02 * f; }
+  for (const m of mats) { const e = m.userData.glow as number; m.emissive.setRGB(e + r, e + g, e + b); }
 }
 
 export function barMat(color: number): THREE.SpriteMaterial {

@@ -100,6 +100,7 @@ const FALLEN = 2.6; // s the hero lies dead before waking
 let dying = 0;
 playerStats.onDeath = () => { // the hero falls; the fight is over at once, the wake-up follows
   kit.system.cancel();
+  kit.magic.reset(); // bolts in flight, burning floors, a leap: gone with the hero
   dctl.stop();
   friars.wipe(); // a wipe: whoever was fighting, the boss too, evades home at full health
   priests.wipe();
@@ -123,7 +124,7 @@ kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
 const MAIN = ABILITIES.find((a) => a.id === 'fall')!; // Caduta d'ossa, the swing a click-attack repeats, wherever it sits on the bar
 dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(kit.system.slots.indexOf(MAIN));
-const AIMED = new Set(['fall', 'step', 'plague', 'strike']); // casts that go where the hero faces
+const AIMED = new Set(['fall', 'step', 'plague', 'strike', 'pyre', 'frost', 'lance', 'chain', 'toll', 'leap', 'grace', 'charge']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
 const occlusion = new Occlusion([level.root, fx.torches.root], level, [ // walls drop, roofs and props in the way fade out, Diablo view
   [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], [bees.root, 0xff3b2e], // x-ray silhouettes behind what still hides them

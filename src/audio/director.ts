@@ -104,7 +104,7 @@ export class Director {
     this.w = w;
     this.bees = w.bees.map((b) => new Emitter(b.kind === APE ? 'bee_queen' : 'bee_worker'));
     this.groups = [...new Set(w.casters.map((p) => p.mates))];
-    for (const b of ['core', 'world'] as const) loadBank(b);
+    for (const b of ['core', 'arcane', 'world'] as const) loadBank(b);
     // Menu clicks and hovers (the action bar and the map have their own sounds or none).
     addEventListener('click', (e) => { if ((e.target as HTMLElement).closest?.('#menu button, #menu-btn')) playSfx('ui_click', null, { ui: true }); }, true);
     addEventListener('pointerover', (e) => {

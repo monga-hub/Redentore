@@ -329,6 +329,80 @@ def _(i):  # the stopper, three gulps, a sigh of glitter
     return norm(mix(r('cork'), (gulp(1.0), 0.18), (gulp(0.95), 0.42), (gulp(1.05), 0.66), (sparkle(1.0, [74, 77, 81], 6) * expdec(1.0, 0.3) * 0.15, 0.85)))
 
 
+# ---------------------------------------------------------------- fire, frost and lightning (arcane): real fire, ice and storms
+
+@sound('fire_cast', 'arcane')
+def _(i):  # Rogo dell'eretico let go: a flame flung forward
+    return norm(mix(r('rpg:spell_fire_04', 0.9), (r('swoosh_low', 0.9) * 0.6, 0.02), (tail(r('torch', 1.0, 3.3, 0.7)) * 0.6, 0.05)))
+
+
+@sound('fire_hit', 'arcane', 2)
+def _(i):  # the fireball bursts: a roar of flame, the floor shaken, embers raining
+    roar = tail(lp(r('fire_roar', 1.3 + 0.15 * i, 2 + i, 1.4), 5000), 0.8)
+    boom = tail(lp(r('debris_big', 0.55, 0, 1.2), 900), 0.6)
+    return norm(wet(mix(r('rpg:spell_fire_06', 0.8 + 0.1 * i), (roar * 0.8, 0.02), (boom * 0.7, 0), (k(f'impactMining_00{i}', 0.6) * 0.5, 0)), 1.4, 0.25))
+
+
+@sound('frost_cast', 'arcane', 2)
+def _(i):  # a dart of ice let fly: frost crackling, a sharp whoosh
+    crackle = hp(tail(r('ice_grind', 1.3, 1.0 + i, 0.5), 0.3), 900)
+    return norm(mix(r(['bamboo3', 'bamboo4'][i], 1.1) * 0.8, (crackle * 0.7, 0), (k(f'impactGlass_light_00{i}', 1.2) * 0.4, 0.02), (sparkle(0.6, [88, 91, 95], 16) * expdec(0.6, 0.2) * 0.2, 0)))
+
+
+@sound('frost_hit', 'arcane', 3)
+def _(i):  # ice striking: glass and crackling rime
+    return norm(mix(k(f'impactGlass_medium_00{i}'), (ev('ice_cracks', i, 0.5) * 0.7, 0.01), (lp(k(f'impactPunch_medium_00{i}'), 2500) * 0.4, 0)))
+
+
+@sound('ice_shatter', 'arcane', 2)
+def _(i):  # a frozen body bursting: heavy glass, ice breaking, crystal ringing
+    return norm(wet(mix(k(f'impactGlass_heavy_00{i}'), (ev('ice_break', i, 0.9) * 0.8, 0), (r(f'rpg:item_gem_0{i + 1}', 0.8) * 0.5, 0.04), (ev('ice_crunch', i, 0.6) * 0.5, 0.02)), 1.0, 0.2))
+
+
+@sound('frost_nova', 'arcane')
+def _(i):  # Acquasantiera gelata: the floor freezing at once, a gust of cold, ice cracking outwards
+    grind = tail(r('ice_grind', 1.0, 0.5, 1.6), 0.8)
+    return norm(wet(mix(k('impactGlass_heavy_003', 0.8), (grind * 0.8, 0.02), (tail(gust(1.4, 0, 1.4), 0.7) * 0.5, 0), (ev('ice_cracks', 0, 0.8) * 0.6, 0.15), (bowl(1.3, 0, 1.6) * 0.25, 0)), 1.6, 0.25))
+
+
+@sound('zap', 'arcane', 3)
+def _(i):  # Catena di saette: real electric arcs, a crack at each jump
+    arc = fade(r('zap', [1.0, 1.15, 0.9][i]), 0.002, 0.15)
+    return norm(mix(arc, (r('stun_gun', 1.0 + 0.1 * i) * 0.6, 0.02), (r('spark', 0.9 + 0.1 * i) * 0.7, 0.05), (hp(ev('thunder_crack', 0, 0.5, 1.4), 400) * 0.35, 0)))
+
+
+@sound('thunder', 'arcane', 2)
+def _(i):  # Rintocco del campanile: a thunderbolt striking close, the rumble rolling on
+    crack = tail(r(['thunder_close', 'thunder_crack'][i], 1.0, max(0, events(REC(['thunder_close', 'thunder_crack'][i]), 1)[0] - 0.02), 3.2), 1.5)
+    return norm(mix(crack, (r('zap') * 0.4, 0), (tail(lp(r('debris_big', 0.5, 0, 1.4), 600), 0.7) * 0.6, 0.01)))
+
+
+@sound('toll_bell', 'arcane')
+def _(i):  # the bell tower called: one bell struck low, electricity rising
+    bell = tail(lp(ev('bells_italy', 0, 2.2, 0.85, gap=0.8), 4000), 1.0)
+    return norm(wet(mix(bell, (fade(ev('jacobs_ladder', 0, 0.7), 0.3, 0.2) * 0.35, 0.1)), 2.0, 0.3))
+
+
+@sound('whirl', 'arcane', 3)
+def _(i):  # Turbine d'ossa: the club whistling round, again and again
+    return norm(lp(mix(r(['bamboo3', 'bamboo4', 'bamboo5'][i], 0.62), (r('swoosh_low', 1.4) * 0.5, 0.03)), 5000))
+
+
+@sound('leap_land', 'arcane', 2)
+def _(i):  # Balzo del sepolcro lands: the floor cracks under the weight
+    return norm(mix(k(f'impactMining_00{i + 2}', 0.65), (tail(lp(r('debris_big', 0.6, 0, 1.2), 1200), 0.6) * 0.8, 0.01), (bone(i + 1, 0.8) * 0.5, 0.02)))
+
+
+@sound('charge_hit', 'arcane', 2)
+def _(i):  # Carica del dannato slams in
+    return norm(mix(k(f'impactPunch_heavy_00{i + 2}', 0.8), (bone(i + 3, 0.85) * 0.6, 0.01), (k(['cloth2', 'cloth4'][i]) * 0.4, 0)))
+
+
+@sound('execute', 'arcane', 2)
+def _(i):  # Colpo di grazia: the two-handed blow biting deep
+    return norm(mix(r('swoosh_low', 0.85) * 0.5, (k(f'impactPunch_heavy_00{i}', 0.75), 0.06), (bone(i, 0.75) * 0.8, 0.07), (lp(r(f'mud:mud_{[3, 12][i]:02d}'), 2500) * 0.4, 0.07)))
+
+
 @sound('charge_ready', 'core')
 def _(i):  # the fury bar is full: the bowl struck, a fifth above it answering
     return norm(wet(mix(bowl(0.75, 0, 2.5), (bowl(1.12, 0, 2.2) * 0.6, 0.12)), 1.8, 0.3))

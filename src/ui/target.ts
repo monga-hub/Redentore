@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { Bar } from './hud.ts';
+import type { Control } from '../enemies/control.ts';
 
 /** A targetable mob: brain state from enemies/brain.ts or enemies/caster.ts. */
-export interface Mob { x: number; y: number; z: number; hp: number; state: string }
+export interface Mob { x: number; y: number; z: number; hp: number; state: string; cc?: Control }
 
 /**
  * One kind of enemy: display name, full health, model height and the live brains. `ownBar`: true

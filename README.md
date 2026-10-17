@@ -39,8 +39,8 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione (3 build + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -78,6 +78,28 @@ con salto e pozione tra i tasti piccoli.
 
 In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,
 anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
+
+## Abilità
+
+Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste e la fiala; ai livelli pari arrivano due
+carte di nuove abilità (la seconda, una volta su due, della stessa scuola di una già posseduta), agli altri
+potenziamenti, passivi e fusioni (`src/player/levels.ts`: 16 abilità da sbloccare, 56 carte di potenziamento di cui 6 fusioni). Le
+abilità sbloccate prendono il primo tasto libero della barra (le prime sette posizioni sono quelle del ventaglio touch).
+
+| Scuola | Abilità |
+|---|---|
+| ossa | Caduta d'ossa · Balzo del sepolcro (balzo fino a 12 m, stordisce all'atterraggio) · Turbine d'ossa (3 s di rotazione, anche correndo) · Colpo di grazia (fendente a due mani, fino al triplo sui feriti) · Sentenza e Lamento (speciali) |
+| peste, ombra | Nube di peste · Passo d'ombra · Velo spettrale · Carica del dannato (a testa bassa sul nemico, stordisce, riempie la furia) · Patto della tomba (speciale) |
+| fuoco | Fuoco fatuo · Rogo dell'eretico (lancio lungo 2,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) |
+| gelo | Dardo di brina (rallenta) · Acquasantiera gelata (congela sul posto chi è vicino) · Stiletto di ghiaccio (triplo su chi è congelato) |
+| fulmine | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) |
+
+Fusioni nuove: Frantumazione (fuoco su gelo: +60% e schegge), Miasma elettrico (fulmini +50% e catena più lunga su
+chi sta nella peste), Turbine di brina (il turbine gela e raddoppia sui congelati). I lanci si interrompono muovendosi
+(il turbine no) e mentre si lancia o si canalizza la clava resta ferma. Rallentamenti, congelamenti e stordimenti
+(`src/enemies/control.ts`) si vedono sui nemici (tinta gelida, corpo fermo nel ghiaccio, stelle, fiamme), hanno
+rendimenti decrescenti (metà, un quarto, poi immune per 15 s); sacerdoti e api li scuotono via prima e il
+Reverendissimo dura a un terzo, così il boss resta una sfida.
 
 ## Stile Diablo
 
@@ -203,7 +225,10 @@ src/
                              tooltip, errori, testo di combattimento); ui/icons.ts icone SVG
   abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s, off-GCD,
                              lanci, canalizzate, interruzione al movimento. Nessun DOM/three
-  abilities/forsaken.ts      le abilità del Reietto (tabella `ABILITIES`, ordine `BAR`), numeri vivi in `tune`
+  abilities/forsaken.ts      le abilità del Reietto (tabella `ABILITIES`, ordine `BAR`), numeri vivi in `tune`, e i loro effetti
+  abilities/grimoire.ts      regole di fuoco, gelo, fulmine e dei colpi nuovi (dardi a ricerca, fiamme a terra, catena,
+                             fulmine ritardato, balzo e carica, esecuzione), senza grafica: le usa anche il banco. Nessun three
+  enemies/control.ts         stati dei nemici: rallentato, congelato, stordito, in fiamme; rendimenti decrescenti e resistenza
   player/levels.ts           livelli d'esperienza: curva, XP dai morti, le carte (nuove abilità,
                              potenziamenti, passivi, fusioni) e l'offerta da due. Nessun DOM/three
   ui/levelUp.ts              finestra di scelta delle due carte, lampo "Livello N!"
@@ -264,6 +289,7 @@ src/
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest
 scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sistema abilità
+scripts/check-spells.ts      stati dei nemici e loro effetto sulle IA, regole degli incantesimi nuovi e delle fusioni
 scripts/check-levels.ts      curva XP, offerte delle carte su molte partite casuali, fusioni, slot riservati
 scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e carte veri, giocati da un bot sul percorso della missione
 ```

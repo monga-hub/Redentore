@@ -7,6 +7,7 @@
 // helpers it shares; priests.ts puts models and spell effects on top.
 import type { World } from '../core/physics.ts';
 import { face, feet, walk, type Target } from './brain.ts';
+import { clear, control, pace, tick, type Control } from './control.ts';
 
 export interface CasterKind {
   hp: number; xp: number; aggro: number; leash: number; blind: number; range: number; keep: number; backoff: number;
@@ -18,6 +19,8 @@ export interface CasterKind {
   nova?: { every: number; cast: number; radius: number; damage: number };
   /** Boss only: phases below each `at` share of health. */
   phases?: Phases;
+  /** Share of crowd control that sticks (control.ts): durations and slows ×; default 1. */
+  resist?: number;
 }
 
 /**
@@ -73,6 +76,7 @@ export const SACERDOTE: CasterKind = {
   radius: 0.55,
   melee: { reach: 2, hit: 2.8, windup: 0.7, swing: 1.3, cooldown: 2.2, damage: 105 },
   nova: { every: 11, cast: 1.8, radius: 4, damage: 220 },
+  resist: 0.7, // an elite shakes off control sooner
 };
 
 /**
@@ -99,6 +103,7 @@ export const REVERENDISSIMO: CasterKind = {
     haste: 1.25,
     berserk: 240, rage: 3,
   },
+  resist: 0.35, // stuns and roots last a third as long, slows bite a third as deep, with diminishing returns on top
 };
 /**
  * L'ape gigante: a giant hornet guarding the apiary, an elite between a sacerdote and the boss.
@@ -118,6 +123,7 @@ export const APE: CasterKind = {
   radius: 0.9, margin: 1,
   melee: { reach: 1.3, hit: 3.4, windup: 0.6, swing: 1.3, cooldown: 2.4, damage: 70 }, // a lunging dive: too long to step out of
   nova: { every: 9, cast: 2, radius: 4.5, damage: 260 },
+  resist: 0.6,
 };
 /** Worker bees round the hives, pulled with the giant: quick, frail, small stings. */
 export const APETTA: CasterKind = {
@@ -129,6 +135,7 @@ export const APETTA: CasterKind = {
   radius: 0.35, margin: 0.5,
   melee: { reach: 0.7, hit: 1.6, windup: 0.35, swing: 0.8, cooldown: 1.8, damage: 22 },
   nova: undefined,
+  resist: 1,
 };
 /** The apiary (zones/orto.ts, hives at z -130): the giant and her workers on the hives' north side, away from the paved paths. */
 export const APIARY = { x: 0.5, z: -132.6 };
@@ -174,6 +181,7 @@ export interface Priest {
   home: { x: number; z: number; yaw: number };
   bounds: Bounds; // the cloister's court (or garden, church floor): never leaves it
   mates: Priest[];
+  cc: Control; // slows, roots, stuns laid by the hero's spells (control.ts)
 }
 
 export interface Bolt {
@@ -283,7 +291,7 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
     g.forEach(([x, z, yaw], k) => {
       const kind = kinds[i]?.[k] ?? PRIEST;
       mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false,
-        phase: 0, fight: 0, brand: kind.phases?.marks.every ?? 0, marks: [], backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates });
+        phase: 0, fight: 0, brand: kind.phases?.marks.every ?? 0, marks: [], backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
     });
     return mates;
   });
@@ -425,6 +433,14 @@ function brand(f: Priest, P: Phases, p: Target, level: boolean, dt: number, figh
 /** One caster's frame: `haste` × on its cooldowns, `rage` × on what it deals (the boss's phases; 1 for everyone else). */
 function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], haste: number, rage: number): number {
   const K = f.kind;
+  tick(f.cc, dt);
+  if (f.state === 'evade' || f.state === 'dead') clear(f.cc);
+  else if (f.cc.stun > 0) { // stunned: a cast or a swing is lost, a nova only held (it is never interrupted)
+    if (f.state === 'cast') { enter(f, 'chase'); f.cd = 0.5; }
+    if (f.state === 'swing') enter(f, 'chase');
+    return 0;
+  }
+  const mv = pace(f.cc);
   f.t += dt;
   f.cd = Math.max(0, f.cd - dt * haste);
   f.melee = Math.max(0, f.melee - dt * haste);
@@ -453,13 +469,13 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
         // Backpedal straight away from the player, still facing them.
         f.backoff -= dt;
         const x = f.x, z = f.z;
-        go(f, f.x + ((f.x - p.x) / Math.max(dist, 0.1)) * 2, f.z + ((f.z - p.z) / Math.max(dist, 0.1)) * 2, K.back, 0, world, dt);
-        if (Math.hypot(f.x - x, f.z - z) > K.back * dt * 0.3) f.move = -1;
+        go(f, f.x + ((f.x - p.x) / Math.max(dist, 0.1)) * 2, f.z + ((f.z - p.z) / Math.max(dist, 0.1)) * 2, K.back * mv, 0, world, dt);
+        if (mv > 0 && Math.hypot(f.x - x, f.z - z) > K.back * mv * dt * 0.3) f.move = -1;
         else f.backoff = 0; // cornered against the cloister's edge: stand and cast
         f.yaw = toPlayer;
       } else if (!seen || (K.melee && f.cd > 0)) {
-        go(f, p.x, p.z, K.speed, K.melee ? reach * 0.8 : 0, world, dt); // melee kinds close in between casts
-        f.move = 1;
+        go(f, p.x, p.z, K.speed * mv, K.melee ? reach * 0.8 : 0, world, dt); // melee kinds close in between casts
+        f.move = mv > 0 ? 1 : 0;
       } else if (f.cd === 0) enter(f, 'cast');
       else face(f, toPlayer, dt);
       return 0;

@@ -6,6 +6,7 @@ import type { PlayerStats } from '../player/stats.ts';
 import { separate, type Target } from './brain.ts';
 import { APE, hurt, killAll, spawnApiary, think, wipe, type CasterState, type Priest } from './caster.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
+import { still } from './control.ts';
 
 // L'ape gigante and her workers at the apiary: a giant hornet generated with Meshy AI (see
 // ATTRIBUTION.md), one static mesh animated here in code, as Meshy's auto-rig is for bipeds:
@@ -139,7 +140,7 @@ class View {
       if (f.state === 'dead') this.fall = { y: 0, v: 0, roll: 0 };
     }
     const K = f.kind, hover = this.queen ? HOVER.queen : HOVER.worker, s = this.queen ? 1 : 0.5;
-    this.phase += dt;
+    this.phase += dt * still(f.cc);
     const t = this.phase;
 
     // Body pose in the bee's frame (yaw applied by root): offsets and turns layered per state.
@@ -210,7 +211,7 @@ class View {
     }
 
     if (this.flashK > 0) this.flashK = Math.max(0, this.flashK - dt * 4);
-    flash(this.mats, this.flashK);
+    flash(this.mats, this.flashK, f.cc);
     const r = f.hp / K.hp;
     this.bar.visible = f.state !== 'dead' && (f.state !== 'pray' || r < 1);
     this.bar.position.y = y + 0.65 * (this.queen ? SIZES.queen : SIZES.worker) + 0.35;

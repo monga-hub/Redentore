@@ -3,6 +3,7 @@
 // exercises it in Node. Also exposed as `window.playerStats` (see main.ts).
 
 export const VEIL_CUT = 0.5; // Velo spettrale: share of incoming damage it takes off
+export const GUARD_CUT = 0.3; // Turbine d'ossa: the whirling club parries this share
 
 export class PlayerStats {
   hp: number;
@@ -10,6 +11,8 @@ export class PlayerStats {
   /** s left of Velo spettrale (incoming damage × VEIL_CUT off) and of total immunity. */
   veil = 0;
   immune = 0;
+  /** s left of the whirl's parry (refreshed every frame of Turbine d'ossa). */
+  guard = 0;
   /** Called once when health reaches 0. */
   onDeath?: () => void;
   /** Called with the damage actually taken, before `onDeath` (the hero flinches). */
@@ -44,7 +47,7 @@ export class PlayerStats {
   /** Returns the damage actually taken. */
   takeDamage(n: number): number {
     if (this.dead || !(n > 0) || this.immune > 0) return 0;
-    const d = Math.min((this.veil > 0 ? n * (1 - VEIL_CUT) : n) * this.armor, this.hp);
+    const d = Math.min((this.veil > 0 ? n * (1 - VEIL_CUT) : n) * (this.guard > 0 ? 1 - GUARD_CUT : 1) * this.armor, this.hp);
     this.hp -= d;
     if (d > 0) this.onHurt?.(d);
     if (this.dead) this.onDeath?.();
@@ -80,6 +83,7 @@ export class PlayerStats {
   update(dt: number): void {
     this.veil = Math.max(0, this.veil - dt);
     this.immune = Math.max(0, this.immune - dt);
+    this.guard = Math.max(0, this.guard - dt);
     if (!this.dead) this.restoreMana(this.regen * dt);
   }
 }

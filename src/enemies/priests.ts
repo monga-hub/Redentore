@@ -8,6 +8,7 @@ import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, fly, hurt, killAll, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Mark, type Priest } from './caster.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
+import { still } from './control.ts';
 
 // The casters, one body per kind, each generated, rigged and animated with Meshy AI (see
 // ATTRIBUTION.md), with a Meshy-made staff in the right fist. Preti non-morti: hooded skeletons
@@ -241,10 +242,10 @@ class View {
     }
 
     this.overlay.update(dt, f.state === 'swing' || f.state === 'cast' || f.state === 'nova' || f.state === 'dead');
-    if (d < FAR || f.state !== 'pray') this.mixer.update(dt);
+    if (d < FAR || f.state !== 'pray') this.mixer.update(dt * still(f.cc));
     this.shadows.update(d);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
-    flash(this.mats, this.flash);
+    flash(this.mats, this.flash, f.cc);
 
     let sink = 0;
     if (f.state === 'dead') sink = THREE.MathUtils.clamp((f.t - SINK.after) / SINK.time, 0, 1);

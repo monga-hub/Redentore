@@ -2,10 +2,11 @@
 // boss's resistance, what a stun, a root and a chill do to a friar's and a priest's brain, and the rules of the
 // fire, frost and lightning spells and the new blows (abilities/grimoire.ts): bolts homing and landing, splash
 // and burning, the chill, the frozen shattering, the chain's jumps, the thunderbolt's delay, the leap's travel,
-// the execute's scaling, Miasma elettrico, Frantumazione, the whirl's parry.
+// the execute's scaling, Miasma elettrico, Frantumazione, the whirl's parry, and walls: bolts (the hero's and
+// the priests') burst on them, a hidden target refuses the cast, the chain and the novas don't pass them.
 import { World } from '../src/core/physics.ts';
 import { FRIAR, think as friarThink, type Friar } from '../src/enemies/brain.ts';
-import { PRIEST, REVERENDISSIMO, think as casterThink, spawnPriests, type Bolt as Shadow } from '../src/enemies/caster.ts';
+import { PRIEST, REVERENDISSIMO, fly as casterFly, think as casterThink, spawnPriests, type Bolt as Shadow } from '../src/enemies/caster.ts';
 import { control, chill, root, stun, pace, tick } from '../src/enemies/control.ts';
 import { Grimoire, maxHp } from '../src/abilities/grimoire.ts';
 import { tuneOf } from '../src/player/levels.ts';
@@ -173,6 +174,40 @@ shatter.shoot('pyre', { x: 0, y: 1.3, z: 0 });
 for (let s = 0; s < 1; s += 1 / 30) shatter.update(1 / 30);
 if (!(dmg(foes[0]) >= tuneOf([]).pyreDmg * 1.6) || foes[0].cc!.slow > 0) fail('Frantumazione: +60% and the ice gone');
 
+// Walls: spells never pass through them (the captain's rule). A wall 6 m north of the hero, 2.5 m tall.
+host.player.pos.x = 0; host.player.pos.y = 0; host.player.pos.z = 0; host.player.facing = 0;
+const wall = world.add(0, -6, 6, 0.25, 0, 2.5);
+near(world.ray(0, 1.2, 0, 0, 1.2, -12), (6 - 0.25) / 12, 'the ray stops at the wall face', 1e-6);
+if (world.sees({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -12 }) || !world.sees({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 4 })) fail('line of sight');
+hits.clear(); book.reset(); book.events.length = 0;
+foes = [foe(0, -10)];
+if (book.target() || book.why() !== 'Bersaglio non in vista.') fail(`a target behind a wall: ${book.why()}`); // the cast is refused before mana or cooldown
+book.bolts.push({ kind: 'pyre', x: 0, y: 1.3, z: 0, to: foes[0], speed: 14, t: 0, dmg: 100 }); // a bolt already flying when the foe stepped behind it
+run(1.5);
+if (dmg(foes[0]) || !book.events.some((e) => e.type === 'wall') || book.bolts.length) fail('a bolt must burst on the wall');
+foes = [foe(0, -4), foe(0, -9)]; // the chain can't jump through
+book.chain({ x: 0, y: 1.3, z: 0 });
+if (!dmg(foes[0]) || dmg(foes[1])) fail('the chain jumped through a wall');
+hits.clear();
+foes = [foe(0, -4.5), foe(0, -7.5)];
+host.player.pos.z = -2;
+book.font(); // 5 m frost nova: the foe past the wall stays free
+if (!foes[0].cc!.root || foes[1].cc!.root || dmg(foes[1])) fail('the frost nova went through a wall');
+const bolts2: Shadow[] = [{ x: 0, y: 1.6, z: -10, dmg: 50, speed: 13, life: 4, t: 0, hit: false }];
+let through = 0;
+for (let t = 0; t < 2; t += 1 / 60) through += casterFly(bolts2, { x: 0, y: 0, z: 0 }, 1 / 60, [], world);
+if (through || bolts2.length) fail('a priest\'s bolt went through a wall');
+// friars: a hoeing one doesn't hear the hero through the wall; one pinned chasing behind it gives up
+const hoer = friar(0, -9); hoer.state = 'hoe'; hoer.mates.push(hoer);
+friarThink(hoer, { x: 0, y: 0, z: -2 }, world, 0.05);
+if (hoer.state !== 'hoe') fail('a friar pulled through a wall');
+const pinned = friar(0, -7); pinned.mates.push(pinned);
+let gaveUp = false;
+for (let t = 0; t < FRIAR.blind + 0.5; t += 0.05) { friarThink(pinned, { x: 0, y: 0, z: -2 }, world, 0.05); gaveUp ||= pinned.state === 'evade'; }
+if (!gaveUp) fail('a friar pinned behind a wall should give up');
+world.boxes.splice(world.boxes.indexOf(wall), 1);
+host.player.pos.z = 0;
+
 // Turbine d'ossa's parry takes its share off every blow while it whirls
 const me = new PlayerStats();
 me.guard = 0.1;
@@ -180,4 +215,4 @@ near(me.takeDamage(100), 100 * (1 - GUARD_CUT), 'the whirl parries');
 me.update(0.2);
 near(me.takeDamage(100), 100, 'the parry ends with the whirl');
 
-console.log('spells ok (control, diminishing returns, boss resist, brains, bolts, chain, thunderbolt, leap, execute, fusions)');
+console.log('spells ok (control, diminishing returns, boss resist, brains, bolts, chain, thunderbolt, leap, execute, fusions, walls, parry)');

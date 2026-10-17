@@ -18,7 +18,7 @@ export interface Toll { x: number; y: number; z: number; t: number }
 export interface Dash { kind: 'leap' | 'charge'; pts: P[]; len: number; t: number; total: number; to?: Mob }
 /** Something the looks should show where it happened (`pts`: the chain's path, hand first). */
 export type SpellEvent =
-  | { type: 'pyre' | 'frost' | 'lance' | 'shatter' | 'thaw' | 'font' | 'toll' | 'leap' | 'charge' | 'grace' | 'fizzle'; x: number; y: number; z: number; big?: boolean }
+  | { type: 'pyre' | 'frost' | 'lance' | 'shatter' | 'thaw' | 'font' | 'toll' | 'leap' | 'charge' | 'grace' | 'fizzle' | 'wall'; x: number; y: number; z: number; big?: boolean; kind?: BoltKind }
   | { type: 'chain'; pts: P[] };
 
 export const RANGE = 30; // m: bolts, the chain and the thunderbolt reach this far
@@ -73,26 +73,36 @@ export class Grimoire {
     this.tune = tune;
   }
 
-  /** The selected target if alive and within `range`, else the nearest living foe in front. */
+  /**
+   * The selected target if alive, within `range` and in sight, else the nearest living foe in front and in
+   * sight; none when the selected one is hidden behind a wall (WoW: "not in line of sight", see `why`).
+   */
   target(range = RANGE): Mob | undefined {
-    const p = this.host.player.pos, f = this.host.player.facing, fx = -Math.sin(f), fz = -Math.cos(f);
+    const p = this.host.player.pos, f = this.host.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), w = this.host.player.world;
     const t = this.host.aimed?.();
-    if (t && alive(t) && flat(t, p) <= range) return t;
+    if (t && alive(t) && flat(t, p) <= range) return w.sees(p, t) ? t : undefined;
     let best: Mob | undefined, bd = range;
     for (const m of this.host.foes?.() ?? []) {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
-      if (alive(m) && d < bd && (d < 1 || (dx * fx + dz * fz) / d > ARC)) { bd = d; best = m; }
+      if (alive(m) && d < bd && (d < 1 || (dx * fx + dz * fz) / d > ARC) && w.sees(p, m)) { bd = d; best = m; }
     }
     return best;
+  }
+
+  /** Why a targeted spell can't go now (no target, or the selected one out of sight), or undefined. */
+  why(range = RANGE): string | undefined {
+    if (this.target(range)) return undefined;
+    const t = this.host.aimed?.(), p = this.host.player.pos;
+    return t && alive(t) && flat(t, p) <= range ? 'Bersaglio non in vista.' : 'Nessun bersaglio.';
   }
 
   private hit(m: Mob, n: number): void {
     if (n > 0) this.host.hurt?.((_x, _z, o) => o === m, n);
   }
-  /** Every living foe within `r` of (x, z). */
-  private near(x: number, z: number, r: number): Mob[] {
-    const out: Mob[] = [];
-    for (const m of this.host.foes?.() ?? []) if (alive(m) && Math.hypot(m.x - x, m.z - z) < r) out.push(m);
+  /** Every living foe within `r` of `c` (feet) with no wall between them: blasts stop at walls. */
+  private near(c: P, r: number): Mob[] {
+    const out: Mob[] = [], w = this.host.player.world;
+    for (const m of this.host.foes?.() ?? []) if (alive(m) && Math.hypot(m.x - c.x, m.z - c.z) < r && w.sees(c, m)) out.push(m);
     return out;
   }
 
@@ -112,11 +122,11 @@ export class Grimoire {
       if (t.fxShatter && c && chilled(c)) { // Frantumazione: the ice bursts under the fire
         dmg *= SHATTER.mul;
         c.slow = c.root = 0;
-        for (const o of this.near(m.x, m.z, SHATTER.r)) if (o !== m) this.hit(o, SHATTER.dmg);
+        for (const o of this.near(m, SHATTER.r)) if (o !== m) this.hit(o, SHATTER.dmg);
         this.events.push({ type: 'thaw', ...at });
       }
       this.hit(m, dmg);
-      for (const o of this.near(m.x, m.z, t.pyreR)) if (o !== m) this.hit(o, b.dmg * SPLASH);
+      for (const o of this.near(m, t.pyreR)) if (o !== m) this.hit(o, b.dmg * SPLASH);
       this.burns.set(m, BURN.t);
       if (c) c.burn = BURN.t;
       this.fires.push({ ...at, r: t.pyreR * 0.8, t: FIRE.life, life: FIRE.life, dps: FIRE.dps });
@@ -129,7 +139,7 @@ export class Grimoire {
     } else {
       const shatter = !!c && frozen(c);
       this.hit(m, shatter ? b.dmg * LANCE_FROZEN : b.dmg);
-      if (shatter && t.lanceSplit) for (const o of this.near(m.x, m.z, LANCE_R)) if (o !== m) this.hit(o, b.dmg * LANCE_FROZEN * LANCE_SPLIT);
+      if (shatter && t.lanceSplit) for (const o of this.near(m, LANCE_R)) if (o !== m) this.hit(o, b.dmg * LANCE_FROZEN * LANCE_SPLIT);
       this.events.push({ type: shatter ? 'shatter' : 'lance', ...at, big: shatter });
     }
   }
@@ -137,7 +147,7 @@ export class Grimoire {
   /** Acquasantiera gelata: everyone round the hero is hurt and frozen in place. */
   font(): void {
     const p = this.host.player.pos, t = this.tune;
-    for (const m of this.near(p.x, p.z, FONT_R)) { this.hit(m, t.fontDmg); if (m.cc) root(m.cc, t.fontRoot); }
+    for (const m of this.near(p, FONT_R)) { this.hit(m, t.fontDmg); if (m.cc) root(m.cc, t.fontRoot); }
     this.events.push({ type: 'font', ...p });
   }
 
@@ -154,7 +164,7 @@ export class Grimoire {
       this.hit(m, storm(m) ? dmg * STORM : dmg);
       const at: Mob = m;
       let next: Mob | undefined, bd = HOP;
-      for (const o of this.near(at.x, at.z, HOP)) {
+      for (const o of this.near(at, HOP)) {
         const d = flat(o, at);
         if (!struck.has(o) && (d < bd || (storm(o) && !(next && storm(next))))) { bd = d; next = o; }
       }
@@ -171,13 +181,14 @@ export class Grimoire {
   /** Rintocco del campanile: a mark on the target's floor (or 8 m ahead), struck TOLL_DELAY s later. */
   toll(): void {
     const p = this.host.player.pos, f = this.host.player.facing, m = this.target();
-    const at = m ? { x: m.x, y: m.y, z: m.z } : { x: p.x - Math.sin(f) * 8, y: p.y, z: p.z - Math.cos(f) * 8 };
+    const k = m ? 1 : Math.max(0, this.host.player.world.ray(p.x, p.y + 1.2, p.z, p.x - Math.sin(f) * 8, p.y + 1.2, p.z - Math.cos(f) * 8) - 0.06); // no foe: 8 m ahead, short of a wall
+    const at = m ? { x: m.x, y: m.y, z: m.z } : { x: p.x - Math.sin(f) * 8 * k, y: p.y, z: p.z - Math.cos(f) * 8 * k };
     this.tolls.push({ ...at, t: TOLL_DELAY });
   }
 
   private strike(k: Toll): void {
     const t = this.tune;
-    for (const m of this.near(k.x, k.z, t.tollR)) {
+    for (const m of this.near(k, t.tollR)) {
       this.hit(m, t.fxStorm && this.host.clouded?.(m.x, m.z) ? t.tollDmg * STORM : t.tollDmg);
       if (m.cc) stun(m.cc, t.tollStun);
     }
@@ -186,9 +197,10 @@ export class Grimoire {
 
   /** Why a leap or a charge can't go now (no foe in reach), or undefined. */
   reach(kind: 'leap' | 'charge'): string | undefined {
-    if (kind === 'leap') return undefined; // a leap without a foe goes ahead
-    const m = this.target(CHARGE.max), p = this.host.player.pos;
-    if (!m) return 'Nessun bersaglio.';
+    const t = this.host.aimed?.(), p = this.host.player.pos;
+    if (kind === 'leap') return t && alive(t) && flat(t, p) <= LEAP.range && !this.host.player.world.sees(p, t) ? 'Bersaglio non in vista.' : undefined; // a leap without a foe goes ahead
+    const m = this.target(CHARGE.max);
+    if (!m) return this.why(CHARGE.max);
     if (flat(m, p) < CHARGE.min) return 'Troppo vicino.';
   }
 
@@ -248,7 +260,7 @@ export class Grimoire {
   private arrive(k: Dash): void {
     const t = this.tune, p = this.host.player.pos;
     if (k.kind === 'leap') {
-      for (const m of this.near(p.x, p.z, t.leapR)) { this.hit(m, t.leapDmg); if (m.cc) stun(m.cc, LEAP.stun); }
+      for (const m of this.near(p, t.leapR)) { this.hit(m, t.leapDmg); if (m.cc) stun(m.cc, LEAP.stun); }
       this.events.push({ type: 'leap', ...p, big: true });
     } else {
       const m = k.to && alive(k.to) && flat(k.to, p) < CHARGE.stop + 1.5 ? k.to : undefined;
@@ -260,7 +272,7 @@ export class Grimoire {
   /** Turbine d'ossa, one tick: everyone within WHIRL_R (Turbine di brina chills them, the frozen take double). */
   whirl(): void {
     const p = this.host.player.pos, t = this.tune;
-    for (const m of this.near(p.x, p.z, WHIRL_R)) {
+    for (const m of this.near(p, WHIRL_R)) {
       const c = m.cc;
       this.hit(m, t.fxFrostWhirl && c && frozen(c) ? t.whirlDmg * WHIRL_FROZEN : t.whirlDmg);
       if (t.fxFrostWhirl && c) chill(c, 2, WHIRL_CHILL);
@@ -271,7 +283,7 @@ export class Grimoire {
   grace(): void {
     const h = this.host.player, p = h.pos, fx = -Math.sin(h.facing), fz = -Math.cos(h.facing), t = this.tune;
     let any = false;
-    for (const m of this.near(p.x, p.z, GRACE.range)) {
+    for (const m of this.near(p, GRACE.range)) {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
       if (d > 0.6 && (dx * fx + dz * fz) / d < GRACE.arc) continue;
       const missing = 1 - Math.max(0, m.hp) / maxHp(m);
@@ -289,11 +301,19 @@ export class Grimoire {
       const dx = m.x - b.x, dy = m.y + CHEST - b.y, dz = m.z - b.z, d = Math.hypot(dx, dy, dz), s = b.speed * dt;
       if (d <= Math.max(s, 0.4)) { this.bolts.splice(i, 1); if (alive(m)) this.land(b); else this.events.push({ type: 'fizzle', x: b.x, y: b.y, z: b.z }); continue; }
       if (b.t > 4) { this.bolts.splice(i, 1); this.events.push({ type: 'fizzle', x: b.x, y: b.y, z: b.z }); continue; }
-      b.x += (dx / d) * s; b.y += (dy / d) * s; b.z += (dz / d) * s;
+      const nx = b.x + (dx / d) * s, ny = b.y + (dy / d) * s, nz = b.z + (dz / d) * s;
+      const wall = this.host.player.world.ray(b.x, b.y, b.z, nx, ny, nz);
+      if (wall < 1) { // it bursts on the wall: no curving round it, no passing through
+        b.x += (nx - b.x) * wall; b.y += (ny - b.y) * wall; b.z += (nz - b.z) * wall;
+        this.bolts.splice(i, 1);
+        this.events.push({ type: 'wall', x: b.x, y: b.y, z: b.z, kind: b.kind, big: b.kind === 'pyre' });
+        continue;
+      }
+      b.x = nx; b.y = ny; b.z = nz;
     }
     for (let i = this.fires.length - 1; i >= 0; i--) {
       const f = this.fires[i];
-      this.host.hurt?.((x, z) => Math.hypot(x - f.x, z - f.z) < f.r, f.dps * dt);
+      this.host.hurt?.((x, z, m) => Math.hypot(x - f.x, z - f.z) < f.r && this.host.player.world.sees(f, m), f.dps * dt);
       if ((f.t -= dt) <= 0) this.fires.splice(i, 1);
     }
     for (const [m, t] of this.burns) {

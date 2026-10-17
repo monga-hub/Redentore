@@ -189,6 +189,7 @@ export interface Bolt {
   dmg: number; speed: number; life: number; // from the caster's kind
   t: number;
   hit: boolean; // struck the player (set by fly, for the impact effect)
+  wall?: boolean; // burst on a wall in its way instead (set by fly)
 }
 
 /** The cloisters, by area label: the arcaded courts of the convent zone. */
@@ -502,7 +503,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       if (f.t < n.cast) return 0;
       f.nova = n.every;
       enter(f, 'chase');
-      return dist <= n.radius && level ? n.damage : 0;
+      return dist <= n.radius && level && world.sees(f, p) ? n.damage : 0; // a wall shelters from it
     }
     case 'evade':
       f.hp = K.hp;
@@ -521,10 +522,11 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
 
 /**
  * Fly every bolt one step towards the player's chest. Returns the magic damage landed this
- * frame. Spent bolts (hit or fizzled) are removed; a bolt that struck has `hit` set first so
- * the caller can draw the impact (see priests.ts) — read it before the next call.
+ * frame. Spent bolts (hit, fizzled or, with `world`, burst on a wall in their way) are removed; a bolt
+ * that struck has `hit` set first, one that hit a wall `wall`, so the caller can draw the impact (see
+ * priests.ts) — read them before the next call. Homing never takes a bolt round or through a wall.
  */
-export function fly(bolts: Bolt[], p: Target, dt: number, spent: Bolt[] = []): number {
+export function fly(bolts: Bolt[], p: Target, dt: number, spent: Bolt[] = [], world?: World): number {
   let dmg = 0;
   spent.length = 0;
   for (let i = bolts.length - 1; i >= 0; i--) {
@@ -533,7 +535,13 @@ export function fly(bolts: Bolt[], p: Target, dt: number, spent: Bolt[] = []): n
     const dx = p.x - b.x, dy = p.y + CHEST - b.y, dz = p.z - b.z, d = Math.hypot(dx, dy, dz);
     const s = b.speed * dt;
     if (d <= Math.max(s, 0.4)) { b.hit = true; dmg += b.dmg; }
-    else if (b.t < b.life) { b.x += (dx / d) * s; b.y += (dy / d) * s; b.z += (dz / d) * s; continue; }
+    else if (b.t < b.life) {
+      const nx = b.x + (dx / d) * s, ny = b.y + (dy / d) * s, nz = b.z + (dz / d) * s;
+      const k = world ? world.ray(b.x, b.y, b.z, nx, ny, nz) : 1;
+      b.x += (nx - b.x) * k; b.y += (ny - b.y) * k; b.z += (nz - b.z) * k;
+      if (k >= 1) continue;
+      b.wall = true;
+    }
     spent.push(b);
     bolts.splice(i, 1);
   }

@@ -213,7 +213,7 @@ class Run {
   wisp = 0;
   wispAt = new THREE.Vector3();
   private wispVel = new THREE.Vector3();
-  private clouds: { x: number; z: number; t: number }[] = [];
+  private clouds: { x: number; y: number; z: number; t: number }[] = [];
   private combo = 0;
   private comboT = 9;
   private fallSow = 0;
@@ -258,9 +258,9 @@ class Run {
   // --- what the ability table calls ---
   swingCombo(): void { this.combo = this.comboT < 1.1 ? (this.combo + 1) % 3 : 0; this.comboT = 0; }
   plague(at?: { x: number; y: number; z: number }, life = tune.plagueLife): void {
-    const p = at ?? plagueSpot(this.player.pos, this.player.facing, this.target, this.mobs);
+    const p = at ?? plagueSpot(this.player.pos, this.player.facing, this.target, this.mobs, this.world);
     if (this.clouds.length >= 6) this.clouds.shift();
-    this.clouds.push({ x: p.x, z: p.z, t: life });
+    this.clouds.push({ x: p.x, y: this.world.groundAt(p.x, p.z, p.y + 1.5) > -Infinity ? this.world.groundAt(p.x, p.z, p.y + 1.5) : p.y, z: p.z, t: life });
   }
   sowFall(): void {
     if (this.fallSow > 0) return;
@@ -282,7 +282,7 @@ class Run {
   summonWisp(): void { const p = this.player.pos; this.wispAt.set(p.x, p.y + 2.2, p.z); this.wisp = 60; }
   strikeTarget(): Mob | undefined {
     if (this.target && this.target.state !== 'dead') return this.target;
-    return this.nearest(this.mobs.filter((m) => m.state !== 'dead'), 30);
+    return this.nearest(this.mobs.filter((m) => m.state !== 'dead' && this.world.sees(this.player.pos, m)), 30);
   }
   private blink(dist: number): number {
     const p = this.player.pos, dx = -Math.sin(this.player.facing), dz = -Math.cos(this.player.facing);
@@ -311,10 +311,10 @@ class Run {
       const c = this.clouds[i];
       if ((c.t -= dt) <= 0) { this.clouds.splice(i, 1); continue; }
       this.src = 'plague';
-      this.hurt((x, z) => Math.hypot(x - c.x, z - c.z) < tune.plagueR, tune.plagueDps * dt);
+      this.hurt((x, z, m) => Math.hypot(x - c.x, z - c.z) < tune.plagueR && this.world.sees(c, m), tune.plagueDps * dt);
     }
     if (this.wisp > 0) {
-      const p = this.player.pos, f = this.player.facing, w = this.wispAt, foe = wispFoe(p, this.target, this.mobs);
+      const p = this.player.pos, f = this.player.facing, w = this.wispAt, foe = wispFoe(p, this.target, this.mobs, this.world);
       const a = this.time * 2.4, bob = Math.sin(this.time * 2.3) * 0.15;
       const tx = foe ? foe.x + Math.cos(a) * 0.7 : p.x + Math.cos(f) * 0.8 + Math.sin(f) * 0.5;
       const tz = foe ? foe.z + Math.sin(a) * 0.7 : p.z - Math.sin(f) * 0.8 + Math.cos(f) * 0.5;
@@ -500,7 +500,7 @@ class Run {
       dmg += d;
     }
     separate(this.casters, this.world);
-    dmg += fly(this.bolts, p, dt);
+    dmg += fly(this.bolts, p, dt, [], this.world);
     if (dmg > 0) s.takeDamage(dmg);
     if (t) {
       const z = this.zone(this.zoneOf(t));

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
+import type { World } from '../core/physics.ts';
 import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import { START, tuneOf, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
@@ -321,7 +322,7 @@ export class Forsaken {
       const c = this.clouds[i];
       c.t -= dt;
       const R = tune.plagueR;
-      this.hurt?.((x, z) => Math.hypot(x - c.x, z - c.z) < R, tune.plagueDps * dt);
+      this.hurt?.((x, z, m) => Math.hypot(x - c.x, z - c.z) < R && this.player.world.sees(c, m), tune.plagueDps * dt); // the miasma stops at walls
       const age = c.life - c.t, r = R * Math.min(1, Math.max(0, age - GLOB) * 2.5); // swells in once the glob has landed
       const pl = c.pool;
       pl.on = age > GLOB;
@@ -376,7 +377,7 @@ export class Forsaken {
     if (this.wisp <= 0) return;
     // Hovers off the right shoulder, lagging behind like something alive; in a fight it flies at the
     // target (else the nearest foe fighting) and circles it, scorching.
-    const p = this.player.pos, f = this.player.facing, foe = wispFoe(p, this.aimed?.(), this.foes?.() ?? []);
+    const p = this.player.pos, f = this.player.facing, foe = wispFoe(p, this.aimed?.(), this.foes?.() ?? [], this.player.world);
     const a = this.time * 2.4, bob = Math.sin(this.time * 2.3) * 0.15;
     const tx = foe ? foe.x + Math.cos(a) * WISP_ORBIT : p.x + Math.cos(f) * 0.8 + Math.sin(f) * 0.5;
     const tz = foe ? foe.z + Math.sin(a) * WISP_ORBIT : p.z - Math.sin(f) * 0.8 + Math.cos(f) * 0.5;
@@ -616,6 +617,24 @@ export class Forsaken {
       case 'fizzle':
         v.burst(pyreSmoke, x, y, z, 3, 0.2, 0.5);
         break;
+      case 'wall': // a bolt bursts on a wall it ran into
+        if (e.kind === 'pyre') {
+          v.spawn({ ...flareFire, size: 1.6 }, x, y, z);
+          v.burst(pyreSpark, x, y, z, 30, 0.2, 5, 1);
+          v.burst(pyreFlame, x, y, z, 14, 0.3, 1.5, 1);
+          v.burst(pyreSmoke, x, y, z, 5, 0.3, 0.8);
+          v.pulse(x, y, z, FIRE, 28);
+          v.shake(0.12);
+          playSfx('fire_hit', { x, y, z }, { gain: -6 });
+        } else {
+          v.spawn({ ...flareIce, size: 1 }, x, y, z);
+          v.burst(iceShard, x, y, z, e.kind === 'frost' ? 16 : 8, 0.15, 4, 1);
+          v.burst(frostMote, x, y, z, 12, 0.1, 3);
+          v.burst(frostMist, x, y, z, 2, 0.2, 0.5);
+          v.pulse(x, y, z, ICE, 16);
+          playSfx('frost_hit', { x, y, z }, { gain: -4 });
+        }
+        break;
     }
   }
 
@@ -747,7 +766,7 @@ export class Forsaken {
    * for `life` s (the fusions). With every pool in use, the oldest cloud gives its pool up.
    */
   plague(at?: { x: number; y: number; z: number }, life = tune.plagueLife, from?: { x: number; y: number; z: number }): void {
-    const { x, y, z } = at ?? plagueSpot(this.player.pos, this.player.facing, this.aimed?.(), this.foes?.() ?? []);
+    const { x, y, z } = at ?? plagueSpot(this.player.pos, this.player.facing, this.aimed?.(), this.foes?.() ?? [], this.player.world);
     const g = at ? y : this.player.world.groundAt(x, z, y + 1.5);
     if (this.clouds.length >= this.pools.length) {
       const old = this.clouds.shift()!;
@@ -871,7 +890,7 @@ export class Forsaken {
     let best: Mob | undefined, bestD = STRIKE_RANGE;
     for (const m of this.foes?.() ?? []) {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
-      if (m.state !== 'dead' && d < bestD && (d < 1 || (dx * fx + dz * fz) / d > STRIKE_ARC)) { bestD = d; best = m; }
+      if (m.state !== 'dead' && d < bestD && (d < 1 || (dx * fx + dz * fz) / d > STRIKE_ARC) && this.player.world.sees(p, m)) { bestD = d; best = m; }
     }
     return best;
   }
@@ -891,8 +910,8 @@ export class Forsaken {
 }
 
 /** The foe Fuoco fatuo goes for: the target if it is fighting within WISP_REACH of `p`, else the nearest one fighting. */
-export function wispFoe(p: { x: number; z: number }, aimed: Mob | undefined, foes: Iterable<Mob>): Mob | undefined {
-  const fighting = (m: Mob) => m.state !== 'dead' && m.state !== 'pray' && m.state !== 'hoe' && m.state !== 'evade' && Math.hypot(m.x - p.x, m.z - p.z) < WISP_REACH;
+export function wispFoe(p: { x: number; y: number; z: number }, aimed: Mob | undefined, foes: Iterable<Mob>, world?: World): Mob | undefined {
+  const fighting = (m: Mob) => m.state !== 'dead' && m.state !== 'pray' && m.state !== 'hoe' && m.state !== 'evade' && Math.hypot(m.x - p.x, m.z - p.z) < WISP_REACH && (!world || world.sees(p, m));
   if (aimed && fighting(aimed)) return aimed;
   let best: Mob | undefined, bd = Infinity;
   for (const m of foes) { const d = Math.hypot(m.x - p.x, m.z - p.z); if (fighting(m) && d < bd) { bd = d; best = m; } }
@@ -902,9 +921,10 @@ export function wispFoe(p: { x: number; z: number }, aimed: Mob | undefined, foe
 /**
  * Where Nube di peste lands: on the selected target if it is alive and within reach, else on the
  * nearest living foe within reach, else on the ground ahead, far enough that the caster stays out of it.
+ * With `world`, only foes in sight count and the lob ahead falls short of a wall.
  */
-export function plagueSpot(p: { x: number; y: number; z: number }, facing: number, aimed: Mob | undefined, foes: Iterable<Mob>): { x: number; y: number; z: number } {
-  const near = (m: Mob) => m.state !== 'dead' && Math.hypot(m.x - p.x, m.z - p.z) <= PLAGUE_RANGE;
+export function plagueSpot(p: { x: number; y: number; z: number }, facing: number, aimed: Mob | undefined, foes: Iterable<Mob>, world?: World): { x: number; y: number; z: number } {
+  const near = (m: Mob) => m.state !== 'dead' && Math.hypot(m.x - p.x, m.z - p.z) <= PLAGUE_RANGE && (!world || world.sees(p, m));
   let best = aimed && near(aimed) ? aimed : undefined;
   if (!best) {
     let bestD = Infinity;
@@ -914,7 +934,9 @@ export function plagueSpot(p: { x: number; y: number; z: number }, facing: numbe
     }
   }
   if (best) return { x: best.x, y: best.y, z: best.z };
-  return { x: p.x - Math.sin(facing) * PLAGUE_REACH, y: p.y, z: p.z - Math.cos(facing) * PLAGUE_REACH };
+  const ax = p.x - Math.sin(facing) * PLAGUE_REACH, az = p.z - Math.cos(facing) * PLAGUE_REACH;
+  const k = world ? Math.max(0, world.ray(p.x, p.y + 1.2, p.z, ax, p.y + 1.2, az) - 0.1) : 1;
+  return { x: p.x + (ax - p.x) * k, y: p.y, z: p.z + (az - p.z) * k };
 }
 
 /** Distance from (x,z) to the segment a-b. */
@@ -1030,9 +1052,9 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.swingCombo();
       const third = k.comboStep === 2;
       let hit = 0;
-      k.hurt?.((x, z) => {
+      k.hurt?.((x, z, mob) => {
         const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
-        const ok = d < tune.fallRange && (d < 0.6 || (dx * fx + dz * fz) / d > tune.fallArc);
+        const ok = d < tune.fallRange && (d < 0.6 || (dx * fx + dz * fz) / d > tune.fallArc) && k.player.world.sees(p, mob); // not through a wall
         if (ok) hit++;
         return ok;
       }, third ? tune.fallDmg * tune.fallThird : tune.fallDmg);
@@ -1046,7 +1068,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     get cooldown() { return 4 * tune.cdr; },
     get cast() { return tune.pyreCast; },
     get desc() { return `Raccogli tra le mani il fuoco dei ceri votivi e lo scagli sul bersaglio (o sul nemico più vicino davanti a te): ${dmg(tune.pyreDmg)} danni, metà a chi gli sta entro ${num(tune.pyreR)} m; il bersaglio brucia per 4 s e il pavimento arde per 4 s. Muoverti interrompe il lancio.${tune.fxShatter ? ' Su un nemico rallentato o congelato: +60% e il ghiaccio esplode in schegge.' : ''}`; },
-    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    check: (k) => k.magic.why(),
     during(k, prog, dt) {
       k.player.model.channel(true, 'gather');
       k.faceMark(dt);
@@ -1067,7 +1089,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     id: 'frost', name: 'Dardo di brina', icon: 'frost', mana: 22, cooldown: 0, charge: 8,
     get cast() { return tune.frostCast; },
     get desc() { return `Un dardo dell'acqua gelata della laguna sul bersaglio: ${dmg(tune.frostDmg)} danni, e per 6 s cammina del ${Math.round((1 - tune.frostSlow) * 100)}% più lento. Muoverti interrompe il lancio.`; },
-    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    check: (k) => k.magic.why(),
     during(k, prog, dt) {
       k.player.model.channel(true, 'gather');
       k.faceMark(dt);
@@ -1094,7 +1116,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'lance', name: 'Stiletto di ghiaccio', icon: 'lance', mana: 12, cooldown: 0, charge: 6,
     get desc() { return `Istantaneo. Uno stiletto di ghiaccio sul bersaglio: ${dmg(tune.lanceDmg)} danni, ${dmg(tune.lanceDmg * 3)} se è congelato.${tune.lanceSplit ? ' Chi è congelato va in frantumi: metà dei danni a chi gli sta entro 3 m.' : ''}`; },
-    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    check: (k) => k.magic.why(),
     fire(k) {
       k.player.model.play('throw', BLOW);
       k.player.model.fight();
@@ -1107,7 +1129,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     get cooldown() { return 5 * tune.cdr; },
     get cast() { return tune.chainCast; },
     get desc() { return `Una saetta sul bersaglio: ${dmg(tune.chainDmg)} danni, poi salta di nemico in nemico (entro 8 m) per altre ${tune.chainHops} volte, un quarto più debole a ogni salto.${tune.fxStorm ? ' Chi sta in una nube di peste prende +50% e attira la catena (fino a 3 salti in più).' : ''} Muoverti interrompe il lancio.`; },
-    check: (k) => (k.magic.target() ? undefined : 'Nessun bersaglio.'),
+    check: (k) => k.magic.why(),
     during(k, prog, dt) {
       k.player.model.channel(true, 'gather');
       k.faceMark(dt);
@@ -1125,6 +1147,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'toll', name: 'Rintocco del campanile', icon: 'toll', mana: 45, charge: 12,
     get cooldown() { return 18 * tune.cdr; },
+    check: (k) => (k.magic.why() === 'Bersaglio non in vista.' ? 'Bersaglio non in vista.' : undefined), // no target: it falls ahead
     get desc() { return `Chiami il fulmine dal campanile: un segno si accende sotto il bersaglio (o 8 m davanti a te) e dopo un rintocco il fulmine cade, ${dmg(tune.tollDmg)} danni entro ${num(tune.tollR)} m e storditi per ${num(tune.tollStun)} s (meno sui più forti).`; },
     fire(k) {
       k.player.model.play('raise', 0.2);
@@ -1138,7 +1161,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     id: 'leap', name: 'Balzo del sepolcro', icon: 'leap', mana: 30, charge: 10,
     get cooldown() { return tune.leapCd * tune.cdr; },
     get desc() { return `Un balzo fino a 12 m sul nemico (senza nemico, davanti a te): all'atterraggio ${dmg(tune.leapDmg)} danni entro ${num(tune.leapR)} m e un attimo di stordimento. I muri ti fermano.`; },
-    check: (k) => (k.magic.dashing ? "Un'altra azione è in corso." : undefined),
+    check: (k) => (k.magic.dashing ? "Un'altra azione è in corso." : k.magic.reach('leap')),
     fire(k) {
       k.player.model.play('leap', 0.3);
       k.player.model.fight();
@@ -1196,6 +1219,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     check(k) {
       const m = k.strikeTarget(), p = k.player.pos;
       if (!m) return 'Nessun bersaglio.';
+      if (!k.player.world.sees(p, m)) return 'Bersaglio non in vista.';
       if (Math.hypot(m.x - p.x, m.z - p.z) > STRIKE_RANGE) return 'Bersaglio fuori portata.';
     },
     fire(k) {
@@ -1219,7 +1243,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
       const p = k.player.pos;
       k.player.model.play('slam', BLOW);
       k.player.model.fight();
-      k.hurt?.((x, z) => Math.hypot(x - p.x, z - p.z) < tune.novaR, tune.novaDmg);
+      k.hurt?.((x, z, mob) => Math.hypot(x - p.x, z - p.z) < tune.novaR && k.player.world.sees(p, mob), tune.novaDmg);
       k.at(BLOW, () => k.nova());
     },
   },

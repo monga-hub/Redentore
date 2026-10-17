@@ -50,7 +50,7 @@ export interface Ability<C extends Caster = Caster> {
   mana?: number; // cost, paid when the cooldown starts (instant/channel: on press; cast: when the bar fills)
   charge?: number; // added to the charge bar when the cooldown starts
   special?: boolean; // needs a full charge bar and empties it
-  /** Why it can't be used right now (e.g. no target), checked on press; nothing is spent. */
+  /** Why it can't be used right now (e.g. no target, out of sight), checked on press and again as a cast bar fills; nothing is spent. */
   check?(ctx: C): string | undefined;
   /** Instant: on press. Cast: when the bar fills. Channel: on every tick (`tick` counts from 1). */
   fire(ctx: C, tick: number): void;
@@ -167,6 +167,7 @@ export class AbilitySystem<C extends Caster = Caster> {
         if (c.t >= c.total) {
           if (c.channel) this.stop(true);
           else if (!this.affordable(a)) { this.stop(false); this.fail('Mana insufficiente.'); }
+          else if (a.check?.(this.ctx)) { const why = a.check(this.ctx)!; this.stop(false); this.fail(why); } // the target went out of sight: nothing spent
           else { this.start(a); a.fire(this.ctx, 0); this.stop(true); }
         }
       }

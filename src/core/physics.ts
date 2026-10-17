@@ -74,6 +74,48 @@ export class World {
     return false;
   }
 
+  /**
+   * The first share (0..1) of the segment a→b that runs into a solid box, 1 if it is clear: what stops a
+   * bolt or blocks a line of sight. Boxes the segment starts inside are ignored (a caster against a wall,
+   * the floor under a spark). Exact slab test in each box's frame; no allocations.
+   */
+  ray(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number {
+    let best = 1;
+    const ex = bx - ax, ey = by - ay, ez = bz - az;
+    for (const b of this.boxes) {
+      const dx = ax - b.cx, dz = az - b.cz;
+      const lx = b.cos * dx - b.sin * dz, lz = b.sin * dx + b.cos * dz; // start, box frame
+      const vx = b.cos * ex - b.sin * ez, vz = b.sin * ex + b.cos * ez; // direction, box frame
+      let t0 = -Infinity, t1 = best;
+      if (Math.abs(vx) < 1e-9) { if (Math.abs(lx) > b.hx) continue; } else {
+        let p = (-b.hx - lx) / vx, q = (b.hx - lx) / vx;
+        if (p > q) { const r = p; p = q; q = r; }
+        if (p > t0) t0 = p; if (q < t1) t1 = q;
+      }
+      if (Math.abs(vz) < 1e-9) { if (Math.abs(lz) > b.hz) continue; } else {
+        let p = (-b.hz - lz) / vz, q = (b.hz - lz) / vz;
+        if (p > q) { const r = p; p = q; q = r; }
+        if (p > t0) t0 = p; if (q < t1) t1 = q;
+      }
+      if (Math.abs(ey) < 1e-9) { if (ay <= b.y0 || ay >= b.y1) continue; } else {
+        let p = (b.y0 - ay) / ey, q = (b.y1 - ay) / ey;
+        if (p > q) { const r = p; p = q; q = r; }
+        if (p > t0) t0 = p; if (q < t1) t1 = q;
+      }
+      if (t0 <= 0 || t0 > t1) continue; // missed, or it starts inside this box
+      best = t0;
+    }
+    return best;
+  }
+
+  /**
+   * Nothing solid between a and b, both `lift` m above the given feet: a line of sight. Head height by
+   * default, so walls, doors and grates block it and hives, beds, benches and the cloisters' parapets don't.
+   */
+  sees(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, lift = 1.5): boolean {
+    return this.ray(a.x, a.y + lift, a.z, b.x, b.y + lift, b.z) >= 1;
+  }
+
   /** Push the circle at p out of every blocking box (a few relaxation passes). */
   resolve(p: { x: number; z: number }, feet: number, r = PLAYER.radius): void {
     for (let pass = 0; pass < 3; pass++) {

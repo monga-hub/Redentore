@@ -94,6 +94,13 @@ abilità sbloccate prendono il primo tasto libero della barra (le prime sette po
 | gelo | Dardo di brina (rallenta) · Acquasantiera gelata (congela sul posto chi è vicino) · Stiletto di ghiaccio (triplo su chi è congelato) |
 | fulmine | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) |
 
+Le magie non attraversano i muri (`World.ray` in `src/core/physics.ts`, un test esatto contro i box di collisione,
+porte e grate chiuse comprese): i dardi dell'eroe e dei preti si infrangono sul muro che incontrano, un bersaglio
+dietro un muro rifiuta il lancio ("Bersaglio non in vista.", niente mana né recupero, anche a barra piena), la catena
+non salta oltre un muro, novae, acquasantiera, turbine, nube di peste, fuoco a terra e fendenti non colpiscono chi sta
+dall'altra parte. I frati non si accorgono di chi è dietro un muro e, se restano bloccati a inseguirlo senza vederlo,
+dopo 6 s tornano a zappare.
+
 Fusioni nuove: Frantumazione (fuoco su gelo: +60% e schegge), Miasma elettrico (fulmini +50% e catena più lunga su
 chi sta nella peste), Turbine di brina (il turbine gela e raddoppia sui congelati). I lanci si interrompono muovendosi
 (il turbine no) e mentre si lancia o si canalizza la clava resta ferma. Rallentamenti, congelamenti e stordimenti

@@ -10,6 +10,7 @@ export const FRIAR = {
   xp: 10, // experience for killing one (player/levels.ts)
   aggro: 9, // m: the player this close (and roughly level) pulls the group
   leash: 24, // m from home before the friar gives up and evades
+  blind: 6, // s chasing a player it can't see (a wall between) before it gives up and evades
   speed: 3.6, // chase m/s, under the player's 6 so they can be kited
   walk: 5, // evade m/s (immune meanwhile, like a WoW evade)
   reach: 1.5, // starts a swing inside this
@@ -35,6 +36,7 @@ export interface Friar {
   home: { x: number; z: number; yaw: number };
   mates: Friar[]; // the hoeing group, pulled together
   cc: Control; // slows, roots, stuns laid by the hero's spells (control.ts)
+  blind?: number; // s chasing without line of sight
 }
 
 export interface Target { x: number; y: number; z: number }
@@ -133,10 +135,11 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
   switch (f.state) {
     case 'hoe':
       face(f, f.home.yaw, dt);
-      if (dist < FRIAR.aggro && level) pull(f);
+      if (dist < FRIAR.aggro && level && world.sees(f, p)) pull(f); // not through a wall
       return 0;
     case 'chase':
-      if (fromHome > FRIAR.leash || dist > FRIAR.leash) { enter(f, 'evade'); return 0; }
+      f.blind = dist < FRIAR.aggro * 1.5 && level && world.sees(f, p) ? 0 : (f.blind ?? 0) + dt; // pinned behind a wall: it gives up
+      if (fromHome > FRIAR.leash || dist > FRIAR.leash || f.blind > FRIAR.blind) { f.blind = 0; enter(f, 'evade'); return 0; }
       if (dist <= FRIAR.reach && f.cd === 0 && level) { enter(f, 'swing'); f.cd = FRIAR.cooldown; return 0; }
       walk(f, p.x, p.z, FRIAR.speed * pace(f.cc), FRIAR.reach * 0.7, world, dt);
       return 0;

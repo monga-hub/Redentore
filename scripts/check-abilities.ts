@@ -128,4 +128,14 @@ for (const junk of [JSON.stringify([1, ...def.slice(1)]), JSON.stringify(['x', '
   store.set('redentore.bar', junk);
   if (loadBar(def, mem) !== def) throw new Error(`junk layout ${junk} accepted`);
 }
+// A cast whose target goes out of sight while the bar fills is refused at the end: no mana, no cooldown.
+let visible = true;
+const sighted = new AbilitySystem([ab('bolt', { cast: 1, mana: 10, check: () => (visible ? undefined : 'Bersaglio non in vista.') })], ['bolt'], ctx);
+sighted.pool = new PlayerStats();
+const mana0 = sighted.pool.mana;
+fired.length = 0;
+sighted.tryCast(0);
+visible = false;
+for (let t = 0; t < 1.2; t += 0.1) sighted.update(0.1, () => false);
+if (fired.length || sighted.pool.mana !== mana0 || sighted.cooldown(sighted.slots[0]!) || !sighted.notices.some((n) => n.text === 'Bersaglio non in vista.')) throw new Error('a cast at a hidden target must cost nothing');
 console.log('abilities ok');

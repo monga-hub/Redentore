@@ -372,7 +372,7 @@ export class Priests {
       this.flights.set(b, { trail: v.ribbons.begin(boltTrail(look.bolt.glow, look.bolt.size)), look, core: this.sprite(look.bolt.core, 3.2), halo: this.sprite(look.bolt.glow, 1.6), spin: Math.random() * 6 });
     });
     separate(this.all, this.world);
-    dmg += fly(this.bolts, player, dt, this.spent);
+    dmg += fly(this.bolts, player, dt, this.spent, this.world); // walls stop them
     for (const b of this.spent) this.land(b, b.hit);
     const boss = this.boss;
     for (const m of this.branded) if (m.t <= 0 && !boss.marks.includes(m)) this.erupt(m, Math.hypot(player.x - m.x, player.z - m.z) < MARK.radius);
@@ -401,6 +401,13 @@ export class Priests {
       this.flights.delete(b);
     }
     const k = f?.look.bolt.size ?? 1;
+    if (b.wall) { // burst on the wall it ran into
+      v.spawn(flareBolt, b.x, b.y, b.z);
+      v.burst(boltSpark, b.x, b.y, b.z, Math.round(16 * k), 0.2, 4);
+      v.burst(boltSmoke, b.x, b.y, b.z, 4, 0.2, 0.6);
+      v.pulse(b.x, b.y, b.z, f?.look.bolt.glow ?? SHADOW, 15 * k);
+      return;
+    }
     if (!hit) { v.burst(boltSpark, b.x, b.y, b.z, 8, 0.2, 1.5); v.burst(boltSmoke, b.x, b.y, b.z, 3, 0.2, 0.5); return; }
     v.spawn(flareBolt, b.x, b.y, b.z);
     v.burst(boltSpark, b.x, b.y, b.z, Math.round(22 * k), 0.3, 5);

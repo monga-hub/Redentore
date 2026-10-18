@@ -112,7 +112,7 @@ const LOOKS = new Map<CasterKind, Look>([
 ]);
 /** The lace: lines and the fuso's threads on the floor, white-gold, a square decal per width along each. */
 const LACE = 0xfff0d0, LACE_DECALS = 48;
-const laceTele: DecalStyle = { life: 0, size: 2, tile: D.disc, color: LACE, hdr: 1.7 };
+const laceTele: DecalStyle = { life: 0, size: 2, tile: D.disc, color: LACE, hdr: 1.2 };
 const laceSpark: Style = { life: [0.4, 0.7], size: [0.05, 0.09], color: 0xffffff, color2: LACE, hdr: 4, tex: T.spark, stretch: 0.04, drag: 2, grav: 3 };
 const laceCut: DecalStyle = { life: 0.6, size: 2, grow: 0.3, tile: D.shock, color: LACE, hdr: 2.2, fadeOut: 0.5 };
 
@@ -562,7 +562,7 @@ export class Priests {
       const S = f.kind.spin;
       if (S && f.state === 'spin') for (let a = 0; a < 4; a++) {
         const r = f.spinA + (a * Math.PI) / 2, dx = Math.sin(r), dz = Math.cos(r), live = f.t >= SPIN_DRAW;
-        lay(f.x, f.y, f.z, dx, dz, S.length, S.width, live ? 0.95 : 0.3);
+        lay(f.x, f.y, f.z, dx, dz, S.length, S.width, live ? 0.75 : 0.25);
         if (live && Math.random() < dt * 30) { const d = Math.random() * S.length; v.spawn(laceSpark, f.x + dx * d, f.y + 0.3, f.z + dz * d, 0, 1.5, 0); }
       }
     }

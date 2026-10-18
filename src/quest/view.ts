@@ -13,7 +13,7 @@ import { BLESSING, CHEST, NPC, SPEZIALE, type Gate, type Quest, type Stage } fro
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
 // open on a burst of gold, the key rising out of it; a gold glint over it while the quest wants
-// it), Fra' Zuane and his dialogue window, Fra' Bortolo in the serra and his blessing (a green
+// it), Fra' Zuane and his dialogue window, Fra' Bortolo in the serra, his blessing and his shop (a green
 // rush of rue round the hero and a buff icon with its countdown under the player frame), the quest tracker, the "F" interaction prompt (also a
 // tap target on phones), the boss's health bar and the victory banner. Its few DOM pieces are
 // styled here so they stay out of the HUD's way.
@@ -96,6 +96,8 @@ export class QuestView {
   private victoryEl = document.createElement('div');
   /** The boss bar is up: the target frame and the boss's own nameplate bar give way to it. */
   bossShown = false;
+  /** Fra' Bortolo's Commercia: main.ts opens the shop. */
+  shop?: () => void;
   private shown = '';
   private tapped = false;
 
@@ -240,7 +242,7 @@ export class QuestView {
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
         const t = this.quest.bossDead ? SPEZIALE_DONE : this.quest.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
-        this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t);
+        this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t, undefined, () => this.shop?.());
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }

@@ -7,7 +7,7 @@ import type { Mob } from '../ui/target.ts';
 import { Bag, ITEM, RARITY, roll, type Icon, type Rarity, type Tier } from './bag.ts';
 
 // Loot on the ground, in both camera styles: a dead enemy throws its gold and items out in a
-// small arc; gold glints, items stand in a beam of their rarity's colour and every drop wears a
+// small arc; gold glints, items (gear too) stand in a beam of their rarity's colour and every drop wears a
 // name plate. Walking over one puts it in the bag (gold is pulled in from a little further),
 // with a sound and a floating "+N oro". Everything is pooled: a fixed set of meshes shared by
 // geometry and material, no lights, plates as plain DOM placed each frame.
@@ -56,9 +56,23 @@ function shapes(): Record<Icon, THREE.BufferGeometry> {
     vial: mergeGeometries([new THREE.SphereGeometry(0.07, 8, 6).translate(0, 0.07, 0), new THREE.CylinderGeometry(0.025, 0.025, 0.09, 6).translate(0, 0.17, 0)]),
     skull: new THREE.SphereGeometry(0.1, 8, 6).scale(1, 0.9, 1.15).translate(0, 0.09, 0),
     nail: new THREE.ConeGeometry(0.03, 0.34, 6).rotateZ(Math.PI / 2).translate(0, 0.03, 0),
+    // gear, lying folded or in pairs
+    helm: new THREE.SphereGeometry(0.13, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.9, 1.15),
+    shoulders: mergeGeometries([-1, 1].map((s) => new THREE.SphereGeometry(0.09, 8, 5).scale(1, 0.55, 1).translate(s * 0.1, 0.04, 0))),
+    chest: new THREE.BoxGeometry(0.34, 0.05, 0.4).translate(0, 0.025, 0),
+    gloves: mergeGeometries([-1, 1].map((s) => new THREE.BoxGeometry(0.1, 0.04, 0.16).rotateY(s * 0.3).translate(s * 0.08, 0.02, 0))),
+    legs: mergeGeometries([-1, 1].map((s) => new THREE.BoxGeometry(0.1, 0.05, 0.38).translate(s * 0.06, 0.025, 0))),
+    boots: mergeGeometries([-1, 1].map((s) => new THREE.BoxGeometry(0.09, 0.14, 0.2).translate(s * 0.07, 0.07, 0))),
+    club: mergeGeometries([new THREE.CylinderGeometry(0.025, 0.03, 0.4, 6).rotateZ(Math.PI / 2).translate(-0.05, 0.03, 0), new THREE.SphereGeometry(0.07, 8, 6).scale(1.4, 1, 1).translate(0.2, 0.06, 0)]),
+    amulet: mergeGeometries([new THREE.TorusGeometry(0.1, 0.012, 5, 16).rotateX(Math.PI / 2).translate(0, 0.012, 0), new THREE.SphereGeometry(0.045, 4, 2).translate(0, 0.03, 0.12)]),
+    ring: new THREE.TorusGeometry(0.06, 0.018, 6, 14).rotateX(Math.PI / 2).translate(0, 0.018, 0),
   };
 }
-const TINT: Record<Icon, number> = { rosary: 0x7a4a26, candle: 0xe8dcc0, bone: 0xd8ccae, relic: 0xb8b8c0, medal: 0xc9a45c, vial: 0x9ad0c0, skull: 0xe0d0a8, nail: 0x6a5040 };
+const TINT: Record<Icon, number> = {
+  rosary: 0x7a4a26, candle: 0xe8dcc0, bone: 0xd8ccae, relic: 0xb8b8c0, medal: 0xc9a45c, vial: 0x9ad0c0, skull: 0xe0d0a8, nail: 0x6a5040,
+  helm: 0x6a5a48, shoulders: 0x7a6a50, chest: 0x6a5a48, gloves: 0x8a7a60, legs: 0x5a4a38, boots: 0x4a3a28, club: 0xd8ccae, amulet: 0xc9a45c, ring: 0xc9a45c,
+};
+const METAL = new Set<Icon>(['relic', 'medal', 'amulet', 'ring']);
 
 // A four-point star for the gold's glint.
 function star(): THREE.Texture {
@@ -105,7 +119,7 @@ export class Drops {
     this.tracks = droppers.flatMap((d) => d.all.map((mob) => ({ mob, tier: d.tier, dead: mob.state === 'dead', t: 0 }))); // the dead of a loaded game drop nothing
 
     this.geo = shapes();
-    this.mats = Object.fromEntries(Object.entries(TINT).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: k === 'relic' || k === 'medal' ? 0.8 : 0.1, emissive: c, emissiveIntensity: 0.12 })])) as Record<Icon, THREE.MeshStandardMaterial>;
+    this.mats = Object.fromEntries(Object.entries(TINT).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: METAL.has(k as Icon) ? 0.8 : 0.1, emissive: c, emissiveIntensity: 0.12 })])) as Record<Icon, THREE.MeshStandardMaterial>;
     const coin = new THREE.CylinderGeometry(0.075, 0.075, 0.018, 10);
     const pile = this.pile = mergeGeometries([0, 1, 2, 3, 4].map((i) => coin.clone().rotateX(i ? 0.25 : 0).rotateY(i).translate(i ? Math.cos(i * 1.9) * 0.1 : 0, 0.009 + (i ? 0 : 0.02), i ? Math.sin(i * 1.9) * 0.1 : 0)));
     const goldMat = this.goldMat = new THREE.MeshStandardMaterial({ color: GOLD, metalness: 0.9, roughness: 0.3, emissive: 0x8a5a00, emissiveIntensity: 0.35 });

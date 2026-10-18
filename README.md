@@ -16,8 +16,9 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
   capo della navata e dietro l'altare — e il boss, il Reverendissimo, sotto la cupola: magia, mischia,
   nova d'ombra da cui scappare, sotto il 60% marchi cremisi a terra (uno sotto i piedi, due ai lati:
   un passo di lato e li eviti), sotto il 30% furia (tutto più rapido), dopo 4 minuti di lotta ogni
-  colpo triplica. Pensato per il livello 8-9: 2-3 minuti con una build sensata che schiva; con il kit
-  iniziale o al livello 6 è quasi impossibile. Una morte ti risveglia al checkpoint senza perdere carte.
+  colpo triplica. Pensato per il livello 8-9: circa 3 minuti con una build sensata che schiva e
+  l'equipaggiamento raccolto per strada (col solo set di canapa si perde spesso, con qualche epico comprato
+  si fa prima); con il kit iniziale è quasi impossibile. Una morte ti risveglia al checkpoint senza perdere carte.
 - Progressione (missione "La chiave del portinaio"): il portone della chiesa è sbarrato. Sulla
   fondamenta Fra' Zuane, il fantasma incatenato del portinaio dei cappuccini (punto esclamativo
   dorato), affida la missione in una finestra di dialogo stile WoW (ritratto, testo scritto a
@@ -32,7 +33,15 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
   gli si parla), racconta l'antefatto che l'intro accenna: le fosse dell'orto, il conto del
   Reverendissimo, la ruta che ha lasciato al Risorto il suo nome. Una volta per partita congeda con la
   Benedizione della serra: per 3 minuti lanci il 20% più rapidi e +10% ai danni (icona e conto alla
-  rovescia sotto il ritratto). La serra è fuori dalla portata dei frati.
+  rovescia sotto il ritratto). La serra è fuori dalla portata dei frati. È anche un mercante
+  (Commercia, in ogni pagina del dialogo): compra tutto quello che c'è nella borsa a un quarto del suo
+  prezzo (con una fila per riacquistare le vendite della visita) e vende tutti i pezzi epici (viola).
+- Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
+  gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
+  pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono
+  davvero: Vigore (+10 salute), Intelletto (+10 mana), Spirito (rigenerazione), Potenza (+% danni),
+  Critico (probabilità di un colpo al 150%) e Celerità (lanci e tempo di recupero globale più rapidi);
+  l'armatura toglie A / (A + 700) dei danni. Il confronto con il pezzo indossato è nel tooltip.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile
@@ -44,8 +53,8 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino e borsa
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona; il bot indossa il bottino migliore e vende il resto, il boss da solo in set iniziale, tipico, con epici comprati o tutto epico
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -74,7 +83,8 @@ caricata parte senza intro.
 | 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato). Si parte con Caduta d'ossa (1), Nube di peste (2), Preghiera di suffragio (3) e la pozione (9); le altre arrivano coi livelli |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
-| B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio |
+| B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un pezzo (secondo tocco su touch) per indossarlo: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
+| C | scheda del personaggio: manichino stile WoW con i nove posti e i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
@@ -288,7 +298,11 @@ src/
   quest/npc.ts               Fra' Zuane (Meshy, idle e gesti mentre parla, "!" sulla testa)
   quest/view.ts              grate e battenti animati, baule Meshy col coperchio che si apre e il
                              bottino, prompt "F", tracker della missione, barra del boss, banner di vittoria
-  ui/dialogue.ts             finestra di dialogo stile WoW (ritratto, testo a macchina, Accetta / Rifiuta)
+  ui/dialogue.ts             finestra di dialogo stile WoW (ritratto, testo a macchina, Accetta / Rifiuta, Commercia)
+  loot/gear.ts               equipaggiamento: posti, oggetti e budget di statistiche, armatura, critico, prezzi,
+                             Equipment (indossa / togli), vendita e acquisto. Nessuna dipendenza da three
+  ui/bag.ts, ui/sheet.ts,    borsa, scheda del personaggio e bottega di Fra' Bortolo nella stessa finestra;
+  ui/vendor.ts, ui/tooltip.ts tooltip stile WoW con il pezzo indossato accanto e le differenze
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,
                              pergole; registra collider e aree

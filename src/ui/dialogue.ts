@@ -29,6 +29,7 @@ const CSS = `
   background: linear-gradient(#8a1c12, #4a0a06 60%, #2e0503); border: 1px solid #c9a45c; border-radius: 4px;
   box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,215,94,.3); touch-action: manipulation; }
 #talk button.no { background: linear-gradient(#4a3a26, #1c140c); }
+#talk button.shop { order: -1; margin-right: auto; background: linear-gradient(#2a5a1c, #12300a 60%, #0a1c05); }
 #talk button:hover, #talk button:focus-visible { filter: brightness(1.35); outline: none; }
 #talk kbd { margin-left: 6px; padding: 0 4px; font: 700 11px/1.3 sans-serif; color: #1a1208; background: #e0b55a; border-radius: 3px; text-shadow: none; }
 body.touch #talk kbd { display: none; }
@@ -67,6 +68,7 @@ export class Dialogue {
   private last = 0; // performance.now() of the last typing step
   private raf = 0;
   private onAccept?: () => void;
+  private onShop?: () => void;
   /** Called when the window closes, after the accept handler if the quest was taken. */
   onClose?: () => void;
 
@@ -111,14 +113,15 @@ export class Dialogue {
     return this.typed < this.text.length;
   }
 
-  /** Opens on `talk` in `who`'s voice; `accept` runs if the offered quest is taken. */
-  show(who: Speaker, talk: Talk, accept?: () => void): void {
+  /** Opens on `talk` in `who`'s voice; `accept` runs if the offered quest is taken; `shop` adds Commercia (a vendor) to every page. */
+  show(who: Speaker, talk: Talk, accept?: () => void, shop?: () => void): void {
     this.el.setAttribute('aria-label', who.name);
     this.whoEl.textContent = who.name;
     this.img.src = who.portrait;
     this.img.style.filter = who.tint ?? '';
     this.talk = talk;
     this.onAccept = accept;
+    this.onShop = shop;
     this.titleEl.textContent = this.talk.offer ? QUEST_TITLE : '';
     this.el.classList.add('show');
     document.body.classList.add('talking');
@@ -154,10 +157,11 @@ export class Dialogue {
 
   private buttons(): void {
     const last = this.page >= this.talk.pages.length - 1, key = '<kbd>F</kbd>';
-    const html = this.text !== this.talk.pages[this.page] ? `<button data-do="close">Addio${key}</button>` // the decline line
+    let html = this.text !== this.talk.pages[this.page] ? `<button data-do="close">Addio${key}</button>` // the decline line
       : !last ? `<button data-do="next">Continua${key}</button>`
       : this.talk.offer ? `<button data-do="accept">Accetta${key}</button><button class="no" data-do="decline">Rifiuta</button>`
       : `<button data-do="close">Addio${key}</button>`;
+    if (this.onShop) html += '<button class="shop" data-do="shop">Commercia</button>';
     if (this.btns.innerHTML !== html) this.btns.innerHTML = html;
     this.btns.style.visibility = this.typing ? 'hidden' : 'visible';
   }
@@ -166,6 +170,11 @@ export class Dialogue {
     playSfx('ui_click', null, { ui: true });
     if (what === 'next') this.say(this.page + 1);
     else if (what === 'decline') this.say(this.page, DECLINE);
+    else if (what === 'shop') {
+      const shop = this.onShop;
+      this.close();
+      shop?.();
+    }
     else if (what === 'accept') {
       this.onAccept?.();
       this.close();

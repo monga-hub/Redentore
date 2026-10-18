@@ -82,12 +82,13 @@ export const SACERDOTE: CasterKind = {
 /**
  * Il Reverendissimo: the boss under the dome. Huge and slow, hits hard, a nova to run out of and,
  * as it weakens, branded floor and rage (`phases`). Tuned with scripts/balance.ts: a level 8-9 build
- * that dodges brings it down in 2-3 minutes; one that eats the novas and the marks dies, and so does
- * the starting kit, which can't beat the berserk.
+ * that dodges, in the gear the route drops, brings it down in about 3 minutes (in the starter set it
+ * mostly can't, with epics bought a little sooner); one that eats the novas and the marks dies, and so
+ * does the starting kit, which can't beat the berserk.
  */
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
-  hp: 8500,
+  hp: 11000,
   xp: 0, // his fall ends the run
   aggro: 15, leash: 60, blind: 15,
   range: 22, keep: 0,
@@ -95,7 +96,7 @@ export const REVERENDISSIMO: CasterKind = {
   radius: 1.1,
   margin: 1.6, // m kept from BOSS_BOUNDS' edges: its 1.1 m bulk clears pews, columns and the pilasters at |x| 6.58
   // reach + radius stops it ~2 m from the player, inside the bone slash's 2.6 m
-  melee: { reach: 1.5, hit: 4.5, windup: 0.8, swing: 1.6, cooldown: 3.4, damage: 75 }, // the crozier's sweep: taken, not dodged
+  melee: { reach: 1.5, hit: 4.5, windup: 0.8, swing: 1.6, cooldown: 3.4, damage: 85 }, // the crozier's sweep: taken, not dodged
   nova: { every: 13, cast: 2.6, radius: 6, damage: 420 },
   phases: {
     at: [0.6, 0.3],

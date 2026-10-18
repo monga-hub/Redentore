@@ -1,6 +1,6 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
-// dead staying dead, play time, the explored map, level-up picks and XP, the bag); slots and the reload handoff survive storage and refuse junk.
+// dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots and the reload handoff survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { Quest } from '../src/quest/progress.ts';
@@ -10,22 +10,26 @@ import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
 import { Bag } from '../src/loot/bag.ts';
+import { Equipment, STARTER, effects } from '../src/loot/gear.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
 function boot(): Game {
-  const level = buildLevel(), stats = new PlayerStats();
-  return {
+  const level = buildLevel(), stats = new PlayerStats(), gear = new Equipment();
+  const g: Game = {
     player: { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: SPAWN.yaw },
     stats,
     kit: { charge: 0 },
-    levels: { xp: 0, picks: [], apply() { const t = tuneOf(this.picks); stats.grow(t.hp, t.mana); } }, // main.ts lays the rest on the kit
+    levels: { xp: 0, picks: [], apply() { const t = tuneOf(this.picks), w = effects(gear.totals); stats.grow(t.hp, t.mana, w.hp, w.mana); } }, // main.ts lays the rest on the kit
     quest: new Quest(level.world),
     mobs: spawnGroups(level.world).flat(),
     time: 0,
     fog: new Discovery(level.areas),
     bag: new Bag(),
+    gear,
   };
+  gear.onChange = () => g.levels.apply(); // as main.ts
+  return g;
 }
 const fogOf = (g: Game) => g.fog as Discovery;
 
@@ -42,6 +46,10 @@ a.time = 754;
 a.bag.gold = 321;
 a.bag.add('rosario-bosso', 3);
 a.bag.add('chiodo');
+a.bag.add('saio-voto');
+a.gear.wear(a.bag, a.bag.items.length - 1); // the hemp robe goes into the bag
+a.gear.takeOff(a.bag, 'testa');
+a.stats.hp = 700; a.stats.mana = 123; // after the gear: a raise of the max fills in
 // Fog: the spawn's surroundings are seen, the far north is not; standing still reveals nothing new.
 const fa = fogOf(a);
 if (!fa.reveal(SPAWN.x, SPAWN.z) || fa.reveal(SPAWN.x, SPAWN.z)) fail('reveal at spawn');
@@ -74,6 +82,8 @@ if (b.quest.gates.some((g) => g.open && b.quest['world'].boxes.includes(g.box)))
 if (b.mobs[2].state !== 'dead' || b.mobs.filter((m) => m.state === 'dead').length !== 1) fail('dead mobs not restored');
 if (b.time !== 754) fail('play time not restored');
 if (fogOf(b).cells.join('') !== fa.cells.join('')) fail('explored map not restored');
+if (b.gear.worn.torso !== 'saio-voto' || b.gear.worn.testa || b.gear.worn.arma !== 'clava-osso' || b.stats.hpMax !== a.stats.hpMax) fail(`gear restored as ${JSON.stringify(b.gear.encode())}, ${b.stats.hpMax} hp max`);
+if (b.bag.count('canapa-torso') !== 1 || b.bag.count('canapa-testa') !== 1) fail('the pieces taken off are not in the bag');
 if (b.bag.gold !== 321 || b.bag.count('rosario-bosso') !== 3 || b.bag.count('chiodo') !== 1) fail(`bag restored as ${JSON.stringify(b.bag.encode())}`);
 
 // A save from before the fog loads fully fogged; a grid of another size or junk is refused untouched.
@@ -87,6 +97,9 @@ if (!valid(legacy) || valid({ ...s, fog: 5 })) fail('fog field validation');
 const poor = boot();
 deserialize(poor, (({ bag: _g, ...o }) => o)(s));
 if (poor.bag.gold || poor.bag.items.length || !valid((({ bag: _g, ...o }) => o)(s))) fail('a save from before the loot loads with loot');
+const plain = boot();
+deserialize(plain, (({ gear: _g, ...o }) => o)(s));
+if (JSON.stringify(plain.gear.encode()) !== JSON.stringify(STARTER) || !valid((({ gear: _g, ...o }) => o)(s)) || valid({ ...s, gear: { torso: 3 } })) fail('a save from before the gear does not load in the starter set');
 if (valid({ ...s, bag: { gold: 'x', items: [] } }) || valid({ ...s, bag: { gold: 1, items: [[3, 1]] } })) fail('bag field validation');
 
 // The boss's fall carries the portone with it; a saved corpse player wakes alive.
@@ -115,12 +128,13 @@ if (ls.build.lv !== 5 || ls.build.picks.join() !== 'step,hp,dmg') fail(`build sa
 const lb = boot();
 deserialize(lb, ls);
 if (lb.levels.picks.join() !== 'step,hp,dmg' || lb.levels.xp !== 200) fail('picks or XP not restored');
-if (lb.stats.hpMax !== 1472 || lb.stats.hp !== 1450) fail(`hp ${lb.stats.hp} / ${lb.stats.hpMax} after load, want 1450 / 1472`);
+const want = 1472 + effects(lb.gear.totals).hp; // the hp card, then the starter set's Vigore
+if (lb.stats.hpMax !== want || lb.stats.hp !== 1450) fail(`hp ${lb.stats.hp} / ${lb.stats.hpMax} after load, want 1450 / ${want}`);
 // A save from before the levels loads at level 1 with the starting kit (main.ts then offers what its dead earned);
 // a card id this build doesn't know is dropped; a malformed build is refused.
 const pre = boot();
 deserialize(pre, s.build ? (({ build: _b, ...o }) => o)(s) : s);
-if (pre.levels.picks.length || pre.levels.xp || pre.stats.hpMax !== 1280) fail('a save from before the levels loads with a build');
+if (pre.levels.picks.length || pre.levels.xp || pre.stats.hpMax !== 1280 + effects(pre.gear.totals).hp) fail('a save from before the levels loads with a build');
 const odd = boot();
 deserialize(odd, { ...ls, build: { ...ls.build, picks: ['hp', 'from_the_future'] } });
 if (odd.levels.picks.join() !== 'hp') fail('unknown card kept');

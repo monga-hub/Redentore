@@ -39,6 +39,9 @@ import { Director } from './audio/director.ts';
 import { Bag } from './loot/bag.ts';
 import { Drops } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
+import { Equipment, crit, effects } from './loot/gear.ts';
+import { SheetPanel } from './ui/sheet.ts';
+import { VendorPanel } from './ui/vendor.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -75,16 +78,21 @@ scene.add(questView.root);
 const bar = new ActionBar(kit.system);
 const levels = new Levels(); // XP from the dead, the cards picked; laid on the kit by `apply`
 const levelUp = new LevelUp(); // the two-card window
-levels.apply = () => {
+const gear = new Equipment(); // what the hero wears: the hemp set and the bone club at first
+let worn = effects(gear.totals);
+levels.apply = () => { // the cards and the gear, laid on the kit and the stats
   Object.assign(tune, tuneOf(levels.picks));
-  playerStats.grow(tune.hp, tune.mana);
-  playerStats.armor = tune.armor;
-  playerStats.regen = tune.regen;
+  worn = effects(gear.totals);
+  playerStats.grow(tune.hp, tune.mana, worn.hp, worn.mana);
+  playerStats.armor = tune.armor * (1 - worn.cut);
+  playerStats.regen = tune.regen + worn.regen;
   player.speed = tune.speed;
   kit.system.chargeMul = tune.fury;
   kit.system.chargeAfter = tune.furyStart;
   for (const id of tune.owned) kit.system.unlock(id);
 };
+gear.onChange = () => levels.apply();
+levels.apply(); // the starter set's stats (a load lays its own again)
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
 scene.add(friars.root);
 const priests = new Priests(level.world, kit.vfx, playerStats, level.areas); // undead priests casting in the cloisters
@@ -120,7 +128,7 @@ function wake(): void {
   player.model.revive();
   kit.system.notices.push({ kind: 'error', text: at === SPAWN ? 'Sei caduto. Ti risvegli sulla fondamenta.' : 'Sei caduto. Ti risvegli alla porta del coro.' });
 }
-kit.hurt = (inside, n) => { n *= tune.dmg * quest.dmgMul; friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
+kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all];
 kit.foes = () => foes;
@@ -137,7 +145,7 @@ const head = new THREE.Vector3();
 const old = GROUPS.flat().length;
 const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all];
 const bag = new Bag(); // gold and items picked up off the dead
-const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag };
+const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
 if (loaded) {
@@ -197,8 +205,14 @@ const drops = new Drops([ // gold and items out of the dead, walked over into th
   { all: bees.all.filter((f) => f.kind === APETTA), tier: 'worker' },
 ], level.world, bag, cam.camera);
 scene.add(drops.root);
-const bagPanel = new BagPanel(bag); // B or the satchel button
+const bagPanel = new BagPanel(bag, gear); // B or the satchel button
 bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
+const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure button: the paper doll
+  lv: levels.lv, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
+  dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
+}));
+const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
+questView.shop = () => vendor.open();
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
 level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
@@ -254,7 +268,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { bag, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { bag, gear, sheet, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
@@ -298,13 +312,14 @@ renderer.setAnimationLoop(() => {
   }
   if (input.pressed('KeyM')) openMap();
   if (input.pressed('KeyB')) bagPanel.toggle();
+  if (input.pressed('KeyC')) sheet.toggle();
   game.time += dt;
   playerStats.update(dt);
   if (dying > 0 && (dying -= dt) <= 0) wake();
   player.frozen = dying > 0;
   const diablo = isDiablo();
   if (!player.frozen) dctl.update(dt, input); // click-to-move steering, click-attack swings
-  kit.system.castMul = quest.castMul; // Fra' Bortolo's blessing, while it lasts
+  kit.system.castMul = quest.castMul / worn.haste; // Fra' Bortolo's blessing, while it lasts, and Celerità
   kit.update(dt, player.frozen ? () => false : pressed); // before the player moves: casts see last frame's motion
   player.update(dt, input, diablo ? dcam.yaw : cam.yaw, !diablo && (input.buttons & 2) !== 0, dctl.steer);
   friars.update(dt, player.pos);

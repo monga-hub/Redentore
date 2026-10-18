@@ -1,5 +1,5 @@
 // Saved games: the state worth keeping as plain JSON (player, quest flags, who is dead, play
-// time, the map explored so far, level, XP and level-up picks, the bag), three localStorage slots, and the handoff that carries a loaded game across a reload.
+// time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), three localStorage slots, and the handoff that carries a loaded game across a reload.
 // Loading and "Nuova partita" reload the page so every system boots clean (no stray bolts,
 // cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
@@ -7,6 +7,7 @@ import { killAll } from '../enemies/caster.ts';
 import { CARD, levelOf } from '../player/levels.ts';
 import type { Quest } from '../quest/progress.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
+import type { Equipment, GearState } from '../loot/gear.ts';
 
 const VERSION = 1;
 const SLOT_KEY = (i: number) => `redentore.save.${i}`;
@@ -29,6 +30,7 @@ export interface GameState {
   // dead, the level-ups their kills earned are offered one after another right after the load.
   build?: { xp: number; lv: number; picks: string[] };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
+  gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -43,6 +45,7 @@ export interface Game {
   time: number;
   fog: { encode(): string; decode(s: string): boolean };
   bag: Bag;
+  gear: Equipment;
 }
 
 export function serialize(g: Game): GameState {
@@ -56,6 +59,7 @@ export function serialize(g: Game): GameState {
     fog: g.fog.encode(),
     build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks] },
     bag: g.bag.encode(),
+    gear: g.gear.encode(),
   };
 }
 
@@ -66,6 +70,7 @@ export function deserialize(g: Game, s: GameState): void {
   g.player.facing = p.yaw;
   g.levels.xp = s.build?.xp ?? 0;
   g.levels.picks = (s.build?.picks ?? []).filter((id) => CARD.has(id)); // a card from another build is dropped
+  if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
   g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
   g.stats.hp = Math.min(Math.max(p.hp, 1), g.stats.hpMax); // never wake up dead
   g.stats.mana = Math.min(Math.max(p.mana, 0), g.stats.manaMax);
@@ -95,7 +100,8 @@ export function valid(s: unknown): s is GameState {
     && (o.quest.blessLeft === undefined || num(o.quest.blessLeft))
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))
-    && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))));
+    && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
+    && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')));
 }
 
 export interface Slot { label: string; savedAt: number; state: GameState }

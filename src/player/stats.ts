@@ -20,7 +20,7 @@ export class PlayerStats {
 
   hpMax: number;
   manaMax: number;
-  /** Level-up cards: share of incoming damage taken, and mana/s, always on. */
+  /** Level-up cards and armor: share of incoming damage taken, and mana/s, always on. */
   armor = 1;
   regen = 2;
   private base: [number, number];
@@ -31,9 +31,9 @@ export class PlayerStats {
     this.base = [hpMax, manaMax];
   }
 
-  /** Scale the maxima off the starting ones; what a raise adds is filled in at once. */
-  grow(hp: number, mana: number): void {
-    const h = Math.round(this.base[0] * hp), m = Math.round(this.base[1] * mana);
+  /** Scale the maxima off the starting ones and add the gear's flat `plusHp`/`plusMana`; what a raise adds is filled in at once. */
+  grow(hp: number, mana: number, plusHp = 0, plusMana = 0): void {
+    const h = Math.round(this.base[0] * hp + plusHp), m = Math.round(this.base[1] * mana + plusMana);
     if (!this.dead) this.hp = Math.min(h, this.hp + Math.max(0, h - this.hpMax));
     this.mana = Math.min(m, this.mana + Math.max(0, m - this.manaMax));
     this.hpMax = h;

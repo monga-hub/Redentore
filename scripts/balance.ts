@@ -7,13 +7,19 @@
 // three.js, are re-done here in a few lines. The bot is fair but plain: it faces and hits the nearest
 // foe, keeps its cooldowns rolling, prays (the heal) under 55% and between pulls, drinks under 45% health, and if it dodges it runs straight out of
 // every telegraphed area (novas, the swarm, the boss's marks) with no finesse, like a phone player.
+// Gear: on the route every kill rolls its loot (loot/bag.ts); the bot wears a piece if it is worth more
+// budget points than what it wears and sells the rest (and every flavour item) to Fra' Bortolo, so the
+// gold it ends with is what a player could spend on epics. The boss and the elites alone take a GEAR:
+// start (the hemp set), typical (the loot of a typical route's kills, best in slot), buy (typical, then
+// epics bought with that route's gold), epic (every purple piece).
 //
 // Every run is seeded (the bot's picks and dodges, and Math.random for the mobs), so a run replays exactly.
 //
-//   node scripts/balance.ts [runs]                 every build on the route (3 runs each; arcane and storm take fire/frost and lightning/new blows first), then the boss alone at levels 1, 6, 8, 9
+//   node scripts/balance.ts [runs]                 every build on the route (3 runs each; arcane and storm take fire/frost and lightning/new blows first), then the boss alone at levels 1, 6, 8, 9 in typical gear, at 8 and 9 in the starter set, at 9 with epics bought and in all of them
+//   node scripts/balance.ts bosses [runs]          only the boss part of the above
 //   node scripts/balance.ts route melee [runs]     one build on the route (NODODGE=1: the bot that dodges nothing)
-//   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks)
-//   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life
+//   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks; GEAR=start|typical|buy|epic, default typical)
+//   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
@@ -28,6 +34,8 @@ import { Grimoire } from '../src/abilities/grimoire.ts';
 import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { START, levelOf, offer, tuneOf } from '../src/player/levels.ts';
+import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
+import { Equipment, SHOP, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
 const DT = 1 / 30;
 /** HANDS=0.6: the bot lands that share of its damage, a stand-in for a human's slower, sloppier rotation. */
@@ -197,6 +205,12 @@ class Run {
   readonly level = buildLevel(); // its own: the quest's gates are boxes in its world
   readonly world = this.level.world;
   readonly stats = new PlayerStats();
+  readonly gear = new Equipment();
+  readonly bag = new Bag(); // only its gold: pieces are worn or sold on the spot
+  worn = effects(this.gear.totals);
+  looting = false; // the route: kills drop loot
+  private looted = new Set<Mob>();
+  tierKills: Partial<Record<Tier, number>> = {};
   readonly quest = new Quest(this.world);
   readonly paths = new Paths(this.world);
   readonly friars = spawnGroups(this.world).flat();
@@ -230,7 +244,7 @@ class Run {
   casts = new Map<string, number>(); // abilities started, by id
   taken = new Map<string, number>(); // from the boss, by attack (before the hp floor)
   hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number) => {
-    n *= tune.dmg * HANDS;
+    n = crit(n * tune.dmg * HANDS * this.worn.dmg, this.worn.crit, rnd);
     for (const m of this.mobs) if (m.state !== 'dead' && inside(m.x, m.z, m)) {
       if (m === this.boss && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
       if (isCaster(m)) casterHurt(m, n); else friarHurt(m, n);
@@ -257,6 +271,46 @@ class Run {
     this.system = new AbilitySystem<Forsaken>(ABILITIES, BAR, this as unknown as Forsaken, START);
     this.system.pool = this.stats;
     this.player.pos.y = this.world.groundAt(SPAWN.x, SPAWN.z, 0);
+    this.apply(); // the starter set
+  }
+
+  tierOf(m: Mob): Tier {
+    if (!isCaster(m)) return 'friar';
+    return m.kind === REVERENDISSIMO ? 'boss' : m.kind === SACERDOTE || m.kind === APE ? 'elite' : m.kind === APETTA ? 'worker' : 'priest';
+  }
+  /** A kill's loot: gold banked, a better piece worn (the old one sold), everything else sold. */
+  loot(tier: Tier): void {
+    this.tierKills[tier] = (this.tierKills[tier] ?? 0) + 1;
+    const d = roll(tier, rnd);
+    this.bag.gold += d.gold.reduce((a, b) => a + b, 0);
+    for (const id of d.items) this.take(id);
+  }
+  take(id: string): void {
+    const it = ITEM.get(id)!, cur = it.slot && ITEM.get(this.gear.worn[it.slot] ?? '');
+    if (it.slot && (!cur || worth(it) > worth(cur))) {
+      this.gear.worn[it.slot] = id;
+      if (cur) this.bag.gold += sellPrice(cur);
+      this.apply();
+    } else this.bag.gold += sellPrice(it);
+  }
+  /** Spend the gold on epics, the biggest gain per coin first, while any is affordable. */
+  shop(): number {
+    let bought = 0;
+    for (;;) {
+      const gain = (it: typeof SHOP[number]) => worth(it) - worth(ITEM.get(this.gear.worn[it.slot!] ?? '') ?? it) * (this.gear.worn[it.slot!] ? 1 : 0);
+      const best = SHOP.filter((it) => buyPrice(it) <= this.bag.gold && gain(it) > 0).sort((a, b) => gain(b) / buyPrice(b) - gain(a) / buyPrice(a))[0];
+      if (!best) return bought;
+      this.bag.gold -= buyPrice(best);
+      this.take(best.id);
+      bought++;
+    }
+  }
+  /** GEAR: what the boss and the elites alone are fought in. */
+  dress(kind: string): void {
+    if (kind === 'epic') { for (const it of SHOP) this.gear.worn[it.slot!] = it.id; this.apply(); return; }
+    if (kind === 'start') return;
+    for (const [tier, n] of Object.entries(TYPICAL)) for (let i = 0; i < n; i++) this.loot(tier as Tier);
+    if (kind === 'buy') this.shop();
   }
 
   // --- what the ability table calls ---
@@ -345,9 +399,11 @@ class Run {
   }
   apply(): void {
     Object.assign(tune, tuneOf(this.picks));
-    this.stats.grow(tune.hp, tune.mana);
-    this.stats.armor = tune.armor;
-    this.stats.regen = tune.regen;
+    this.worn = effects(this.gear.totals);
+    this.stats.grow(tune.hp, tune.mana, this.worn.hp, this.worn.mana);
+    this.stats.armor = tune.armor * (1 - this.worn.cut);
+    this.stats.regen = tune.regen + this.worn.regen;
+    this.system.castMul = 1 / this.worn.haste;
     this.system.chargeMul = tune.fury;
     this.system.chargeAfter = tune.furyStart;
     for (const id of tune.owned) this.system.unlock(id);
@@ -512,6 +568,7 @@ class Run {
     separate(this.casters, this.world);
     dmg += fly(this.bolts, p, dt, [], this.world);
     if (dmg > 0 && s.takeDamage(dmg) > 0) this.system.pushback(); // the game's onHurt
+    if (this.looting) for (const m of this.mobs) if (m.state === 'dead' && !this.looted.has(m)) { this.looted.add(m); this.loot(this.tierOf(m)); }
     if (t) {
       const z = this.zone(this.zoneOf(t));
       z.time += dt;
@@ -560,14 +617,17 @@ function route(apiary: boolean): Goal[] {
 }
 
 const LIMIT = 45 * 60; // s of play before a run is called off
+/** Kills by tier on a typical route up to the choir door (the mean of `npm run balance`'s runs): the loot of GEAR=typical. */
+const TYPICAL: Record<string, number> = { friar: 32, priest: 32, elite: 3, worker: 3 };
 
-export interface RouteResult { build: string; dodge: boolean; won: boolean; time: number; deaths: number; lv: number; xp: number; zones: Map<string, Zone>; picks: string[]; boss: number }
+export interface RouteResult { build: string; dodge: boolean; won: boolean; time: number; deaths: number; lv: number; xp: number; zones: Map<string, Zone>; picks: string[]; boss: number; gold: number; gear: GearState; kills: Partial<Record<Tier, number>> }
 
 export function playRoute(build: string, dodge: boolean, s = 1, apiary = true): RouteResult {
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919; // after the level is built: its first build draws on Math.random more than the next ones
-  let bossT = 0;
+  r.looting = true;
+  let bossT = 0, gold = 0, gear: GearState = {}, kills = {};
   for (const g of route(apiary)) {
     const reached = () => Math.hypot(r.player.pos.x - g.x, r.player.pos.z - g.z) < g.r + 0.6 && (g.y === undefined || Math.abs(r.player.pos.y - g.y) < 1);
     while (r.time < LIMIT && !(g.until ? g.until(r) : reached() && !r.target)) {
@@ -576,17 +636,19 @@ export function playRoute(build: string, dodge: boolean, s = 1, apiary = true): 
     }
     if (r.time >= LIMIT) break;
     g.done?.(r);
+    if (g.name === 'coro') { gold = r.bag.gold; gear = r.gear.encode(); kills = { ...r.tierKills }; } // what the hero has walking in on the boss
   }
-  return { build, dodge, won: r.boss.state === 'dead', time: r.time, deaths: r.deaths, lv: r.lv, xp: r.xp, zones: r.zones, picks: r.picks, boss: bossT };
+  return { build, dodge, won: r.boss.state === 'dead', time: r.time, deaths: r.deaths, lv: r.lv, xp: r.xp, zones: r.zones, picks: r.picks, boss: bossT, gold, gear, kills };
 }
 
-export interface BossResult { build: string; lv: number; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dealt: Map<string, number>; taken: Map<string, number>; casts: Map<string, number> }
+export interface BossResult { build: string; lv: number; gear: string; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dealt: Map<string, number>; taken: Map<string, number>; casts: Map<string, number> }
 
 /** The boss alone: the church cleared, the choir door open, a build at level `lv`, five tries at most. */
-export function playBoss(build: string, lv: number, dodge: boolean, s = 1): BossResult {
+export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear = process.env.GEAR ?? 'typical'): BossResult {
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919; // after the level is built: its first build draws on Math.random more than the next ones
+  r.dress(gear);
   r.picks = process.env.PICKS ? process.env.PICKS.split(',') : lv > 1 ? picksTo(build, lv) : []; // PICKS=a,b,c: a fixed build
   r.apply();
   r.stats.revive();
@@ -612,7 +674,7 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1): Boss
     }
     if ((r.boss.state as string) === 'dead') tries.push({ time: r.time - t0, left: 0, potions: pots });
   }
-  return { build, lv, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dealt: r.dealt, taken: r.taken, casts: r.casts };
+  return { build, lv, gear, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dealt: r.dealt, taken: r.taken, casts: r.casts };
 }
 
 export interface EliteResult { build: string; lv: number; elite: string; dodge: boolean; won: boolean; time: number; potions: number; lost: number }
@@ -626,6 +688,7 @@ export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape',
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919;
+  r.dress(process.env.GEAR ?? 'typical');
   r.picks = lv > 1 ? picksTo(build, lv) : [];
   r.apply();
   r.stats.revive();
@@ -659,7 +722,10 @@ const f1 = (x: number) => (Math.round(x * 10) / 10).toString();
 /** One build's runs on the route: each run in a line, then the zones averaged over the runs. */
 export function routeTable(rs: RouteResult[]): string {
   const r0 = rs[0], out = [`\n${r0.build}${r0.dodge ? '' : ' (no dodge)'}, ${rs.length} runs`];
-  for (const r of rs) out.push(`  ${r.won ? 'boss down' : 'NOT FINISHED'} in ${(r.time / 60).toFixed(1)} min, ${r.deaths} deaths, level ${r.lv} (${r.xp} XP), boss fight ${r.boss.toFixed(0)} s; picks ${r.picks.join(' ')}`);
+  for (const r of rs) {
+    out.push(`  ${r.won ? 'boss down' : 'NOT FINISHED'} in ${(r.time / 60).toFixed(1)} min, ${r.deaths} deaths, level ${r.lv} (${r.xp} XP), boss fight ${r.boss.toFixed(0)} s; picks ${r.picks.join(' ')}`);
+    out.push(`    at the boss: ${r.gold} gold, ${gearLine(r.gear)}; kills ${Object.entries(r.kills).map(([k, v]) => `${k} ${v}`).join(' ')}`);
+  }
   out.push(`  ${'zone'.padEnd(9)}${pad('fight s', 8)}${pad('hp lost', 8)}${pad('potions', 8)}${pad('deaths', 7)}${pad('level', 6)}`);
   for (const k of ZONES) {
     const zs = rs.map((r) => r.zones.get(k)).filter((z) => z) as Zone[];
@@ -669,14 +735,19 @@ export function routeTable(rs: RouteResult[]): string {
   }
   return out.join('\n');
 }
-/** The boss alone: per build and level, wins, tries to the first kill, the kill time and potions. */
+/** What a set is: pieces by quality and the stats it adds. */
+function gearLine(g: GearState): string {
+  const its = Object.values(g).map((id) => ITEM.get(id!)!), n = (r: string) => its.filter((i) => i.rarity === r).length, e = effects(totals(Object.values(g)));
+  return `${n('epico')} epic ${n('raro')} rare ${n('noncomune')} green ${n('comune')} white: +${e.hp} hp +${e.mana} mana, ${Math.round(e.cut * 100)}% armor, +${Math.round((e.dmg - 1) * 100)}% dmg, ${e.crit}% crit, +${Math.round((e.haste - 1) * 100)}% haste`;
+}
+/** The boss alone: per build, level and gear, wins, tries to the first kill, the kill time and potions. */
 export function bossTable(rs: BossResult[]): string {
-  const out = [`${'build'.padEnd(8)}${pad('level', 6)} ${'bot'.padEnd(9)}${pad('wins', 6)}${pad('tries', 7)}${pad('kill s', 8)}${pad('pots', 6)}  died at (s)`];
-  const key = (r: BossResult) => `${r.build}|${r.lv}|${r.dodge}`;
+  const out = [`${'build'.padEnd(8)}${pad('level', 6)} ${'gear'.padEnd(8)}${'bot'.padEnd(9)}${pad('wins', 6)}${pad('tries', 7)}${pad('kill s', 8)}${pad('pots', 6)}  died at (s)`];
+  const key = (r: BossResult) => `${r.build}|${r.lv}|${r.gear}|${r.dodge}`;
   for (const k of [...new Set(rs.map(key))]) {
     const g = rs.filter((r) => key(r) === k), won = g.filter((r) => r.won), r0 = g[0];
     const kills = won.map((r) => r.tries[r.tries.length - 1]);
-    out.push(`${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 6)}${pad(won.length ? f1(mean(won.map((r) => r.tries.length))) : '-', 7)}` +
+    out.push(`${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${r0.gear.padEnd(8)}${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 6)}${pad(won.length ? f1(mean(won.map((r) => r.tries.length))) : '-', 7)}` +
       `${pad(won.length ? mean(kills.map((t) => t.time)).toFixed(0) : '-', 8)}${pad(won.length ? f1(mean(kills.map((t) => t.potions))) : '-', 6)}  ` +
       g.flatMap((r) => r.tries.filter((t) => t.left).map((t) => t.time.toFixed(0))).join(' '));
     if (process.env.DEALT) for (const r of g) out.push(`    ${r.picks.join(' ')}\n    dealt: ${[...r.dealt].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}; taken: ${[...r.taken].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}\n    casts: ${[...r.casts].map(([d, v]) => `${d} ${v}`).join(', ')}`);
@@ -714,14 +785,19 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     runs(Number(n ?? 3), (s) => rs.push(playRoute(build ?? 'mixed', !process.env.NODODGE, s)));
     console.log(routeTable(rs));
   } else {
-    const k = Number(mode ?? 3);
-    for (const [b, d] of [...Object.keys(BUILDS).map((b) => [b, true] as const), ['mixed', false] as const]) {
+    const k = Number(mode === 'bosses' ? build ?? 3 : mode ?? 3);
+    if (mode !== 'bosses') for (const [b, d] of [...Object.keys(BUILDS).map((b) => [b, true] as const), ['mixed', false] as const]) {
       const rs: RouteResult[] = [];
       runs(k, (s) => rs.push(playRoute(b, d, s)));
       console.log(routeTable(rs));
     }
     const boss: BossResult[] = [];
-    for (const b of Object.keys(BUILDS)) for (const lv of [1, 6, 8, 9]) runs(k, (s) => boss.push(playBoss(b, lv, true, s)));
+    for (const b of Object.keys(BUILDS)) {
+      for (const lv of [1, 6, 8, 9]) runs(k, (s) => boss.push(playBoss(b, lv, true, s)));
+      for (const lv of [8, 9]) runs(k, (s) => boss.push(playBoss(b, lv, true, s, 'start')));
+      runs(k, (s) => boss.push(playBoss(b, 9, true, s, 'buy')));
+      runs(k, (s) => boss.push(playBoss(b, 9, true, s, 'epic')));
+    }
     for (const lv of [9]) runs(k, (s) => boss.push(playBoss('mixed', lv, false, s)));
     console.log('\nboss alone (choir door checkpoint, church cleared; five tries at most)\n' + bossTable(boss));
   }

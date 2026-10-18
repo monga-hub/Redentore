@@ -851,7 +851,7 @@ export function eliteTable(rs: EliteResult[]): string {
     out.push(`${r0.elite.padEnd(10)}${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 7)}` +
       `${pad(won.length ? mean(won.map((r) => r.time)).toFixed(0) : '-', 8)}${pad(won.length ? f1(mean(won.map((r) => r.potions))) : '-', 6)}${pad(`${Math.round(mean(g.map((r) => r.lost)) * 100)}%`, 9)}`);
   }
-  out.push(`elites at 6-8, dodging: ${rs.filter((r) => r.dodge && r.won).length}/${rs.filter((r) => r.dodge).length} won`);
+  out.push(`elites, dodging: ${rs.filter((r) => r.dodge && r.won).length}/${rs.filter((r) => r.dodge).length} won`);
   return out.join('\n');
 }
 

@@ -55,6 +55,7 @@ npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
 npm run balance  # banco di bilanciamento headless: un bot gioca la missione (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona; il bot indossa il bottino migliore e vende il resto, il boss da solo in set iniziale, tipico, con epici comprati o tutto epico
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
+npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, CHROME=... per il binario)
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -66,7 +67,10 @@ camera dietro al personaggio. Sopra scorre l'antefatto in didascalie cinematogra
 luogo (`CAPTIONS`: la peste del 1576, il voto e Palladio, i morti sepolti nell'orto, il secondo
 voto del Reverendissimo, la notte del Redentore, il Risorto), ciascuna con l'id della sua futura
 voce narrante (`Intro.onLine`). Esc, Spazio, Invio, clic o tap la saltano; una partita
-caricata parte senza intro.
+caricata parte senza intro. La partita in corso si salva da sola ogni 5 s e quando la scheda va
+in secondo piano, ma solo lontano dai combattimenti, e ogni avvio la riprende ("Partita ripresa"):
+se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'ultimo scontro.
+"Nuova partita" la cancella.
 
 ## Controlli
 
@@ -228,7 +232,11 @@ src/
                              ombre, hemisphere, nebbia (più fitta verso la laguna), foschia
                              sull'acqua, pulviscolo, post (bloom, grading notturno, ACES);
                              interni/esterni sfumati per area.
-                             `?fx=low` (o fps bassi sostenuti) spegne ombre e post
+                             `?fx=low` (o fps bassi sostenuti) spegne ombre e post e ne
+                             libera i buffer. Su telefono (`core/device.ts`, puntatore
+                             touch) pixel ratio 1,5, niente MSAA sul canvas, MSAA 2x nel
+                             post, ombre 1024 e texture dei modelli dimezzate: iOS ricarica
+                             la scheda oltre ~1 GB di memoria, GPU compresa
   fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
                              PointLight assegnate alle torce più vicine al player; candele,
                              lampadari e bagliori colorati delle vetrate da `level.lights`
@@ -328,6 +336,7 @@ scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del pl
 scripts/check-abilities.ts   GCD per scuola, pushback, cooldown, lanci, canali e interruzioni del sistema abilità
 scripts/check-spells.ts      stati dei nemici e loro effetto sulle IA, regole degli incantesimi nuovi e delle fusioni
 scripts/check-levels.ts      curva XP, offerte delle carte su molte partite casuali, fusioni, slot riservati
+scripts/soak-boss.ts         il combattimento col boss nel gioco vero, Chrome headless su iPhone emulato: errori, crescita, memoria GPU
 scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e carte veri, giocati da un bot sul percorso della missione
 ```
 

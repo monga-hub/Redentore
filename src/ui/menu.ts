@@ -1,7 +1,7 @@
 import attribution from '../../ATTRIBUTION.md?raw';
 import { getAudio, setAudio, type AudioSettings } from '../audio/engine.ts';
 import { isDiablo, setDiablo } from '../core/style.ts';
-import { save, setPending, slots, type GameState, type Slot } from '../core/save.ts';
+import { clearAutosave, save, setPending, slots, type GameState, type Slot } from '../core/save.ts';
 import { ICONS } from './icons.ts';
 
 // Game menu, WoW style: a gear button in the top-right corner opens a framed panel that
@@ -223,7 +223,7 @@ export class Menu {
     if (go) this.show(go as View);
     else if (d === 'close') this.close();
     else if (d === 'back') this.show(this.from);
-    else if (d === 'new') location.reload(); // a clean boot is a clean start
+    else if (d === 'new') { clearAutosave(); location.reload(); } // a clean boot is a clean start
     else if (d === 'exit') this.show('title');
     else if (d === 'style') {
       setDiablo(!isDiablo());

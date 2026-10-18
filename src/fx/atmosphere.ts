@@ -7,6 +7,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Level } from '../level/index.ts';
 import { Z } from '../level/plan.ts';
 import { Torches, DOT } from './torches.ts';
+import { PHONE } from '../core/device.ts';
 
 // Lighting and mood on top of the dressed level: a full-moon night over the lagoon.
 // A cold moon is the only shadow-casting light; a starry sky dome with drifting clouds
@@ -16,7 +17,9 @@ import { Torches, DOT } from './torches.ts';
 // through a door feels like eyes adapting to the dark.
 //
 // Quality: `?fx=low` (or a sustained slow frame rate) drops the moon shadows and the
-// post chain; sky, torches, fog and particles stay.
+// post chain, freeing their buffers; sky, torches, fog and particles stay. Phones start lean
+// (`PHONE`): iOS kills a tab whose memory, GPU buffers included, outgrows a budget of about a
+// gigabyte, and reloads it, so their buffers are sized down from the start.
 
 /** 0 = open air, 1 = closed interior; covered cloister walks sit in between. */
 function indoorness(zone: string | undefined, label: string | undefined): number {
@@ -238,7 +241,7 @@ export class Atmosphere {
     // Moon: crisp cold key light, shadow box following the player.
     this.moon.castShadow = true;
     const s = this.moon.shadow;
-    s.mapSize.set(2048, 2048);
+    s.mapSize.setScalar(PHONE ? 1024 : 2048);
     Object.assign(s.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 10, far: 320 });
     s.bias = -0.0004;
     s.normalBias = 0.04;
@@ -261,7 +264,8 @@ export class Atmosphere {
     scene.add(this.dust);
 
     // Post: HDR scene (MSAA) -> bloom on moon and flames -> night grading -> ACES + sRGB.
-    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    // The composer keeps two of these (the passes ping-pong), each a multisampled half-float colour and depth buffer.
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: PHONE ? 2 : 4 });
     this.composer = new EffectComposer(renderer, rt);
     this.composer.addPass(new RenderPass(scene, camera));
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.8, 0.6, 1.0));
@@ -348,7 +352,7 @@ export class Atmosphere {
    */
   warm(): void {
     const r = this.renderer, was = r.getRenderTarget();
-    for (const target of [this.composer.readBuffer, null]) {
+    for (const target of this.low ? [null] : [this.composer.readBuffer, null]) { // in low quality the HDR buffer is gone: binding it would allocate it again
       r.setRenderTarget(target);
       r.compileAsync(this.scene, this.camera).catch(() => undefined); // its compile() runs now, under this target
     }
@@ -360,9 +364,24 @@ export class Atmosphere {
     else this.composer.render();
   }
 
+  /**
+   * Drop to low quality, giving back what high quality held: the post chain's buffers (on a phone the
+   * biggest allocation of the game), the shadow map, and every program built for shadows or the HDR
+   * buffer. Three keeps a material's old programs next to the new ones until the material is disposed,
+   * so without that the fallback, which a heavy fight on a phone triggers, piled a second set of programs
+   * and buffers on top of the first, the peak that got the tab killed.
+   */
   private degrade(why: string): void {
     this.low = true;
     this.moon.castShadow = false; // light state change recompiles programs without shadows
+    this.moon.shadow.map?.dispose();
+    this.moon.shadow.map = null;
+    for (const p of this.composer.passes) p.dispose();
+    this.composer.dispose();
+    this.scene.traverse((o) => { // only the GPU side goes: three builds a disposed material again on its next draw
+      const m = (o as THREE.Mesh).material;
+      if (m) for (const x of Array.isArray(m) ? m : [m]) x.dispose();
+    });
     console.info(`[fx] low quality: ${why}`);
     this.onDegrade?.();
   }

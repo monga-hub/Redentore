@@ -1,5 +1,7 @@
 // Saved games: the state worth keeping as plain JSON (player, quest flags, who is dead, play
-// time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), three localStorage slots, and the handoff that carries a loaded game across a reload.
+// time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), three localStorage slots, the handoff that carries a loaded game across a reload,
+// and the autosave: the run in progress, kept whenever no fight is on, that a cold boot resumes. iOS reloads a tab
+// it kills for memory (and a home-screen app relaunches from the start), which used to throw the whole run away.
 // Loading and "Nuova partita" reload the page so every system boots clean (no stray bolts,
 // cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
@@ -12,6 +14,7 @@ import type { Equipment, GearState } from '../loot/gear.ts';
 const VERSION = 1;
 const SLOT_KEY = (i: number) => `redentore.save.${i}`;
 const PENDING = 'redentore.pending'; // sessionStorage: the state to apply on the next boot
+const AUTO = 'redentore.auto'; // localStorage: the run in progress, resumed by a boot with nothing pending
 export const SLOTS = 3;
 const GONE = 1e3; // s a loaded corpse has lain: past the sink, so it is hidden from the start
 
@@ -133,4 +136,20 @@ export function takePending(store: Storage = sessionStorage): GameState | undefi
   const s = read(store, PENDING);
   try { store.removeItem(PENDING); } catch { /* blocked storage: nothing was queued either */ }
   return valid(s) ? s : undefined;
+}
+
+/** Keep `s` as the run in progress (main.ts, out of combat only, so a resume never lands mid-fight). False when storage is full or blocked. */
+export function autosave(s: GameState, store: Storage = localStorage): boolean {
+  try { store.setItem(AUTO, JSON.stringify(s)); return true; } catch { return false; }
+}
+
+/** The run in progress, if any: it stays until overwritten or cleared, so every cold boot resumes it. */
+export function resume(store: Storage = localStorage): GameState | undefined {
+  const s = read(store, AUTO);
+  return valid(s) ? s : undefined;
+}
+
+/** "Nuova partita": the next boot starts afresh. */
+export function clearAutosave(store: Storage = localStorage): void {
+  try { store.removeItem(AUTO); } catch { /* blocked storage: nothing was kept either */ }
 }

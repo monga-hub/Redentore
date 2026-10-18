@@ -8,6 +8,7 @@ import { Intro } from './camera/intro.ts';
 import { Hud } from './ui/hud.ts';
 import { TouchControls } from './ui/touch.ts';
 import { Atmosphere } from './fx/atmosphere.ts';
+import { PHONE } from './core/device.ts';
 import { ABILITIES, Forsaken, tune } from './abilities/forsaken.ts';
 import { CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
 import { LevelUp } from './ui/levelUp.ts';
@@ -27,7 +28,7 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { deserialize, serialize, takePending, type Game } from './core/save.ts';
+import { autosave, deserialize, resume, serialize, takePending, type Game } from './core/save.ts';
 import { isDiablo, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
 import { DiabloControls } from './player/diabloControls.ts';
@@ -46,8 +47,9 @@ import { VendorPanel } from './ui/vendor.ts';
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
 initAudio(); // before the intro, whose first press unlocks the sound
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// Phones: a 1.5 pixel ratio (a third of DPR 3's pixels on an iPhone) and no MSAA on the canvas, which the post chain draws one quad into.
+const renderer = new THREE.WebGLRenderer({ antialias: !PHONE });
+renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 
@@ -147,12 +149,13 @@ const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(o
 const bag = new Bag(); // gold and items picked up off the dead
 const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
-const loaded = takePending(); // a slot picked in the menu, carried across the reload
+const pending = takePending(); // a slot picked in the menu, carried across the reload
+const loaded = pending ?? resume(); // or the run in progress: a tab iOS killed for memory and reloaded, the home-screen app relaunched
 if (loaded) {
   deserialize(game, loaded);
   cam.yaw = player.facing;
   questView.settle();
-  kit.system.notices.push({ kind: 'info', text: 'Partita caricata' });
+  kit.system.notices.push({ kind: 'info', text: pending ? 'Partita caricata' : 'Partita ripresa' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
 let bossAct = 0, bossRage = false;
 let kills = mobs.filter((m) => m.state === 'dead').length; // Sete d'anime heals on new ones only
@@ -270,6 +273,14 @@ addEventListener('resize', () => {
 // Debug hooks for later ships and for poking around in the console.
 Object.assign(window, { bag, gear, sheet, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
+// The autosave (core/save.ts): every few seconds and when the tab is hidden (iOS may kill it then), only
+// while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
+const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova']);
+const KEEP = 5; // s
+let kept = KEEP;
+const keep = () => { if (!flying() && dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state))) autosave(serialize(game)); };
+addEventListener('visibilitychange', () => { if (document.hidden) keep(); });
+
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
@@ -370,4 +381,5 @@ renderer.setAnimationLoop(() => {
   fx.render();
   bar.render(dt, pressed);
   input.endFrame();
+  if ((kept -= dt) <= 0) { kept = KEEP; keep(); }
 });

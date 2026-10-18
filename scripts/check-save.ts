@@ -1,11 +1,11 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
-// dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots and the reload handoff survive storage and refuse junk.
+// dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots, the reload handoff and the autosave survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { deserialize, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
+import { autosave, clearAutosave, deserialize, resume, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
@@ -117,6 +117,15 @@ const list = slots(store);
 if (list.length !== 3 || list[0] || list[1]?.label !== 'Orti' || list[2]) fail('slots misread');
 setPending(s, store);
 if (!takePending(store) || takePending(store)) fail('pending state not taken exactly once');
+// The autosave: every cold boot resumes it (an iOS tab reloaded after a kill), junk is refused, "Nuova partita" clears it.
+if (resume(store)) fail('resumed a run never kept');
+if (!autosave(s, store)) fail('autosave failed');
+if (resume(store)?.time !== s.time || resume(store)?.time !== s.time) fail('autosave not resumed on every boot');
+mem.set('redentore.auto', '{"v":1,"player":{}}');
+if (resume(store)) fail('junk autosave resumed');
+autosave(s, store);
+clearAutosave(store);
+if (resume(store)) fail('autosave survived a new game');
 // Levels: picks and XP round-trip; an hp pick's raised max is in place before the saved hp is clamped to it.
 const lv = boot();
 lv.levels.picks = ['step', 'hp', 'dmg'];

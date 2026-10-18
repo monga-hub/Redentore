@@ -1,0 +1,194 @@
+// Boss soak (`npm run soak`; not in `npm run check`: it needs Chrome and plays for minutes). The real
+// game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), fights the
+// Reverendissimo with every ability on the bar, the church's sacerdoti and priests alive, through all
+// three acts and the berserk, then the slow-frame fallback forced mid-fight, then the kill. It asserts
+// what got the fight's tab killed on iPhones (iOS reloads a tab past its memory budget, GPU buffers
+// included): no page errors or lost context, no programs, geometries or textures piling up as the
+// fight goes on, the GPU buffers of the phone profile within budget, and the fallback giving memory
+// back instead of adding a second set on top. A WebGL hook tallies the buffers (bytes the page asks for).
+//
+//   npm run soak                       ~2 minutes of fight
+//   SOAK_SECONDS=600 npm run soak      a longer one
+//   CHROME=/path/to/chrome npm run soak
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createServer } from 'vite';
+
+const SECONDS = Number(process.env.SOAK_SECONDS ?? 120);
+const BUDGET = 200; // MB of GPU buffers the phone profile may hold (it held ~380 before the phone tier)
+const SLACK = { prog: 4, geo: 12, tex: 4 }; // first uses that may still come late (a loot beam, a death's effects)
+const CHROME = process.env.CHROME ?? (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
+
+let failed = 0;
+const fail = (why: string) => { failed++; console.error(`FAIL ${why}`); };
+
+/** In the page before anything else: the bytes of every texture, renderbuffer and buffer the GL context holds. */
+function track(): void {
+  const live = new Map<object, number>(), unit = new WeakMap<object, { u: number; tex: Record<string, object>; rb?: object; buf: Record<number, object> }>();
+  const S = (gl: object) => { let s = unit.get(gl); if (!s) unit.set(gl, (s = { u: 0, tex: {}, buf: {} })); return s; };
+  const BPP: Record<number, number> = { 0x881a: 8, 0x8814: 16, 0x81a5: 2, 0x81a6: 4, 0x88f0: 4, 0x8cad: 8, 0x8229: 1, 0x822b: 2, 0x822e: 4, 0x8230: 8, 0x8d62: 2, 0x8056: 2, 0x8051: 3 };
+  const bpp = (f: number) => BPP[f] ?? 4;
+  const P = WebGL2RenderingContext.prototype as unknown as Record<string, (...a: any[]) => unknown>;
+  const wrap = (name: string, f: (gl: object, a: any[]) => void) => { const o = P[name]; P[name] = function (this: object, ...a: any[]) { const r = o.apply(this, a); try { f(this, a); } catch { /* tally only */ } return r; }; };
+  const bound = (gl: object, target: number) => S(gl).tex[`${S(gl).u}:${target >= 0x8515 && target <= 0x851a ? 0x8513 : target}`];
+  wrap('activeTexture', (gl, [u]) => { S(gl).u = u; });
+  wrap('bindTexture', (gl, [t, x]) => { S(gl).tex[`${S(gl).u}:${t}`] = x; });
+  wrap('texStorage2D', (gl, [t, lv, f, w, h]) => { const x = bound(gl, t); if (x) live.set(x, w * h * bpp(f) * (lv > 1 ? 4 / 3 : 1) * (t === 0x8513 ? 6 : 1)); });
+  wrap('texStorage3D', (gl, [t, lv, f, w, h, d]) => { const x = bound(gl, t); if (x) live.set(x, w * h * d * bpp(f) * (lv > 1 ? 4 / 3 : 1)); });
+  wrap('texImage2D', (gl, a) => {
+    if (a[1] !== 0) return;
+    const x = bound(gl, a[0]), src = a[5], [w, h] = a.length >= 8 ? [a[3], a[4]] : [src.width ?? src.videoWidth, src.height ?? src.videoHeight];
+    if (x) live.set(x, w * h * bpp(a[2]) * (a[0] >= 0x8515 && a[0] <= 0x851a ? 6 : 1));
+  });
+  wrap('deleteTexture', (_gl, [x]) => { live.delete(x); });
+  wrap('bindRenderbuffer', (gl, [, x]) => { S(gl).rb = x; });
+  wrap('renderbufferStorage', (gl, [, f, w, h]) => { const x = S(gl).rb; if (x) live.set(x, w * h * bpp(f)); });
+  wrap('renderbufferStorageMultisample', (gl, [, n, f, w, h]) => { const x = S(gl).rb; if (x) live.set(x, w * h * bpp(f) * Math.max(1, n)); });
+  wrap('deleteRenderbuffer', (_gl, [x]) => { live.delete(x); });
+  wrap('bindBuffer', (gl, [t, x]) => { S(gl).buf[t] = x; });
+  wrap('bufferData', (gl, [t, d]) => { const x = S(gl).buf[t]; if (x) live.set(x, typeof d === 'number' ? d : d.byteLength); });
+  wrap('deleteBuffer', (_gl, [x]) => { live.delete(x); });
+  const w = window as any;
+  w.SOAK = { errors: [] as string[], gpuMB: () => [...live.values()].reduce((s, b) => s + b, 0) / 1048576 };
+  addEventListener('error', (e) => w.SOAK.errors.push(`error: ${e.message}`));
+  addEventListener('unhandledrejection', (e) => w.SOAK.errors.push(`unhandled rejection: ${e.reason?.stack ?? e.reason}`));
+  addEventListener('webglcontextlost', () => w.SOAK.errors.push('WebGL context lost'), true);
+}
+
+/** In the page once it has loaded: the church set for the boss, every ability on the bar, a bot that fights him. */
+function fight(seconds: number): void {
+  const w = window as any, { quest, priests, player, playerStats, levels, kit, targeting, fx } = w;
+  const boss = priests.boss, BERSERK = 240;
+  quest.accepted = true;
+  quest.takeKey();
+  for (const g of quest.gates) if (g.needs === 'key') quest.open(g);
+  levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
+  levels.apply();
+  player.respawn({ x: 0, z: -28, yaw: 0 });
+  const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
+  let next = 0, degraded = false, raged = false;
+  const tick = () => {
+    const t = (performance.now() - t0) / 1000;
+    if (boss.state === 'dead' && t > seconds) { w.SOAK.done = true; w.SOAK.won = quest.bossDead; return; }
+    requestAnimationFrame(tick);
+    playerStats.hp = playerStats.hpMax; // the fight, not the hero, is under test
+    playerStats.mana = playerStats.manaMax;
+    if (boss.state !== 'dead') boss.hp = t < seconds ? Math.max(boss.hp, boss.kind.hp * 0.03 + 1) : Math.min(boss.hp, boss.kind.hp * 0.03); // kept up through every act until the end, then brought down (an evade heals him)
+    if (!degraded && t > seconds * 0.6) { degraded = true; w.SOAK.before = samples.at(-1); fx.degrade('soak'); }
+    if (!raged && t > seconds * 0.3) { raged = true; boss.fight = Math.max(boss.fight, BERSERK - 5); } // the berserk without four minutes of waiting
+    const dx = boss.x - player.pos.x, dz = boss.z - player.pos.z, d = Math.hypot(dx, dz) || 1;
+    player.facing = Math.atan2(-dx, -dz);
+    targeting.target = { kind: targeting.kinds[3], mob: boss };
+    if ((boss.state === 'nova' || boss.marks.length) && player.pos.z - (dz / d) * 0.25 < -27.5) { player.pos.x -= (dx / d) * 0.25; player.pos.z -= (dz / d) * 0.25; } // dodge: out of the nova, off the brands
+    for (let i = 0; i < 12; i++) kit.system.tryCast(i);
+    if (t >= next) {
+      next = t + 1;
+      samples.push({ t, low: degraded, prog: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures, gpu: w.SOAK.gpuMB(), phase: boss.phase, rage: boss.fight >= BERSERK, state: boss.state, lost: w.fx.renderer.getContext().isContextLost() });
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
+// --- the game, served
+const server = await createServer({ logLevel: 'error', server: { port: 0 } });
+await server.listen();
+const url = server.resolvedUrls!.local[0];
+
+// --- Chrome, over the DevTools protocol
+const profile = mkdtempSync(join(tmpdir(), 'soak-'));
+const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+const wsUrl = await new Promise<string>((ok, no) => {
+  let err = '';
+  chrome.stderr.on('data', (d) => { err += d; const m = err.match(/DevTools listening on (ws:\S+)/); if (m) ok(m[1]); });
+  chrome.on('exit', () => no(new Error(`Chrome exited: ${err.slice(-400)}`)));
+  chrome.on('error', no);
+});
+const ws = new WebSocket(wsUrl);
+await new Promise((ok) => ws.addEventListener('open', ok, { once: true }));
+let ids = 0;
+const waiting = new Map<number, { ok: (r: any) => void; no: (e: Error) => void }>();
+const events: ((m: any) => void)[] = [];
+ws.addEventListener('message', (e) => {
+  const m = JSON.parse(String(e.data));
+  if (m.id === undefined) { for (const f of events) f(m); return; }
+  const w = waiting.get(m.id)!;
+  waiting.delete(m.id);
+  if (m.error) w.no(new Error(m.error.message)); else w.ok(m.result);
+});
+let session: string | undefined;
+const send = (method: string, params: object = {}): Promise<any> => new Promise((ok, no) => {
+  const id = ++ids;
+  waiting.set(id, { ok, no });
+  ws.send(JSON.stringify({ id, method, params, sessionId: session }));
+});
+const evaluate = async (expression: string) => {
+  const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
+  return r.result.value;
+};
+const sleep = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+const pageErrors: string[] = [];
+events.push((m) => {
+  if (m.method === 'Runtime.exceptionThrown') pageErrors.push(`exception: ${m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text}`);
+  if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') pageErrors.push(`console.error: ${m.params.args.map((a: any) => a.value ?? a.description).join(' ')}`);
+  if (m.method === 'Inspector.targetCrashed') pageErrors.push('the page crashed');
+});
+
+try {
+  const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+  ({ sessionId: session } = await send('Target.attachToTarget', { targetId, flatten: true }));
+  await send('Runtime.enable');
+  await send('Inspector.enable');
+  await send('Page.enable');
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true });
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `(${track})()` });
+  await send('Page.navigate', { url });
+  const t0 = Date.now();
+  while (!(await evaluate('!!(window.priests?.root.children.length && window.friars?.root.children.length && window.bees?.root.children.length && window.player?.model.root.children.length)').catch(() => false))) {
+    if (Date.now() - t0 > 180e3) throw new Error('the game never finished loading');
+    await sleep(500);
+  }
+  if (!(await evaluate("matchMedia('(pointer: coarse)').matches"))) fail('the emulated phone is not taken for a phone');
+  for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro
+  await sleep(3000);
+  await evaluate(`(${fight})(${SECONDS})`);
+  while (!(await evaluate('!!window.SOAK.done'))) {
+    if ((await evaluate('performance.now()')) > (SECONDS + 300) * 1000) throw new Error('the boss never fell');
+    await sleep(2000);
+  }
+  type Sample = { t: number; low: boolean; prog: number; geo: number; tex: number; gpu: number; phase: number; rage: boolean; state: string; lost: boolean };
+  const r: { samples: Sample[]; before: Sample; errors: string[]; won: boolean } = await evaluate('({ samples: SOAK.samples, before: SOAK.before, errors: SOAK.errors, won: SOAK.won })');
+  const s = r.samples;
+
+  for (const e of [...pageErrors, ...r.errors]) fail(`page: ${e.slice(0, 300)}`);
+  if (s.some((x) => x.lost)) fail('WebGL context lost');
+  if (Math.max(...s.map((x) => x.phase)) < 2 || !s.some((x) => x.rage)) fail('the fight never reached the third act and the berserk');
+  if (!r.won) fail('the boss fell but the quest missed it');
+  // Steady state: past the first seconds' first uses, nothing piles up, in either quality.
+  for (const low of [false, true]) {
+    const run = s.filter((x) => x.low === low).slice(low ? 3 : 8);
+    for (const k of ['prog', 'geo', 'tex'] as const) {
+      const lo = Math.min(...run.map((x) => x[k])), hi = Math.max(...run.map((x) => x[k]));
+      if (hi - lo > SLACK[k]) fail(`${k} grew ${lo} -> ${hi} over the ${low ? 'low-quality' : 'high-quality'} fight`);
+    }
+  }
+  const high = Math.max(...s.filter((x) => !x.low).map((x) => x.gpu)), low = Math.max(...s.filter((x) => x.low).slice(3).map((x) => x.gpu));
+  if (high > BUDGET) fail(`the phone profile holds ${high.toFixed(0)} MB of GPU buffers, over the ${BUDGET} MB budget`);
+  if (low >= r.before.gpu) fail(`the slow-frame fallback kept its buffers: ${r.before.gpu.toFixed(0)} -> ${low.toFixed(0)} MB`);
+  const progLow = Math.max(...s.filter((x) => x.low).map((x) => x.prog));
+  if (progLow > r.before.prog) fail(`the slow-frame fallback piled up programs: ${r.before.prog} -> ${progLow}`);
+  console.log(`boss soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU ${high.toFixed(0)} MB, ${low.toFixed(0)} MB after the fallback; programs ${r.before.prog} -> ${progLow}`);
+} catch (e) {
+  fail(String((e as Error).message));
+} finally {
+  ws.close();
+  await new Promise((ok) => { chrome.once('exit', ok); chrome.kill(); }); // gone before its profile is
+  await server.close();
+  rmSync(profile, { recursive: true, force: true });
+}
+if (failed) process.exit(1);
+console.log('boss soak ok');

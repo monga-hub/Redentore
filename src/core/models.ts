@@ -1,15 +1,41 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { PHONE } from './device.ts';
 
 // Loading and posing the Meshy characters (see ATTRIBUTION.md): meshopt/WebP GLBs, biped rigs
 // facing +Z, props held in the right fist.
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
-/** A GLB under public/models/ (Vite's base). */
-export function loadModel(file: string): Promise<GLTF> {
-  return loader.loadAsync(`${import.meta.env.BASE_URL}models/${file}`);
+/** A GLB under public/models/ (Vite's base); on a phone its textures at half size. */
+export async function loadModel(file: string): Promise<GLTF> {
+  const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/${file}`);
+  if (PHONE) await halve(gltf.scene);
+  return gltf;
+}
+
+const MAX_PHONE = 512;
+/**
+ * Every texture of `root` wider than `MAX_PHONE` px scaled down by half, the decoded original freed:
+ * a quarter of the memory, on the GPU and off it. The Meshy bodies' 1024 px maps came to ~64 MB of
+ * the GPU budget a phone has, for detail its screen can't show at a character's size.
+ */
+async function halve(root: THREE.Object3D): Promise<void> {
+  const maps = new Set<THREE.Texture>();
+  root.traverse((o) => {
+    const m = (o as THREE.Mesh).material;
+    if (m) for (const x of Array.isArray(m) ? m : [m]) for (const v of Object.values(x)) if (v instanceof THREE.Texture) maps.add(v);
+  });
+  await Promise.all([...maps].map(async (t) => {
+    const img = t.image as ImageBitmap | HTMLImageElement | undefined;
+    if (!img || img.width <= MAX_PHONE) return;
+    try {
+      t.image = await createImageBitmap(img, { resizeWidth: img.width / 2, resizeHeight: img.height / 2, resizeQuality: 'high' });
+      if (img instanceof ImageBitmap) img.close();
+      t.needsUpdate = true;
+    } catch { /* keep the full size */ }
+  }));
 }
 
 /** Stand a Meshy body `height` m tall on y = 0, facing the game's yaw 0 (-Z; the models face +Z). */

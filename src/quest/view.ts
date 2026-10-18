@@ -69,7 +69,7 @@ body.diablo #quests b { color: #e9d6b0; }
 `;
 
 /** One gate's meshes and its opening animation. */
-interface GateView { gate: Gate; root: THREE.Group; leaves: THREE.Object3D[]; p: number }
+interface GateView { gate: Gate; root: THREE.Group; leaves: THREE.Object3D[]; p: number; solid: THREE.Mesh[] }
 
 export class QuestView {
   readonly root = new THREE.Group();
@@ -221,7 +221,7 @@ export class QuestView {
     const c = this.quest.centre(g);
     root.position.set(c.x, g.y0, c.z);
     root.rotation.y = g.axis === 'x' ? 0 : Math.PI / 2; // local X runs along the wall
-    const leaves: THREE.Object3D[] = [];
+    const leaves: THREE.Object3D[] = [], solid: THREE.Mesh[] = [];
     if (g.kind === 'chain') { // the vow's chains, gone to lace: three sagging strands of pale glowing links between two iron posts
       const links: THREE.BufferGeometry[] = [], link = new THREE.TorusGeometry(0.09, 0.025, 4, 8);
       for (const y of [0.9, 1.6, 2.3]) {
@@ -260,14 +260,25 @@ export class QuestView {
           hinge.add(strap);
         }
         hinge.add(leaf);
+        solid.push(leaf);
         hinge.userData.side = s;
         root.add(hinge);
         leaves.push(hinge);
       }
     }
     this.root.add(root);
-    return { gate: g, root, leaves, p: 0 };
+    return { gate: g, root, leaves, p: 0, solid };
   }
+
+  /**
+   * The follow camera and the targeting rays stop on shut door leaves (`blockers` is the level's list they test):
+   * without them the camera behind a hero in front of a barred portone backs out through its arch.
+   */
+  blockDoors(blockers: THREE.Object3D[]): void {
+    this.blockers = blockers;
+    for (const v of this.gates) if (!v.gate.open) blockers.push(...v.solid);
+  }
+  private blockers: THREE.Object3D[] = [];
 
   /** `pressed('KeyF')` (or a tap on the prompt) uses whatever is at hand; returns a notice to show, if any. */
   update(dt: number, player: THREE.Vector3, pressed: (code: string) => boolean, boss: Priest): string[] {
@@ -319,6 +330,7 @@ export class QuestView {
 
     for (const v of this.gates) {
       if (!v.gate.open || v.p >= 1) continue;
+      if (v.p === 0) for (const m of v.solid) { const i = this.blockers.indexOf(m); if (i >= 0) this.blockers.splice(i, 1); } // open: the camera may pass
       v.p = Math.min(1, v.p + dt / OPEN_TIME);
       this.pose(v);
     }
@@ -388,7 +400,7 @@ export class QuestView {
 
   /** A loaded game: gates already open and the chest already emptied, without playing the openings. */
   settle(): void {
-    for (const v of this.gates) if (v.gate.open) { v.p = 1; this.pose(v); }
+    for (const v of this.gates) if (v.gate.open) { v.p = 1; this.pose(v); for (const m of v.solid) { const i = this.blockers.indexOf(m); if (i >= 0) this.blockers.splice(i, 1); } }
     if (this.quest.chestOpen) { this.lidP = LOOT; this.opening(LOOT); }
   }
 

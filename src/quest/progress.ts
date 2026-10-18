@@ -79,7 +79,7 @@ const ZITELLE = 196;
 
 /** Level 2 checkpoints: past the chains, the foot of the Ponte de la Croce's far side; once the church's back door is open, the andito at its steps. */
 export const CROCE = { x: 78, z: 15, yaw: -Math.PI / 2 } as const;
-export const ANDITO = { x: 240, z: -35, yaw: 0 } as const;
+export const ANDITO = { x: 240, z: -35, yaw: Math.PI } as const; // facing the back door
 
 /** What each report to Fra' Zuane is worth: experience on top of the dead's, gold into the bag. */
 export const REWARD = { report: { xp: 150, gold: 80 }, return: { xp: 300, gold: 200 } } as const;

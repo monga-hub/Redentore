@@ -238,6 +238,7 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
 const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
 questView.shop = () => vendor.open();
 questView.reward = (gold) => { bag.gold += gold; };
+questView.blockDoors(level.cameraBlockers); // shut doors stop the camera and the targeting rays
 vendor.level2 = () => quest.accepted2; // level 2's epics on the road to the Zitelle
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
 level.root.add(gothic.root);

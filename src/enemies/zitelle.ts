@@ -57,13 +57,13 @@ export const MAESTRA: CasterKind = {
 };
 export const GOVERNATRICE: CasterKind = {
   ...PRIEST,
-  hp: 17000, xp: 0, // her fall ends the second quest
+  hp: 13000, xp: 0, // her fall ends the second quest
   aggro: 14, leash: 60, blind: 15,
   range: 22, keep: 0, speed: 2.9, walk: 6, cast: 2.2, cooldown: 4, bolt: 11, life: 5, damage: 125,
   radius: 1, margin: 1.6,
   melee: { reach: 1.5, hit: 4.2, windup: 0.85, swing: 1.6, cooldown: 3.2, damage: 140 }, // the sceptre
   lines: { every: 9, cast: 1.7, length: 22, width: 2, damage: 330, n: 2, spread: 0.55 },
-  phases: { at: [0.7, 0.4, 0.25], haste: 1.2, berserk: 300, rage: 3 },
+  phases: { at: [0.7, 0.4, 0.25], haste: 1.2, berserk: 330, rage: 3 },
   veil: { cut: 0.8 },
   spin: { phase: 3, every: 14, time: 6, speed: 0.9, length: 9, width: 1.4, dps: 280 },
   resist: 0.35,

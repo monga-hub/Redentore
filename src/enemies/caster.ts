@@ -526,8 +526,8 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       if (dist < K.aggro && level && look(f, p, world, dt)) pull(f);
       return 0;
     case 'chase': {
-      const seen = level && dist <= K.range && look(f, p, world, dt);
-      f.blind = seen ? 0 : f.blind + dt;
+      const sight = level && look(f, p, world, dt), seen = sight && dist <= K.range;
+      f.blind = (K.range ? seen : sight) ? 0 : f.blind + dt; // a melee-only kind (the gondolieri) loses the player only behind a wall
       if (Math.hypot(p.x - f.home.x, p.z - f.home.z) > K.leash || f.blind > K.blind) { enter(f, 'evade'); return 0; }
       f.move = 0;
       if (K.spin && f.phase >= K.spin.phase && f.spinCd <= 0 && dist < K.spin.length + 4 && level) { enter(f, 'spin'); f.spinA = Math.atan2(p.x - f.x, p.z - f.z) + Math.PI / 4; return 0; }

@@ -19,6 +19,9 @@
 //   node scripts/balance.ts bosses [runs]          only the boss part of the above
 //   node scripts/balance.ts route melee [runs]     one build on the route (NODODGE=1: the bot that dodges nothing)
 //   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks; GEAR=start|typical|buy|epic, default typical)
+//   node scripts/balance.ts route2 melee [runs]    one build on the route, on into level 2 (Fra' Zuane, the fondamenta, the Zitelle, the Governatrice)
+//   node scripts/balance.ts boss2 plague 11 [runs] the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, epic)
+//   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
 import * as THREE from 'three';
@@ -26,6 +29,9 @@ import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
 import { CHEST, CHOIR_DOOR, NPC, Quest } from '../src/quest/progress.ts';
+import { GASTALDO, GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, PACKS, VELO, ZITELLA, spawnLevel2, type Level2 } from '../src/enemies/zitelle.ts';
+import { onLine, veiled } from '../src/enemies/caster.ts';
+import { ZF } from '../src/level/zones/zitelle.ts';
 import { FRIAR, separate, spawnGroups, think as friarThink, hurt as friarHurt, type Friar } from '../src/enemies/brain.ts';
 import { APE, APETTA, APIARY, BOSS_AT, GARDENS, REVERENDISSIMO, SACERDOTE, fly, hurt as casterHurt, spawnApiary, spawnCasters, think as casterThink, wipe, type Bolt, type Priest } from '../src/enemies/caster.ts';
 import { PlayerStats } from '../src/player/stats.ts';
@@ -77,7 +83,7 @@ function choose(build: string, picks: string[]): string {
 }
 
 // --- walking: the flood fill of check-walkable.ts, then breadth-first fields towards each goal ---
-const STEP = 0.5, X0 = -62, X1 = 62, Z0 = -197, Z1 = 22;
+const STEP = 0.5, X0 = -62, X1 = 302, Z0 = -197, Z1 = 22;
 const nx = Math.round((X1 - X0) / STEP), nz = Math.round((Z1 - Z0) / STEP);
 const toI = (x: number) => Math.round((x - X0) / STEP), toJ = (z: number) => Math.round((z - Z0) / STEP);
 const inGrid = (i: number, j: number) => i >= 0 && j >= 0 && i < nx && j < nz;
@@ -140,7 +146,7 @@ class Paths {
         q.push(n);
       }
     }
-    if (this.fields.size > 64) this.fields.clear();
+    if (this.fields.size > 24) this.fields.clear();
     this.fields.set(key, d);
     return d;
   }
@@ -186,6 +192,16 @@ function dangers(casters: Priest[], friars: Friar[], p: { x: number; z: number }
   };
   for (const c of casters) {
     if (c.state === 'dead' || c.state === 'pray') continue;
+    const L = c.kind.lines;
+    if (L) for (const l of c.lines) if (l.t < L.cast - REACT && onLine(l, L.width + 0.8, p)) { // a lace line: step off it sideways
+      const side = (p.x - l.x) * l.dz - (p.z - l.z) * l.dx >= 0 ? 1 : -1;
+      x += l.dz * side; z += -l.dx * side;
+    }
+    const S = c.kind.spin;
+    if (S && c.state === 'spin' && c.t > REACT && Math.hypot(p.x - c.x, p.z - c.z) < S.length + 1) { // the fuso: run round with the threads, in a gap
+      const dx = p.x - c.x, dz = p.z - c.z, d = Math.max(Math.hypot(dx, dz), 0.1);
+      x += (dz / d) * 1.2 + (dx / d) * (d < 4 ? 0.6 : d > 6 ? -0.4 : 0); z += (-dx / d) * 1.2 + (dz / d) * (d < 4 ? 0.6 : d > 6 ? -0.4 : 0);
+    }
     if (c.state === 'nova' && c.kind.nova) away(c.x, c.z, c.kind.nova.radius + 0.8);
     for (const k of c.marks) away(k.x, k.z, c.kind.phases!.marks!.radius + 0.6, c);
     const m = c.kind.melee; // a swing seen coming (REACT s in): step out of it, if there is time
@@ -218,7 +234,9 @@ class Run {
   readonly casters: Priest[];
   readonly boss: Priest;
   readonly bees: Priest[];
+  readonly l2: Level2; // the second level's casters
   readonly mobs: Mob[];
+  private free = new Set<Mob>(); // killed by a victory: worth nothing
   bolts: Bolt[] = [];
   picks: string[] = [];
   time = 0;
@@ -248,7 +266,7 @@ class Run {
   hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number) => {
     n = crit(n * tune.dmg * HANDS * this.worn.dmg, this.worn.crit, rnd);
     for (const m of this.mobs) if (m.state !== 'dead' && inside(m.x, m.z, m)) {
-      if (m === this.boss && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
+      if ((m === this.boss || m === this.l2.boss) && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
       if (isCaster(m)) casterHurt(m, n); else friarHurt(m, n);
     }
   };
@@ -265,7 +283,8 @@ class Run {
     this.dodge = dodge;
     Object.assign(tune, tuneOf([]));
     const c = spawnCasters(this.world, this.level.areas), a = spawnApiary(this.world);
-    this.casters = [...c.all, ...a.all];
+    this.l2 = spawnLevel2(this.world);
+    this.casters = [...c.all, ...a.all, ...this.l2.all];
     this.boss = c.boss;
     this.bees = a.all;
     this.mobs = [...this.friars, ...this.casters];
@@ -279,12 +298,14 @@ class Run {
 
   tierOf(m: Mob): Tier {
     if (!isCaster(m)) return 'friar';
-    return m.kind === REVERENDISSIMO ? 'boss' : m.kind === SACERDOTE || m.kind === APE ? 'elite' : m.kind === APETTA ? 'worker' : 'priest';
+    const k = m.kind;
+    return k === REVERENDISSIMO || k === GOVERNATRICE ? 'boss' : k === SACERDOTE || k === APE || k === GASTALDO || k === MAESTRA ? 'elite' : k === APETTA ? 'worker' : k === GONDOLIERE ? 'friar' : 'priest';
   }
+  levelOf(m: Mob): 1 | 2 { return isCaster(m) && this.l2.all.includes(m) ? 2 : 1; }
   /** A kill's loot: gold banked, a better piece worn (the old one sold), everything else sold. */
-  loot(tier: Tier): void {
+  loot(tier: Tier, level: 1 | 2 = 1): void {
     this.tierKills[tier] = (this.tierKills[tier] ?? 0) + 1;
-    const d = roll(tier, rnd);
+    const d = roll(tier, rnd, level);
     this.bag.gold += d.gold.reduce((a, b) => a + b, 0);
     for (const id of d.items) this.take(id);
   }
@@ -313,7 +334,8 @@ class Run {
     if (kind === 'epic') { for (const it of shop(false)) this.gear.worn[it.slot!] = it.id; this.apply(); return; }
     if (kind === 'start') return;
     for (const [tier, n] of Object.entries(TYPICAL)) for (let i = 0; i < n; i++) this.loot(tier as Tier);
-    if (kind === 'buy') this.shop();
+    if (kind === 'typical2' || kind === 'buy2') for (const [tier, n] of Object.entries(TYPICAL2)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 2);
+    if (kind === 'buy' || kind === 'buy2') this.shop();
   }
 
   // --- what the ability table calls ---
@@ -390,7 +412,13 @@ class Run {
     }
   }
 
-  get xp(): number { return [...this.worth].reduce((s, [m, xp]) => s + (m.state === 'dead' && m !== this.boss ? xp : 0), 0); }
+  get xp(): number { return [...this.worth].reduce((s, [m, xp]) => s + (m.state === 'dead' && !this.free.has(m) ? xp : 0), 0) + this.quest.bonusXp; }
+  /** The Reverendissimo is dead: as in the game, everyone of level 1 falls with him, for nothing; out of the portone. */
+  victory1(): void {
+    this.quest.win();
+    this.quest.out = true;
+    for (const m of [...this.friars, ...this.casters]) if (!this.l2.all.includes(m as Priest) && m.state !== 'dead') { this.free.add(m); m.state = 'dead'; m.hp = 0; }
+  }
   levelUp(): void {
     const lv = levelOf(this.xp).lv;
     while (this.picks.length < lv - 1) {
@@ -423,6 +451,10 @@ class Run {
     if (!isCaster(m)) return 'orto';
     if (m.kind === APE || m.kind === APETTA) return 'apiario';
     if (m.kind === REVERENDISSIMO) return 'boss';
+    if (m.kind === GOVERNATRICE || m.kind === VELO) return 'boss2';
+    if (m.kind === MAESTRA || m.mates.some((x) => x.kind === MAESTRA)) return 'maestra';
+    if (m.kind === GASTALDO || m.mates.some((x) => x.kind === GASTALDO)) return 'gastaldo';
+    if (this.l2.all.includes(m)) return m.kind === ZITELLA ? 'ospizio' : 'fond.2';
     const a = this.level.areaAt(m.home.x, m.home.z);
     return /^Chiostr/.test(a?.label ?? '') ? 'chiostri' : a?.zone === 'chiesa' ? 'chiesa' : 'laguna';
   }
@@ -501,6 +533,7 @@ class Run {
     const engaged = this.mobs.filter((m) => FIGHTING.has(m.state));
     if (engaged.length) this.best.t = this.time; // fighting is not being stuck
     if (!this.target || !FIGHTING.has(this.target.state)) this.target = this.nearest(engaged);
+    if (this.target && isCaster(this.target) && veiled(this.target)) this.target = this.nearest(this.target.wards!.filter((w) => FIGHTING.has(w.state))) ?? this.target; // her veil: the girls first
     const t = this.target;
     const hp0 = s.hp;
 
@@ -520,7 +553,7 @@ class Run {
     } else if (t) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
-      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE);
+      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO);
       if (!this.system.casting) {
         // the heal: a long cast, pushed back by every hit taken, so only worth it below 55%
         if (low < 0.55 && this.ready('mend')) { if (this.cast('mend') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
@@ -565,13 +598,14 @@ class Run {
     separate(this.friars, this.world);
     for (const c of this.casters) {
       const was = c.state, d = casterThink(c, p, this.world, dt, this.bolts);
-      if (c === this.boss && d > 0) { const k = was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
+      if ((c === this.boss || c === this.l2.boss) && d > 0) { const k = was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
       dmg += d;
     }
     separate(this.casters, this.world);
     dmg += fly(this.bolts, p, dt, [], this.world);
     if (dmg > 0 && s.takeDamage(dmg) > 0) this.system.pushback(); // the game's onHurt
-    if (this.looting) for (const m of this.mobs) if (m.state === 'dead' && !this.looted.has(m)) { this.looted.add(m); this.loot(this.tierOf(m)); }
+    if (this.looting) for (const m of this.mobs) if (m.state === 'dead' && !this.looted.has(m) && !this.free.has(m)) { this.looted.add(m); this.loot(this.tierOf(m), this.levelOf(m)); }
+    if (!this.quest.key2 && this.l2.maestra.state === 'dead') this.quest.takeKey2();
     this.zone(t ? this.zoneOf(t) : 'viaggio').mana += this.spent;
     this.spent = 0;
     if (t) {
@@ -622,13 +656,36 @@ function route(apiary: boolean): Goal[] {
   ];
 }
 
+/**
+ * Level 2: report to Fra' Zuane and take La dote delle Zitelle, then east along the fondamenta through the packs a
+ * player meets on the way (the campo, the squero's Gastaldo and the sagrato among them; the campiello, the far
+ * sagrato, the refettorio, the dormitorio, the infermeria and the orto left), into the ospizio, the Maestra and her
+ * key, the court, the back door, the Governatrice.
+ */
+const ON_THE_WAY = [0, 2, 3, 4, 5, 6, 9, 10, 11, 12];
+const BACK = { x: 240, z: -33 };
+function route2(r: Run): Goal[] {
+  const pack = (i: number): Goal => {
+    const p = PACKS[i], ms = r.l2.all.filter((m) => p.members.some(([k, x, z]) => m.kind === k && m.home.x === x && m.home.z === z));
+    return { name: p.label, x: p.at[0], z: p.at[1], r: 2.5, until: () => ms.every((m) => m.state === 'dead') };
+  };
+  return [
+    { name: 'zuane', x: NPC.x, z: NPC.z, r: 2.2, done: (r) => { r.quest.report(); r.quest.accept2(); r.paths.reset(); } },
+    ...ON_THE_WAY.map(pack),
+    { name: 'porta', x: BACK.x, z: BACK.z, r: 1.6, done: (r) => { r.quest.open(r.quest.gate('coro-zitelle')); r.paths.reset(); } },
+    { name: 'boss2', x: GOV_AT.x, z: GOV_AT.z, y: ZF, r: 3, boss: true, until: (r) => r.l2.boss.state === 'dead' },
+  ];
+}
+
 const LIMIT = 45 * 60; // s of play before a run is called off
 /** Kills by tier on a typical route up to the choir door (the mean of `npm run balance`'s runs): the loot of GEAR=typical. */
 const TYPICAL: Record<string, number> = { friar: 32, priest: 32, elite: 3, worker: 3 };
+/** Level 2's kills on the way to the Governatrice (ON_THE_WAY; GEAR=typical2: level 1's typical, then these). */
+const TYPICAL2: Record<string, number> = { friar: 11, priest: 15, elite: 2 };
 
-export interface RouteResult { build: string; dodge: boolean; won: boolean; time: number; deaths: number; lv: number; xp: number; zones: Map<string, Zone>; picks: string[]; boss: number; gold: number; gear: GearState; kills: Partial<Record<Tier, number>> }
+export interface RouteResult { build: string; dodge: boolean; won: boolean; time: number; deaths: number; lv: number; xp: number; zones: Map<string, Zone>; picks: string[]; boss: number; gold: number; gear: GearState; kills: Partial<Record<Tier, number>>; l2?: { won: boolean; time: number; deaths: number; lv0: number; lv: number; xp: number; boss: number; kills: Partial<Record<Tier, number>> } }
 
-export function playRoute(build: string, dodge: boolean, s = 1, apiary = true): RouteResult {
+export function playRoute(build: string, dodge: boolean, s = 1, apiary = true, level2 = false): RouteResult {
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919; // after the level is built: its first build draws on Math.random more than the next ones
@@ -644,13 +701,33 @@ export function playRoute(build: string, dodge: boolean, s = 1, apiary = true): 
     g.done?.(r);
     if (g.name === 'coro') { gold = r.bag.gold; gear = r.gear.encode(); kills = { ...r.tierKills }; } // what the hero has walking in on the boss
   }
-  return { build, dodge, won: r.boss.state === 'dead', time: r.time, deaths: r.deaths, lv: r.lv, xp: r.xp, zones: r.zones, picks: r.picks, boss: bossT, gold, gear, kills };
+  const out: RouteResult = { build, dodge, won: r.boss.state === 'dead', time: r.time, deaths: r.deaths, lv: r.lv, xp: r.xp, zones: r.zones, picks: r.picks, boss: bossT, gold, gear, kills };
+  if (!level2 || !out.won) return out;
+  // Level 2 from where level 1 left the hero: its level, its gear, its gold unspent.
+  r.victory1();
+  const t0 = r.time, d0 = r.deaths, lv0 = r.lv, k0 = { ...r.tierKills };
+  let boss2 = 0;
+  for (const g of route2(r)) {
+    const reached = () => Math.hypot(r.player.pos.x - g.x, r.player.pos.z - g.z) < g.r + 0.6 && (g.y === undefined || Math.abs(r.player.pos.y - g.y) < 1);
+    while (r.time < t0 + LIMIT && !(g.until ? g.until(r) : reached() && !r.target)) {
+      if (g.name === 'boss2' && FIGHTING.has(r.l2.boss.state)) boss2 += DT;
+      r.step(g);
+    }
+    if (r.time >= t0 + LIMIT) break;
+    g.done?.(r);
+  }
+  const kills2 = Object.fromEntries(Object.entries(r.tierKills).map(([k, v]) => [k, v - (k0[k as Tier] ?? 0)]));
+  if (process.env.DBG) for (const m of r.l2.all) if (m.state !== "dead" && Math.abs(m.x - r.player.pos.x) < 40) console.log(m.kind.hp, m.state, "y", m.y, r.player.pos.y, m.x.toFixed(1), m.z.toFixed(1), m.hp.toFixed(0), "player", r.player.pos.x.toFixed(1), r.player.pos.z.toFixed(1));
+  out.l2 = { won: r.l2.boss.state === 'dead', time: r.time - t0, deaths: r.deaths - d0, lv0, lv: r.lv, xp: r.xp, boss: boss2, kills: kills2 };
+  out.picks = r.picks;
+  out.zones = r.zones;
+  return out;
 }
 
 export interface BossResult { build: string; lv: number; gear: string; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dry: number; dealt: Map<string, number>; taken: Map<string, number>; casts: Map<string, number> }
 
 /** The boss alone: the church cleared, the choir door open, a build at level `lv`, five tries at most. */
-export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear = process.env.GEAR ?? 'typical'): BossResult {
+export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear = process.env.GEAR ?? 'typical', second = false): BossResult {
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919; // after the level is built: its first build draws on Math.random more than the next ones
@@ -661,26 +738,28 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear 
   r.quest.accepted = true;
   r.quest.takeKey();
   for (const g of r.quest.gates) if (g.needs === 'key') r.quest.open(g);
+  const boss = second ? r.l2.boss : r.boss, zone = second ? 'boss2' : 'boss';
+  if (second) { r.quest.win(); r.quest.out = true; r.quest.report(); r.quest.accept2(); r.quest.takeKey2(); r.quest.open(r.quest.gate('coro-zitelle')); }
   r.paths.reset();
-  for (const m of r.mobs) if (m !== r.boss) { m.state = 'dead'; m.hp = 0; }
+  for (const m of r.mobs) if (m !== boss && !(second && (m as Priest).kind === VELO)) { m.state = 'dead'; m.hp = 0; }
   r.levelUp = () => {}; // the level is fixed
   const at = r.quest.checkpoint();
   Object.assign(r.player.pos, { x: at.x, y: r.world.standHeight(at.x, at.z), z: at.z });
-  const goal = { x: BOSS_AT.x, z: BOSS_AT.z, r: 3, boss: true }, tries: BossResult['tries'] = [];
+  const goal = second ? { x: GOV_AT.x, z: GOV_AT.z, r: 3, boss: true } : { x: BOSS_AT.x, z: BOSS_AT.z, r: 3, boss: true }, tries: BossResult['tries'] = [];
   let t0 = -1, pots = 0, deaths = 0;
-  while (r.time < LIMIT && r.boss.state !== 'dead' && tries.length < 5) {
-    const was = r.stats.dead, z = r.zone('boss'), p0 = z.potions;
-    if (FIGHTING.has(r.boss.state) && t0 < 0) t0 = r.time;
+  while (r.time < LIMIT && boss.state !== 'dead' && tries.length < 5) {
+    const was = r.stats.dead, z = r.zone(zone), p0 = z.potions;
+    if (FIGHTING.has(boss.state) && t0 < 0) t0 = r.time;
     r.step(goal);
     pots += z.potions - p0;
     if (r.deaths > deaths || (was && !r.stats.dead)) {
       deaths = r.deaths;
-      tries.push({ time: t0 >= 0 ? r.time - t0 : 0, left: r.boss.kind.hp, potions: pots });
+      tries.push({ time: t0 >= 0 ? r.time - t0 : 0, left: boss.kind.hp, potions: pots });
       t0 = -1; pots = 0;
     }
-    if ((r.boss.state as string) === 'dead') tries.push({ time: r.time - t0, left: 0, potions: pots });
+    if ((boss.state as string) === 'dead') tries.push({ time: r.time - t0, left: 0, potions: pots });
   }
-  return { build, lv, gear, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dry: r.zone('boss').dry / Math.max(r.zone('boss').time, 1e-9), dealt: r.dealt, taken: r.taken, casts: r.casts };
+  return { build, lv, gear, picks: r.picks, dodge, won: boss.state === 'dead', tries, dry: r.zone(zone).dry / Math.max(r.zone(zone).time, 1e-9), dealt: r.dealt, taken: r.taken, casts: r.casts };
 }
 
 export interface EliteResult { build: string; lv: number; elite: string; dodge: boolean; won: boolean; time: number; potions: number; lost: number }
@@ -690,7 +769,7 @@ export interface EliteResult { build: string; lv: number; elite: string; dodge: 
  * giant bee and her workers, a build at level `lv`, everything else on the map dead. Won if the
  * group falls before the hero does.
  */
-export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape', dodge: boolean, s = 1): EliteResult {
+export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape' | 'maestra' | 'gastaldo', dodge: boolean, s = 1): EliteResult {
   swings.clear();
   const r = new Run(build, dodge);
   seed = s * 7919;
@@ -703,14 +782,15 @@ export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape',
   for (const g of r.quest.gates) if (g.needs === 'key') r.quest.open(g);
   r.paths.reset();
   const garden = GARDENS[s % GARDENS.length];
-  const group = elite === 'ape' ? r.bees : r.casters.find((c) => c.kind === SACERDOTE && r.level.areaAt(c.home.x, c.home.z)?.label === garden)!.mates;
+  if (elite === 'maestra' || elite === 'gastaldo') { r.quest.win(); r.quest.out = true; r.quest.report(); r.quest.accept2(); r.paths.reset(); }
+  const group = elite === 'ape' ? r.bees : elite === 'maestra' ? r.l2.maestra.mates : elite === 'gastaldo' ? r.l2.gastaldo.mates : r.casters.find((c) => c.kind === SACERDOTE && r.level.areaAt(c.home.x, c.home.z)?.label === garden)!.mates;
   for (const m of r.mobs) if (!group.includes(m as Priest)) { m.state = 'dead'; m.hp = 0; }
   r.levelUp = () => {};
   const g0 = group[0], goal = { x: g0.home.x, z: g0.home.z, r: 2 };
   let t0 = -1, pots = 0, lost = 0;
   while (r.time < 15 * 60 && !r.deaths && group.some((m) => m.state !== 'dead')) {
     if (t0 < 0 && group.some((m) => FIGHTING.has(m.state))) t0 = r.time;
-    const z = r.zone(elite === 'ape' ? 'apiario' : 'laguna'), p0 = z.potions;
+    const z = r.zone(elite === 'ape' ? 'apiario' : elite === 'sacerdote' ? 'laguna' : elite), p0 = z.potions;
     const h0 = r.stats.hp;
     r.step(goal);
     if (t0 >= 0) lost += Math.max(0, h0 - r.stats.hp) / r.stats.hpMax;
@@ -720,7 +800,7 @@ export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape',
 }
 
 // --- reports ---
-const ZONES = ['orto', 'apiario', 'laguna', 'chiostri', 'chiesa', 'boss', 'viaggio'];
+const ZONES = ['orto', 'apiario', 'laguna', 'chiostri', 'chiesa', 'boss', 'fond.2', 'gastaldo', 'ospizio', 'maestra', 'boss2', 'viaggio'];
 const pad = (s: string | number, n: number) => String(s).padStart(n);
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
 const f1 = (x: number) => (Math.round(x * 10) / 10).toString();
@@ -731,6 +811,7 @@ export function routeTable(rs: RouteResult[]): string {
   for (const r of rs) {
     out.push(`  ${r.won ? 'boss down' : 'NOT FINISHED'} in ${(r.time / 60).toFixed(1)} min, ${r.deaths} deaths, level ${r.lv} (${r.xp} XP), boss fight ${r.boss.toFixed(0)} s; picks ${r.picks.join(' ')}`);
     out.push(`    at the boss: ${r.gold} gold, ${gearLine(r.gear)}; kills ${Object.entries(r.kills).map(([k, v]) => `${k} ${v}`).join(' ')}`);
+    if (r.l2) out.push(`    level 2: ${r.l2.won ? 'Governatrice down' : 'NOT FINISHED'} in ${(r.l2.time / 60).toFixed(1)} min, ${r.l2.deaths} deaths, level ${r.l2.lv0} -> ${r.l2.lv} (${r.l2.xp} XP), boss fight ${r.l2.boss.toFixed(0)} s; kills ${Object.entries(r.l2.kills).map(([k, v]) => `${k} ${v}`).join(' ')}`);
   }
   out.push(`  ${'zone'.padEnd(9)}${pad('fight s', 8)}${pad('hp lost', 8)}${pad('potions', 8)}${pad('deaths', 7)}${pad('level', 6)}${pad('mana', 7)}${pad('dry %', 7)}`);
   for (const k of ZONES) {
@@ -778,10 +859,18 @@ if (process.argv[1]?.endsWith('balance.ts')) {
   const [mode, build, n, seeds] = process.argv.slice(2);
   const runs = (k: number, f: (s: number) => void) => { for (let s = 1; s <= k; s++) f(s); };
   const t0 = performance.now();
-  if (mode === 'boss') {
-    const rs: BossResult[] = [];
-    for (const d of [true, false]) runs(Number(seeds ?? 3), (s) => rs.push(playBoss(build ?? 'mixed', Number(n ?? 9), d, s)));
+  if (mode === 'boss' || mode === 'boss2') {
+    const rs: BossResult[] = [], two = mode === 'boss2';
+    for (const d of [true, false]) runs(Number(seeds ?? 3), (s) => rs.push(playBoss(build ?? 'mixed', Number(n ?? (two ? 11 : 9)), d, s, process.env.GEAR ?? (two ? 'typical2' : 'typical'), two)));
     console.log(bossTable(rs));
+  } else if (mode === 'elite2') {
+    const rs: EliteResult[] = [];
+    for (const e of ['gastaldo', 'maestra'] as const) for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [9, 10, 11]) runs(Number(build ?? 3), (s) => rs.push(playElite(b, lv, e, d, s)));
+    console.log(eliteTable(rs));
+  } else if (mode === 'route2') {
+    const rs: RouteResult[] = [];
+    runs(Number(n ?? 3), (s) => rs.push(playRoute(build ?? 'mixed', !process.env.NODODGE, s, true, true)));
+    console.log(routeTable(rs));
   } else if (mode === 'elite') {
     const rs: EliteResult[] = [];
     for (const e of ['sacerdote', 'ape'] as const) for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [6, 7, 8]) runs(Number(build ?? 4), (s) => rs.push(playElite(b, lv, e, d, s)));
@@ -794,7 +883,7 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     const k = Number(mode === 'bosses' ? build ?? 3 : mode ?? 3);
     if (mode !== 'bosses') for (const [b, d] of [...Object.keys(BUILDS).map((b) => [b, true] as const), ['mixed', false] as const]) {
       const rs: RouteResult[] = [];
-      runs(k, (s) => rs.push(playRoute(b, d, s)));
+      runs(k, (s) => rs.push(playRoute(b, d, s, true, true))); // on into level 2
       console.log(routeTable(rs));
     }
     const boss: BossResult[] = [];
@@ -806,6 +895,14 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     }
     for (const lv of [9]) runs(k, (s) => boss.push(playBoss('mixed', lv, false, s)));
     console.log('\nboss alone (choir door checkpoint, church cleared; five tries at most)\n' + bossTable(boss));
+    const gov: BossResult[] = [];
+    for (const b of Object.keys(BUILDS)) {
+      for (const lv of [10, 11, 12]) runs(k, (s) => gov.push(playBoss(b, lv, true, s, 'typical2', true)));
+      runs(k, (s) => gov.push(playBoss(b, 11, true, s, 'typical', true))); // level 1's gear only
+      runs(k, (s) => gov.push(playBoss(b, 11, true, s, 'buy2', true)));
+    }
+    runs(k, (s) => gov.push(playBoss('mixed', 11, false, s, 'typical2', true)));
+    console.log('\nthe Governatrice alone (andito checkpoint, the Zitelle cleared but her wards; five tries at most)\n' + bossTable(gov));
   }
   console.log(`\n(${((performance.now() - t0) / 1000).toFixed(0)} s)`);
 }

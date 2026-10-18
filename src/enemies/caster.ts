@@ -68,14 +68,14 @@ export const PRIEST: CasterKind = {
  */
 export const SACERDOTE: CasterKind = {
   ...PRIEST,
-  hp: 950, // ~15 s of a level-6 rotation
+  hp: 760, // ~12 s of a level-6 rotation
   xp: 40,
   aggro: 13, leash: 40, blind: 10,
   range: 18, keep: 0, // never backpedals: walks into melee
-  speed: 3.4, cast: 1.8, cooldown: 3.2, damage: 75,
+  speed: 3.4, cast: 1.8, cooldown: 3.2, damage: 60,
   radius: 0.55,
-  melee: { reach: 2, hit: 2.8, windup: 0.7, swing: 1.3, cooldown: 2.2, damage: 105 },
-  nova: { every: 11, cast: 1.8, radius: 4, damage: 220 },
+  melee: { reach: 2, hit: 2.8, windup: 0.7, swing: 1.3, cooldown: 2.2, damage: 85 },
+  nova: { every: 11, cast: 1.8, radius: 4, damage: 170 },
   resist: 0.7, // an elite shakes off control sooner
 };
 
@@ -110,19 +110,19 @@ export const REVERENDISSIMO: CasterKind = {
  * The caster brain without bolts (`range` 0: it never casts, so it never loses sight either):
  * a stinger dive in melee and, every `nova.every` s of fighting, a poison swarm round itself to
  * run out of. It flies, but its brain walks the ground like everyone else (bees.ts lifts the body).
- * Against the player's 1280 hp: ~40 dps from the stinger if the swarm is dodged, and a swarm eaten
- * costs a fifth of it; about 30 s to kill at level 5.
+ * Against the player's 1280 hp: ~30 dps from the stinger if the swarm is dodged, and a swarm eaten
+ * costs a sixth of it; about 25 s to kill at level 5.
  */
 export const APE: CasterKind = {
   ...PRIEST,
-  hp: 1500,
+  hp: 1200,
   xp: 80,
   aggro: 6, leash: 30, blind: Infinity, // off the paved paths' reach: the player steps into the frutteto to pull it
   range: 0, keep: 0,
   speed: 4.4, walk: 6,
   radius: 0.9, margin: 1,
-  melee: { reach: 1.3, hit: 3.4, windup: 0.6, swing: 1.3, cooldown: 2.4, damage: 70 }, // a lunging dive: too long to step out of
-  nova: { every: 9, cast: 2, radius: 4.5, damage: 260 },
+  melee: { reach: 1.3, hit: 3.4, windup: 0.6, swing: 1.3, cooldown: 2.4, damage: 56 }, // a lunging dive: too long to step out of
+  nova: { every: 9, cast: 2, radius: 4.5, damage: 200 },
   resist: 0.6,
 };
 /** Worker bees round the hives, pulled with the giant: quick, frail, small stings. */
@@ -133,7 +133,7 @@ export const APETTA: CasterKind = {
   aggro: 5,
   speed: 5.2, walk: 7,
   radius: 0.35, margin: 0.5,
-  melee: { reach: 0.7, hit: 1.6, windup: 0.35, swing: 0.8, cooldown: 1.8, damage: 22 },
+  melee: { reach: 0.7, hit: 1.6, windup: 0.35, swing: 0.8, cooldown: 1.8, damage: 18 },
   nova: undefined,
   resist: 1,
 };

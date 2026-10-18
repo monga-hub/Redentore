@@ -13,13 +13,15 @@
 //   node scripts/balance.ts [runs]                 every build on the route (3 runs each; arcane and storm take fire/frost and lightning/new blows first), then the boss alone at levels 1, 6, 8, 9
 //   node scripts/balance.ts route melee [runs]     one build on the route (NODODGE=1: the bot that dodges nothing)
 //   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks)
+//   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life
+//   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
 import { CHEST, CHOIR_DOOR, NPC, Quest } from '../src/quest/progress.ts';
 import { FRIAR, separate, spawnGroups, think as friarThink, hurt as friarHurt, type Friar } from '../src/enemies/brain.ts';
-import { APE, APETTA, APIARY, BOSS_AT, REVERENDISSIMO, fly, hurt as casterHurt, spawnApiary, spawnCasters, think as casterThink, wipe, type Bolt, type Priest } from '../src/enemies/caster.ts';
+import { APE, APETTA, APIARY, BOSS_AT, GARDENS, REVERENDISSIMO, SACERDOTE, fly, hurt as casterHurt, spawnApiary, spawnCasters, think as casterThink, wipe, type Bolt, type Priest } from '../src/enemies/caster.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { ABILITIES, BAR, plagueSpot, tune, wispFoe, type Forsaken } from '../src/abilities/forsaken.ts';
 import { Grimoire } from '../src/abilities/grimoire.ts';
@@ -28,6 +30,8 @@ import { AbilitySystem } from '../src/abilities/system.ts';
 import { START, levelOf, offer, tuneOf } from '../src/player/levels.ts';
 
 const DT = 1 / 30;
+/** HANDS=0.6: the bot lands that share of its damage, a stand-in for a human's slower, sloppier rotation. */
+const HANDS = Number(process.env.HANDS ?? 1);
 type World = ReturnType<typeof buildLevel>['world'];
 type Mob = Friar | Priest;
 const isCaster = (m: Mob): m is Priest => 'kind' in m;
@@ -226,7 +230,7 @@ class Run {
   casts = new Map<string, number>(); // abilities started, by id
   taken = new Map<string, number>(); // from the boss, by attack (before the hp floor)
   hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number) => {
-    n *= tune.dmg;
+    n *= tune.dmg * HANDS;
     for (const m of this.mobs) if (m.state !== 'dead' && inside(m.x, m.z, m)) {
       if (m === this.boss && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
       if (isCaster(m)) casterHurt(m, n); else friarHurt(m, n);
@@ -611,6 +615,41 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1): Boss
   return { build, lv, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dealt: r.dealt, taken: r.taken, casts: r.casts };
 }
 
+export interface EliteResult { build: string; lv: number; elite: string; dodge: boolean; won: boolean; time: number; potions: number; lost: number }
+
+/**
+ * A miniboss alone, one life: a garden's sacerdote and its two priests (the garden by the seed) or the
+ * giant bee and her workers, a build at level `lv`, everything else on the map dead. Won if the
+ * group falls before the hero does.
+ */
+export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape', dodge: boolean, s = 1): EliteResult {
+  swings.clear();
+  const r = new Run(build, dodge);
+  seed = s * 7919;
+  r.picks = lv > 1 ? picksTo(build, lv) : [];
+  r.apply();
+  r.stats.revive();
+  r.quest.accepted = true;
+  r.quest.takeKey();
+  for (const g of r.quest.gates) if (g.needs === 'key') r.quest.open(g);
+  r.paths.reset();
+  const garden = GARDENS[s % GARDENS.length];
+  const group = elite === 'ape' ? r.bees : r.casters.find((c) => c.kind === SACERDOTE && r.level.areaAt(c.home.x, c.home.z)?.label === garden)!.mates;
+  for (const m of r.mobs) if (!group.includes(m as Priest)) { m.state = 'dead'; m.hp = 0; }
+  r.levelUp = () => {};
+  const g0 = group[0], goal = { x: g0.home.x, z: g0.home.z, r: 2 };
+  let t0 = -1, pots = 0, lost = 0;
+  while (r.time < 15 * 60 && !r.deaths && group.some((m) => m.state !== 'dead')) {
+    if (t0 < 0 && group.some((m) => FIGHTING.has(m.state))) t0 = r.time;
+    const z = r.zone(elite === 'ape' ? 'apiario' : 'laguna'), p0 = z.potions;
+    const h0 = r.stats.hp;
+    r.step(goal);
+    if (t0 >= 0) lost += Math.max(0, h0 - r.stats.hp) / r.stats.hpMax;
+    pots += z.potions - p0;
+  }
+  return { build, lv, elite, dodge, won: !r.deaths && group.every((m) => m.state === 'dead'), time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
+}
+
 // --- reports ---
 const ZONES = ['orto', 'apiario', 'laguna', 'chiostri', 'chiesa', 'boss', 'viaggio'];
 const pad = (s: string | number, n: number) => String(s).padStart(n);
@@ -645,6 +684,19 @@ export function bossTable(rs: BossResult[]): string {
   return out.join('\n');
 }
 
+/** Minibosses alone: per elite, build and level, wins (one life each), the fight's length and potions. */
+export function eliteTable(rs: EliteResult[]): string {
+  const out = [`${'elite'.padEnd(10)}${'build'.padEnd(8)}${pad('level', 6)} ${'bot'.padEnd(9)}${pad('wins', 7)}${pad('fight s', 8)}${pad('pots', 6)}${pad('hp lost', 9)}`];
+  const key = (r: EliteResult) => `${r.elite}|${r.build}|${r.lv}|${r.dodge}`;
+  for (const k of [...new Set(rs.map(key))]) {
+    const g = rs.filter((r) => key(r) === k), r0 = g[0], won = g.filter((r) => r.won);
+    out.push(`${r0.elite.padEnd(10)}${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 7)}` +
+      `${pad(won.length ? mean(won.map((r) => r.time)).toFixed(0) : '-', 8)}${pad(won.length ? f1(mean(won.map((r) => r.potions))) : '-', 6)}${pad(`${Math.round(mean(g.map((r) => r.lost)) * 100)}%`, 9)}`);
+  }
+  out.push(`elites at 6-8, dodging: ${rs.filter((r) => r.dodge && r.won).length}/${rs.filter((r) => r.dodge).length} won`);
+  return out.join('\n');
+}
+
 if (process.argv[1]?.endsWith('balance.ts')) {
   const [mode, build, n, seeds] = process.argv.slice(2);
   const runs = (k: number, f: (s: number) => void) => { for (let s = 1; s <= k; s++) f(s); };
@@ -653,6 +705,10 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     const rs: BossResult[] = [];
     for (const d of [true, false]) runs(Number(seeds ?? 3), (s) => rs.push(playBoss(build ?? 'mixed', Number(n ?? 9), d, s)));
     console.log(bossTable(rs));
+  } else if (mode === 'elite') {
+    const rs: EliteResult[] = [];
+    for (const e of ['sacerdote', 'ape'] as const) for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [6, 7, 8]) runs(Number(build ?? 4), (s) => rs.push(playElite(b, lv, e, d, s)));
+    console.log(eliteTable(rs));
   } else if (mode === 'route') {
     const rs: RouteResult[] = [];
     runs(Number(n ?? 3), (s) => rs.push(playRoute(build ?? 'mixed', !process.env.NODODGE, s)));

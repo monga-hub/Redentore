@@ -96,6 +96,7 @@ export class QuestView {
   private bossFill: HTMLElement;
   private bossText: HTMLElement;
   private victoryEl = document.createElement('div');
+  private bossName?: object; // the kind the boss bar is named for
   /** The boss bar is up: the target frame and the boss's own nameplate bar give way to it. */
   bossShown = false;
   /** Fra' Bortolo's Commercia: main.ts opens the shop. */
@@ -332,6 +333,10 @@ export class QuestView {
 
     const fighting = (this.bossShown = boss.state !== 'pray' && boss.state !== 'dead' && boss.state !== 'evade');
     this.bossEl.style.display = fighting ? 'block' : 'none';
+    if (fighting && this.bossName !== boss.kind) { // whose bar: the Reverendissimo's, then the Governatrice's
+      this.bossName = boss.kind;
+      this.bossEl.firstChild!.textContent = boss.kind.phases?.marks ? 'Il Reverendissimo' : 'La Governatrice';
+    }
     if (fighting) {
       this.bossFill.style.width = `${(boss.hp / boss.kind.hp) * 100}%`;
       this.bossText.textContent = `${Math.ceil(boss.hp)} / ${boss.kind.hp}`;
@@ -399,7 +404,11 @@ export class QuestView {
     }
   }
 
-  victory(): void {
+  /** The banner: the Reverendissimo's fall, or (`second`) the Governatrice's. */
+  victory(second = false): void {
+    if (second) this.victoryEl.innerHTML = 'La Governatrice è caduta<small>Il velo si scioglie: il portone delle Zitelle si apre sulla fondamenta</small>';
+    this.victoryEl.classList.remove('show');
+    void this.victoryEl.offsetWidth; // replay the fade
     this.victoryEl.classList.add('show');
   }
 }

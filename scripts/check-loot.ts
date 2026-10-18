@@ -3,7 +3,7 @@
 // (gear one per slot), refuses what does not fit and round-trips. Gear: the stat math, wearing from
 // the bag (swapping), taking off, selling at a quarter, buying epics, crits, and the save of what is worn.
 import { Bag, ITEM, ITEMS, RARITY, TABLES, roll, type Tier } from '../src/loot/bag.ts';
-import { ARMOR_K, CRIT_BASE, Equipment, GEAR, SHOP, STARTER, buy, buyPrice, crit, effects, sell, sellPrice, totals, worth } from '../src/loot/gear.ts';
+import { ARMOR_K, CRIT_BASE, Equipment, GEAR, SHOP, STARTER, shop, buy, buyPrice, crit, effects, sell, sellPrice, totals, worth } from '../src/loot/gear.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 let seed = 1;
@@ -48,7 +48,7 @@ if (back.gold !== 1234 || JSON.stringify(back.encode()) !== JSON.stringify(bag.e
 back.decode({ gold: -5, items: [['from_the_future', 3], ['mozzicone', 2]] });
 if (back.gold !== 0 || back.items.length !== 1 || back.count('mozzicone') !== 2) fail('unknown ids or negative gold kept');
 // --- gear ---
-if (GEAR.some((g) => !g.slot || !g.stats || !Object.keys(g.stats).length) || SHOP.length !== 9 || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
+if (GEAR.some((g) => !g.slot || !g.stats || !Object.keys(g.stats).length) || shop(false).length !== 9 || shop(true).length !== 18 || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
 if (Object.keys(STARTER).length !== 7 || STARTER.amuleto || STARTER.anello) fail('starter set');
 const t = totals(['canapa-torso', 'saio-voto', 'nope', undefined]), hemp = ITEM.get('canapa-torso')!.stats!, torso = ITEM.get('saio-voto')!.stats!;
 if (t.vigore !== hemp.vigore! + torso.vigore! || t.armatura !== hemp.armatura! + torso.armatura! || t.potenza !== torso.potenza) fail(`totals ${JSON.stringify(t)}`);
@@ -57,7 +57,9 @@ if (e.cut !== 0.5 || e.crit !== CRIT_BASE + 5 || Math.abs(e.haste - 1.1) > 1e-9 
 if (crit(100, 10, () => 0.05) !== 150 || crit(100, 10, () => 0.5) !== 100 || Math.abs(crit(0.5, 10) - 0.525) > 1e-9) fail('crit');
 if (buyPrice(ITEM.get('saio-voto')!) !== 480 || sellPrice(ITEM.get('saio-voto')!) !== 120 || sellPrice(ITEM.get('chiodo')!) !== 150) fail('prices');
 const ep = (ids: string[]) => ids.reduce((s, id) => s + worth(ITEM.get(id)!), 0);
-if (!(ep(Object.values(STARTER) as string[]) < ep(SHOP.map((g) => g.id)))) fail('epics not better than the starter set');
+if (!(ep(Object.values(STARTER) as string[]) < ep(shop(false).map((g) => g.id)))) fail('epics not better than the starter set');
+if (!(ep(shop(false).map((g) => g.id)) < ep(SHOP.filter((g) => g.l2).map((g) => g.id)))) fail("level 2's epics not better than level 1's");
+for (const lv of [1, 2] as const) for (let i = 0; i < 300; i++) for (const id of roll('elite', Math.random, lv).items) if (!!ITEM.get(id)!.l2 !== (lv === 2) && ITEM.get(id)!.slot) fail(`level ${lv} dropped ${id}`);
 
 const gear = new Equipment(), bag2 = new Bag();
 let changed = 0;

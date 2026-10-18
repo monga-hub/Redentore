@@ -323,7 +323,7 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   if (!rings || SACERDOTE.nova!.radius >= n.radius) fail('sacerdote: no ring of its own, smaller than the boss\'s');
 
   // The boss's phases. Untouched it stays in the first act: no marks.
-  const P = REVERENDISSIMO.phases!, M = P.marks;
+  const P = REVERENDISSIMO.phases!, M = P.marks!;
   if (boss.phase !== 0 || boss.marks.length) fail('boss: a phase before losing health');
   // Below the first threshold it brands the floor: a mark under the player and the rest round them. The
   // boss is held 12 m off (out of its swing and nova) so only the marks can land.

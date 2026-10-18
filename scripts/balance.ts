@@ -35,7 +35,7 @@ import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { START, levelOf, offer, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
-import { Equipment, SHOP, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
+import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
 const DT = 1 / 30;
 /** HANDS=0.6: the bot lands that share of its damage, a stand-in for a human's slower, sloppier rotation. */
@@ -187,7 +187,7 @@ function dangers(casters: Priest[], friars: Friar[], p: { x: number; z: number }
   for (const c of casters) {
     if (c.state === 'dead' || c.state === 'pray') continue;
     if (c.state === 'nova' && c.kind.nova) away(c.x, c.z, c.kind.nova.radius + 0.8);
-    for (const k of c.marks) away(k.x, k.z, c.kind.phases!.marks.radius + 0.6, c);
+    for (const k of c.marks) away(k.x, k.z, c.kind.phases!.marks!.radius + 0.6, c);
     const m = c.kind.melee; // a swing seen coming (REACT s in): step out of it, if there is time
     if (c.state === 'swing' && m && c.t > REACT && c.t < m.windup && seen(c)) away(c.x, c.z, m.hit + c.kind.radius + 0.3);
   }
@@ -300,8 +300,8 @@ class Run {
   shop(): number {
     let bought = 0;
     for (;;) {
-      const gain = (it: typeof SHOP[number]) => worth(it) - worth(ITEM.get(this.gear.worn[it.slot!] ?? '') ?? it) * (this.gear.worn[it.slot!] ? 1 : 0);
-      const best = SHOP.filter((it) => buyPrice(it) <= this.bag.gold && gain(it) > 0).sort((a, b) => gain(b) / buyPrice(b) - gain(a) / buyPrice(a))[0];
+      const gain = (it: ReturnType<typeof shop>[number]) => worth(it) - worth(ITEM.get(this.gear.worn[it.slot!] ?? '') ?? it) * (this.gear.worn[it.slot!] ? 1 : 0);
+      const best = shop(this.quest.accepted2).filter((it) => buyPrice(it) <= this.bag.gold && gain(it) > 0).sort((a, b) => gain(b) / buyPrice(b) - gain(a) / buyPrice(a))[0];
       if (!best) return bought;
       this.bag.gold -= buyPrice(best);
       this.take(best.id);
@@ -310,7 +310,7 @@ class Run {
   }
   /** GEAR: what the boss and the elites alone are fought in. */
   dress(kind: string): void {
-    if (kind === 'epic') { for (const it of SHOP) this.gear.worn[it.slot!] = it.id; this.apply(); return; }
+    if (kind === 'epic') { for (const it of shop(false)) this.gear.worn[it.slot!] = it.id; this.apply(); return; }
     if (kind === 'start') return;
     for (const [tier, n] of Object.entries(TYPICAL)) for (let i = 0; i < n; i++) this.loot(tier as Tier);
     if (kind === 'buy') this.shop();

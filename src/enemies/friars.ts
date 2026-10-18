@@ -195,7 +195,7 @@ export function flash(mats: THREE.MeshStandardMaterial[], k: number, cc?: Contro
   let r = 0.9 * k, g = 0.15 * k, b = 0.1 * k;
   if (cc?.root) { r += 0.12; g += 0.34; b += 0.6; } else if (cc?.slow) { r += 0.04; g += 0.12; b += 0.26; }
   if (cc?.burn) { const f = 0.7 + 0.3 * Math.sin(performance.now() * 0.023); r += 0.5 * f; g += 0.17 * f; b += 0.02 * f; }
-  for (const m of mats) { const e = m.userData.glow as number; m.emissive.setRGB(e + r, e + g, e + b); }
+  for (const m of mats) { const e = m.userData.glow as number, h = m.userData.ghost as number[] | undefined; m.emissive.setRGB((h?.[0] ?? e) + r, (h?.[1] ?? e) + g, (h?.[2] ?? e) + b); } // a ghost keeps its cold glow
 }
 
 export function barMat(color: number): THREE.SpriteMaterial {

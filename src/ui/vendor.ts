@@ -1,5 +1,5 @@
 import { ITEM, RARITY, type Bag } from '../loot/bag.ts';
-import { SHOP, buy, buyPrice, sell, sellPrice, type Equipment } from '../loot/gear.ts';
+import { buy, buyPrice, sell, sellPrice, shop, type Equipment } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
@@ -36,6 +36,9 @@ export class VendorPanel {
   private readonly bag: Bag;
   private readonly gear: Equipment;
   private sold: { id: string; n: number }[] = []; // this visit's sales, newest last
+
+  /** On the road to the Zitelle he has level 2's epics too (main.ts). */
+  level2 = () => false;
 
   constructor(host: BagPanel, bag: Bag, gear: Equipment) {
     this.host = host;
@@ -105,7 +108,7 @@ export class VendorPanel {
     };
     this.el.innerHTML = `<h2>Fra' Bortolo</h2><button class="x" aria-label="Chiudi bottega">✕</button>
       <p class="sub">Speziale · reliquie e paramenti dei morti</p>
-      <div class="goods">${SHOP.map((it) => {
+      <div class="goods">${shop(this.level2()).map((it) => {
         const p = buyPrice(it);
         return `<div class="good">${cell(`s:${it.id}`, it.id)}<span><em style="color: ${RARITY[it.rarity].color}">${it.name}</em><small class="${this.bag.gold < p ? 'no' : ''}"><i class="coin"></i>${p.toLocaleString('it-IT')}</small></span></div>`;
       }).join('')}</div>

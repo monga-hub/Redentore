@@ -5,7 +5,8 @@ import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type V
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, fly, hurt, killAll, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Mark, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest } from './caster.ts';
+import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA } from './zitelle.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
 import { still } from './control.ts';
@@ -44,6 +45,8 @@ interface Look {
   clips: Record<CasterState, string>; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
   shoots: { clip: string; from: number; rate: number }[]; swings: { clip: string; from: number; hit: number }[]; deaths: string[];
   bolt: { core: number; glow: number; size: number };
+  /** A ghost's cold self-glow (rgb 0..1) over its own colours, which it tints: the zitelle. */
+  ghost?: [number, number, number];
 }
 const Y = new THREE.Vector3(0, 1, 0), Q = new THREE.Quaternion(), UP = new THREE.Quaternion();
 const CAST = 'mage_soell_cast', RELEASE = { clip: 'mage_soell_cast_3', from: 0.75, rate: 1.4 }, THROW = { clip: 'Cast_Throw', from: 0.66, rate: 1.2 };
@@ -57,23 +60,61 @@ const WALK = 1.55, RUN = 5.5;
 const LOOKS = new Map<CasterKind, Look>([
   [PRIEST, {
     body: 'prete.glb', prop: 'bastone.glb', height: 1.85, staff: 1.2, grip: 0.4,
-    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, evade: 'Running', dead: 'dying_backwards' },
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: DEATHS, // no melee: never used
     bolt: { core: 0xf0dcff, glow: SHADOW, size: 1 },
   }],
   [SACERDOTE, {
     body: 'sacerdote.glb', prop: 'mazza.glb', height: 2.5, staff: 1.7, grip: 0.4,
-    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: CAST, evade: 'Running', dead: 'dying_backwards' },
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: SWINGS, deaths: DEATHS, // never backpedals
     bolt: { core: 0xfff0c8, glow: 0xb050ff, size: 1.2 },
   }],
   [REVERENDISSIMO, {
     body: 'reverendissimo.glb', prop: 'pastorale.glb', height: 4.6, staff: 4.2, grip: 0.45,
-    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', evade: 'Running', dead: 'dying_backwards' },
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: SWINGS, deaths: ['dying_backwards'],
     bolt: { core: 0xffd8ff, glow: 0x9a20ff, size: 1.7 },
   }],
+  // Level 2 (enemies/zitelle.ts): the same clip names, packed from each body's Meshy animations.
+  ...([[GONDOLIERE, 1.85], [GASTALDO, 2.5]] as const).map(([kind, height]): [CasterKind, Look] => [kind, {
+    body: 'gondoliere.glb', prop: 'remo.glb', height, staff: height * 1.35, grip: 0.55,
+    clips: { pray: 'Pray', chase: 'Idle', cast: 'Idle', swing: 'Attack', nova: 'Attack_Hammer', spin: 'Idle', evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xffffff, glow: 0x60d0c0, size: 1 }, // never casts
+  }]),
+  [CODEGA, {
+    body: 'codega.glb', prop: 'lanterna.glb', height: 1.8, staff: 2, grip: 0.4,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xf4ffc8, glow: 0x8aff3a, size: 1 }, // a will-o'-wisp out of the lantern
+  }],
+  ...([ZITELLA, VELO] as const).map((kind): [CasterKind, Look] => [kind, {
+    body: 'zitella.glb', prop: 'rocca.glb', height: 1.65, staff: 1.25, grip: 0.35,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xffffff, glow: 0x9fd8ff, size: 0.9 }, // a skein of thread
+    ghost: [0.32, 0.55, 0.75],
+  }]),
+  [MAESTRA, {
+    body: 'maestra.glb', prop: 'forbici.glb', height: 2.3, staff: 1.4, grip: 0.82,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: CAST, evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xfff0fa, glow: 0xd890ff, size: 1.2 },
+    ghost: [0.22, 0.16, 0.3],
+  }],
+  [GOVERNATRICE, {
+    body: 'governatrice.glb', prop: 'scettro.glb', height: 4.3, staff: 3.4, grip: 0.42,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: 'Spin', evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards'],
+    bolt: { core: 0xfff4d0, glow: 0xffb030, size: 1.6 },
+  }],
 ]);
+/** The lace: lines and the fuso's threads on the floor, white-gold, a square decal per width along each. */
+const LACE = 0xfff0d0, LACE_DECALS = 48;
+const laceTele: DecalStyle = { life: 0, size: 2, tile: D.disc, color: LACE, hdr: 1.7 };
+const laceSpark: Style = { life: [0.4, 0.7], size: [0.05, 0.09], color: 0xffffff, color2: LACE, hdr: 4, tex: T.spark, stretch: 0.04, drag: 2, grav: 3 };
+const laceCut: DecalStyle = { life: 0.6, size: 2, grow: 0.3, tile: D.shock, color: LACE, hdr: 2.2, fadeOut: 0.5 };
 
 // effects
 const charge: Style = { life: 0.4, size: [0.05, 0.08], color: 0xd8b8ff, color2: SHADOW, hdr: 3, tex: T.spark, stretch: 0.03, drag: 1 };
@@ -99,7 +140,7 @@ const blastOf = (r: number) => {
   return b;
 };
 // The boss's marks (caster.ts Phases): a crimson brand that fills to its edge, then erupts in a column of flame.
-const BRAND = 0xff2f6e, MARK = REVERENDISSIMO.phases!.marks;
+const BRAND = 0xff2f6e, MARK = REVERENDISSIMO.phases!.marks!;
 const brandRing: DecalStyle = { life: 0, size: MARK.radius * 2, tile: D.ring, color: BRAND, hdr: 2.2 };
 const brandRunes: DecalStyle = { life: 0, size: MARK.radius * 1.7, tile: D.runes, color: BRAND, hdr: 1.3 };
 const brandFlame: Style = { ...novaFlame, color: 0xff8ab4, color2: 0x4a0618 };
@@ -256,7 +297,7 @@ class View {
     this.stand(f.yaw);
 
     const r = f.hp / f.kind.hp;
-    this.bar.visible = f.kind !== REVERENDISSIMO && f.state !== 'dead' && (f.state !== 'pray' || r < 1); // the boss's bar is the big one up top (quest/view.ts)
+    this.bar.visible = f.kind !== REVERENDISSIMO && f.kind !== GOVERNATRICE && f.state !== 'dead' && (f.state !== 'pray' || r < 1); // a boss's bar is the big one up top (quest/view.ts)
     this.fill.scale.x = BAR_W * Math.max(r, 1e-3);
     this.fill.center.x = 0.5 / Math.max(r, 1e-3);
   }
@@ -294,6 +335,16 @@ function dress(scene: THREE.Group, prop: THREE.Group, look: Look): void {
   tip.name = 'staffTip';
   stand(scene, look.height);
   arm(scene, prop, look.staff, look.grip).add(tip);
+  const g = look.ghost;
+  if (g) scene.traverse((o) => { // a ghost: its colours cooled and dimmed, a cold glow from within (friars.ts flash keeps it)
+    if (!(o instanceof THREE.Mesh) || o.material === glow || o.parent?.name === 'held') return;
+    const m = o.material as THREE.MeshStandardMaterial;
+    m.color.setRGB(0.55, 0.68, 0.85);
+    m.emissive.setRGB(...g);
+    m.userData.ghost = g;
+    m.transparent = true;
+    m.opacity = 0.88;
+  });
 }
 
 /** A bolt in flight: its trail and two pooled sprites. */
@@ -310,6 +361,8 @@ export class Priests {
   private flights = new Map<Bolt, Flight>();
   private sprites: THREE.Sprite[] = []; // free core/halo sprites, pooled
   private teles: [Decal, Decal][] = []; // nova telegraphs (ring, sigil) on the floor, lent to whoever channels one
+  private laces: Decal[] = []; // lace lines and the fuso's threads
+  private laid = new Set<Line>(); // lines seen last frame: the ones gone with their time run out cut
   private brands: [Decal, Decal][] = []; // the boss's marks (ring, runes)
   private branded = new Set<Mark>(); // marks seen last frame: the ones gone with their time run out erupted
   private world: World;
@@ -317,17 +370,19 @@ export class Priests {
   private stats: PlayerStats;
   private v = new THREE.Vector3();
 
-  constructor(world: World, vfx: Vfx, stats: PlayerStats, areas: Area[]) {
+  /** `cast`: who this set is (level 2's, enemies/zitelle.ts); level 1's by default. */
+  constructor(world: World, vfx: Vfx, stats: PlayerStats, areas: Area[], cast?: { all: Priest[]; boss: Priest }) {
     this.world = world;
     this.vfx = vfx;
     this.stats = stats;
-    const casters = spawnCasters(world, areas);
+    const casters = cast ?? spawnCasters(world, areas);
     this.boss = casters.boss;
     this.all = casters.all;
+    if (this.all.some((f) => f.kind.lines)) for (let i = 0; i < LACE_DECALS; i++) this.laces.push(vfx.hold(laceTele));
     for (let i = 0; i < 3; i++) this.teles.push([vfx.hold(tele), vfx.hold(teleSigil)]); // ponytail: three rings at once, a fourth nova goes unmarked
-    for (let i = 0; i < MARK.n * 2; i++) this.brands.push([vfx.hold(brandRing), vfx.hold(brandRunes)]);
-    const looks = [...LOOKS];
-    Promise.all(looks.flatMap(([, l]) => [loadModel(l.body), loadModel(l.prop)])).then((gltfs) => {
+    if (this.boss.kind.phases?.marks) for (let i = 0; i < MARK.n * 2; i++) this.brands.push([vfx.hold(brandRing), vfx.hold(brandRunes)]);
+    const looks = [...LOOKS].filter(([k]) => this.all.some((f) => f.kind === k)); // only the bodies this set needs
+    Promise.all(looks.flatMap(([, l]) => [loadModel(l.body), loadModel(l.prop)])).then((gltfs) => { // two kinds on one body each get their own copy
       const templates = new Map<CasterKind, Template>();
       looks.forEach(([kind, look], i) => {
         const body = gltfs[i * 2], prop = gltfs[i * 2 + 1];
@@ -379,6 +434,7 @@ export class Priests {
     this.branded = new Set(boss.marks);
     this.drawBolts(dt);
     this.drawTelegraphs(dt);
+    this.drawLace(dt, player);
     this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, Math.hypot(f.x - player.x, f.z - player.z)));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
@@ -477,6 +533,49 @@ export class Priests {
         v.spawn(brandFlame, m.x + Math.cos(a) * e, m.y + 0.1, m.z + Math.sin(a) * e, 0, 0.5 + p * 1.5, 0);
       }
     });
+  }
+
+  /**
+   * Lace lines (the Maestra's, the Governatrice's) fill white-gold along their length while they wait, then cut with a
+   * spray of thread-sparks; the fuso's four threads turn round the Governatrice, faint while they draw taut.
+   */
+  private drawLace(dt: number, player: Target): void {
+    const v = this.vfx, now = new Set<Line>();
+    let k = 0;
+    const lay = (x: number, y: number, z: number, dx: number, dz: number, len: number, w: number, alpha: number) => {
+      for (let d = w / 2; d < len && k < this.laces.length; d += w * 0.9) {
+        const c = this.laces[k++];
+        c.on = true;
+        c.x = x + dx * d; c.y = y + 0.06; c.z = z + dz * d;
+        c.size = w * 1.1;
+        c.rot = Math.atan2(dx, dz);
+        c.alpha = alpha;
+      }
+    };
+    for (const f of this.all) {
+      const L = f.kind.lines;
+      if (L) for (const l of f.lines) {
+        now.add(l);
+        const p = 1 - Math.max(l.t, 0) / L.cast;
+        lay(l.x, l.y, l.z, l.dx, l.dz, l.len, L.width, 0.25 + 0.65 * p);
+      }
+      const S = f.kind.spin;
+      if (S && f.state === 'spin') for (let a = 0; a < 4; a++) {
+        const r = f.spinA + (a * Math.PI) / 2, dx = Math.sin(r), dz = Math.cos(r), live = f.t >= SPIN_DRAW;
+        lay(f.x, f.y, f.z, dx, dz, S.length, S.width, live ? 0.95 : 0.3);
+        if (live && Math.random() < dt * 30) { const d = Math.random() * S.length; v.spawn(laceSpark, f.x + dx * d, f.y + 0.3, f.z + dz * d, 0, 1.5, 0); }
+      }
+    }
+    for (; k < this.laces.length; k++) this.laces[k].on = false;
+    for (const l of this.laid) if (!now.has(l) && l.t <= 0) { // cut: thread-sparks all along it
+      const w = this.all.find((f) => f.kind.lines)?.kind.lines?.width ?? 2;
+      for (let d = 0; d < l.len; d += w) {
+        v.decal(laceCut, l.x + l.dx * d, l.y + 0.07, l.z + l.dz * d);
+        v.burst(laceSpark, l.x + l.dx * d, l.y + 0.3, l.z + l.dz * d, 5, 0.3, 3, 2);
+      }
+      v.shake(Math.hypot(player.x - l.x, player.z - l.z) < l.len + 3 ? 0.2 : 0.05);
+    }
+    this.laid = now;
   }
 
   /** A mark erupts: a column of crimson flame out of the brand, a shock wave to its edge. */

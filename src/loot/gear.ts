@@ -42,6 +42,8 @@ const BUDGET: Partial<Record<Rarity, number>> = { comune: 4, noncomune: 9, raro:
 const ARMOR: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 14, raro: 20, epico: 28 };
 const ILVL: Partial<Record<Rarity, number>> = { comune: 5, noncomune: 10, raro: 15, epico: 20 };
 const BUY: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 40, raro: 120, epico: 480 };
+/** Level 2's pieces (the Giudecca and the Zitelle): a bigger budget and more armor at each quality, a higher item level, dearer. */
+const L2 = { budget: 1.4, armor: 1.3, ilvl: 12, buy: 1.6 };
 const JUNK: Record<Rarity, number> = { comune: 3, noncomune: 8, raro: 20, epico: 50, leggendario: 150 }; // flavour items' sell price
 const SHARES = [[1], [0.6, 0.4], [0.5, 0.3, 0.2]];
 
@@ -104,6 +106,39 @@ const DEFS: [string, string, Slot, Rarity, string, string?][] = [
   ['anello-1576', 'Anello del voto del 1576', 'anello', 'epico', 'critico potenza vigore', 'Dentro la fascia: «Liberaci, e ti alzeremo un tempio».'],
 ];
 
+// Level 2: off the dead of the fondamenta and the Pia Casa (loot/bag.ts roll at level 2).
+const DEFS2: typeof DEFS = [
+  ['paglietta', 'Paglietta del gondoliere', 'testa', 'noncomune', 'vigore critico'],
+  ['codega-spalle', 'Mantelletta della codega', 'spalle', 'noncomune', 'intelletto spirito'],
+  ['righe-torso', 'Maglia a righe dell’annegato', 'torso', 'noncomune', 'vigore potenza'],
+  ['merlettaia-mani', 'Mezzemani della merlettaia', 'mani', 'noncomune', 'intelletto celerita'],
+  ['squerariol-gambe', 'Braghe dello squerariol', 'gambe', 'noncomune', 'vigore spirito'],
+  ['traghetto-piedi', 'Scarpe del traghetto', 'piedi', 'noncomune', 'vigore celerita'],
+  ['remo-spezzato', 'Remo spezzato', 'arma', 'noncomune', 'potenza critico'],
+  ['tombolo', 'Tombolo d’osso', 'amuleto', 'noncomune', 'intelletto spirito'],
+  ['anello-dote', 'Anello della dote', 'anello', 'noncomune', 'vigore potenza'],
+
+  ['zendale', 'Zendale della Pia Casa', 'testa', 'raro', 'intelletto celerita spirito'],
+  ['gastaldo-spalle', 'Spallacci del gastaldo', 'spalle', 'raro', 'vigore potenza critico'],
+  ['velada', 'Velada del traghetto', 'torso', 'raro', 'vigore critico'],
+  ['puntoaria-mani', 'Guanti del punto in aria', 'mani', 'raro', 'potenza celerita'],
+  ['zitelle-gambe', 'Calze delle Zitelle', 'gambe', 'raro', 'intelletto spirito'],
+  ['squero-piedi', 'Stivali dello squero', 'piedi', 'raro', 'vigore potenza'],
+  ['fuso-ferrato', 'Fuso ferrato', 'arma', 'raro', 'potenza celerita intelletto'],
+  ['medaglia-presentazione', 'Medaglia della Presentazione', 'amuleto', 'raro', 'vigore critico'],
+  ['ditale', 'Ditale d’argento', 'anello', 'raro', 'potenza critico'],
+
+  ['velo-governatrice', 'Velo della Governatrice', 'testa', 'epico', 'intelletto potenza critico', 'Ogni punto è un nome. Alcuni li riconosci.'],
+  ['collare-puntoaria', 'Collare di punto in aria', 'spalle', 'epico', 'vigore celerita potenza', 'Lo cucirono cento mani che non avevano dote.'],
+  ['busto-broccato', 'Busto di broccato della Pia Casa', 'torso', 'epico', 'vigore potenza critico', 'Oro di Rialto, debiti di San Marco.'],
+  ['guanti-maestra', 'Guanti della Maestra del merletto', 'mani', 'epico', 'potenza celerita critico', 'Le dita non hanno mai smesso di contare i punti.'],
+  ['cosciali-gastaldo', 'Cosciali del Gastaldo', 'gambe', 'epico', 'vigore intelletto potenza', 'Remava per i vivi, poi per i morti, allo stesso prezzo.'],
+  ['zoccoli-voga', 'Zoccoli dell’ultima voga', 'piedi', 'epico', 'vigore celerita', 'Hanno toccato il fondo del canale della Giudecca. Due volte.'],
+  ['scettro-governatrice', 'Scettro della Governatrice', 'arma', 'epico', 'potenza critico celerita', 'Il fuso d’oro gira ancora, se lo guardi troppo a lungo.'],
+  ['rosario-spolette', 'Rosario di spolette', 'amuleto', 'epico', 'spirito intelletto potenza', 'Spolette d’osso al posto dei grani: dodici per ogni zitella.'],
+  ['fede-senza-dote', 'Fede senza dote', 'anello', 'epico', 'critico potenza vigore', 'Nessuno l’ha mai portata all’altare.'],
+];
+
 /** The stats a budget of `points` buys, split over `focus` (best first). */
 function spend(points: number, focus: Stat[]): Stats {
   const out: Stats = {};
@@ -111,19 +146,22 @@ function spend(points: number, focus: Stat[]): Stats {
   return out;
 }
 
-export const GEAR: readonly Item[] = DEFS.map(([id, name, slot, rarity, focus, lore]) => {
-  const s = SLOT.get(slot)!, stats = spend(BUDGET[rarity]! * s.w, focus.split(' ') as Stat[]);
-  if (s.armor) stats.armatura = Math.round(ARMOR[rarity]! * s.armor);
-  return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity] };
-});
+const make = (lvl: 1 | 2) => ([id, name, slot, rarity, focus, lore]: typeof DEFS[number]): Item => {
+  const k = lvl === 2 ? L2 : { budget: 1, armor: 1, ilvl: 0 };
+  const s = SLOT.get(slot)!, stats = spend(BUDGET[rarity]! * k.budget * s.w, focus.split(' ') as Stat[]);
+  if (s.armor) stats.armatura = Math.round(ARMOR[rarity]! * k.armor * s.armor);
+  return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : {}) };
+};
+export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2))];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
-/** What Fra' Bortolo sells: every purple piece. */
+/** What Fra' Bortolo sells: every purple piece (level 2's once the hero is on the road to the Zitelle: `shop`). */
 export const SHOP = GEAR.filter((g) => g.rarity === 'epico');
+export const shop = (level2: boolean) => SHOP.filter((g) => level2 || !g.l2);
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club. */
 export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune').map((g) => [g.slot, g.id]));
 
 /** Gold Fra' Bortolo asks for it. */
-export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w) : JUNK[it.rarity] * 4);
+export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w * (it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);
 /** Gold he gives for one: a quarter of his price. */
 export const sellPrice = (it: Item) => Math.floor(buyPrice(it) / 4);
 /** Share of a blow armor turns aside. */

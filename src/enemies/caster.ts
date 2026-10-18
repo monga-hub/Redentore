@@ -21,6 +21,19 @@ export interface CasterKind {
   phases?: Phases;
   /** Share of crowd control that sticks (control.ts): durations and slows ×; default 1. */
   resist?: number;
+  /**
+   * Lace lines (level 2): every `every` s of fighting, `n` lines `length` m long and `width` m wide laid through
+   * the player's feet from the caster (the first straight at them, the others `spread` rad either side), cutting
+   * `cast` s later for `damage` on whoever stands in one.
+   */
+  lines?: { every: number; cast: number; length: number; width: number; damage: number; n: number; spread: number };
+  /** The Governatrice's veil: while any ward she has called lives, she takes `cut` less damage. */
+  veil?: { cut: number };
+  /**
+   * The fuso: from phase `phase` on, every `every` s, she spins for `time` s with two crossed lines `length` m
+   * long either side and `width` wide turning round her at `speed` rad/s, `dps` to whoever they sweep.
+   */
+  spin?: { phase: number; every: number; time: number; speed: number; length: number; width: number; dps: number };
 }
 
 /**
@@ -30,8 +43,8 @@ export interface CasterKind {
  * everything it deals is multiplied by `rage`, a wall for a build that can't bring it down in time.
  */
 export interface Phases {
-  at: [number, number];
-  marks: { every: number; n: number; cast: number; radius: number; spread: number; damage: number };
+  at: number[];
+  marks?: { every: number; n: number; cast: number; radius: number; spread: number; damage: number };
   haste: number;
   berserk: number;
   rage: number;
@@ -39,6 +52,8 @@ export interface Phases {
 
 /** A branded circle on the floor at the player's feet height `y`: erupts when `t` runs out (the boss's marks). */
 export interface Mark { x: number; y: number; z: number; t: number }
+/** A lace line on the floor from (x, z) along the unit (dx, dz), `len` long: cuts when `t` runs out. */
+export interface Line { x: number; y: number; z: number; dx: number; dz: number; len: number; t: number }
 
 export const PRIEST: CasterKind = {
   hp: 90, // casters are squishy: nine bone slashes
@@ -153,10 +168,12 @@ export function spawnApiary(world: World): { all: Priest[]; queen: Priest } {
  * across the chiostro grande at `walk`, takes ~8 s.
  */
 const EVADE_MAX = 10;
-const LOS_EVERY = 0.25; // s: tracing a ray through the cloister costs ~0.2 ms
+const LOS_EVERY = 0.25;
+/** s into the fuso before its threads cut: drawn, they can be read and left. */
+export const SPIN_DRAW = 0.8; // s: tracing a ray through the cloister costs ~0.2 ms
 const CHEST = 1.1; // m above the feet: where bolts leave the staff and strike the player
 
-export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'evade' | 'dead';
+export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'spin' | 'evade' | 'dead';
 
 export interface Bounds { x0: number; x1: number; z0: number; z1: number }
 
@@ -175,6 +192,11 @@ export interface Priest {
   fight: number; // s fighting since the pull (the boss's berserk)
   brand: number; // s until the next marks
   marks: Mark[]; // branded circles waiting to erupt
+  lines: Line[]; // lace lines waiting to cut (level 2)
+  lineCd: number; // s until the next lines
+  spinCd: number; // s until the next fuso
+  spinA: number; // the fuso's angle, rad
+  wards?: Priest[]; // the Governatrice's: the zitelle she calls, two at each new phase, who keep her veil up
   backoff: number; // backpedal budget left until the next cast
   blind: number; // s pulled without line of sight
   los: { ok: boolean; t: number }; // line of sight to the player, re-traced every LOS_EVERY s
@@ -293,7 +315,7 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
     g.forEach(([x, z, yaw], k) => {
       const kind = kinds[i]?.[k] ?? PRIEST;
       mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false,
-        phase: 0, fight: 0, brand: kind.phases?.marks.every ?? 0, marks: [], backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
+        phase: 0, fight: 0, brand: kind.phases?.marks?.every ?? 0, marks: [], lines: [], lineCd: kind.lines ? kind.lines.every * 0.5 : 0, spinCd: 0, spinA: 0, backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
     });
     return mates;
   });
@@ -399,16 +421,61 @@ function go(f: Priest, x: number, z: number, speed: number, stop: number, world:
  */
 export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[]): number {
   const P = f.kind.phases;
-  if (!P) return act(f, p, world, dt, bolts, 1, 1);
-  if (f.state === 'dead') { f.marks.length = 0; return 0; }
-  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova';
+  if (!P) return act(f, p, world, dt, bolts, 1, 1) + cut(f, p, dt);
+  if (f.state === 'dead') { f.marks.length = 0; f.lines.length = 0; return 0; }
+  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova' || f.state === 'spin';
   if (fighting) {
     f.fight += dt;
-    while (f.phase < P.at.length && f.hp <= f.kind.hp * P.at[f.phase]) f.phase++;
+    while (f.phase < P.at.length && f.hp <= f.kind.hp * P.at[f.phase]) {
+      f.phase++;
+      call(f); // the Governatrice calls two more of her girls
+    }
   }
-  const haste = f.phase >= 2 ? P.haste : 1, rage = f.fight >= P.berserk ? P.rage : 1;
+  const haste = f.phase >= P.at.length ? P.haste : 1, rage = f.fight >= P.berserk ? P.rage : 1;
   const level = Math.abs(p.y - f.y) < 2.5;
-  return (act(f, p, world, dt, bolts, haste, rage) + brand(f, P, p, level, dt * haste, fighting)) * rage;
+  return (act(f, p, world, dt, bolts, haste, rage) + (P.marks ? brand(f, P, p, level, dt * haste, fighting) : 0) + cut(f, p, dt * haste)) * rage;
+}
+
+/** The wards not yet called, two by two: pulled onto the player. */
+function call(f: Priest): void {
+  const asleep = (f.wards ?? []).filter((w) => w.state === 'pray');
+  for (const w of asleep.slice(0, 2)) { enter(w, 'chase'); w.cd = 0.5 + Math.random(); }
+}
+
+/** Her veil holds while a ward she has called is still standing. */
+export function veiled(f: Priest): boolean {
+  return !!f.kind.veil && !!f.wards?.some((w) => w.state !== 'dead' && w.state !== 'pray' && w.state !== 'evade');
+}
+
+/** On a line from (l.x, l.z) along (l.dx, l.dz), `len` long, within half of `w` of it. */
+export function onLine(l: { x: number; z: number; dx: number; dz: number; len: number }, w: number, p: { x: number; z: number }): boolean {
+  const vx = p.x - l.x, vz = p.z - l.z, s = vx * l.dx + vz * l.dz;
+  return s >= -w / 2 && s <= l.len + w / 2 && Math.abs(vx * l.dz - vz * l.dx) <= w / 2;
+}
+
+/** Lace lines: cut the due ones (their damage on the player), lay new ones on schedule. */
+function cut(f: Priest, p: Target, dt: number): number {
+  const L = f.kind.lines;
+  if (!L) return 0;
+  if (f.state === 'dead' || f.state === 'evade' || f.state === 'pray') { f.lines.length = 0; f.lineCd = L.every * 0.5; return 0; }
+  let dmg = 0;
+  const level = Math.abs(p.y - f.y) < 2.5;
+  for (let i = f.lines.length - 1; i >= 0; i--) {
+    const l = f.lines[i];
+    if ((l.t -= dt) > 0) continue;
+    f.lines.splice(i, 1);
+    if (level && onLine(l, L.width, p)) dmg += L.damage;
+  }
+  if (f.state !== 'nova' && f.state !== 'spin' && f.cc.stun <= 0 && (f.lineCd -= dt) <= 0) {
+    f.lineCd = L.every;
+    // From behind the caster through the player and on: a step to the side clears a line, a step back does not.
+    const a0 = Math.atan2(p.x - f.x, p.z - f.z);
+    for (let i = 0; i < L.n; i++) {
+      const a = a0 + (i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.ceil(i / 2) * L.spread), dx = Math.sin(a), dz = Math.cos(a);
+      f.lines.push({ x: f.x - dx * 2, y: p.y, z: f.z - dz * 2, dx, dz, len: L.length, t: L.cast });
+    }
+  }
+  return dmg;
 }
 
 /** The boss's marks: erupt the due ones (returns their damage on the player), brand new ones on schedule. */
@@ -418,12 +485,13 @@ function brand(f: Priest, P: Phases, p: Target, level: boolean, dt: number, figh
     const m = f.marks[i];
     if ((m.t -= dt) > 0) continue;
     f.marks.splice(i, 1);
-    if (level && Math.hypot(p.x - m.x, p.z - m.z) < P.marks.radius) dmg += P.marks.damage;
+    if (level && Math.hypot(p.x - m.x, p.z - m.z) < P.marks!.radius) dmg += P.marks!.damage;
   }
   if (f.phase >= 1 && fighting && f.state !== 'nova' && (f.brand -= dt) <= 0) {
     // One under the player, the rest round them on a line: a step aside clears them all.
-    f.brand = P.marks.every;
-    const a0 = Math.random() * Math.PI * 2, M = P.marks;
+    const M = P.marks!;
+    f.brand = M.every;
+    const a0 = Math.random() * Math.PI * 2;
     for (let i = 0; i < M.n; i++) {
       const a = a0 + Math.PI * (i % 2), r = Math.ceil(i / 2) * M.spread;
       f.marks.push({ x: p.x + Math.cos(a) * r, y: p.y, z: p.z + Math.sin(a) * r, t: M.cast });
@@ -447,6 +515,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
   f.cd = Math.max(0, f.cd - dt * haste);
   f.melee = Math.max(0, f.melee - dt * haste);
   if (K.nova && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.nova -= dt * haste;
+  if (K.spin && f.phase >= K.spin.phase && f.state !== 'spin') f.spinCd -= dt * haste;
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
   const toPlayer = Math.atan2(f.x - p.x, f.z - p.z);
   const reach = K.melee ? K.melee.reach + K.radius : 0;
@@ -461,6 +530,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       f.blind = seen ? 0 : f.blind + dt;
       if (Math.hypot(p.x - f.home.x, p.z - f.home.z) > K.leash || f.blind > K.blind) { enter(f, 'evade'); return 0; }
       f.move = 0;
+      if (K.spin && f.phase >= K.spin.phase && f.spinCd <= 0 && dist < K.spin.length + 4 && level) { enter(f, 'spin'); f.spinA = Math.atan2(p.x - f.x, p.z - f.z) + Math.PI / 4; return 0; }
       if (K.nova && f.nova <= 0 && dist < K.nova.radius && level) { enter(f, 'nova'); return 0; }
       if (K.melee && dist <= reach && level) {
         if (f.melee === 0) { enter(f, 'swing'); f.melee = K.melee.cooldown; }
@@ -506,6 +576,17 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       enter(f, 'chase');
       return dist <= n.radius && level && world.sees(f, p) ? n.damage : 0; // a wall shelters from it
     }
+    case 'spin': { // the fuso: two crossed lines turning round her; she stands and spins
+      const S = K.spin!;
+      f.spinA += S.speed * dt * haste;
+      if (f.t >= S.time) { enter(f, 'chase'); f.spinCd = S.every; return 0; }
+      if (f.t < SPIN_DRAW || !level) return 0; // the threads take a moment to draw taut
+      for (let k = 0; k < 4; k++) {
+        const a = f.spinA + (k * Math.PI) / 2;
+        if (onLine({ x: f.x, z: f.z, dx: Math.sin(a), dz: Math.cos(a), len: S.length }, S.width, p)) return S.dps * dt;
+      }
+      return 0;
+    }
     case 'evade':
       f.hp = K.hp;
       walk(f, f.home.x, f.home.z, K.walk, 0, world, dt, K.radius);
@@ -513,8 +594,10 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       if (f.t > EVADE_MAX) { f.x = f.home.x; f.z = f.home.z; f.y = feet(world, f.x, f.z); }
       if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
       f.phase = f.fight = 0; // a fresh fight next time
-      f.brand = K.phases?.marks.every ?? 0;
+      f.brand = K.phases?.marks?.every ?? 0;
       f.marks.length = 0;
+      f.spinCd = 0;
+      for (const w of f.wards ?? []) if (w.state !== 'dead' && w.state !== 'pray') { w.hp = w.kind.hp; enter(w, 'evade'); } // her girls go back to their places
       return 0;
     case 'dead': // for good: nobody respawns
       return 0;
@@ -552,6 +635,7 @@ export function fly(bolts: Bolt[], p: Target, dt: number, spent: Bolt[] = [], wo
 /** Damage a priest. Returns true if this killed it. Evading and dead priests ignore it. */
 export function hurt(f: Priest, n: number): boolean {
   if (f.state === 'dead' || f.state === 'evade' || n <= 0) return false;
+  if (veiled(f)) n *= 1 - f.kind.veil!.cut; // the Governatrice's veil
   f.hp -= n;
   if (f.hp > 0) { pull(f); return false; }
   f.hp = 0;

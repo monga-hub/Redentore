@@ -20,8 +20,8 @@ const LABEL = 24; // m: plates further than this are hidden
 const BEAM_H: Record<Rarity, number> = { comune: 0, noncomune: 1.4, raro: 2.2, epico: 3, leggendario: 4.5 };
 const GOLD = 0xffcf4a;
 
-/** Watched enemies and what tier of loot they drop. */
-export interface Dropper { all: readonly Mob[]; tier: Tier }
+/** Watched enemies, what tier of loot they drop, from which level's tables, and when their deaths drop nothing (a victory takes them all). */
+export interface Dropper { all: readonly Mob[]; tier: Tier; level?: 1 | 2; quiet?: () => boolean }
 
 interface Loose {
   gold: number; id: string; // gold > 0: a pile, else the item `id`
@@ -95,7 +95,7 @@ function star(): THREE.Texture {
 export class Drops {
   readonly root = new THREE.Group();
   private pool: Loose[] = [];
-  private tracks: { mob: Mob; tier: Tier; dead: boolean; t: number }[];
+  private tracks: { mob: Mob; tier: Tier; level: 1 | 2; quiet?: () => boolean; dead: boolean; t: number }[];
   private layer = document.createElement('div');
   private floats: Float[] = [];
   private time = 0;
@@ -116,7 +116,7 @@ export class Drops {
     this.bag = bag;
     this.camera = camera;
     this.root.name = 'loot';
-    this.tracks = droppers.flatMap((d) => d.all.map((mob) => ({ mob, tier: d.tier, dead: mob.state === 'dead', t: 0 }))); // the dead of a loaded game drop nothing
+    this.tracks = droppers.flatMap((d) => d.all.map((mob) => ({ mob, tier: d.tier, level: d.level ?? 1, quiet: d.quiet, dead: mob.state === 'dead', t: 0 }))); // the dead of a loaded game drop nothing
 
     this.geo = shapes();
     this.mats = Object.fromEntries(Object.entries(TINT).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: METAL.has(k as Icon) ? 0.8 : 0.1, emissive: c, emissiveIntensity: 0.12 })])) as Record<Icon, THREE.MeshStandardMaterial>;
@@ -176,15 +176,15 @@ export class Drops {
     l.plate.style.color = item ? RARITY[item.rarity].color : '';
   }
   /**
-   * Per frame, after the enemies moved. `quiet`: deaths are not looted (the boss's fall takes everyone with it).
+   * Per frame, after the enemies moved (and before a victory's: its dead drop nothing, the boss's own loot aside).
    * Returns what to tell the player (a full bag).
    */
-  update(dt: number, hero: { x: number; y: number; z: number }, quiet: boolean): string[] {
+  update(dt: number, hero: { x: number; y: number; z: number }): string[] {
     this.time += dt;
     for (const k of this.tracks) {
       const dead = k.mob.state === 'dead';
-      if (dead && !k.dead && !quiet) {
-        const d = roll(k.tier), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body
+      if (dead && !k.dead && !k.quiet?.()) {
+        const d = roll(k.tier, Math.random, k.level), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body
         for (const g of d.gold) this.spawn(m.x, m.y, m.z, g, '', far);
         for (const id of d.items) this.spawn(m.x, m.y, m.z, 0, id, far);
       }

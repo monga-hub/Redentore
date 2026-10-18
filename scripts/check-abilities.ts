@@ -70,8 +70,14 @@ mana(20, 'instant pays');
 pay.tryCast(0);
 eq(['m'], 'not enough mana blocks the cast');
 if (!pay.notices.some((n) => n.text === 'Mana insufficiente.')) throw new Error('no mana error');
-stats.update(12.5); // 2 mana/s
-mana(45, 'regen');
+stats.update(2.5); // 3 mana/s within five seconds of spending
+mana(27.5, 'regen');
+stats.update(2.5); // five calm seconds: six times faster, up to the top
+mana(50, 'resting regen');
+stats.spendMana(5);
+stats.update(1);
+if (stats.resting || stats.mana !== 48) throw new Error(`spending ends the rest: mana ${stats.mana}`);
+stats.mana = 45;
 pay.tryCast(1);
 mana(45, 'cast-time ability pays when the bar fills, not on press');
 for (let t = 0; t < 1.1; t += 0.1) pay.update(0.1, () => false);

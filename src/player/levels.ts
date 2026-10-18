@@ -51,7 +51,7 @@ export const START = ['fall', 'plague', 'mend', 'potion'];
 export const SPECIALS = ['strike', 'nova', 'ward'];
 const BASE: Tune = {
   owned: START,
-  dmg: 1, hp: 1, mana: 1, armor: 1, regen: 2, speed: 1, cdr: 1, leech: 0, fury: 1, furyStart: 0,
+  dmg: 1, hp: 1, mana: 1, armor: 1, regen: 3, speed: 1, cdr: 1, leech: 0, fury: 1, furyStart: 0,
   fallDmg: 10, fallRange: 2.6, fallArc: Math.cos(1.1), fallThird: 1, fallMana: 0,
   plagueDps: 12, plagueR: 2.2, plagueCd: 5, plagueLife: 8,
   wispDps: 15, wispR: 1.6, wispCast: 1.5,
@@ -121,7 +121,7 @@ export const CARDS: Card[] = [
   passive('hp', 'Carne di tomba', '+15% di salute massima (+192), e la recuperi subito.', 3, (t) => { t.hp += 0.15; }),
   passive('armor', 'Pelle di lapide', '−8% ai danni che subisci.', 2, (t) => { t.armor -= 0.08; }),
   passive('mana', "Pozzo d'anime", '+20% di mana massimo (+80).', 2, (t) => { t.mana += 0.2; }),
-  passive('regen', 'Linfa nera', 'Rigenerazione del mana +1 al secondo (base 2).', 2, (t) => { t.regen += 1; }),
+  passive('regen', 'Linfa nera', 'Rigenerazione del mana +1 al secondo (base 3).', 2, (t) => { t.regen += 1; }),
   passive('speed', 'Passo del morto', '+8% alla velocità di corsa.', 2, (t) => { t.speed += 0.08; }),
   passive('cdr', 'Gelo della cripta', '−10% ai tempi di recupero (non a Caduta d’ossa).', 2, (t) => { t.cdr -= 0.1; }),
   passive('leech', "Sete d'anime", 'Ogni nemico che uccidi ti cura del 3% della salute massima.', 2, (t) => { t.leech += 0.03; }),

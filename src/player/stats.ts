@@ -4,6 +4,8 @@
 
 export const VEIL_CUT = 0.5; // Velo spettrale: share of incoming damage it takes off
 export const GUARD_CUT = 0.3; // Turbine d'ossa: the whirling club parries this share
+/** WoW's five-second rule: this many s without spending mana or taking a hit and the mana flows REST_MUL times faster. */
+export const REST_AFTER = 5, REST_MUL = 6;
 
 export class PlayerStats {
   hp: number;
@@ -22,7 +24,9 @@ export class PlayerStats {
   manaMax: number;
   /** Level-up cards and armor: share of incoming damage taken, and mana/s, always on. */
   armor = 1;
-  regen = 2;
+  regen = 3;
+  /** s since mana was last spent or a hit was taken: from REST_AFTER on, the hero rests. */
+  calm = REST_AFTER;
   private base: [number, number];
 
   constructor(hpMax = 1280, manaMax = 400) {
@@ -49,7 +53,7 @@ export class PlayerStats {
     if (this.dead || !(n > 0) || this.immune > 0) return 0;
     const d = Math.min((this.veil > 0 ? n * (1 - VEIL_CUT) : n) * (this.guard > 0 ? 1 - GUARD_CUT : 1) * this.armor, this.hp);
     this.hp -= d;
-    if (d > 0) this.onHurt?.(d);
+    if (d > 0) { this.calm = 0; this.onHurt?.(d); }
     if (this.dead) this.onDeath?.();
     return d;
   }
@@ -66,6 +70,7 @@ export class PlayerStats {
   spendMana(n: number): boolean {
     if (this.mana < n) return false;
     this.mana -= n;
+    if (n > 0) this.calm = 0;
     return true;
   }
 
@@ -78,13 +83,19 @@ export class PlayerStats {
   revive(): void {
     this.hp = this.hpMax;
     this.mana = this.manaMax;
+    this.calm = REST_AFTER;
+  }
+
+  get resting(): boolean {
+    return this.calm >= REST_AFTER;
   }
 
   update(dt: number): void {
     this.veil = Math.max(0, this.veil - dt);
     this.immune = Math.max(0, this.immune - dt);
     this.guard = Math.max(0, this.guard - dt);
-    if (!this.dead) this.restoreMana(this.regen * dt);
+    this.calm += dt;
+    if (!this.dead) this.restoreMana(this.regen * (this.resting ? REST_MUL : 1) * dt);
   }
 }
 

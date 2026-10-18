@@ -29,7 +29,7 @@ import { CHEST, CHOIR_DOOR, NPC, Quest } from '../src/quest/progress.ts';
 import { FRIAR, separate, spawnGroups, think as friarThink, hurt as friarHurt, type Friar } from '../src/enemies/brain.ts';
 import { APE, APETTA, APIARY, BOSS_AT, GARDENS, REVERENDISSIMO, SACERDOTE, fly, hurt as casterHurt, spawnApiary, spawnCasters, think as casterThink, wipe, type Bolt, type Priest } from '../src/enemies/caster.ts';
 import { PlayerStats } from '../src/player/stats.ts';
-import { ABILITIES, BAR, plagueSpot, tune, wispFoe, type Forsaken } from '../src/abilities/forsaken.ts';
+import { ABILITIES, BAR, MEND, plagueSpot, tune, wispFoe, type Forsaken } from '../src/abilities/forsaken.ts';
 import { Grimoire } from '../src/abilities/grimoire.ts';
 import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
@@ -198,7 +198,8 @@ function dangers(casters: Priest[], friars: Friar[], p: { x: number; z: number }
 // A stand-in for whatever the ability table touches on the Forsaken kit that is only looks.
 const NOOP: any = new Proxy(function () {}, { get: (_t, k) => (k === Symbol.toPrimitive ? () => 0 : NOOP), apply: () => NOOP });
 
-interface Zone { time: number; hp: number; potions: number; deaths: number; kills: number; lv: number }
+/** `mana`: spent; `dry`: fight s with too little mana to pray (the heal); in 'viaggio', `time` is s stood waiting for health or mana. */
+interface Zone { time: number; hp: number; potions: number; deaths: number; kills: number; lv: number; mana: number; dry: number }
 
 /** One run: the kit, the stats, every mob, the bot. */
 class Run {
@@ -238,6 +239,7 @@ class Run {
   private sowT = 0;
   private later: { t: number; f: () => void }[] = [];
   private immune = false;
+  private spent = 0;
   target?: Mob;
   src = '';
   dealt = new Map<string, number>(); // on the boss, by source
@@ -269,7 +271,8 @@ class Run {
     this.mobs = [...this.friars, ...this.casters];
     for (const m of this.mobs) this.worth.set(m, isCaster(m) ? m.kind.xp : FRIAR.xp);
     this.system = new AbilitySystem<Forsaken>(ABILITIES, BAR, this as unknown as Forsaken, START);
-    this.system.pool = this.stats;
+    const s = this.stats; // counts what is spent
+    this.system.pool = { get mana() { return s.mana; }, spendMana: (n) => s.spendMana(n) && ((this.spent += n), true) };
     this.player.pos.y = this.world.groundAt(SPAWN.x, SPAWN.z, 0);
     this.apply(); // the starter set
   }
@@ -425,7 +428,7 @@ class Run {
   }
   zone(name: string): Zone {
     let z = this.zones.get(name);
-    if (!z) this.zones.set(name, (z = { time: 0, hp: 0, potions: 0, deaths: 0, kills: 0, lv: 0 }));
+    if (!z) this.zones.set(name, (z = { time: 0, hp: 0, potions: 0, deaths: 0, kills: 0, lv: 0, mana: 0, dry: 0 }));
     return z;
   }
 
@@ -549,7 +552,7 @@ class Run {
     } else if (this.system.casting?.ability.id === 'mend') { // stand still for it
     } else if (!(this.dodge && ((low < 0.7 && !this.ready('potion')) || (goal.boss && s.mana < s.manaMax * 0.6)))) { // a careful player waits for the potion before the next pull, for mana before the boss
       this.travel(goal.x, goal.z, goal.r, dt);
-    }
+    } else this.zone('viaggio').time += dt;
     this.tickWorld(dt, hp0, t);
   }
 
@@ -569,9 +572,12 @@ class Run {
     dmg += fly(this.bolts, p, dt, [], this.world);
     if (dmg > 0 && s.takeDamage(dmg) > 0) this.system.pushback(); // the game's onHurt
     if (this.looting) for (const m of this.mobs) if (m.state === 'dead' && !this.looted.has(m)) { this.looted.add(m); this.loot(this.tierOf(m)); }
+    this.zone(t ? this.zoneOf(t) : 'viaggio').mana += this.spent;
+    this.spent = 0;
     if (t) {
       const z = this.zone(this.zoneOf(t));
       z.time += dt;
+      if (s.mana < MEND.mana) z.dry += dt;
       z.hp += Math.max(0, hp0 - s.hp);
       z.lv = this.lv;
     }
@@ -641,7 +647,7 @@ export function playRoute(build: string, dodge: boolean, s = 1, apiary = true): 
   return { build, dodge, won: r.boss.state === 'dead', time: r.time, deaths: r.deaths, lv: r.lv, xp: r.xp, zones: r.zones, picks: r.picks, boss: bossT, gold, gear, kills };
 }
 
-export interface BossResult { build: string; lv: number; gear: string; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dealt: Map<string, number>; taken: Map<string, number>; casts: Map<string, number> }
+export interface BossResult { build: string; lv: number; gear: string; picks: string[]; dodge: boolean; won: boolean; tries: { time: number; left: number; potions: number }[]; dry: number; dealt: Map<string, number>; taken: Map<string, number>; casts: Map<string, number> }
 
 /** The boss alone: the church cleared, the choir door open, a build at level `lv`, five tries at most. */
 export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear = process.env.GEAR ?? 'typical'): BossResult {
@@ -674,7 +680,7 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear 
     }
     if ((r.boss.state as string) === 'dead') tries.push({ time: r.time - t0, left: 0, potions: pots });
   }
-  return { build, lv, gear, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dealt: r.dealt, taken: r.taken, casts: r.casts };
+  return { build, lv, gear, picks: r.picks, dodge, won: r.boss.state === 'dead', tries, dry: r.zone('boss').dry / Math.max(r.zone('boss').time, 1e-9), dealt: r.dealt, taken: r.taken, casts: r.casts };
 }
 
 export interface EliteResult { build: string; lv: number; elite: string; dodge: boolean; won: boolean; time: number; potions: number; lost: number }
@@ -726,12 +732,12 @@ export function routeTable(rs: RouteResult[]): string {
     out.push(`  ${r.won ? 'boss down' : 'NOT FINISHED'} in ${(r.time / 60).toFixed(1)} min, ${r.deaths} deaths, level ${r.lv} (${r.xp} XP), boss fight ${r.boss.toFixed(0)} s; picks ${r.picks.join(' ')}`);
     out.push(`    at the boss: ${r.gold} gold, ${gearLine(r.gear)}; kills ${Object.entries(r.kills).map(([k, v]) => `${k} ${v}`).join(' ')}`);
   }
-  out.push(`  ${'zone'.padEnd(9)}${pad('fight s', 8)}${pad('hp lost', 8)}${pad('potions', 8)}${pad('deaths', 7)}${pad('level', 6)}`);
+  out.push(`  ${'zone'.padEnd(9)}${pad('fight s', 8)}${pad('hp lost', 8)}${pad('potions', 8)}${pad('deaths', 7)}${pad('level', 6)}${pad('mana', 7)}${pad('dry %', 7)}`);
   for (const k of ZONES) {
     const zs = rs.map((r) => r.zones.get(k)).filter((z) => z) as Zone[];
     if (!zs.length) continue;
     const m = (f: (z: Zone) => number) => mean(rs.map((r) => (r.zones.get(k) ? f(r.zones.get(k)!) : 0)));
-    out.push(`  ${k.padEnd(9)}${pad(m((z) => z.time).toFixed(0), 8)}${pad(Math.round(m((z) => z.hp)), 8)}${pad(f1(m((z) => z.potions)), 8)}${pad(f1(m((z) => z.deaths)), 7)}${pad(k === 'viaggio' ? '' : f1(mean(zs.map((z) => z.lv))), 6)}`);
+    out.push(`  ${k.padEnd(9)}${pad(m((z) => z.time).toFixed(0), 8)}${pad(Math.round(m((z) => z.hp)), 8)}${pad(f1(m((z) => z.potions)), 8)}${pad(f1(m((z) => z.deaths)), 7)}${pad(k === 'viaggio' ? '' : f1(mean(zs.map((z) => z.lv))), 6)}${pad(Math.round(m((z) => z.mana)), 7)}${pad(k === 'viaggio' ? '' : Math.round((100 * m((z) => z.dry)) / Math.max(m((z) => z.time), 1e-9)), 7)}`);
   }
   return out.join('\n');
 }
@@ -742,13 +748,13 @@ function gearLine(g: GearState): string {
 }
 /** The boss alone: per build, level and gear, wins, tries to the first kill, the kill time and potions. */
 export function bossTable(rs: BossResult[]): string {
-  const out = [`${'build'.padEnd(8)}${pad('level', 6)} ${'gear'.padEnd(8)}${'bot'.padEnd(9)}${pad('wins', 6)}${pad('tries', 7)}${pad('kill s', 8)}${pad('pots', 6)}  died at (s)`];
+  const out = [`${'build'.padEnd(8)}${pad('level', 6)} ${'gear'.padEnd(8)}${'bot'.padEnd(9)}${pad('wins', 6)}${pad('tries', 7)}${pad('kill s', 8)}${pad('pots', 6)}${pad('dry %', 7)}  died at (s)`];
   const key = (r: BossResult) => `${r.build}|${r.lv}|${r.gear}|${r.dodge}`;
   for (const k of [...new Set(rs.map(key))]) {
     const g = rs.filter((r) => key(r) === k), won = g.filter((r) => r.won), r0 = g[0];
     const kills = won.map((r) => r.tries[r.tries.length - 1]);
     out.push(`${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${r0.gear.padEnd(8)}${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 6)}${pad(won.length ? f1(mean(won.map((r) => r.tries.length))) : '-', 7)}` +
-      `${pad(won.length ? mean(kills.map((t) => t.time)).toFixed(0) : '-', 8)}${pad(won.length ? f1(mean(kills.map((t) => t.potions))) : '-', 6)}  ` +
+      `${pad(won.length ? mean(kills.map((t) => t.time)).toFixed(0) : '-', 8)}${pad(won.length ? f1(mean(kills.map((t) => t.potions))) : '-', 6)}${pad(Math.round(100 * mean(g.map((r) => r.dry))), 7)}  ` +
       g.flatMap((r) => r.tries.filter((t) => t.left).map((t) => t.time.toFixed(0))).join(' '));
     if (process.env.DEALT) for (const r of g) out.push(`    ${r.picks.join(' ')}\n    dealt: ${[...r.dealt].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}; taken: ${[...r.taken].map(([d, v]) => `${d} ${Math.round(v)}`).join(', ')}\n    casts: ${[...r.casts].map(([d, v]) => `${d} ${v}`).join(', ')}`);
   }

@@ -55,6 +55,7 @@ export class Hud {
   setStats(s: PlayerStats): void {
     this.hp.set(s.hp, s.hpMax);
     this.mp.set(s.mana, s.manaMax);
+    this.mp.el.classList.toggle('rest', s.resting && s.mana < s.manaMax); // the five-second rule: the bar glows while it fills fast
     this.hp.el.classList.toggle('low', s.hp > 0 && s.hp < s.hpMax * 0.25);
     if (this.lastHp >= 0 && s.hp < this.lastHp) {
       const f = document.createElement('div');

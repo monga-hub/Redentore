@@ -32,7 +32,7 @@ const BLOW = 0.1; // s from the press to the clip's blow (swings, slams)
 const COMBO = 1.1; // s: a swing this soon after the last one carries the combo on
 const GLOB = 0.28; // s the plague glob flies (cosmetic: the cloud is there at the press)
 /** Preghiera di suffragio: a long prayer for a big heal, so it is cast out of reach, or paid for in pushback. */
-export const MEND = { cast: 3, heal: 0.35, cd: 25, mana: 120 };
+export const MEND = { cast: 3, heal: 0.35, mana: 120 }; // no cooldown: mana is the only limit
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -1283,7 +1283,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'mend', name: 'Preghiera di suffragio', icon: 'mend', mana: MEND.mana, charge: 5, cast: MEND.cast,
-    get cooldown() { return MEND.cd * tune.cdr; },
+    cooldown: 0,
     get desc() { return `Reciti a mani alzate il suffragio dei morti e le anime del purgatorio ti ricuciono la carne: recuperi il ${MEND.heal * 100}% della salute. Lancio lungo: muoverti lo interrompe, e ogni colpo che subisci lo fa arretrare.`; },
     check: (k) => (k.stats.hp >= k.stats.hpMax ? 'Sei già in piena salute.' : undefined),
     during(k, prog, dt) {

@@ -245,7 +245,7 @@ export class ActionBar<C extends Caster> {
   private showTip(anchor: HTMLElement, a: Ability<C>): void {
     const cast = a.channel ? 'Canalizzata' : a.cast ? `Lancio ${num(a.cast)} s` : 'Istantanea';
     const cd = a.cooldown >= 60 ? `${num(a.cooldown / 60)} min` : `${num(a.cooldown)} s`;
-    this.tip.innerHTML = `<b></b>${a.mana ? `<div class="row"><span>${a.mana} mana</span></div>` : ''}<div class="row"><span>${cast}</span><span>Recupero ${cd}</span></div><p></p>`;
+    this.tip.innerHTML = `<b></b>${a.mana ? `<div class="row"><span>${a.mana} mana</span></div>` : ''}<div class="row"><span>${cast}</span>${a.cooldown ? `<span>Recupero ${cd}</span>` : ''}</div><p></p>`;
     this.tip.querySelector('b')!.textContent = a.name;
     this.tip.querySelector('p')!.textContent = a.desc;
     const r = anchor.getBoundingClientRect(), t = this.tip;

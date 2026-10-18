@@ -99,7 +99,7 @@ abilità sbloccate prendono il primo tasto libero della barra (le prime sette po
 | fuoco | Fuoco fatuo · Rogo dell'eretico (lancio lungo 2,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) |
 | gelo | Dardo di brina (rallenta) · Acquasantiera gelata (congela sul posto chi è vicino) · Stiletto di ghiaccio (triplo su chi è congelato) |
 | fulmine | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) |
-| sacro | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, recupero 25 s) |
+| sacro | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, nessun recupero: la limita solo il mana) |
 
 Ogni scuola ha il suo tempo di recupero globale (1,5 s): dopo un'abilità di gelo aspettano solo quelle di gelo, mentre
 fuoco, fulmine, ossa o peste partono subito, e sulla barra gira solo la lancetta dei tasti della stessa scuola. Come in

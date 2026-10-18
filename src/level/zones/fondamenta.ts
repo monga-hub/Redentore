@@ -2,16 +2,17 @@ import * as THREE from 'three';
 import type { LevelBuilder } from '../builder.ts';
 import { material } from '../materials.ts';
 import { CHURCH_FLOOR, X, Z } from '../plan.ts';
+import { RII } from './giudecca.ts';
 
 /** Site base (water, ground slabs), Fondamenta San Giacomo, sagrato + scalinata, calle dell'ingresso. */
 export function buildFondamenta(b: LevelBuilder): void {
   b.zone('site');
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(700, 800), material('water'));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), material('water'));
   water.rotation.x = -Math.PI / 2;
-  water.position.set(0, -1.2, -80);
+  water.position.set(80, -1.2, -80); // the lagoon, the canal and the rii of level 2 (zones/giudecca.ts)
   b.add(water, 'water');
   // Island ground: the fondamenta, the walled complex and the neighbouring land seen over the walls.
-  b.box(-120, 120, -1.2, 0, Z.riva, Z.quayEdge, 'ground');
+  b.box(-120, RII.croce[0], -1.2, 0, Z.riva, Z.quayEdge, 'ground'); // east of it the rio de la Croce, then zones/giudecca.ts
 
   b.zone('fondamenta');
   b.area('Fondamenta San Giacomo', -60, 60, Z.sagrato, Z.quayEdge);
@@ -19,7 +20,7 @@ export function buildFondamenta(b: LevelBuilder): void {
   b.box(-60, 60, 0, 0.12, Z.quayEdge - 0.25, Z.quayEdge, 'stoneDark', { camera: false }); // quay edge stones
   b.barrier(-60, 60, Z.quayEdge, Z.quayEdge + 0.6);
   b.barrier(-60.6, -60, Z.sagrato, Z.quayEdge);
-  b.barrier(60, 60.6, Z.sagrato, Z.quayEdge);
+  // East end: the chains across the Ponte de la Croce (quest/progress.ts) until level 2 opens it.
   // Neighbouring houses along the fondamenta (outside the complex).
   b.box(-60, X.west, -1.2, 11, -20, Z.sagrato, 'plaster');
   b.box(X.east, 60, -1.2, 11, -60, Z.sagrato, 'plaster');

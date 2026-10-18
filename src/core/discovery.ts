@@ -78,14 +78,20 @@ export class Discovery {
     return `${this.cols}x${this.rows}:${btoa(bin)}`;
   }
 
-  /** Restore an `encode`d grid. False (and nothing changed) when it is junk or from a level of another size. */
+  /**
+   * Restore an `encode`d grid. A smaller one is a save from before the level grew east (level 2 kept the
+   * north-west corner where it was): its cells are laid at the same place. False (and nothing changed)
+   * when it is junk or from a level it can't fit.
+   */
   decode(s: string): boolean {
     const m = /^(\d+)x(\d+):([A-Za-z0-9+/=]*)$/.exec(s);
-    if (!m || +m[1] !== this.cols || +m[2] !== this.rows) return false;
+    const cols = m ? +m[1] : 0, rows = m ? +m[2] : 0;
+    if (!m || cols > this.cols || rows > this.rows || !cols || !rows) return false;
     let bin: string;
     try { bin = atob(m[3]); } catch { return false; }
-    if (bin.length !== Math.ceil(this.cells.length / 8)) return false;
-    this.cells.forEach((_, i) => { this.cells[i] = (bin.charCodeAt(i >> 3) >> (i & 7)) & 1; });
+    if (bin.length !== Math.ceil((cols * rows) / 8)) return false;
+    this.cells.fill(0);
+    for (let i = 0; i < cols * rows; i++) this.cells[Math.floor(i / cols) * this.cols + (i % cols)] = (bin.charCodeAt(i >> 3) >> (i & 7)) & 1;
     this.last = -1;
     return true;
   }

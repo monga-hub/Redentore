@@ -6,24 +6,33 @@
 // the choir door into the church and kills the Reverendissimo; then the main portone swings open
 // onto the fondamenta and the player walks out. quest/view.ts draws the gates, the chest and the
 // prompts, quest/npc.ts the porter, quest/dialogue.ts what he says.
+//
+// Level 2 (La dote delle Zitelle): back on the fondamenta the hero reports to Fra' Zuane (XP and gold),
+// who offers the second quest; the chains across the Ponte de la Croce fall, the hero walks east to the
+// Zitelle, takes the key of the church off the Maestra del merletto in the ospizio's lace hall, opens the
+// church's back door from the court and kills the Governatrice under the dome; her portone opens on the
+// sagrato, and Fra' Zuane hears it done.
 import type { Box, World } from '../core/physics.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
+import { ZF } from '../level/zones/zitelle.ts';
 
-export type Need = 'key' | 'boss';
+export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2';
 
-/** Where the quest stands, in order; derived from the flags, never stored. */
-export type Stage = 'talk' | 'key' | 'grate' | 'boss' | 'leave' | 'done';
+/** Where the quests stand, in order; derived from the flags, never stored. */
+export type Stage = 'talk' | 'key' | 'grate' | 'boss' | 'leave' | 'report' | 'offer' | 'route' | 'ospizio' | 'church' | 'boss2' | 'return' | 'done';
+/** The stages of the second quest, La dote delle Zitelle (from Zuane's offer on). */
+export const SECOND: readonly Stage[] = ['offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'done'];
 
 export interface Gate {
   id: string;
   label: string; // shown in the prompt
-  kind: 'grate' | 'door';
+  kind: 'grate' | 'door' | 'chain';
   // The door opening it fills (see the walls in zones/convento.ts and zones/chiesa.ts).
   axis: 'x' | 'z'; // the wall runs along this axis
   at: number; // centre along the wall
   c: number; // the wall's line (z for an 'x' wall, x for a 'z' wall)
   w: number; t: number; y0: number; h: number;
-  needs: Need; // 'key': opened by the player holding the key; 'boss': swings open when the boss dies
+  needs: Need; // 'key', 'key2': opened by the player holding that key; 'boss', 'boss2': swings open when that boss dies; 'quest2': falls when the second quest is taken
   open: boolean;
   box: Box; // its collider while shut
 }
@@ -35,6 +44,10 @@ export const GATES: GateSpec[] = [
   { id: 'grata-ovest', label: 'la grata del chiostro grande', kind: 'grate', axis: 'z', at: -70, c: -17, w: 2.4, t: 0.6, y0: 0, h: 3.2, needs: 'key' }, // from the chiostro mediano
   { id: 'coro', label: 'la porta della chiesa', kind: 'door', axis: 'x', at: 0, c: -60, w: 2.4, t: 1, y0: F + 0.6, h: 3.4, needs: 'key' }, // choir back door
   { id: 'portone', label: 'il portone', kind: 'door', axis: 'x', at: 0, c: 0, w: 4, t: 1, y0: F, h: 8, needs: 'boss' }, // facade
+  // Level 2 (zones/giudecca.ts, zones/zitelle.ts): appended, saved games name gates by id.
+  { id: 'catene', label: 'le catene del Ponte de la Croce', kind: 'chain', axis: 'z', at: 15, c: 56.5, w: 10, t: 0.6, y0: 0, h: 3, needs: 'quest2' }, // across the whole quay
+  { id: 'coro-zitelle', label: 'la porta della chiesa delle Zitelle', kind: 'door', axis: 'x', at: 240, c: -30, w: 2.4, t: 1, y0: ZF, h: 3.2, needs: 'key2' }, // the presbytery's back door, from the court
+  { id: 'portone-zitelle', label: 'il portone delle Zitelle', kind: 'door', axis: 'x', at: 240, c: 0, w: 3.4, t: 1, y0: ZF, h: 6, needs: 'boss2' }, // facade
 ];
 
 /** The chest with the key, at the far end of the pontile (zones/nord.ts: x -38..-32, z -194..-186, deck at 0). */
@@ -61,6 +74,15 @@ export const BLESSING = { name: 'Benedizione della serra', time: 180, cast: 0.8,
 
 /** z past which a player is back out on the fondamenta (the foot of the scalinata). */
 const OUTSIDE = 10;
+/** x past which the hero has reached the Zitelle (their sagrato, zones/zitelle.ts). */
+const ZITELLE = 196;
+
+/** Level 2 checkpoints: past the chains, the foot of the Ponte de la Croce's far side; once the church's back door is open, the andito at its steps. */
+export const CROCE = { x: 78, z: 15, yaw: -Math.PI / 2 } as const;
+export const ANDITO = { x: 240, z: -35, yaw: 0 } as const;
+
+/** What each report to Fra' Zuane is worth: experience on top of the dead's, gold into the bag. */
+export const REWARD = { report: { xp: 150, gold: 80 }, return: { xp: 300, gold: 200 } } as const;
 
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
@@ -75,6 +97,13 @@ export class Quest {
   out = false; // back on the fondamenta after the boss
   blessed = false; // Fra' Bortolo's blessing taken (once a run)
   blessLeft = 0; // s of it still running
+  blessed2 = false; // his second infusion, on the road to the Zitelle
+  reported = false; // the first quest handed in to Fra' Zuane
+  accepted2 = false; // La dote delle Zitelle taken
+  arrived = false; // reached the Zitelle
+  key2 = false; // the key of the church, off the Maestra del merletto
+  boss2Dead = false; // the Governatrice
+  reported2 = false; // the second quest handed in
   readonly gates: Gate[];
   private world: World;
 
@@ -96,14 +125,61 @@ export class Quest {
     if (!this.key) return 'key';
     if (!this.gates.some((g) => g.kind === 'grate' && g.open)) return 'grate';
     if (!this.bossDead) return 'boss';
-    return this.out ? 'done' : 'leave';
+    if (!this.out) return 'leave';
+    if (!this.reported) return 'report';
+    if (!this.accepted2) return 'offer';
+    if (!this.arrived) return 'route';
+    if (!this.key2) return 'ospizio';
+    if (!this.gate('coro-zitelle').open) return 'church';
+    if (!this.boss2Dead) return 'boss2';
+    return this.reported2 ? 'done' : 'return';
   }
 
-  /** Per frame with the player's feet: walking out of the open portone ends the quest. */
-  update(p: { z: number }): boolean {
-    if (this.stage !== 'leave' || p.z < OUTSIDE) return false;
-    this.out = true;
-    return true;
+  gate(id: string): Gate {
+    return this.gates.find((g) => g.id === id)!;
+  }
+
+  /** Per frame with the player's feet: walking out of the open portone ends the first quest's fight, reaching the Zitelle the second's walk. */
+  update(p: { x: number; z: number }): boolean {
+    const s = this.stage;
+    if (s === 'leave' && p.z >= OUTSIDE) return (this.out = true);
+    if (s === 'route' && p.x >= ZITELLE) return (this.arrived = true);
+    return false;
+  }
+
+  /** Fra' Zuane hears the first quest done (once): its reward is laid on. */
+  report(): boolean {
+    if (!this.out || this.reported) return false;
+    return (this.reported = true);
+  }
+
+  /** La dote delle Zitelle taken: the chains on the Ponte de la Croce fall. */
+  accept2(): void {
+    this.reported = this.accepted2 = true;
+    for (const g of this.gates) if (g.needs === 'quest2') this.open(g);
+  }
+
+  /** The Maestra del merletto is dead: her key of the church is the hero's. */
+  takeKey2(): void {
+    this.key2 = true;
+  }
+
+  /** The Governatrice is dead: her portone opens onto the sagrato. */
+  win2(): void {
+    if (this.boss2Dead) return;
+    this.boss2Dead = true;
+    for (const g of this.gates) if (g.needs === 'boss2') this.open(g);
+  }
+
+  /** Fra' Zuane hears the second quest done (once). */
+  report2(): boolean {
+    if (this.stage !== 'return') return false;
+    return (this.reported2 = true);
+  }
+
+  /** Experience the reports to Fra' Zuane have earned, on top of the dead's (main.ts adds it). */
+  get bonusXp(): number {
+    return (this.reported ? REWARD.report.xp : 0) + (this.reported2 ? REWARD.return.xp : 0);
   }
 
   centre(g: Gate): { x: number; z: number } {
@@ -136,6 +212,14 @@ export class Quest {
     return true;
   }
 
+  /** His last rue, once the second quest is taken: the same blessing again, once. */
+  bless2(): boolean {
+    if (this.blessed2 || !this.accepted2) return false;
+    this.blessed2 = true;
+    this.blessLeft = BLESSING.time;
+    return true;
+  }
+
   /** Cast time × and damage × while the blessing runs. */
   get castMul(): number { return this.blessLeft > 0 ? BLESSING.cast : 1; }
   get dmgMul(): number { return this.blessLeft > 0 ? BLESSING.dmg : 1; }
@@ -143,9 +227,12 @@ export class Quest {
   /**
    * Where a fallen player wakes: at the choir door once it is open, so a boss attempt
    * is a short walk away instead of the whole route again; on the fondamenta before that.
+   * In level 2, past the Ponte de la Croce, then in the andito behind the Zitelle's altar.
    */
   checkpoint(): { x: number; z: number; yaw: number } {
-    return this.gates.find((g) => g.id === 'coro')!.open ? CHOIR_DOOR : SPAWN;
+    if (this.gate('coro-zitelle').open) return ANDITO;
+    if (this.gate('catene').open) return CROCE;
+    return this.gate('coro').open ? CHOIR_DOOR : SPAWN;
   }
 
   /** The nearest thing to interact with around the player's feet `p`, if any. */
@@ -159,8 +246,9 @@ export class Quest {
     for (const g of this.gates) {
       const c = this.centre(g);
       if (g.open || Math.hypot(p.x - c.x, p.z - c.z) > REACH || Math.abs(p.y - g.y0) > 1.5) continue;
-      if (g.needs === 'boss') return { text: `${cap(g.label)} è sbarrato` };
-      if (!this.key) return { text: `${cap(g.label)} è chiusa a chiave` };
+      if (g.needs === 'boss' || g.needs === 'boss2') return { text: `${cap(g.label)} è sbarrato` };
+      if (g.needs === 'quest2') return { text: `${cap(g.label)} sbarrano la fondamenta` };
+      if (!(g.needs === 'key2' ? this.key2 : this.key)) return { text: `${cap(g.label)} è chiusa a chiave` };
       return { text: `Apri ${g.label}`, act: () => { this.open(g); return ''; } };
     }
     return undefined;

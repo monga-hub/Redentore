@@ -108,6 +108,34 @@ deserialize(c, { ...s, player: { ...s.player, hp: 0 }, quest: { ...s.quest, boss
 if (!c.quest.gates.find((g) => g.id === 'portone')!.open) fail('boss dead but portone shut');
 if (c.stats.hp <= 0) fail('loaded a dead player');
 
+// Level 2: its flags round-trip, the chains and the Zitelle's doors with them; a save from before it loads at the report to Fra' Zuane.
+const z = boot();
+Object.assign(z.quest, { accepted: true, out: true });
+z.quest.takeKey();
+for (const g of z.quest.gates) if (g.needs === 'key') z.quest.open(g);
+z.quest.win();
+z.quest.report();
+z.quest.accept2();
+z.quest.arrived = true;
+z.quest.takeKey2();
+z.quest.open(z.quest.gate('coro-zitelle'));
+z.quest.bless2();
+const zs = JSON.parse(JSON.stringify(serialize(z))), zb = boot();
+deserialize(zb, zs);
+if (zb.quest.stage !== 'boss2' || !zb.quest.gate('catene').open || !zb.quest.gate('coro-zitelle').open || zb.quest.gate('portone-zitelle').open || !zb.quest.blessed2) fail(`level 2 restored at ${zb.quest.stage}`);
+if (zb.quest['world'].boxes.includes(zb.quest.gate('catene').box)) fail('the fallen chains still block the bridge');
+const zw = boot();
+deserialize(zw, { ...zs, quest: { ...zs.quest, boss2Dead: true } });
+if (!zw.quest.gate('portone-zitelle').open || zw.quest.stage !== 'return') fail('the Governatrice dead but her portone shut');
+const l1 = boot();
+deserialize(l1, (({ quest: { reported: _r, accepted2: _a2, arrived: _ar, key2: _k, boss2Dead: _b, reported2: _r2, blessed2: _b2, ...q }, ...o }) => ({ ...o, quest: { ...q, gates: ['grata-nord', 'coro', 'portone'] } }))(zs));
+if (l1.quest.stage !== 'report' || l1.quest.gate('catene').open) fail(`a finished level-1 save loads at ${l1.quest.stage}`);
+if (valid({ ...zs, quest: { ...zs.quest, key2: 1 } })) fail('level 2 flag validation');
+// A fog grid from before the level grew east keeps its cells where they were.
+const narrow = (() => { const f = new Discovery(buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle')); f.reveal(SPAWN.x, SPAWN.z); return f; })();
+const wide = fogOf(boot());
+if (narrow.x0 !== wide.x0 || narrow.z0 !== wide.z0 || narrow.rows !== wide.rows || !wide.decode(narrow.encode()) || !wide.seen(SPAWN.x, SPAWN.z) || wide.seen(SPAWN.x + 30, SPAWN.z)) fail('an old fog grid lost its place');
+
 // Storage: three slots, empty ones undefined, junk refused; the pending handoff is taken once.
 const mem = new Map<string, string>();
 const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) } as Storage;

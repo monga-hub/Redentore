@@ -12,6 +12,8 @@ import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 
 const VERSION = 1;
+/** The second quest's flags on Quest, saved as they are. */
+const LEVEL2 = ['reported', 'accepted2', 'arrived', 'key2', 'boss2Dead', 'reported2', 'blessed2'] as const;
 const SLOT_KEY = (i: number) => `redentore.save.${i}`;
 const PENDING = 'redentore.pending'; // sessionStorage: the state to apply on the next boot
 const AUTO = 'redentore.auto'; // localStorage: the run in progress, resumed by a boot with nothing pending
@@ -24,7 +26,10 @@ export interface GameState {
   // gates: ids of the open ones. accepted/out: Fra' Zuane's quest taken, back out on the fondamenta after
   // the boss; absent in saves from before him, which load with the quest already taken. blessed/blessLeft:
   // Fra' Bortolo's blessing taken and the s of it left; absent in saves from before him: not taken.
-  quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number };
+  // Level 2 (all absent in older saves: false): reported (first quest handed in), accepted2 (La dote delle Zitelle taken),
+  // arrived (reached the Zitelle), key2 (the Maestra's key), boss2Dead, reported2, blessed2 (Fra' Bortolo's second infusion).
+  quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number }
+    & Partial<Record<typeof LEVEL2[number], boolean>>;
   dead: number[]; // indices into Game.mobs
   time: number; // s played
   fog?: string; // Discovery.encode(); absent in saves from before the fog of war, which load fully fogged
@@ -56,7 +61,8 @@ export function serialize(g: Game): GameState {
   return {
     v: VERSION,
     player: { x, y, z, yaw: g.player.facing, hp: g.stats.hp, mana: g.stats.mana, charge: g.kit.charge },
-    quest: { key: g.quest.key, gates: g.quest.gates.filter((q) => q.open).map((q) => q.id), bossDead: g.quest.bossDead, accepted: g.quest.accepted, out: g.quest.out, blessed: g.quest.blessed, blessLeft: g.quest.blessLeft },
+    quest: { key: g.quest.key, gates: g.quest.gates.filter((q) => q.open).map((q) => q.id), bossDead: g.quest.bossDead, accepted: g.quest.accepted, out: g.quest.out, blessed: g.quest.blessed, blessLeft: g.quest.blessLeft,
+      ...Object.fromEntries(LEVEL2.map((k) => [k, g.quest[k]])) },
     dead: g.mobs.flatMap((m, i) => (m.state === 'dead' ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
@@ -85,6 +91,8 @@ export function deserialize(g: Game, s: GameState): void {
   if (s.quest.key) g.quest.takeKey();
   for (const q of g.quest.gates) if (s.quest.gates.includes(q.id)) g.quest.open(q);
   if (s.quest.bossDead) g.quest.win();
+  for (const k of LEVEL2) g.quest[k] = s.quest[k] ?? false;
+  if (s.quest.boss2Dead) { g.quest.boss2Dead = false; g.quest.win2(); }
   const dead = s.dead.map((i) => g.mobs[i]).filter((m) => m);
   killAll(dead);
   for (const m of dead) m.t = GONE;
@@ -99,7 +107,7 @@ export function valid(s: unknown): s is GameState {
   const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
   return !!o && o.v === VERSION && !!o.player && ['x', 'y', 'z', 'yaw', 'hp', 'mana', 'charge'].every((k) => num(o.player[k as keyof GameState['player']]))
     && !!o.quest && typeof o.quest.key === 'boolean' && typeof o.quest.bossDead === 'boolean' && Array.isArray(o.quest.gates)
-    && ['accepted', 'out', 'blessed'].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out' | 'blessed']))
+    && ['accepted', 'out', 'blessed', ...LEVEL2].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out' | 'blessed'] as boolean | undefined))
     && (o.quest.blessLeft === undefined || num(o.quest.blessLeft))
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))

@@ -122,7 +122,7 @@ export class Dialogue {
     this.talk = talk;
     this.onAccept = accept;
     this.onShop = shop;
-    this.titleEl.textContent = this.talk.offer ? QUEST_TITLE : '';
+    this.titleEl.textContent = this.talk.offer ? this.talk.title ?? QUEST_TITLE : '';
     this.el.classList.add('show');
     document.body.classList.add('talking');
     if (document.pointerLockElement) document.exitPointerLock();
@@ -169,7 +169,7 @@ export class Dialogue {
   private choose(what: string): void {
     playSfx('ui_click', null, { ui: true });
     if (what === 'next') this.say(this.page + 1);
-    else if (what === 'decline') this.say(this.page, DECLINE);
+    else if (what === 'decline') this.say(this.page, this.talk.decline ?? DECLINE);
     else if (what === 'shop') {
       const shop = this.onShop;
       this.close();

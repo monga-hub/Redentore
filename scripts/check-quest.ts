@@ -4,8 +4,8 @@
 // and the tracker's objective following each step. Fra' Bortolo in the serra: reachable in peace, blesses once.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { BLESSING, CHEST, NPC, Quest, SPEZIALE, type Stage } from '../src/quest/progress.ts';
-import { OBJECTIVE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, TALK } from '../src/quest/dialogue.ts';
+import { BLESSING, CHEST, NPC, Quest, REWARD, SPEZIALE, type Stage } from '../src/quest/progress.ts';
+import { OBJECTIVE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
 
 let failed = 0;
@@ -22,11 +22,11 @@ const facing = feet(NPC.x - 1.2, NPC.z + 0.6);
 if (level.world.blocked(facing.x, facing.z, facing.y)) fail("no room to stand by Fra' Zuane");
 
 // Every stage has his lines and an objective; the first offers the quest.
-for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'done'] as Stage[]) {
+for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'report', 'offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'done'] as Stage[]) {
   if (!TALK[s]?.pages.length || !OBJECTIVE[s]) fail(`stage ${s} has no lines or no objective`);
   for (const p of TALK[s].pages) if (p.length > 260) fail(`a page of ${s} is ${p.length} characters, too long for the window on a phone`);
 }
-if (!TALK.talk.offer || Object.entries(TALK).some(([s, t]) => s !== 'talk' && t.offer)) fail('only the first conversation offers the quest');
+if (!TALK.talk.offer || !TALK.report.offer || !TALK.offer.offer || Object.entries(TALK).some(([s, t]) => !['talk', 'report', 'offer'].includes(s) && t.offer)) fail('only the first conversation, the report and the re-offer offer a quest');
 
 // Start: talk to him; the chest is sealed.
 want('talk');
@@ -54,6 +54,35 @@ want('leave');
 if (quest.update(feet(0, -20))) fail('the quest ended inside the church');
 want('leave');
 if (!quest.update(feet(0, 12))) fail('walking out of the portone did not end the quest');
+want('report');
+if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once the Reverendissimo is dead");
+
+// Level 2: the report pays once; declining leaves the offer open; accepting drops the chains.
+const xp0 = quest.bonusXp;
+if (xp0 !== 0 || !quest.report() || quest.report() || quest.bonusXp !== REWARD.report.xp) fail('the report to Fra\' Zuane does not pay its reward exactly once');
+want('offer');
+const chains = quest.gate('catene');
+if (chains.open || quest.prompt(feet(55, 15))?.act) fail('the chains on the Ponte de la Croce open before the second quest');
+quest.accept2();
+if (!chains.open) fail('accepting La dote delle Zitelle did not drop the chains');
+want('route');
+if (quest.update(feet(150, 15))) fail('arrived at the Zitelle halfway along the fondamenta');
+if (!quest.update(feet(220, 5))) fail('reaching the sagrato of the Zitelle did not count');
+want('ospizio');
+const back = quest.gate('coro-zitelle'), bc = quest.centre(back);
+const shut = quest.prompt({ x: bc.x, y: 0.8, z: bc.z + 1.2 });
+if (!shut || shut.act) fail("the Zitelle's back door opens without the Maestra's key");
+quest.takeKey2();
+want('church');
+const opening = quest.prompt({ x: bc.x, y: 0.8, z: bc.z - 1.2 });
+if (!opening?.act) fail("the Maestra's key does not open the Zitelle's back door");
+opening?.act?.();
+want('boss2');
+if (quest.gate('portone-zitelle').open) fail("the Zitelle's portone opened before the Governatrice fell");
+quest.win2();
+if (!quest.gate('portone-zitelle').open) fail("the Governatrice's death did not open the Zitelle's portone");
+want('return');
+if (!quest.report2() || quest.report2() || quest.bonusXp !== REWARD.report.xp + REWARD.return.xp) fail('the second report does not pay its reward exactly once');
 want('done');
 if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once it is over");
 
@@ -62,14 +91,14 @@ const bortolo = feet(SPEZIALE.x, SPEZIALE.z - 1.2);
 if (level.world.blocked(bortolo.x, bortolo.z, bortolo.y)) fail("no room to stand by Fra' Bortolo");
 if (quest.prompt(bortolo)?.talk !== 'speziale') fail("no 'talk' prompt next to Fra' Bortolo");
 for (const [x, z] of [...GROUPS, ...MORE].flat()) if (Math.hypot(x - bortolo.x, z - bortolo.z) < FRIAR.aggro + 1) fail(`a friar at (${x}, ${z}) hoes within reach of Fra' Bortolo`);
-for (const t of [SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
+for (const t of [SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
 if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('blessed before talking to Fra\' Bortolo');
 if (!quest.bless() || quest.castMul !== BLESSING.cast || quest.dmgMul !== BLESSING.dmg) fail('the blessing does not quicken casts and harden blows');
 if (quest.bless()) fail('the blessing was given twice');
 quest.blessLeft = 0;
 if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('the blessing outlived its time');
 
-console.log(`quest ok: talk -> key -> grate -> boss -> leave -> done, Fra' Bortolo blesses once`);
+console.log(`quest ok: talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);
   process.exit(1);

@@ -3,11 +3,15 @@
 // (step height, body radius), once per stage of the quest (quest/progress.ts): at the start
 // the chiostro grande and the church must be locked and everything else (the key chest on the
 // pontile included) reachable; the portone the boss's death opens must join the fondamenta to
-// the nave; with every gate open every named area must be reachable.
+// the nave; with every gate open every named area must be reachable. Level 2: the chains on the Ponte
+// de la Croce keep the Giudecca east of the Redentore and the Zitelle shut until Fra' Zuane's second quest is
+// taken; then everything there but the Zitelle's church is open, the key of the church opens it from the
+// court, and the Governatrice's death opens its portone on the sagrato.
 import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { CHEST, CHOIR_DOOR, Quest, SPEZIALE } from '../src/quest/progress.ts';
+import { ANDITO, CHEST, CHOIR_DOOR, CROCE, Quest, SPEZIALE } from '../src/quest/progress.ts';
+import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
 {
@@ -24,7 +28,7 @@ import { CHEST, CHOIR_DOOR, Quest, SPEZIALE } from '../src/quest/progress.ts';
 const level = buildLevel();
 const { world } = level;
 const quest = new Quest(world); // shut gates and the key chest, as at the start of a game
-const STEP = 0.5, X0 = -62, X1 = 62, Z0 = -197, Z1 = 22;
+const STEP = 0.5, X0 = -62, X1 = 302, Z0 = -197, Z1 = 22;
 const nx = Math.round((X1 - X0) / STEP), nz = Math.round((Z1 - Z0) / STEP);
 const idx = (i: number, j: number) => j * nx + i;
 const toI = (x: number) => Math.round((x - X0) / STEP), toJ = (z: number) => Math.round((z - Z0) / STEP);
@@ -69,7 +73,9 @@ const t0 = performance.now();
 
 // Start of the game: the grates and both church doors are shut. Everything but the chiostro
 // grande and the church is reachable, the chest with the key among it; those two are not.
-const locked = (a: { zone: string; label: string }) => a.zone === 'chiesa' || a.label === 'Chiostro grande';
+const level2 = (a: { zone: string }) => a.zone === 'giudecca' || a.zone === 'zitelle';
+const zChurch = (a: { label: string }) => /^Le Zitelle:|^Altar maggiore delle Zitelle/.test(a.label);
+const locked = (a: { zone: string; label: string }) => a.zone === 'chiesa' || a.label === 'Chiostro grande' || level2(a);
 const start = flood();
 const near = [[0, 0.8], [-0.8, 0], [0.8, 0], [0, -0.8]].some(([dx, dz]) => at(start, CHEST.x + dx * 1.2, CHEST.z + dz * 1.2));
 if (!near) fail('quest      the key chest on the pontile is out of reach');
@@ -96,10 +102,40 @@ if (!at(portone, 0, -2)) fail('quest      the open portone does not lead from th
 // church aisle runs from the portone to the foot of the high altar.
 quest.takeKey();
 for (const g of quest.gates) if (g.needs === 'key') quest.open(g);
+const done1 = flood(), choirWake = quest.checkpoint();
+for (const a of level.areas) if (level2(a) && cells(done1, a)) fail(`${a.zone.padEnd(11)} ${a.label} reachable before the second quest`);
+
+// Level 2: the second quest taken, the chains fall; the Zitelle's church stays shut until its key opens the back door.
+quest.out = true;
+quest.accept2();
+const road = flood();
+console.log('-- level 2: the chains on the Ponte de la Croce fallen');
+for (const a of level.areas) {
+  if (!level2(a)) continue;
+  const hit = cells(road, a), shut = zChurch(a);
+  if (shut ? hit > 0 : !hit) fail(`${a.zone.padEnd(11)} ${a.label}: ${hit} cells reached, want ${shut ? 'none (locked)' : 'some'}`);
+  else console.log(`ok   ${a.zone.padEnd(11)} ${a.label} (${shut ? 'locked' : `${hit} cells`})`);
+}
+if (quest.checkpoint() !== CROCE || !at(road, CROCE.x, CROCE.z)) fail('quest      past the chains a death should wake at the foot of the Ponte de la Croce, on open ground');
+let east = -Infinity, south = Infinity;
+for (let n = 0; n < road.length; n++) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx; if (X0 + i * STEP > 60) { east = Math.max(east, X0 + i * STEP); south = Math.min(south, Z0 + j * STEP); } }
+if (east > 300.5 || south < -104.5) {
+  fail(`level 2 leaks: walkable as far as x ${east}, z ${south}`);
+  for (let n = 0; n < road.length; n += 1) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP; if (x > 60 && (x > 300.5 || z < -104.5) && (i + j) % 40 === 0) console.log('  leak at', x, z); }
+}
+quest.takeKey2();
+quest.open(quest.gate('coro-zitelle'));
+const nave = flood();
+if (quest.checkpoint() !== ANDITO || !at(nave, ANDITO.x, ANDITO.z)) fail('quest      with the Zitelle\'s back door open a death should wake in the andito, on open ground');
+for (const [x, z] of [[ZCX, -22], [ZCX, -10], [ZCX, -2]]) if (!at(nave, x, z)) fail(`zitelle     hall point (${x}, ${z}) unreachable through the back door`);
+quest.win2();
+const won2 = flood();
+if (!at(won2, ZCX, 1.5) || Math.abs(won2[idx(toI(ZCX), toJ(-2))] - ZF) > 0.05) fail('quest      the open portone of the Zitelle does not join the sagrato to the hall');
+
 const won = flood();
 console.log('-- every gate open');
 for (const [x, z] of [[0, -2], [0, -20], [0, -37], [0, -48.5]]) if (!at(won, x, z)) fail(`chiesa      aisle point (${x}, ${z}) unreachable`);
-if (quest.checkpoint() !== CHOIR_DOOR) fail('quest      with the choir door open a death should wake at the choir door');
+if (choirWake !== CHOIR_DOOR) fail('quest      with the choir door open a death should wake at the choir door');
 if (!at(won, CHOIR_DOOR.x, CHOIR_DOOR.z) || world.blocked(CHOIR_DOOR.x, CHOIR_DOOR.z, world.standHeight(CHOIR_DOOR.x, CHOIR_DOOR.z))) fail('quest      the choir-door checkpoint is not open ground');
 for (const a of level.areas) if (!cells(won, a)) fail(`${a.zone.padEnd(11)} ${a.label} unreachable`);
 let reached = 0;

@@ -6,9 +6,9 @@ import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Dialogue } from '../ui/dialogue.ts';
 import { ICONS } from '../ui/icons.ts';
-import { OBJECTIVE, QUEST_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, TALK } from './dialogue.ts';
+import { OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, titleOf } from './dialogue.ts';
 import { Npc } from './npc.ts';
-import { BLESSING, CHEST, NPC, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
+import { BLESSING, CHEST, NPC, REWARD, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -19,7 +19,7 @@ import { BLESSING, CHEST, NPC, SPEZIALE, type Gate, type Quest, type Stage } fro
 // styled here so they stay out of the HUD's way.
 
 const OPEN_TIME = 1.6; // s for a gate to open
-const SWING = { portone: -1, coro: 1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir wall
+const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls
 const GOLD = 0xffd36a;
 const LOOT = 2.2; // s of the chest's opening: lid, burst, the key rising and fading
 
@@ -100,6 +100,8 @@ export class QuestView {
   bossShown = false;
   /** Fra' Bortolo's Commercia: main.ts opens the shop. */
   shop?: () => void;
+  /** A quest handed in: main.ts puts its gold in the bag. */
+  reward?: (gold: number) => void;
   private shown = '';
   private tapped = false;
 
@@ -147,10 +149,19 @@ export class QuestView {
     document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.buffEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
+      if (this.npc.talking) this.paid(); // a report heard, even if the next quest is turned down
       this.npc.talking = false;
-      if (this.speziale.talking && this.quest.bless()) this.blessed(); // he gives it as he says goodbye
+      if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
     };
+  }
+
+  /** Fra' Zuane hears a quest done: its reward, once (the XP is derived from the flags, main.ts). */
+  private paid(): void {
+    const r = this.quest.report() ? REWARD.report : this.quest.report2() ? REWARD.return : undefined;
+    if (!r) return;
+    this.reward?.(r.gold);
+    this.news.push(`Ricompensa: ${r.xp} esperienza, ${r.gold} oro`);
   }
 
   /** Fra' Bortolo's blessing lands on the hero: a rush of rue and gold round them, a chime, a notice. */
@@ -183,14 +194,25 @@ export class QuestView {
 
   /** While the world is paused for the dialogue (main.ts): only the speaker moves. */
   idle(dt: number, player: THREE.Vector3): void {
-    this.npc.update(dt, player, this.quest.stage === 'talk');
-    this.speziale.update(dt, player, !this.quest.blessed);
+    this.npc.update(dt, player, this.offering());
+    this.speziale.update(dt, player, this.blessing());
+  }
+
+  /** Fra' Zuane has a quest to give or to hear about: his marker is up. */
+  private offering(): boolean {
+    return ['talk', 'report', 'offer', 'return'].includes(this.quest.stage);
+  }
+
+  /** Fra' Bortolo has an infusion to give: the first, or on the road to the Zitelle the second. */
+  private blessing(): boolean {
+    const q = this.quest;
+    return !q.blessed || (q.accepted2 && !q.blessed2 && !q.boss2Dead);
   }
 
   /** The tracker's lines; `fresh` flashes the objective as new. */
   private track(stage: Stage, fresh: boolean): void {
     this.trackEl.classList.toggle('done', stage === 'done');
-    this.trackEl.innerHTML = `<b>${QUEST_TITLE}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>`;
+    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>`;
   }
 
   private gate(g: Gate, iron: THREE.Material): GateView {
@@ -199,7 +221,23 @@ export class QuestView {
     root.position.set(c.x, g.y0, c.z);
     root.rotation.y = g.axis === 'x' ? 0 : Math.PI / 2; // local X runs along the wall
     const leaves: THREE.Object3D[] = [];
-    if (g.kind === 'grate') {
+    if (g.kind === 'chain') { // the vow's chains, gone to lace: three sagging strands of pale glowing links between two iron posts
+      const links: THREE.BufferGeometry[] = [], link = new THREE.TorusGeometry(0.09, 0.025, 4, 8);
+      for (const y of [0.9, 1.6, 2.3]) {
+        for (let i = 0, n = Math.round(g.w / 0.16); i <= n; i++) {
+          const x = -g.w / 2 + (g.w * i) / n, sag = 0.45 * (1 - (2 * x / g.w) ** 2);
+          links.push(link.clone().rotateY(i % 2 ? Math.PI / 2 : 0).rotateZ(Math.PI / 2).translate(x, y - sag, 0));
+        }
+      }
+      const chain = new THREE.Mesh(mergeGeometries(links), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xdff4ff).multiplyScalar(1.6), transparent: true, fog: false }));
+      root.add(chain);
+      for (const x of [-g.w / 2, g.w / 2]) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, g.h, 8), iron);
+        post.position.set(x, g.h / 2, 0);
+        root.add(post);
+      }
+      leaves.push(chain);
+    } else if (g.kind === 'grate') {
       const bars: THREE.BufferGeometry[] = [];
       const n = Math.round(g.w / 0.22);
       for (let i = 0; i <= n; i++) bars.push(new THREE.CylinderGeometry(0.025, 0.025, g.h, 6).translate(-g.w / 2 + (g.w * i) / n, g.h / 2, 0));
@@ -240,10 +278,13 @@ export class QuestView {
       if (n) notices.push(n);
       if (pr.talk === 'zuane') {
         this.npc.talking = true;
-        this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, TALK[this.quest.stage], () => this.quest.accepted = true);
+        const stage = this.quest.stage;
+        const accept = stage === 'talk' ? () => { this.quest.accepted = true; } : stage === 'report' || stage === 'offer' ? () => { this.paid(); this.quest.accept2(); } : undefined;
+        this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, TALK[stage], accept);
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
-        const t = this.quest.bossDead ? SPEZIALE_DONE : this.quest.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
+        const q = this.quest;
+        const t = q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
         this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t, undefined, () => this.shop?.());
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
@@ -252,13 +293,18 @@ export class QuestView {
     this.quest.update(player);
     const stage = this.quest.stage;
     if (stage !== this.stage) {
-      if (this.stage) notices.push(this.stage === 'talk' ? `Missione accettata: ${QUEST_TITLE}` : stage === 'done' ? `Missione compiuta: ${QUEST_TITLE}` : OBJECTIVE[stage]);
-      if (this.stage) playSfx('quest', null, stage === 'done' ? { rate: 0.84, gain: 1.3 } : {}); // complete: lower and fuller
+      const was = this.stage, done = was === 'report' || was === 'return';
+      if (was === 'report') notices.push(`Missione compiuta: ${QUEST_TITLE}`);
+      if (was === 'return') notices.push(`Missione compiuta: ${QUEST2_TITLE}`);
+      if (was === 'talk') notices.push(`Missione accettata: ${QUEST_TITLE}`);
+      else if (stage === 'route') notices.push(`Missione accettata: ${QUEST2_TITLE}`);
+      else if (was && !done) notices.push(OBJECTIVE[stage]);
+      if (was) playSfx('quest', null, done ? { rate: 0.84, gain: 1.3 } : {}); // complete: lower and fuller
       this.track(stage, !!this.stage);
       this.stage = stage;
     }
-    this.npc.update(dt, player, stage === 'talk');
-    this.speziale.update(dt, player, !this.quest.blessed);
+    this.npc.update(dt, player, this.offering());
+    this.speziale.update(dt, player, this.blessing());
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt);
     this.buff();
     const now = this.quest.prompt(player);
@@ -326,7 +372,12 @@ export class QuestView {
 
   private pose(v: GateView, p = v.p): void {
     const e = p * p * (3 - 2 * p);
-    if (v.gate.kind === 'grate') v.leaves[0].position.y = e * (v.gate.h - 0.1); // up into the wall above
+    if (v.gate.kind === 'chain') { // the strands thin to nothing and drop
+      const c = v.leaves[0] as THREE.Mesh;
+      (c.material as THREE.MeshBasicMaterial).opacity = 1 - e;
+      c.position.y = -e * 0.6;
+      c.visible = e < 1;
+    } else if (v.gate.kind === 'grate') v.leaves[0].position.y = e * (v.gate.h - 0.1); // up into the wall above
     else for (const l of v.leaves) l.rotation.y = l.userData.side * SWING[v.gate.id as keyof typeof SWING] * e * 1.75;
   }
 

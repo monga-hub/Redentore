@@ -13,7 +13,7 @@ import type { LightSpot } from '../level/builder.ts';
 interface Emitter {
   x: number; y: number; z: number; // flame base
   nx: number; nz: number; // wall normal (0,0 for free-standing braziers)
-  kind: 'torch' | 'brazier' | LightSpot['kind'];
+  kind: LightSpot['kind'];
   color: number;
   phase: number;
 }
@@ -70,7 +70,7 @@ function layout(spots: LightSpot[]): Emitter[] {
     wall(8, -160.7, 0, 1), wall(16, -160.7, 0, 1), // frantoio
   );
   for (const z of [-145, -154, -163]) e.push(wall(-21.7, z, 1, 0), wall(-9.3, z, -1, 0)); // androne
-  for (const s of spots) e.push({ ...s, nx: 0, nz: 0, color: s.color ?? LIGHT_COLOR, phase: 0 });
+  for (const s of spots) e.push({ ...s, nx: s.nx ?? 0, nz: s.nz ?? 0, color: s.color ?? LIGHT_COLOR, phase: 0 });
   e.forEach((t, i) => (t.phase = i * 12.9898));
   return e;
 }

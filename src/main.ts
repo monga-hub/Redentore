@@ -158,7 +158,11 @@ if (loaded) {
   kit.system.notices.push({ kind: 'info', text: pending ? 'Partita caricata' : 'Partita ripresa' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
 let bossAct = 0, bossRage = false;
-let kills = mobs.filter((m) => m.state === 'dead').length; // Sete d'anime heals on new ones only
+// XP is what the hero killed plus Fra' Zuane's rewards. The dead of a load were counted into its saved XP (a save from
+// before the levels: the worth of its dead, short of a won fight's), and a victory's dead are worth nothing.
+const fell = mobs.map((m) => m.state === 'dead');
+let slain = loaded?.build ? loaded.build.xp - quest.bonusXp : quest.bossDead ? 0 : worth.reduce((s, w, i) => s + (fell[i] ? w : 0), 0);
+const sweep = () => mobs.forEach((m, i) => { if (m.state === 'dead') fell[i] = true; }); // after a victory: its dead count for nothing
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
 const picked = (id: string) => levels.picks.filter((p) => p === id).length;
 /** The next level-up's two cards; the world holds still until one is picked. */
@@ -216,6 +220,7 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
 }));
 const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
 questView.shop = () => vendor.open();
+questView.reward = (gold) => { bag.gold += gold; };
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
 level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
@@ -352,13 +357,13 @@ renderer.setAnimationLoop(() => {
     bees.killAll();
     questView.victory();
     player.model.play('victory', 0.4);
+    sweep();
   }
-  if (!quest.bossDead) { // XP is the worth of the dead; the boss's fall takes everyone with it and ends the levelling
-    let xp = 0, dead = 0;
-    mobs.forEach((m, i) => { if (m.state === 'dead') { xp += worth[i]; dead++; } });
-    if (dead > kills && tune.leech) playerStats.heal(playerStats.hpMax * tune.leech * (dead - kills));
-    kills = dead;
-    levels.xp = xp;
+  { // the worth of the newly dead (Sete d'anime heals on each), and the rewards
+    let fresh = 0;
+    mobs.forEach((m, i) => { if (m.state === 'dead' && !fell[i]) { fell[i] = true; slain += worth[i]; fresh++; } });
+    if (fresh && tune.leech) playerStats.heal(playerStats.hpMax * tune.leech * fresh);
+    levels.xp = slain + quest.bonusXp;
     if (levels.lv > shownLv) levelUp.flash((shownLv = levels.lv));
     if (levels.pending > 0 && dying <= 0 && !playerStats.dead) openLevelUp();
   }

@@ -46,6 +46,8 @@ const SPECS = {
   gold: { tint: 0xd09a3c, rough: 0.38, metal: 0.45, glow: 0.07 }, // church candlesticks, ribs, banner trim
   cloth: { tint: 0x8c1622, rough: 0.92, glow: 0.04 }, // crimson carpet, banners, altar frontal
   azure: { tint: 0x3a4f8c, rough: 0.85, glow: 0.16 }, // painted vault coffers and the inner dome
+  lantern: { tint: 0xffc46b, rough: 0.4, glow: 2.2 }, // the fanali's glass along the fondamenta, lit windows
+  iron: { tint: 0x2a2826, rough: 0.6, metal: 0.6 }, // lantern brackets, grates, mooring rings
 } satisfies Record<string, Spec>;
 
 export type Role = keyof typeof SPECS;

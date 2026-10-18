@@ -8,9 +8,12 @@
 // threshold, which he can neither cross nor leave. He has waited four centuries for someone the
 // vow raised and did not keep.
 
-import type { Stage } from './progress.ts';
+import { SECOND, type Stage } from './progress.ts';
 
 export const QUEST_TITLE = 'La chiave del portinaio';
+export const QUEST2_TITLE = 'La dote delle Zitelle';
+/** The tracker's title at a stage: the first quest until it is handed in, then the second. */
+export const titleOf = (s: Stage) => (SECOND.includes(s) ? QUEST2_TITLE : QUEST_TITLE);
 
 /** The tracker's line for each stage. */
 export const OBJECTIVE: Record<Stage, string> = {
@@ -19,13 +22,23 @@ export const OBJECTIVE: Record<Stage, string> = {
   grate: 'Apri la grata del chiostro grande',
   boss: 'Sconfiggi il Reverendissimo sotto la cupola',
   leave: 'Esci dal portone sulla fondamenta',
-  done: 'Il voto è spezzato',
+  report: "Torna da Fra' Zuane, sulla fondamenta",
+  offer: "Parla con Fra' Zuane",
+  route: 'Raggiungi le Zitelle lungo la fondamenta, verso levante',
+  ospizio: "Prendi la chiave della Maestra del merletto, nell'ospizio",
+  church: 'Apri la porta della chiesa dal cortile delle Zitelle',
+  boss2: 'Sconfiggi la Governatrice sotto la cupola delle Zitelle',
+  return: "Torna da Fra' Zuane",
+  done: 'La dote è resa',
 };
 
 export interface Talk {
   pages: string[];
   /** The last page offers the quest: Accetta / Rifiuta instead of a goodbye. */
   offer?: true;
+  /** The offered quest's name (default the first) and the answer to a Rifiuta (default DECLINE). */
+  title?: string;
+  decline?: string;
 }
 
 export const TALK: Record<Stage, Talk> = {
@@ -43,7 +56,35 @@ export const TALK: Record<Stage, Talk> = {
   grate: { pages: ['La senti, vero? Pesa più del ferro. Apri la grata del chiostro grande: dall\'orto, o dal chiostro mediano. Dietro, la porta del coro.'] },
   boss: { pages: ['Il coro è aperto. Lui ti aspetta sotto la cupola. Non ascoltare le sue preghiere, Risorto: sono le nostre, e ce le ha rubate.'] },
   leave: { pages: ['Le campane... le senti? Il voto si è spezzato. Esci dal portone, Risorto. Torna sulla fondamenta, che io veda il cielo con te.'] },
-  done: { pages: ['È finita. Sento la laguna che mi chiama, finalmente. Va\' in pace, Risorto. Qualunque cosa tu sia, sei stato più cristiano di chi ci ha voluti morti.'] },
+  // Level 2: the first quest handed in, the second offered in the same breath.
+  report: {
+    pages: [
+      'Il cielo, Risorto. Lo vedo di nuovo, sopra la cupola. Hai spezzato il voto del Reverendissimo. Sento la laguna che mi chiama... ma le catene non mi lasciano. Guarda: non sono più di ferro.',
+      'Sono di filo. Merletto bianco, stretto ai polsi come una promessa. Lo conosco, questo punto: è il punto in aria delle Zitelle, in fondo alla fondamenta. Stanotte le loro campane hanno ripreso a suonare.',
+      'Il Reverendissimo contava le anime, ma il conto andava saldato. Ogni morto dell\'orto fu messo in dote: la Governatrice della Pia Casa li cucì in un velo per la Madonna della Presentazione. Metà del voto era sua.',
+      'Finché il velo non è finito, nessuno di noi riposa. Le sue figlie filano ancora, i gondolieri annegati fanno la guardia ai rii e le codeghe fanno luce a chi non dovrebbe più camminare.',
+      'Le catene sul Ponte de la Croce cadranno al tuo passo. Entra dall\'ospizio: la Maestra del merletto porta alla cintura la chiave della chiesa. E tieni a mente la ruta di Fra\' Bortolo: le zitelle la temono.',
+      'Prendi queste monete per la strada: è tutto quello che un portinaio può darti. Va\' alle Zitelle, Risorto, e taglia quel filo.',
+    ],
+    offer: true, title: QUEST2_TITLE,
+    decline: 'Il filo è paziente come chi l\'ha filato. Torna quando vuoi, Risorto: le Zitelle non si muovono.',
+  },
+  offer: {
+    pages: ['Le catene di filo tirano ancora, Risorto. Le Zitelle aspettano in fondo alla fondamenta, oltre il Ponte de la Croce. Vuoi tagliare quel filo?'],
+    offer: true, title: QUEST2_TITLE,
+    decline: 'Il filo è paziente come chi l\'ha filato. Torna quando vuoi, Risorto: le Zitelle non si muovono.',
+  },
+  route: { pages: ['Segui la fondamenta verso levante, oltre il rio de la Croce e il rio del Squero. I gondolieri non sono mai tornati dall\'ultima voga: non fermarti a contrattare il prezzo.'] },
+  ospizio: { pages: ['L\'ospizio ha una porta sola sulla fondamenta: la portineria. La Maestra del merletto sta nella sala grande, tra i tavoli e i tomboli. Ha la chiave della chiesa, e non ha mai dato niente a nessuno.'] },
+  church: { pages: ['Hai la chiave. La porta della chiesa si apre dal cortile, dietro l\'altare. La Governatrice ti aspetta sotto la cupola. Non guardare il velo, Risorto: chi lo guarda ci resta cucito.'] },
+  boss2: { pages: ['Il filo trema: la sento lavorare da qui. Sotto la cupola, Risorto. Taglialo prima che lei finisca il velo.'] },
+  return: {
+    pages: [
+      'Il filo si è sciolto. Le campane delle Zitelle tacciono, e le catene... guarda: polvere bianca. Hai reso la dote a chi l\'aveva perduta, Risorto.',
+      'Ma senti la laguna? Non è quieta. Il Reverendissimo e la Governatrice erano due nodi dello stesso filo, e il filo continua oltre San Giorgio. Riposa, per stanotte. Domani parleremo di chi l\'ha teso.',
+    ],
+  },
+  done: { pages: ['Va\' dove vuoi, Risorto: la fondamenta è tua. Io resto ancora un poco a guardare l\'acqua. Quando sarai pronto, la storia continua.'] },
 };
 
 /** Said when the offer is turned down. */
@@ -70,3 +111,11 @@ export const SPEZIALE_TALK: Talk = {
 /** Once the infusion is given; and once the Reverendissimo is dead. */
 export const SPEZIALE_AGAIN: Talk = { pages: ['La ruta ha dato quello che poteva, per questa notte. Va\', Risorto. Lui è sotto la cupola, e non si stanca di aspettare.'] };
 export const SPEZIALE_DONE: Talk = { pages: ['La senti? La terra si è fatta leggera. I fratelli sono tornati a dormire nelle loro fosse. Lasciami ancora un poco con le mie erbe, Risorto. Poi verrò anch\'io.'] };
+/** On the road to the Zitelle: what he knows of them, and a second infusion (once). */
+export const SPEZIALE_ZITELLE: Talk = {
+  pages: [
+    'Le Zitelle? Povere figlie senza dote. Nella peste portavo la ruta anche a loro, in fondo alla fondamenta. La Governatrice la faceva bruciare in cortile: diceva che l\'erba della grazia rovinava il bianco del filo.',
+    'Il filo, Risorto. Lei cuciva i nostri morti nel suo velo e le ragazze contavano i punti. Se il Reverendissimo era il conto, lei era la cassa. Bevi: l\'ultima ruta che ho. Fa\' che basti.',
+  ],
+};
+export const SPEZIALE_ZITELLE_AGAIN: Talk = { pages: ['Non ho altra ruta, Risorto. Va\' alle Zitelle. Se senti cantare sottovoce tra i tavoli del merletto, non fermarti ad ascoltare.'] };

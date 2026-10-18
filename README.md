@@ -252,7 +252,10 @@ src/
   fx/diabloFx.ts             Stile Diablo: numeri di danno, sangue, colonne di luce
   ui/hud.ts                  nome dell'area corrente
   ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,
-                             tooltip, errori, testo di combattimento); ui/icons.ts icone SVG
+                             tooltip, errori, testo di combattimento); ui/icons.ts icone dipinte
+                             (un atlante WebP, `ui/icons.webp`, dipinto e impacchettato da
+                             `scripts/icons/build.py`); la pelle stile WoW (pietra e cornici dorate,
+                             Stile Diablo in ferro) sta nelle variabili `--panel`/`--gilt` di index.html
   abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s per scuola, off-GCD, pushback,
                              lanci, canalizzate, interruzione al movimento. Nessun DOM/three
   abilities/forsaken.ts      le abilità del Reietto (tabella `ABILITIES`, ordine `BAR`), numeri vivi in `tune`, e i loro effetti
@@ -337,7 +340,8 @@ scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e car
 - **Collisioni:** aggiungere box con `builder.box(...)`/`obox(...)`; mesh solo visive
   con `collide: false`. `npm run check` deve restare verde.
 - **Abilità:** aggiungere un oggetto `Ability` in `abilities/forsaken.ts` (o un altro kit)
-  e il suo id in `BAR`; l'icona va in `ui/icons.ts`.
+  e il suo id in `BAR`; l'icona è un prompt in `scripts/icons/build.py` (`ICONS`), poi
+  `python3 scripts/icons/build.py` la dipinge con Meshy (3 crediti) e rifà l'atlante.
 - Debug in console: `window.level`, `window.player`, `window.cam`, `window.scene`, `window.kit`, `window.quest`
   (es. `player.respawn({x: 0, z: -100, yaw: 0})`).
 

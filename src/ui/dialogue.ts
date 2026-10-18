@@ -14,11 +14,11 @@ const CSS = `
 #talk.show { display: flex; }
 #talk .page { position: relative; box-sizing: border-box; width: min(600px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto;
   padding: 18px 20px 14px 112px; color: #2b1a0c; font: 16px/1.45 Georgia, serif;
-  background: radial-gradient(ellipse at 30% 20%, #f4e6c2, #e2cc98 60%, #c9ad74); border: 3px solid #c9a45c; border-radius: 6px;
-  box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #6b4a1f, inset 0 0 30px rgba(110,70,20,.45), 0 10px 40px #000; animation: talk-in .25s ease-out; }
+  border: 4px solid transparent; border-radius: 6px; background: radial-gradient(ellipse at 30% 20%, #f4e6c2, #e2cc98 60%, #c9ad74) padding-box, var(--gilt) border-box;
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #6b4a1f, inset 0 0 30px rgba(110,70,20,.45), 0 10px 40px #000; animation: talk-in .25s ease-out; }
 @keyframes talk-in { from { transform: translateY(16px); opacity: 0; } }
 #talk .portrait { position: absolute; left: 14px; top: 16px; width: 84px; height: 84px; border-radius: 50%; overflow: hidden;
-  background: radial-gradient(#2c4048, #070b0d) center / cover; border: 3px solid #c9a45c; box-shadow: 0 0 0 2px #000, 0 0 14px rgba(120,220,255,.45); }
+  border: 4px solid transparent; background: radial-gradient(#2c4048, #070b0d) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000, 0 0 14px rgba(120,220,255,.45); }
 #talk .portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
 #talk .who { margin: 0 0 2px; font: bold 18px Georgia, serif; color: #6a1408; }
 #talk .title { margin: 0 0 8px; font: italic 13px Georgia, serif; color: #6b4a1f; }
@@ -26,10 +26,10 @@ const CSS = `
 #talk p.text { min-height: 4.4em; margin: 0; white-space: pre-wrap; }
 #talk .btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
 #talk button { min-width: 112px; padding: 9px 16px; cursor: pointer; font: bold 15px Georgia, serif; color: #ffd75e; text-shadow: 0 1px 2px #000;
-  background: linear-gradient(#8a1c12, #4a0a06 60%, #2e0503); border: 1px solid #c9a45c; border-radius: 4px;
-  box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,215,94,.3); touch-action: manipulation; }
-#talk button.no { background: linear-gradient(#4a3a26, #1c140c); }
-#talk button.shop { order: -1; margin-right: auto; background: linear-gradient(#2a5a1c, #12300a 60%, #0a1c05); }
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#9a2216, #520c07 55%, #2e0503) padding-box, var(--gilt) border-box;
+  box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,215,94,.3), 0 2px 5px rgba(0,0,0,.4); touch-action: manipulation; }
+#talk button.no { background: linear-gradient(#4a3a26, #1c140c) padding-box, var(--gilt) border-box; }
+#talk button.shop { order: -1; margin-right: auto; background: linear-gradient(#2a5a1c, #12300a 60%, #0a1c05) padding-box, var(--gilt) border-box; }
 #talk button:hover, #talk button:focus-visible { filter: brightness(1.35); outline: none; }
 #talk kbd { margin-left: 6px; padding: 0 4px; font: 700 11px/1.3 sans-serif; color: #1a1208; background: #e0b55a; border-radius: 3px; text-shadow: none; }
 body.touch #talk kbd { display: none; }
@@ -42,11 +42,11 @@ body.talking #quest-prompt { display: none !important; }
   #talk .btns { justify-content: stretch; }
   #talk button { flex: 1; min-width: 0; }
 }
-body.diablo #talk .page { color: #e9d6b0; background: radial-gradient(ellipse at 30% 20%, #2b2520, #120f0c 70%); border-color: #77705f;
+body.diablo #talk .page { color: #e9d6b0; background: var(--panel); border-width: 3px;
   box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #3a3530, inset 0 0 40px #000, 0 10px 40px #000; }
 body.diablo #talk .who { color: #ff8a5a; }
 body.diablo #talk .title, body.diablo #talk .more { color: #b8a888; }
-body.diablo #talk .portrait { border-color: #77705f; }
+
 `;
 
 const CPS = 55; // characters typed per second

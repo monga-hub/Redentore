@@ -10,18 +10,19 @@ export const TIP_CSS = `
 #bag .tip { position: fixed; z-index: 16; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; width: max-content;
   max-width: calc(100vw - 16px); pointer-events: none; }
 #bag .tip[hidden] { display: none; }
+#bag .tip.stack { flex-direction: column; }
 #bag .tip .box { box-sizing: border-box; width: max-content; max-width: min(250px, calc(100vw - 16px)); padding: 8px 10px;
-  background: rgba(8,6,4,.96); border: 1px solid #6b5332; border-radius: 4px; box-shadow: 0 0 0 1px #000, 0 4px 14px #000; }
+  background: var(--tip-bg); border: 2px solid var(--tip-border); border-radius: 5px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.6), 0 4px 14px #000; }
 #bag .tip .box.worn { opacity: .92; }
-#bag .tip .head { display: block; margin-bottom: 4px; font: bold 10px/14px system-ui, sans-serif; color: #8a7a5a; text-transform: uppercase; letter-spacing: 1px; }
+#bag .tip .head { display: block; margin-bottom: 4px; font: bold 10px/14px system-ui, sans-serif; color: #9a9fb8; text-transform: uppercase; letter-spacing: 1px; }
 #bag .tip b { display: block; font: bold 14px/18px Georgia, serif; }
-#bag .tip small { display: flex; justify-content: space-between; gap: 16px; font: 11px/15px system-ui, sans-serif; color: #c9b48a; }
+#bag .tip small { display: flex; justify-content: space-between; gap: 16px; font: 11px/15px system-ui, sans-serif; color: #fff; }
 #bag .tip .w, #bag .tip .g { display: block; font: 12px/16px system-ui, sans-serif; color: #f3ecd8; }
 #bag .tip .g { color: #3fd84a; }
 #bag .tip p { margin: 6px 0 0; font: italic 12px/1.35 Georgia, serif; color: #e8dcc0; }
 #bag .tip p.lore { color: #ffd75e; }
 #bag .tip .price { margin-top: 6px; color: #e8dcc0; }
-#bag .tip .diff { margin-top: 6px; padding-top: 5px; border-top: 1px solid #3b2a16; font: 11px/15px system-ui, sans-serif; color: #c9b48a; }
+#bag .tip .diff { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(154,159,184,.35); font: 11px/15px system-ui, sans-serif; color: #c9cde0; }
 #bag .tip .diff i { font-style: normal; white-space: nowrap; margin-right: 6px; }
 #bag .tip .up { color: #3fd84a; } #bag .tip .down { color: #ff5a4a; }
 #bag .tip .hint { display: block; margin-top: 6px; font: italic 11px/15px system-ui, sans-serif; color: #ffd75e; }
@@ -56,7 +57,7 @@ function diff(it: Item, worn?: Item): string {
     const d = (a[k] ?? 0) - (b[k] ?? 0);
     return d ? [`<i class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : '−'}${label(k, Math.abs(d))}</i>`] : [];
   });
-  return `<div class="diff">Se lo indossi: ${parts.join('') || 'nessuna differenza'}</div>`;
+  return `<div class="diff">Se lo indossi: ${parts.join(' ') || 'nessuna differenza'}</div>`; // spaces: the line wraps between changes
 }
 
 /**

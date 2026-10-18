@@ -18,11 +18,12 @@ import { ICONS } from './icons.ts';
 // The cooldown sweep shows each slot's school GCD, so after an ice spell only the ice slots sweep;
 // a hit that sets the cast bar back flashes it red as the fill jumps back.
 
-/** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px]. */
+/** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px].
+ *  About 20 px of gap between neighbours and between the arcs, so a thumb lands on one button only. */
 const RING: Record<number, [number, number, number]> = {
-  0: [0, 0, 92], // the big one, in the corner
-  1: [95, 118, 58], 2: [125, 118, 58], 5: [155, 118, 58], 6: [185, 118, 58],
-  3: [92, 192, 48], 4: [114, 192, 48], 7: [136, 192, 48], 8: [158, 192, 48], // + jump at 180 (index.html)
+  0: [0, 0, 96], // the big one, in the corner
+  1: [95, 120, 58], 2: [125, 120, 58], 5: [155, 120, 58], 6: [185, 120, 58],
+  3: [92, 196, 54], 4: [114, 196, 54], 7: [136, 196, 54], 8: [158, 196, 54], // + jump at 180 (index.html)
 };
 
 interface Slot<C extends Caster> {

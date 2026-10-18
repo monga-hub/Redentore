@@ -14,11 +14,10 @@ const CSS = `
 #worldmap.show { display: flex; }
 #worldmap .panel { position: relative; box-sizing: border-box; display: flex; flex-direction: column;
   width: calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  max-width: 900px; padding: 22px 12px 10px; background: linear-gradient(rgba(34,25,16,.97), rgba(10,7,5,.97));
-  border: 2px solid #c9a45c; border-radius: 8px; box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #4a3a26, 0 10px 40px #000; }
+  max-width: 900px; padding: 22px 12px 10px; border: 3px solid transparent; border-radius: 8px; background: var(--panel); box-shadow: var(--panel-shadow); }
 #worldmap h2 { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); margin: 0; padding: 4px 22px; white-space: nowrap;
   font: bold 15px/20px Georgia, serif; color: #ffd75e; letter-spacing: 1px; text-shadow: 0 1px 2px #000;
-  background: linear-gradient(#3a2a18, #120d09); border: 2px solid #c9a45c; border-radius: 4px; box-shadow: 0 0 0 1px #000; }
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3420, #140e08) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0,0,0,.6); }
 #worldmap .x { position: absolute; right: 6px; top: 6px; z-index: 1; width: 30px; height: 30px; padding: 0; cursor: pointer; font: bold 18px/1 system-ui, sans-serif;
   color: #f3e2b0; background: linear-gradient(#7a1a10, #3a0805); border: 1px solid #c9a45c; border-radius: 4px; }
 #worldmap canvas { flex: 1; min-height: 0; width: 100%; border: 1px solid #000; border-radius: 3px;

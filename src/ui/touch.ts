@@ -1,4 +1,5 @@
 import type { Input } from '../core/input.ts';
+import { ICONS } from './icons.ts';
 
 const STICK_TRAVEL = 0.47; // knob travel from the stick centre, fraction of the stick's size (scaled by --k in index.html)
 const DEAD = 0.12; // stick dead zone, fraction of the knob travel
@@ -91,6 +92,7 @@ export class TouchControls {
     addEventListener('blur', () => { this.releaseStick(); this.look.clear(); this.pinch = 0; this.pinched = false; });
 
     const jump = document.getElementById('jump')!;
+    jump.innerHTML = ICONS.ui_jump;
     const press = (on: boolean) => (e: PointerEvent) => {
       if (on) jump.setPointerCapture(e.pointerId);
       e.preventDefault();

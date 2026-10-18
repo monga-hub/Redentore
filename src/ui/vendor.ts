@@ -1,7 +1,8 @@
 import { ITEM, RARITY, type Bag } from '../loot/bag.ts';
 import { SHOP, buy, buyPrice, sell, sellPrice, type Equipment } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
-import { GLYPH, type BagPanel } from './bag.ts';
+import type { BagPanel } from './bag.ts';
+import { ICONS } from './icons.ts';
 import { itemTip } from './tooltip.ts';
 
 // Fra' Bortolo's shop, WoW's merchant window: "Commercia" in his dialogue opens it with the bag
@@ -100,7 +101,7 @@ export class VendorPanel {
     if (!this.el.classList.contains('on')) return;
     const cell = (k: string, id: string, n = 1) => {
       const it = ITEM.get(id)!;
-      return `<button class="cell" data-k="${k}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}">${GLYPH[it.icon]}${n > 1 ? `<b>${n}</b>` : ''}</button>`;
+      return `<button class="cell" data-k="${k}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}">${ICONS[it.icon]}${n > 1 ? `<b>${n}</b>` : ''}</button>`;
     };
     this.el.innerHTML = `<h2>Fra' Bortolo</h2><button class="x" aria-label="Chiudi bottega">✕</button>
       <p class="sub">Speziale · reliquie e paramenti dei morti</p>

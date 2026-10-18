@@ -2,6 +2,7 @@ import attribution from '../../ATTRIBUTION.md?raw';
 import { getAudio, setAudio, type AudioSettings } from '../audio/engine.ts';
 import { isDiablo, setDiablo } from '../core/style.ts';
 import { save, setPending, slots, type GameState, type Slot } from '../core/save.ts';
+import { ICONS } from './icons.ts';
 
 // Game menu, WoW style: a gear button in the top-right corner opens a framed panel that
 // pauses the game — save and load on three slots, audio, new game, credits, exit. "Esci"
@@ -10,11 +11,9 @@ import { save, setPending, slots, type GameState, type Slot } from '../core/save
 
 const CSS = `
 #menu-btn { position: fixed; z-index: 6; right: calc(12px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top));
-  width: 36px; height: 36px; padding: 0; cursor: pointer; border-radius: 50%; color: #f3e2b0;
-  background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09); border: 2px solid #c9a45c;
-  box-shadow: 0 0 0 2px #000, 0 3px 10px rgba(0,0,0,.7); touch-action: manipulation; }
-#menu-btn:hover, #menu-btn:focus-visible { border-color: #ffd75e; filter: brightness(1.2); outline: none; }
-#menu-btn svg { display: block; width: 62%; height: 62%; margin: auto; fill: currentColor; }
+  width: 38px; height: 38px; padding: 0; cursor: pointer; border-radius: 50%;
+  box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.7); touch-action: manipulation; }
+#menu-btn:hover, #menu-btn:focus-visible { filter: brightness(1.25); outline: none; }
 body.touch #menu-btn { transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
 body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under the gear, in the column the minimap leaves free */
 #menu { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
@@ -22,12 +21,11 @@ body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under 
 #menu.show { display: flex; }
 #menu.title { background: radial-gradient(ellipse at 50% 40%, #2a1c12 0%, #0b0705 70%, #000 100%); }
 #menu .panel { position: relative; box-sizing: border-box; width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto;
-  padding: 24px 22px 20px; background: linear-gradient(rgba(34,25,16,.97), rgba(10,7,5,.97));
-  border: 2px solid #c9a45c; border-radius: 8px; box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #4a3a26, 0 10px 40px #000; }
+  padding: 24px 22px 20px; border: 3px solid transparent; border-radius: 8px; background: var(--panel); box-shadow: var(--panel-shadow); }
 #menu .panel.wide { width: min(560px, calc(100vw - 24px)); }
 #menu h2 { width: fit-content; margin: -12px auto 16px; padding: 4px 22px; white-space: nowrap;
   font: bold 15px/20px Georgia, serif; color: #ffd75e; letter-spacing: 1px; text-shadow: 0 1px 2px #000;
-  background: linear-gradient(#3a2a18, #120d09); border: 2px solid #c9a45c; border-radius: 4px; box-shadow: 0 0 0 1px #000; }
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3420, #140e08) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0,0,0,.6); }
 #menu .logo { margin: 0 0 22px; text-align: center; font: bold 34px/1.1 Georgia, serif; color: #ffd75e; letter-spacing: 2px;
   text-shadow: 0 0 18px #a06a10, 0 2px 4px #000; }
 #menu .logo small { display: block; margin-top: 8px; font-size: 14px; letter-spacing: 1px; color: #c9b48a; }
@@ -35,12 +33,12 @@ body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under 
   color: #f3e2b0; background: linear-gradient(#7a1a10, #3a0805); border: 1px solid #c9a45c; border-radius: 4px; }
 #menu .btn { display: block; width: 100%; margin: 7px 0; padding: 9px 12px; cursor: pointer; text-align: center;
   font: bold 15px Georgia, serif; color: #ffd75e; text-shadow: 0 1px 2px #000;
-  background: linear-gradient(#8a1c12, #4a0a06 60%, #2e0503); border: 1px solid #c9a45c; border-radius: 4px;
-  box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,215,94,.3); }
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#9a2216, #520c07 55%, #2e0503) padding-box, var(--gilt) border-box;
+  box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,215,94,.3), 0 2px 5px rgba(0,0,0,.5); }
 #menu .btn:hover, #menu .btn:focus-visible { filter: brightness(1.35); outline: none; }
 #menu .btn:active { transform: translateY(1px); }
 #menu .btn:disabled { cursor: default; filter: grayscale(1) brightness(.6); }
-#menu .btn.back { margin-top: 16px; background: linear-gradient(#4a3a26, #1c140c); }
+#menu .btn.back { margin-top: 16px; background: linear-gradient(#4a3a26, #1c140c) padding-box, var(--gilt) border-box; }
 #menu .btn.style { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
 #menu .btn.style small { font: 11px/1.3 system-ui, sans-serif; color: #c9b48a; text-shadow: none; }
 #menu .btn.style i { flex: none; width: 38px; height: 20px; border-radius: 10px; background: #1c140c; border: 1px solid #c9a45c; position: relative; }
@@ -66,7 +64,6 @@ body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under 
 #menu .credits .asset { margin: 8px 0; padding: 8px; border: 1px solid #4a3a26; border-radius: 4px; background: rgba(0,0,0,.3); }
 `;
 
-const GEAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>';
 
 type View = 'main' | 'save' | 'load' | 'audio' | 'credits' | 'title';
 
@@ -119,9 +116,10 @@ export class Menu {
     document.head.append(style);
     const btn = document.createElement('button');
     btn.id = 'menu-btn';
+    btn.className = 'orb';
     btn.setAttribute('aria-label', 'Menu di gioco');
     btn.title = 'Menu (Esc)';
-    btn.innerHTML = GEAR;
+    btn.innerHTML = ICONS.ui_menu;
     btn.addEventListener('click', () => this.toggle());
     this.el.id = 'menu';
     this.el.setAttribute('role', 'dialog');

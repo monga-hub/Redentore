@@ -16,6 +16,30 @@
       body { position: fixed; inset: 0; touch-action: none; overscroll-behavior: none;
         user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
       canvas { display: block; touch-action: none; }
+      /* The skin, classic WoW: carved stone panels (--stone-img, painted, set by src/ui/icons.ts) in gilded
+         frames. A frame is a transparent border over two backgrounds: the panel on the padding box, --gilt on
+         the border box. Stile Diablo swaps the gold for dark iron and the stone for soot (below). */
+      body {
+        --gilt: linear-gradient(155deg, #fff2c0, #d9ad52 18%, #7a5420 36%, #f0cd7a 52%, #8a5e22 70%, #e8c472 86%, #5e3e14);
+        --gilt-ring: conic-gradient(from 210deg, #fff2c0, #c9973e 12%, #6b4718 25%, #e6c06a 40%, #7a5420 55%, #f3d58a 70%, #6b4718 85%, #fff2c0);
+        --panel: linear-gradient(rgba(30,24,18,.45), rgba(6,5,4,.7)) padding-box, var(--stone-img) center / 256px padding-box, var(--gilt) border-box, #1e1914;
+        --panel-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.8), inset 0 0 0 2px rgba(255,226,150,.18), inset 0 0 24px rgba(0,0,0,.75), 0 8px 30px rgba(0,0,0,.8);
+        --tip-bg: linear-gradient(rgba(16,18,40,.95), rgba(6,7,20,.95));
+        --tip-border: #9a9fb8;
+      }
+      body.diablo {
+        --gilt: linear-gradient(155deg, #c9c0ae, #6f685d 22%, #24201c 45%, #8b8173 62%, #2e2a25 80%, #77705f);
+        --gilt-ring: conic-gradient(from 210deg, #c9c0ae, #4a443c 15%, #1a1714 30%, #8b8173 50%, #24201c 70%, #77705f 85%, #c9c0ae);
+        --panel: linear-gradient(rgba(16,12,10,.7), rgba(4,3,2,.88)) padding-box, var(--stone-img) center / 256px padding-box, var(--gilt) border-box, #0b0908;
+        --panel-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000, inset 0 0 40px #000, 0 0 18px rgba(170,25,12,.25), 0 10px 30px #000;
+        --tip-bg: linear-gradient(rgba(22,18,15,.97), rgba(6,5,4,.97));
+        --tip-border: #5d574e;
+      }
+      /* An icon button in a gilded ring (menu, bag, character, map, jump): the painted icon fills the inside. */
+      .orb { border: 2px solid transparent !important; background: linear-gradient(#0b0907, #0b0907) padding-box, var(--gilt-ring) border-box !important; overflow: hidden; }
+      .orb .ico { border-radius: 50%; box-shadow: inset 0 0 6px #000; }
+      .orb::after { content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+        background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.28), transparent 45%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.7), inset 0 -4px 8px rgba(0,0,0,.6); }
       #zone {
         position: fixed; top: 12%; left: 0; right: 0; text-align: center; pointer-events: none;
         color: #f3e2b0; font-size: 30px; letter-spacing: 1px; text-shadow: 0 2px 4px #000, 0 0 12px #000;
@@ -30,22 +54,24 @@
       }
       #unit .portrait {
         position: relative; z-index: 1; flex: none; width: 62px; height: 62px; border-radius: 50%; overflow: hidden;
-        background: #000; border: 2px solid #c9a45c; box-shadow: 0 0 0 2px #000, 0 3px 10px rgba(0,0,0,.7);
+        border: 4px solid transparent; background: radial-gradient(#2a2018, #000) padding-box, var(--gilt-ring) border-box;
+        box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.7);
       }
+      #unit .portrait::after { content: ''; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 10px rgba(0,0,0,.85); }
       #unit .portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
       #unit .frame {
-        width: 190px; margin-left: -16px; padding: 4px 8px 6px 22px;
-        background: linear-gradient(rgba(34,25,16,.88), rgba(10,7,5,.88)); border: 1px solid #6b5332; border-left: 0;
-        border-radius: 0 6px 6px 0; box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.6);
+        width: 190px; margin-left: -18px; padding: 4px 9px 7px 24px;
+        border: 2px solid transparent; border-left: 0; border-radius: 0 7px 7px 0; background: var(--panel); box-shadow: var(--panel-shadow);
       }
-      /* Target frame (src/ui/target.ts): beside the player's, hostile red name, health only. */
-      #unit #target { width: 150px; margin-left: 10px; padding: 4px 8px 6px; border-left: 1px solid #6b5332; border-radius: 6px; }
+      /* Target frame (src/ui/target.ts): beside the player's, hostile red name on a dark plate, health only. */
+      #unit #target { width: 150px; margin-left: 10px; padding: 4px 9px 7px; border-left: 2px solid transparent; border-radius: 7px; }
+      #unit #target .name { margin: 0 -3px 1px; padding: 0 4px; border-radius: 2px; background: linear-gradient(90deg, rgba(150,20,10,.55), rgba(150,20,10,.1)); }
       #unit #target[hidden] { display: none; }
       #unit #target .name { color: #ff7a5c; }
       #unit .name { color: #f3e2b0; font: bold 13px/16px Georgia, serif; text-shadow: 0 1px 2px #000; }
       .res {
         position: relative; height: 14px; margin-top: 3px; overflow: hidden; border-radius: 2px;
-        background: #120a08; border: 1px solid #000; box-shadow: inset 0 1px 4px #000, 0 0 0 1px rgba(201,164,92,.35);
+        background: #120a08; border: 1px solid #000; box-shadow: inset 0 1px 4px #000, 0 0 0 1px rgba(217,173,82,.55);
       }
       .res.mp { height: 12px; }
       .res i { position: absolute; inset: 0 auto 0 0; width: 100%; }
@@ -63,7 +89,9 @@
       .res.mp.rest .fill { animation: lowhp 1s ease-in-out infinite alternate; }
       .res.mp.rest { box-shadow: inset 0 1px 4px #000, 0 0 6px 1px rgba(106,180,255,.8); }
       /* Experience (src/player/levels.ts): a thin violet bar under mana, the level on a badge at the portrait's foot. */
-      .res.xp { height: 5px; margin-top: 3px; }
+      .res.xp { height: 6px; margin-top: 4px; }
+      .res.xp::after { inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(0,0,0,.75) calc(10% - 1px) 10%),
+        linear-gradient(rgba(255,255,255,.25), transparent 60%); } /* ten notches, a gloss on top */
       .res.xp .fill { background: linear-gradient(#e2b8ff, #9a4ae0 55%, #4a1080); }
       .res.xp .lag { background: #f3e2ff; }
       .res.xp span { display: none; }
@@ -90,8 +118,8 @@
       @keyframes xpburst { 0%, 15% { transform: scaleY(3); filter: brightness(2.4); box-shadow: 0 0 0 1px #fff, 0 0 26px 9px rgba(var(--glow),1); } }
       #unit:has(.xp.up) { z-index: 20; }
       #unit .lv {
-        position: absolute; left: 42px; top: 44px; z-index: 2; min-width: 24px; height: 24px; padding: 0 3px; box-sizing: border-box; border-radius: 12px;
-        background: radial-gradient(#4a3418, #120a04); border: 2px solid #c9a45c; box-shadow: 0 0 0 1px #000, 0 2px 6px #000;
+        position: absolute; left: 44px; top: 46px; z-index: 2; min-width: 24px; height: 24px; padding: 0 3px; box-sizing: border-box; border-radius: 12px;
+        border: 2px solid transparent; background: radial-gradient(#4a3418, #120a04) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000, 0 2px 6px #000;
         color: #ffd75e; font: bold 12px/20px Georgia, serif; text-align: center; text-shadow: 0 1px 2px #000;
       }
       #unit .lv.up { animation: lvup 1.2s ease-out; }
@@ -107,9 +135,11 @@
         width: var(--m); height: var(--m); pointer-events: none;
       }
       #minimap canvas {
-        display: block; width: 100%; height: 100%; border-radius: 50%; background: #16303e;
-        box-shadow: 0 0 0 3px #1a120a, 0 0 0 5px #c9a45c, 0 0 0 7px #3b2a16, 0 0 0 8px #000, 0 4px 14px 8px rgba(0,0,0,.6);
+        position: relative; display: block; width: 100%; height: 100%; border-radius: 50%; background: #16303e;
+        box-shadow: 0 0 0 2px #000, inset 0 0 12px #000;
       }
+      #minimap::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; background: var(--gilt-ring);
+        box-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.6), 0 4px 14px 8px rgba(0,0,0,.6); }
       #minimap .name {
         position: absolute; right: -6px; bottom: calc(100% + 9px); /* long names grow leftwards, clear of the button column */
         min-width: calc(100% + 12px); max-width: 230%; padding: 2px 10px; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -117,21 +147,21 @@
         background: linear-gradient(rgba(34,25,16,.92), rgba(10,7,5,.92)); border: 1px solid #6b5332; border-radius: 4px; box-shadow: 0 0 0 1px #000;
       }
       #minimap .name:empty { visibility: hidden; }
+      #minimap .name { border: 2px solid transparent; background: var(--panel); box-shadow: var(--panel-shadow); }
       #minimap .north {
-        position: absolute; left: 50%; top: -8px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%;
-        background: radial-gradient(#3b2a16, #120d09); border: 1px solid #c9a45c; box-shadow: 0 0 0 1px #000;
+        position: absolute; left: 50%; top: -10px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; box-sizing: border-box;
+        border: 2px solid transparent; background: radial-gradient(#3b2a16, #120d09) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000;
         color: #f3e2b0; font: bold 10px/16px Georgia, serif; text-align: center; text-shadow: 0 1px 1px #000;
       }
       #minimap button {
         position: absolute; width: 22px; height: 22px; padding: 0; border-radius: 50%; cursor: pointer; pointer-events: auto;
-        background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09); border: 1px solid #c9a45c; box-shadow: 0 0 0 1px #000, 0 2px 4px #000;
+        border: 2px solid transparent; background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000, 0 2px 4px #000;
         color: #f3e2b0; font: bold 15px/18px system-ui, sans-serif; text-shadow: 0 1px 1px #000;
       }
       #minimap button:active { filter: brightness(1.4); }
       #minimap .zin { right: -6px; bottom: 16px; }
       #minimap .zout { right: 16px; bottom: -6px; }
-      #minimap .wmap { left: -6px; bottom: 16px; width: 26px; height: 26px; }
-      #minimap .wmap svg { display: block; width: 62%; height: 62%; margin: auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+      #minimap .wmap { left: -10px; bottom: 12px; width: 34px; height: 34px; }
       body.touch #minimap { --m: calc(150px * var(--k)); }
       @media (max-width: 720px) { #minimap { top: calc(26px + 80px * var(--k, 1) + env(safe-area-inset-top)); } }
 
@@ -160,11 +190,12 @@
         box-shadow: 0 0 12px rgba(0,0,0,.5), inset 0 0 14px rgba(0,0,0,.6); text-shadow: 0 1px 3px #000;
       }
       .touch-btn svg { display: block; width: 55%; height: 55%; margin: auto; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-      #jump { background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09); }
-      #jump.down { background: rgba(110,80,40,.9); transform: scale(.94); }
-      #fullscreen { right: calc(12px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); width: 36px; height: 36px; opacity: .75; }
+      #jump.down { transform: scale(.94); filter: brightness(1.3); }
+      #fullscreen { right: calc(12px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); width: 36px; height: 36px; opacity: .85;
+        border: 2px solid transparent; background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09) padding-box, var(--gilt-ring) border-box; }
 
-      /* Action bar: WoW-style buttons, bronze frame, conic cooldown sweep on --p. */
+      /* Action bar: WoW-style buttons on a carved stone bar in a gilded frame, a painted winged lion of San Marco
+         on each end (--cap-img), conic cooldown sweep on --p. */
       .actionbar {
         --s: min(46px, calc((100vw - 24px) / 12 - 4px));
         position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%);
@@ -172,25 +203,30 @@
         user-select: none; -webkit-user-select: none; touch-action: none;
       }
       .actionbar .bar {
-        display: grid; grid-template-columns: repeat(12, var(--s)); gap: 4px; padding: 5px;
-        background: linear-gradient(#2a2118, #120d09); border: 1px solid #6b5332; border-radius: 4px;
-        box-shadow: 0 0 0 1px #000, 0 4px 14px rgba(0,0,0,.7), inset 0 1px 0 rgba(243,226,176,.15);
+        position: relative; display: grid; grid-template-columns: repeat(12, var(--s)); gap: 5px; padding: 6px 8px;
+        border: 3px solid transparent; border-radius: 5px; background: var(--panel); box-shadow: var(--panel-shadow);
       }
+      .actionbar .bar::before, .actionbar .bar::after { /* the lions, sitting on the bar's ends and facing in */
+        content: ''; position: absolute; bottom: -6px; width: calc(var(--s) * 2.1); height: calc(var(--s) * 2.1); pointer-events: none;
+        background: var(--cap-img) center bottom / contain no-repeat; filter: drop-shadow(0 3px 4px #000);
+      }
+      .actionbar .bar::before { right: calc(100% - var(--s) * .2); }
+      .actionbar .bar::after { left: calc(100% - var(--s) * .2); transform: scaleX(-1); }
       .slot {
         position: relative; width: var(--s); height: var(--s); padding: 0; overflow: hidden; cursor: pointer;
         background: #0b0907; border: 1px solid #000; border-radius: 3px; outline: none;
-        box-shadow: inset 0 0 0 1px #8a6d3e, inset 0 0 6px #000; -webkit-tap-highlight-color: transparent;
+        box-shadow: 0 0 0 1px rgba(217,173,82,.55), inset 0 0 6px #000; -webkit-tap-highlight-color: transparent;
       }
-      .slot.empty { cursor: default; background: radial-gradient(#1c1610, #080605); }
-      .slot .icon, .slot .icon svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); display: block; }
+      .slot.empty { cursor: default; background: radial-gradient(#1c1610, #080605); box-shadow: 0 0 0 1px rgba(217,173,82,.3), inset 0 0 10px #000; }
+      .slot .icon { position: absolute; inset: 1px; overflow: hidden; border-radius: 2px; }
       .slot .sweep {
         position: absolute; inset: 2px; pointer-events: none;
         background: conic-gradient(rgba(0,0,0,.72) var(--p, 0%), transparent 0);
       }
-      .slot::after { /* bevel + gloss over the icon */
+      .slot::after { /* bevel + gloss over the icon: lit top-left edge, shaded bottom-right, a dark rim */
         content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: 2px;
-        box-shadow: inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 3px rgba(212,175,95,.25);
-        background: linear-gradient(rgba(255,255,255,.12), transparent 45%);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,.85), inset 2px 2px 0 rgba(255,240,200,.18), inset -2px -2px 0 rgba(0,0,0,.45), inset 0 0 8px rgba(0,0,0,.5);
+        background: linear-gradient(150deg, rgba(255,255,255,.16), transparent 40%);
       }
       .slot .key {
         position: absolute; top: 1px; right: 3px; font: bold 11px/1 system-ui, sans-serif; color: #e8e8e8;
@@ -206,7 +242,7 @@
       .slot.ready .icon { animation: ready .5s ease-out; }
       @keyframes ready { 0% { filter: brightness(2.6) } 100% { filter: none } }
       .slot.oom .icon { filter: brightness(.5) sepia(1) hue-rotate(180deg) saturate(2.5); } /* not enough mana */
-      .slot.active, .slot.casting { box-shadow: inset 0 0 0 1px #8a6d3e, 0 0 6px 1px #ffd75e; border-color: #ffd75e; }
+      .slot.active, .slot.casting { box-shadow: 0 0 0 1px #ffd75e, 0 0 8px 2px #ffd75e; border-color: #ffd75e; }
       .slot.active::after { box-shadow: inset 0 0 0 2px #ffd75e, inset 0 0 10px rgba(255,215,94,.6); animation: proc 1.2s ease-in-out infinite alternate; }
       @keyframes proc { from { opacity: .55 } to { opacity: 1 } }
       /* Charge bar: a half-ring over the main button, filled by stroke-dasharray (actionBar.ts). */
@@ -218,20 +254,20 @@
       .charge .fill { stroke-width: 4.5; stroke-dasharray: 0 100; transition: stroke-dasharray .25s; }
       .charge.full .fill { filter: drop-shadow(0 0 3px #ff3b2f); animation: proc .6s ease-in-out infinite alternate; }
       .slot.locked .icon { filter: grayscale(1) brightness(.35); }
-      .slot.special:not(.locked) { border-color: #ff5a3a; box-shadow: inset 0 0 0 1px #8a6d3e, 0 0 8px 2px #ff5a3a; }
+      .slot.special:not(.locked) { border-color: #ff5a3a; box-shadow: 0 0 0 1px #ff5a3a, 0 0 8px 2px #ff5a3a; }
       .slot.special:not(.locked)::after { animation: proc .8s ease-in-out infinite alternate; }
       /* Mouse drag to rearrange the bar (actionBar.ts grab): the picked slot dims, the slot under the cursor glows, the icon follows. */
       .slot.lifted .icon { opacity: .3; }
       .slot.drop { border-color: #f3e2b0 !important; box-shadow: 0 0 0 2px #000, 0 0 12px 3px #f3e2b0 !important; filter: brightness(1.3); }
       .drag-ghost { position: fixed; left: 0; top: 0; width: 44px; height: 44px; margin: -22px 0 0 -22px; z-index: 50; pointer-events: none;
         border: 1px solid #f3e2b0; border-radius: 4px; overflow: hidden; opacity: .85; box-shadow: 0 0 12px #000; }
-      .drag-ghost .icon, .drag-ghost svg { width: 100%; height: 100%; display: block; }
+      .drag-ghost .icon { width: 100%; height: 100%; display: block; }
       body.diablo .drag-ghost { border-radius: 50%; }
-      body.diablo .drag-ghost .icon { filter: sepia(.8) saturate(3) hue-rotate(-42deg) contrast(1.1); }
+      body.diablo .drag-ghost .icon { filter: var(--ember); }
 
       .castbar {
         position: relative; width: min(260px, 70vw); height: 16px; visibility: hidden; opacity: 0;
-        background: #0d0b08; border: 1px solid #000; box-shadow: 0 0 0 1px #8a6d3e, 0 2px 8px #000; border-radius: 2px;
+        background: linear-gradient(#0d0b08, #0d0b08) padding-box, var(--gilt) border-box; border: 2px solid transparent; box-shadow: 0 0 0 1px #000, 0 2px 8px #000; border-radius: 3px;
         transition: opacity .25s, visibility .25s;
       }
       .castbar.show { visibility: visible; opacity: 1; transition: none; }
@@ -263,7 +299,7 @@
 
       .tooltip {
         position: fixed; width: 260px; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 8px 10px; pointer-events: none; display: none;
-        background: rgba(8, 10, 24, .94); border: 1px solid #8a8fa8; border-radius: 4px; box-shadow: 0 0 0 1px #000;
+        background: var(--tip-bg); border: 2px solid var(--tip-border); border-radius: 5px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.6), 0 4px 14px rgba(0,0,0,.7);
         color: #fff; font: 12px/1.4 system-ui, sans-serif;
       }
       .tooltip.show { display: block; }
@@ -286,6 +322,7 @@
       @media (max-height: 340px), (orientation: portrait) { body.touch { --k: .62; } }
       body:is(.touch, .diablo) .actionbar { transform: none; left: 0; right: 0; bottom: auto; top: 62%; pointer-events: none; }
       body:is(.touch, .diablo) .actionbar .bar { display: contents; }
+      body:is(.touch, .diablo) .actionbar .bar::before, body:is(.touch, .diablo) .actionbar .bar::after { display: none; }
       body:is(.touch, .diablo) .slot:not(.ring), body.touch .slot .key { display: none; }
       body:is(.touch, .diablo) .ring {
         --cx: 74px; --cy: 70px; /* centre of the big button, from the right/bottom edges */
@@ -293,13 +330,19 @@
         position: fixed; width: var(--s); height: var(--s); pointer-events: auto;
         right: calc(env(safe-area-inset-right) + (var(--cx) - cos(var(--a)) * var(--r) - var(--d) / 2) * var(--k));
         bottom: calc(env(safe-area-inset-bottom) + (var(--cy) + sin(var(--a)) * var(--r) - var(--d) / 2) * var(--k));
-        border-radius: 50%; border: 2px solid #b8955a;
-        box-shadow: 0 0 0 2px #000, 0 3px 10px rgba(0,0,0,.7), inset 0 0 8px #000;
+        border-radius: 50%; border: 3px solid transparent; background: linear-gradient(#0b0907, #0b0907) padding-box, var(--gilt-ring) border-box;
+        box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.7);
       }
-      body:is(.touch, .diablo) .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 4px rgba(212,175,95,.3); }
-      body:is(.touch, .diablo) .slot.ring.active, body:is(.touch, .diablo) .slot.ring.casting { border-color: #ffd75e; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ffd75e; }
-      body:is(.touch, .diablo) .slot.ring.special:not(.locked) { border-color: #ff5a3a; box-shadow: 0 0 0 2px #000, 0 0 12px 2px #ff5a3a; }
-      body:is(.touch, .diablo) .slot.ring.down { border-color: #f3e2b0; filter: brightness(1.25); }
+      body:is(.touch, .diablo) .slot.ring.empty { background: radial-gradient(#1c1610, #080605) padding-box, var(--gilt-ring) border-box; opacity: .7; }
+      body:is(.touch, .diablo) .slot.ring .icon, body:is(.touch, .diablo) .slot.ring .sweep { inset: 0; border-radius: 50%; }
+      body:is(.touch, .diablo) .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.85), inset 0 -5px 10px rgba(0,0,0,.55), inset 0 0 12px rgba(0,0,0,.45);
+        background: radial-gradient(circle at 38% 22%, rgba(255,255,255,.26), transparent 42%); }
+      /* The big button: a heavier gilded collar with a gem-dark groove, so the thumb finds it blind. */
+      body:is(.touch, .diablo) .slot.ring.main { border-width: 5px; box-shadow: 0 0 0 2px #000, 0 0 0 4px rgba(217,173,82,.55), 0 0 0 5px #000, 0 4px 14px rgba(0,0,0,.8); }
+      body:is(.touch, .diablo) .slot.ring.active, body:is(.touch, .diablo) .slot.ring.casting { box-shadow: 0 0 0 1px #000, 0 0 0 3px #ffd75e, 0 0 14px 3px #ffd75e; }
+      body:is(.touch, .diablo) .slot.ring.special:not(.locked) { box-shadow: 0 0 0 1px #000, 0 0 0 3px #ff5a3a, 0 0 14px 3px #ff5a3a; }
+      body:is(.touch, .diablo) .slot.ring.down { filter: brightness(1.3); transform: scale(.94); }
+      body:is(.touch, .diablo) .slot.ring .cd { font-size: calc(var(--s) * .34); }
       body.diablo:not(.touch) { --k: .9; } /* Stile Diablo on desktop: the same fan, mouse-sized */
       body.touch .tooltip { width: 230px; font-size: 11px; }
       body.touch .tooltip b { font-size: 13px; }
@@ -330,23 +373,20 @@
       body.diablo #unit .lv { left: 46px; top: 48px; border-radius: 2px; border-color: #77705f; background: radial-gradient(#2b2520, #0b0908); color: #ff8a5a; }
       body.diablo .res .lag { background: #ffe0b8; }
       body.diablo .res span { line-height: 15px; }
-      body.diablo .ring { border: 2px solid #15120f; background: radial-gradient(circle at 50% 40%, #2b1712, #070404);
-        box-shadow: 0 0 0 2px #6f685d, 0 0 0 3px #000, 0 4px 12px rgba(0,0,0,.85), inset 0 0 10px #000; }
-      body.diablo .slot.ring.main { box-shadow: 0 0 0 3px #8b8173, 0 0 0 5px #000, 0 0 20px rgba(210,45,20,.5), inset 0 0 14px #000; }
+      body.diablo .slot.ring.main { box-shadow: 0 0 0 2px #000, 0 0 20px rgba(210,45,20,.5); }
       body.diablo .slot.ring::after { border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.75), inset 0 0 14px rgba(170,30,10,.35);
         background: radial-gradient(circle at 50% 28%, rgba(255,235,210,.14), transparent 58%); }
-      body.diablo .slot .icon { filter: sepia(.8) saturate(3) hue-rotate(-42deg) contrast(1.1); } /* Diablo Immortal's ember-red skill art */
+      /* Diablo Immortal's skill art runs warmer and darker: the same paintings, graded toward embers. */
+      body.diablo { --ember: sepia(.35) saturate(1.25) contrast(1.12) brightness(.92); }
+      body.diablo .slot .icon { filter: var(--ember); }
       body.diablo .slot.oom .icon { filter: brightness(.5) sepia(1) hue-rotate(180deg) saturate(2.5); }
       body.diablo .slot.locked .icon { filter: grayscale(1) brightness(.35); }
       body.diablo .slot.ring.active, body.diablo .slot.ring.casting { border-color: #ff9a3a; box-shadow: 0 0 0 2px #000, 0 0 14px 3px #ff7a2a; }
       body.diablo .slot.ring.special:not(.locked) { border-color: #ff3a1a; box-shadow: 0 0 0 2px #000, 0 0 16px 3px #ff3a1a; }
       body.diablo:not(.touch) .slot .key { top: auto; bottom: 10%; right: 50%; transform: translateX(50%); font-size: 10px; color: #d9ccb4; }
-      body.diablo #jump { background: radial-gradient(circle at 50% 40%, #2b1712, #070404); border-color: #6f685d; }
-      body.diablo #minimap canvas { box-shadow: 0 0 0 3px #0a0908, 0 0 0 5px #6f685d, 0 0 0 7px #24201c, 0 0 0 8px #000, 0 4px 14px 8px rgba(0,0,0,.65); }
-      body.diablo #minimap .name, body.diablo #update { color: #e9d6b0; background: linear-gradient(rgba(30,26,22,.94), rgba(6,5,4,.94)); border-color: #5d574e; }
-      body.diablo #minimap button, body.diablo #minimap .north { background: radial-gradient(circle at 40% 35%, #3a3530, #0a0908); border-color: #77705f; color: #e9d6b0; }
-      body.diablo #menu-btn { background: radial-gradient(circle at 40% 35%, #3a3530, #0a0908); border-color: #77705f; color: #e9d6b0; }
-      body.diablo .castbar { box-shadow: 0 0 0 1px #6f685d, 0 2px 8px #000; }
+      body.diablo #minimap .name { color: #e9d6b0; }
+      body.diablo #update { color: #e9d6b0; background: linear-gradient(rgba(30,26,22,.94), rgba(6,5,4,.94)); border-color: #5d574e; }
+      body.diablo #minimap button, body.diablo #minimap .north { color: #e9d6b0; }
       body.diablo .castbar .fill { background: linear-gradient(#ff9a3a, #a8300c); }
 
       /* Damage numbers over the enemies (src/fx/diabloFx.ts, Stile Diablo): placed by transform each frame, popped by scale. */
@@ -389,12 +429,10 @@
       <canvas></canvas>
       <b class="north">N</b>
       <button class="zin" aria-label="Ingrandisci">+</button><button class="zout" aria-label="Riduci">&minus;</button>
-      <button class="wmap" aria-label="Mappa (M)" title="Mappa (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" /></svg></button>
+      <button class="wmap orb" aria-label="Mappa (M)" title="Mappa (M)"></button>
     </div>
     <div id="stick"><div id="knob"></div></div>
-    <button id="jump" class="touch-btn ring" aria-label="Salta" style="--a: 180deg; --r: 192px; --d: 48px">
-      <svg width="26" height="26" viewBox="0 0 24 24"><path d="M5 14l7-7 7 7M5 20l7-7 7 7" /></svg>
-    </button>
+    <button id="jump" class="touch-btn ring orb" aria-label="Salta" style="--a: 180deg; --r: 196px; --d: 54px"></button>
     <button id="fullscreen" class="touch-btn" aria-label="Schermo intero">
       <svg width="20" height="20" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
     </button>

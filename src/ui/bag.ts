@@ -1,6 +1,7 @@
 import { playSfx } from '../audio/engine.ts';
-import { Bag, ITEM, RARITY, type Icon } from '../loot/bag.ts';
+import { Bag, ITEM, RARITY } from '../loot/bag.ts';
 import { sellPrice, type Equipment } from '../loot/gear.ts';
+import { ICONS } from './icons.ts';
 import { TIP_CSS, itemTip } from './tooltip.ts';
 
 // The bag, Diablo style: B (or the satchel button under the gear) opens a framed grid of slots
@@ -13,17 +14,14 @@ import { TIP_CSS, itemTip } from './tooltip.ts';
 
 const CSS = `
 #bag-btn, #sheet-btn { position: fixed; z-index: 6; right: calc(12px + env(safe-area-inset-right)); top: calc(56px + env(safe-area-inset-top));
-  width: 36px; height: 36px; padding: 0; cursor: pointer; border-radius: 50%; color: #f3e2b0;
-  background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09); border: 2px solid #c9a45c;
-  box-shadow: 0 0 0 2px #000, 0 3px 10px rgba(0,0,0,.7); touch-action: manipulation; }
+  width: 38px; height: 38px; padding: 0; cursor: pointer; border-radius: 50%;
+  box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.7); touch-action: manipulation; }
 #sheet-btn { top: calc(100px + env(safe-area-inset-top)); }
-#bag-btn:hover, #bag-btn:focus-visible, #sheet-btn:hover, #sheet-btn:focus-visible { border-color: #ffd75e; filter: brightness(1.2); outline: none; }
-#bag-btn svg, #sheet-btn svg { display: block; width: 60%; height: 60%; margin: auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+#bag-btn:hover, #bag-btn:focus-visible, #sheet-btn:hover, #sheet-btn:focus-visible { filter: brightness(1.25); outline: none; }
 #bag-btn.got, #sheet-btn.got { animation: baggot .5s ease-out; }
-@keyframes baggot { 30% { transform: scale(1.25); border-color: #ffd75e; box-shadow: 0 0 0 2px #000, 0 0 14px 4px rgba(255,200,90,.8); } }
+@keyframes baggot { 30% { transform: scale(1.25); box-shadow: 0 0 0 1px #000, 0 0 14px 4px rgba(255,200,90,.8); } }
 body.touch #bag-btn { top: calc(100px + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
 body.touch #sheet-btn { top: calc(100px + 52px * var(--k) / .72 + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
-body.diablo #bag-btn, body.diablo #sheet-btn { background: radial-gradient(circle at 40% 35%, #3a3530, #0a0908); border-color: #77705f; color: #e9d6b0; }
 #bag { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center; overflow: auto;
   background: rgba(0,0,0,.5); font: 15px/1.35 Georgia, serif; color: #f3e2b0; user-select: none;
   --s: min(46px, calc((100vw - 80px) / 6), calc((100dvh - 120px) / 5)); }
@@ -31,23 +29,27 @@ body.diablo #bag-btn, body.diablo #sheet-btn { background: radial-gradient(circl
 #bag.show { display: flex; }
 #bag .row { display: flex; align-items: flex-start; justify-content: center; gap: 12px; margin: auto; padding: 22px 8px 8px; }
 #bag .panel { position: relative; display: none; box-sizing: border-box; padding: 26px 14px 12px;
-  background: linear-gradient(rgba(34,25,16,.97), rgba(10,7,5,.97));
-  border: 2px solid #c9a45c; border-radius: 8px; box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #4a3a26, 0 10px 40px #000; }
+  border: 3px solid transparent; border-radius: 8px; background: var(--panel); box-shadow: var(--panel-shadow); }
 #bag .panel.on { display: block; }
 #bag h2 { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); margin: 0; padding: 4px 22px; white-space: nowrap;
   font: bold 15px/20px Georgia, serif; color: #ffd75e; letter-spacing: 1px; text-shadow: 0 1px 2px #000;
-  background: linear-gradient(#3a2a18, #120d09); border: 2px solid #c9a45c; border-radius: 4px; box-shadow: 0 0 0 1px #000; }
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3420, #140e08) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0,0,0,.6); }
 #bag .x { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; padding: 0; cursor: pointer; font: bold 16px/1 system-ui, sans-serif;
   color: #f3e2b0; background: linear-gradient(#7a1a10, #3a0805); border: 1px solid #c9a45c; border-radius: 4px; }
 #bag .grid { display: grid; grid-template-columns: repeat(6, var(--s)); gap: 4px; }
-#bag .cell { position: relative; width: var(--s); height: var(--s); box-sizing: border-box; padding: 0; border-radius: 3px; cursor: default;
-  background: radial-gradient(circle at 50% 40%, #1e1610, #070504); border: 1px solid #3b2a16; box-shadow: inset 0 0 8px #000; color: inherit; }
+/* A slot, WoW style: a recessed dark socket; an item fills it with its painting, framed in its quality's
+   colour (--c) under a bevel (lit top-left, shaded bottom-right) and a faint glow of the same colour. */
+#bag .cell { position: relative; width: var(--s); height: var(--s); box-sizing: border-box; padding: 0; overflow: hidden; border-radius: 3px; cursor: default;
+  background: radial-gradient(circle at 50% 40%, #1e1610, #070504); border: 1px solid #000; box-shadow: inset 0 0 8px #000, 0 0 0 1px rgba(217,173,82,.22); color: inherit; }
 #bag .cell[data-k] { cursor: pointer; }
-#bag .cell[data-k][style] { border-color: var(--c); box-shadow: inset 0 0 10px #000, inset 0 0 0 1px rgba(0,0,0,.6), 0 0 5px -1px var(--c); }
-#bag .cell[data-k]:hover, #bag .cell.sel { filter: brightness(1.35); outline: none; }
+#bag .cell[data-k][style] { box-shadow: 0 0 0 1px #000, 0 0 6px -1px var(--c); }
+#bag .cell::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--c, transparent), inset 0 0 0 3px rgba(0,0,0,.55), inset 3px 3px 2px -1px rgba(255,240,200,.16), inset -3px -3px 3px -1px rgba(0,0,0,.6); }
+#bag .cell[data-k]:hover, #bag .cell.sel { filter: brightness(1.3); outline: none; }
 #bag .cell.sel { outline: 1px solid #ffd75e; outline-offset: 1px; }
-#bag .cell svg { display: block; width: 78%; height: 78%; margin: auto; fill: none; stroke: var(--c, #4a3a26); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-#bag .cell b { position: absolute; right: 3px; bottom: 1px; font: bold 11px system-ui, sans-serif; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
+#bag .cell .ico { position: absolute; inset: 0; width: auto; height: auto; }
+#bag .cell b { position: absolute; z-index: 1; right: 4px; bottom: 2px; font: bold 11px system-ui, sans-serif; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+body.diablo #bag .cell .ico { filter: var(--ember); }
 #bag .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; font: 12px/16px system-ui, sans-serif; color: #c9b48a; }
 #bag .gold { color: #ffd75e; font: bold 16px Georgia, serif; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 #bag .gold i, #bag .coin { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 50%;
@@ -62,30 +64,6 @@ body.touch #bag .keys { display: none; }
   #bag.duo { --s: min(46px, calc((100vw - 80px) / 6), calc((100dvh - 210px) / 10.6)); }
 }
 ${TIP_CSS}`;
-
-const SVG = (d: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
-/** Glyphs per kind of item, stroked in the rarity's colour (also the sheet's empty slots and the shop's goods). */
-export const GLYPH: Record<Icon, string> = {
-  rosary: SVG('<circle cx="12" cy="9" r="6" stroke-dasharray="1.6 1.6"/><path d="M12 15v5M10 18h4"/>'),
-  candle: SVG('<path d="M9 21h6M10 21V9h4v12M12 9V7"/><path d="M12 7c-1.5-1.5-1-3 0-4.5 1 1.5 1.5 3 0 4.5z"/>'),
-  bone: SVG('<path d="M7 17l10-10"/><circle cx="5.5" cy="16.5" r="1.8"/><circle cx="7.5" cy="18.5" r="1.8"/><circle cx="16.5" cy="5.5" r="1.8"/><circle cx="18.5" cy="7.5" r="1.8"/>'),
-  relic: SVG('<path d="M5 9h14v11H5zM5 9l2-4h10l2 4M12 12v5M10 14h4"/>'),
-  medal: SVG('<path d="M8 3l4 6 4-6"/><circle cx="12" cy="15" r="5.5"/><path d="M12 12.5v5M10 15h4"/>'),
-  vial: SVG('<path d="M10 3h4M10.5 3v5L7 14a5 5 0 1 0 10 0l-3.5-6V3"/><path d="M8 15h8"/>'),
-  skull: SVG('<path d="M5 11a7 7 0 0 1 14 0v3l-2 1v4H7v-4l-2-1z"/><circle cx="9.5" cy="12" r="1.6"/><circle cx="14.5" cy="12" r="1.6"/><path d="M10 19v-2M14 19v-2M12 16v-1"/>'),
-  nail: SVG('<path d="M7 4h10M12 4v15l-1 2"/><path d="M9 6h6"/>'),
-  helm: SVG('<path d="M5 20c0-9 3-16 7-16s7 7 7 16"/><path d="M8.5 20c0-5 1.5-8 3.5-8s3.5 3 3.5 8"/>'),
-  shoulders: SVG('<path d="M3 15c0-4 4-7 9-7s9 3 9 7l-3 2-2-3H8l-2 3z"/><path d="M8 8v3M16 8v3"/>'),
-  chest: SVG('<path d="M8 3l4 3 4-3 4 4-3 3v11H7V10L4 7z"/><path d="M12 6v15M9 14h6"/>'),
-  gloves: SVG('<path d="M8 21v-6L5.5 11a1.5 1.5 0 0 1 2.5-1.6L9 11V5a1.3 1.3 0 0 1 2.6 0v5V4a1.3 1.3 0 0 1 2.6 0v6V5.5a1.3 1.3 0 0 1 2.6 0V15c0 3-1.5 6-4 6z"/>'),
-  legs: SVG('<path d="M7 3h10l1 18h-4.5L12 10l-1.5 11H6z"/><path d="M7 6h10"/>'),
-  boots: SVG('<path d="M8 3h5v10l6 3.5V21H6l1.5-5z"/><path d="M8 7h5"/>'),
-  club: SVG('<path d="M4 20l7-7"/><path d="M10.5 13.5c-1-3 1-8 5-9.5 2.5 1 4 3.5 3.5 6-2 3-5.5 5-8.5 3.5z"/><path d="M14 8l1 1M16 11l1 1"/>'),
-  amulet: SVG('<path d="M6 3c0 6 3 9 6 9s6-3 6-9"/><path d="M12 12l3 4-3 5-3-5z"/>'),
-  ring: SVG('<circle cx="12" cy="14.5" r="6"/><path d="M10 6l2-3 2 3-2 2.5z"/>'),
-};
-const SATCHEL = SVG('<path d="M5 9h14l-1 11H6zM9 9V6a3 3 0 0 1 6 0v3M5 9l1 4h12l1-4M12 13v2"/>');
-const FIGURE = SVG('<circle cx="12" cy="5.5" r="2.5"/><path d="M7 21l1.5-9L6 9.5 8 8h8l2 1.5-2.5 2.5L17 21M12 8v6"/>');
 
 /** One kind of cell: its tooltip (with `tap` true on touch), and what a click on the shown one does. */
 export interface Kind { tip(what: string, tap: boolean): string; use(what: string): void }
@@ -121,14 +99,16 @@ export class BagPanel {
     style.textContent = CSS;
     document.head.append(style);
     this.btn.id = 'bag-btn';
+    this.btn.className = 'orb';
     this.btn.setAttribute('aria-label', 'Borsa (B)');
     this.btn.title = 'Borsa (B)';
-    this.btn.innerHTML = SATCHEL;
+    this.btn.innerHTML = ICONS.ui_bag;
     this.btn.addEventListener('click', () => this.toggle());
     this.sheetBtn.id = 'sheet-btn';
+    this.sheetBtn.className = 'orb';
     this.sheetBtn.setAttribute('aria-label', 'Personaggio (C)');
     this.sheetBtn.title = 'Personaggio (C)';
-    this.sheetBtn.innerHTML = FIGURE;
+    this.sheetBtn.innerHTML = ICONS.ui_sheet;
     this.sheetBtn.addEventListener('click', () => this.keys.KeyC?.());
     this.el.id = 'bag';
     this.el.setAttribute('role', 'dialog');
@@ -253,7 +233,7 @@ export class BagPanel {
     this.grid.innerHTML = Array.from({ length: Bag.SLOTS }, (_, i) => {
       const s = this.bag.items[i], it = s && ITEM.get(s.id);
       if (!it) return '<div class="cell"></div>';
-      return `<button class="cell" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${GLYPH[it.icon]}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
+      return `<button class="cell" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${ICONS[it.icon]}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
     }).join('');
     for (const r of this.renders) r();
     this.sel = undefined;
@@ -277,6 +257,9 @@ export class BagPanel {
     this.tip.hidden = false;
     const panels = [...this.row.querySelectorAll('.panel.on')].map((p) => p.getBoundingClientRect());
     const p = { left: Math.min(...panels.map((r) => r.left)), right: Math.max(...panels.map((r) => r.right)) };
+    const room = () => p.left - this.tip.offsetWidth >= 16 || p.right + this.tip.offsetWidth <= innerWidth - 16;
+    this.tip.classList.remove('stack'); // the worn piece under the new one instead of beside it, if that fits beside the panels
+    if (!room()) { this.tip.classList.add('stack'); if (!room()) this.tip.classList.remove('stack'); }
     const b = c.getBoundingClientRect(), w = this.tip.offsetWidth, h = this.tip.offsetHeight;
     const left = p.left - w - 8, right = p.right + 8, side = left >= 8 || right + w <= innerWidth - 8;
     this.tip.style.left = `${side ? (left >= 8 ? left : right) : Math.min(Math.max(8, b.left + b.width / 2 - w / 2), innerWidth - w - 8)}px`;

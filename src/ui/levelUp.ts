@@ -19,28 +19,28 @@ const CSS = `
 #levelup .cards { display: flex; gap: 22px; justify-content: center; width: min(720px, 100%); }
 #levelup .card { position: relative; flex: 1 1 0; max-width: 330px; min-height: 290px; display: flex; flex-direction: column; align-items: center; gap: 8px;
   padding: 16px 16px 14px; box-sizing: border-box; cursor: pointer; text-align: center; font: 15px/1.4 Georgia, serif; color: #f3e2b0;
-  background: linear-gradient(rgba(44,32,20,.97), rgba(14,10,6,.97)); border: 2px solid #c9a45c; border-radius: 8px;
-  box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #6b4a1f, inset 0 0 26px rgba(0,0,0,.7), 0 10px 30px #000; transition: transform .12s, box-shadow .12s, filter .12s; }
-#levelup .card:hover, #levelup .card.sel { transform: translateY(-4px); filter: brightness(1.15);
-  box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #6b4a1f, 0 0 22px 4px rgba(255,200,90,.55), 0 10px 30px #000; }
+  border: 3px solid transparent; border-radius: 8px; background: var(--panel); box-shadow: var(--panel-shadow); transition: transform .12s, box-shadow .12s, filter .12s; }
+#levelup .card:hover, #levelup .card.sel { transform: translateY(-4px); filter: brightness(1.15); box-shadow: var(--panel-shadow), 0 0 22px 4px rgba(255,200,90,.55); }
 #levelup.lock .card { pointer-events: none; filter: brightness(.6) saturate(.6); }
 #levelup .tag { padding: 2px 10px; font: bold 11px/16px system-ui, sans-serif; letter-spacing: 1px; text-transform: uppercase; border-radius: 9px; color: #1a1208; background: #e0b55a; }
 #levelup .card.ability .tag { background: #c48bff; }
 #levelup .card.fusion .tag { background: #7dff3a; }
 #levelup .card.filler .tag { background: #58ff9a; }
-#levelup .ic { width: 84px; height: 84px; flex: none; overflow: hidden; border: 2px solid #c9a45c; border-radius: 10px; box-shadow: 0 0 0 2px #000, 0 0 16px rgba(0,0,0,.8); }
-#levelup .ic svg { display: block; width: 100%; height: 100%; }
+#levelup .ic { position: relative; width: 84px; height: 84px; flex: none; box-sizing: border-box; overflow: hidden; border: 3px solid transparent; border-radius: 6px;
+  background: linear-gradient(#000, #000) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 0 16px rgba(0,0,0,.8); }
+#levelup .ic::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 1px #000, inset 3px 3px 2px -1px rgba(255,240,200,.2), inset -3px -3px 4px -1px rgba(0,0,0,.6); background: linear-gradient(150deg, rgba(255,255,255,.14), transparent 40%); }
 #levelup h3 { margin: 2px 0 0; font: bold 19px Georgia, serif; color: #ffd75e; }
 #levelup p { margin: 0; color: #e9dcc0; }
 #levelup .foot { margin-top: auto; display: flex; gap: 10px; align-items: center; font: 12px system-ui, sans-serif; color: #b8a888; }
 #levelup kbd { padding: 1px 7px; font: 700 13px/1.4 sans-serif; color: #1a1208; background: #e0b55a; border-radius: 3px; }
 body.touch #levelup kbd { display: none; }
 body.diablo #levelup .head b { color: #ff8a5a; text-shadow: 0 2px 4px #000, 0 0 18px rgba(255,90,40,.5); }
-body.diablo #levelup .card { color: #e9d6b0; background: radial-gradient(ellipse at 30% 20%, #2b2520, #120f0c 70%); border-color: #77705f; border-radius: 2px;
-  box-shadow: 0 0 0 2px #000, inset 0 0 0 1px #3a3530, inset 0 0 40px #000, 0 10px 30px #000; }
-body.diablo #levelup .card:hover, body.diablo #levelup .card.sel { box-shadow: 0 0 0 2px #000, inset 0 0 40px #000, 0 0 22px 4px rgba(255,90,40,.5), 0 10px 30px #000; }
-body.diablo #levelup .ic { border-color: #77705f; border-radius: 50%; }
-body.diablo #levelup .ic svg { filter: sepia(.8) saturate(3) hue-rotate(-42deg) contrast(1.1); }
+body.diablo #levelup .card { color: #e9d6b0; border-radius: 2px; }
+body.diablo #levelup .card:hover, body.diablo #levelup .card.sel { box-shadow: var(--panel-shadow), 0 0 22px 4px rgba(255,90,40,.5); }
+body.diablo #levelup .ic { border-radius: 50%; background: linear-gradient(#000, #000) padding-box, var(--gilt-ring) border-box; }
+body.diablo #levelup .ic::after { border-radius: 50%; }
+body.diablo #levelup .ic .ico { filter: var(--ember); }
 body.diablo #levelup h3 { color: #ff8a5a; text-transform: uppercase; letter-spacing: 1px; font-size: 16px; }
 body.diablo #levelup .tag { border-radius: 1px; }
 @media (max-width: 560px) {

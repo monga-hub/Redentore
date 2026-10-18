@@ -33,15 +33,16 @@ const goldGlow: Style = { life: [0.6, 0.9], size: [0.5, 0.8], grow: 1.8, color: 
 
 const CSS = `
 #quest-prompt { position: fixed; left: 50%; bottom: 26%; transform: translateX(-50%); padding: 7px 16px;
-  font: 600 15px/1.2 Georgia, serif; color: #f3e6c4; background: rgba(12, 8, 6, .78); border: 1px solid #8a6a3a;
+  font: 600 15px/1.2 Georgia, serif; color: #f3e6c4; border: 2px solid transparent; background: var(--panel); box-shadow: var(--panel-shadow);
   border-radius: 6px; text-shadow: 0 1px 2px #000; pointer-events: none; display: none; white-space: nowrap; z-index: 5; }
-#quest-prompt.act { pointer-events: auto; cursor: pointer; border-color: #e0b55a; }
+#quest-prompt.act { pointer-events: auto; cursor: pointer; }
 #quest-prompt kbd { display: inline-block; min-width: 1.3em; margin-right: 8px; padding: 1px 5px; font: 700 13px/1.2 sans-serif;
   color: #1a1208; background: #e0b55a; border-radius: 3px; text-align: center; }
 body.touch #quest-prompt kbd { display: none; }
 #boss { position: fixed; left: 50%; top: 56px; transform: translateX(-50%); width: min(460px, 80vw); display: none;
   text-align: center; font: 700 15px/1.3 Georgia, serif; color: #f0d8ff; text-shadow: 0 1px 3px #000; pointer-events: none; z-index: 5; }
-#boss .bar { position: relative; height: 14px; margin-top: 4px; background: #1a0d14; border: 1px solid #6a3c8a; border-radius: 3px; overflow: hidden; }
+#boss .bar { position: relative; height: 14px; margin-top: 4px; overflow: hidden; border: 2px solid transparent; border-radius: 3px;
+  background: linear-gradient(#1a0d14, #1a0d14) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 2px 8px #000; }
 #boss .bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#d23a3a, #7a1414); }
 #boss .bar span { position: relative; font: 600 11px/14px sans-serif; color: #fff; }
 #victory { position: fixed; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; display: none; z-index: 5;
@@ -60,8 +61,9 @@ body.diablo #quests b { color: #e9d6b0; }
 
 #buffs { position: fixed; left: calc(16px + env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); display: flex; gap: 6px; pointer-events: none; z-index: 4; }
 #buffs .buff { position: relative; width: 32px; text-align: center; font: bold 11px/14px system-ui, sans-serif; color: #f3e6c4; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
-#buffs .buff svg { display: block; width: 32px; height: 32px; border: 1px solid #c9a45c; border-radius: 4px; box-shadow: 0 0 0 1px #000, 0 0 10px rgba(138,255,154,.55); }
-#buffs .buff.end svg { animation: buff-end .5s ease-in-out infinite alternate; }
+#buffs .buff .ico { width: 32px; height: 32px; box-sizing: border-box; border: 1px solid #000; border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(217,173,82,.8), inset 2px 2px 0 rgba(255,240,200,.18), 0 0 10px rgba(138,255,154,.55); }
+#buffs .buff.end .ico { animation: buff-end .5s ease-in-out infinite alternate; }
 @keyframes buff-end { to { opacity: .35; } }
 @keyframes victory { 0% { opacity: 0; } 8% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 `;

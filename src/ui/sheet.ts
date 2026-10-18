@@ -1,7 +1,8 @@
 import { ITEM, RARITY, type Bag } from '../loot/bag.ts';
 import { SLOTS, type Equipment, type Slot } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
-import { GLYPH, type BagPanel } from './bag.ts';
+import type { BagPanel } from './bag.ts';
+import { ICONS } from './icons.ts';
 import { itemTip } from './tooltip.ts';
 
 // The character sheet, WoW style: C (or the figure button under the satchel) opens a paper doll
@@ -13,10 +14,10 @@ import { itemTip } from './tooltip.ts';
 const CSS = `
 #bag .sheet .doll { display: grid; grid-template-columns: var(--s) minmax(132px, auto) var(--s); gap: 4px 10px; }
 #bag .sheet .col { display: flex; flex-direction: column; gap: 4px; }
-#bag .sheet .cell:not([style]) svg { opacity: .35; }
+#bag .sheet .cell:not([style]) .ico { opacity: .3; filter: grayscale(1); } /* an empty slot shows what goes there, faded */
 #bag .sheet .mid { display: flex; flex-direction: column; align-items: center; min-width: 0; }
 #bag .sheet .pic { width: calc(var(--s) * 1.2); height: calc(var(--s) * 1.2); border-radius: 50%; overflow: hidden; flex: none;
-  background: radial-gradient(#3a2a18, #070504); border: 2px solid #c9a45c; box-shadow: 0 0 0 1px #000; }
+  border: 3px solid transparent; background: radial-gradient(#3a2a18, #070504) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000; }
 #bag .sheet .pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
 #bag .sheet .lv { margin: 2px 0 3px; font: bold 12px/15px Georgia, serif; color: #ffd75e; }
 #bag .sheet dl { display: grid; grid-template-columns: auto auto; gap: 0 10px; margin: 0; width: 100%; font: 11px/14.5px system-ui, sans-serif; }
@@ -66,8 +67,8 @@ export class SheetPanel {
 
   private cell(slot: Slot): string {
     const id = this.gear.worn[slot], it = id ? ITEM.get(id) : undefined, s = SLOTS.find((x) => x.id === slot)!;
-    if (!it) return `<div class="cell" title="${s.name}">${GLYPH[s.icon]}</div>`;
-    return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${GLYPH[it.icon]}</button>`;
+    if (!it) return `<div class="cell" title="${s.name}">${ICONS[s.icon]}</div>`;
+    return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${ICONS[it.icon]}</button>`;
   }
 
   private render(): void {

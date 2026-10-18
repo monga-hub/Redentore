@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { FogLayer } from './fog.ts';
+import { ICONS } from './icons.ts';
 
 /** Something on the map: a mob (alive unless `state === 'dead'`) or a fixed spot. */
 export interface Pin { x: number; z: number; state?: string }
@@ -71,6 +72,7 @@ export class Minimap {
     }
 
     const [zin, zout, map] = this.el.querySelectorAll('button');
+    map.innerHTML = ICONS.ui_map;
     map.addEventListener('click', openMap);
     zin.addEventListener('click', () => this.step(1));
     zout.addEventListener('click', () => this.step(-1));

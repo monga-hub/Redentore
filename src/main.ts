@@ -103,7 +103,7 @@ scene.add(priests.root);
 const bees = new Bees(level.world, kit.vfx, playerStats); // the giant hornet and her workers at the apiary
 scene.add(bees.root);
 const l2 = spawnLevel2(level.world); // level 2: the fondamenta to the Zitelle, the Pia Casa, the Governatrice
-const zitelle = new Priests(level.world, kit.vfx, playerStats, level.areas, l2);
+const zitelle = new Priests(level.world, kit.vfx, playerStats, level.areas, l2, true); // its ~6 MB of bodies load with the second quest (stream)
 scene.add(zitelle.root);
 /** Level 2's kinds: name, kind, height. */
 const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85], ['Codega', CODEGA, 1.8], ['Zitella', ZITELLA, 1.65], ['Zitella del velo', VELO, 1.65], ['Il Gastaldo dei gondolieri', GASTALDO, 2.5], ['La Maestra del merletto', MAESTRA, 2.3], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
@@ -311,6 +311,7 @@ function stream(x: number): void {
   friars.root.visible = priests.root.visible = bees.root.visible = one;
   for (const g of LEVEL2) g.visible = two;
   zitelle.root.visible = two;
+  if (quest.accepted2) zitelle.load(); // a no-op once started
 }
 
 addEventListener('resize', () => {
@@ -367,7 +368,7 @@ renderer.setAnimationLoop(() => {
       blend.start(cam.camera);
     }
   }
-  if (!warmed && friars.root.children.length && priests.root.children.length && bees.root.children.length && zitelle.root.children.length && player.model.root.children.length) { warmed = true; warm(); } // everyone loaded
+  if (!warmed && friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length) { warmed = true; warm(); } // everyone loaded
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();
     else menu.toggle();

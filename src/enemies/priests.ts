@@ -370,8 +370,8 @@ export class Priests {
   private stats: PlayerStats;
   private v = new THREE.Vector3();
 
-  /** `cast`: who this set is (level 2's, enemies/zitelle.ts); level 1's by default. */
-  constructor(world: World, vfx: Vfx, stats: PlayerStats, areas: Area[], cast?: { all: Priest[]; boss: Priest }) {
+  /** `cast`: who this set is (level 2's, enemies/zitelle.ts); level 1's by default. `lazy`: its models wait for `load`. */
+  constructor(world: World, vfx: Vfx, stats: PlayerStats, areas: Area[], cast?: { all: Priest[]; boss: Priest }, lazy = false) {
     this.world = world;
     this.vfx = vfx;
     this.stats = stats;
@@ -381,6 +381,15 @@ export class Priests {
     if (this.all.some((f) => f.kind.lines)) for (let i = 0; i < LACE_DECALS; i++) this.laces.push(vfx.hold(laceTele));
     for (let i = 0; i < 3; i++) this.teles.push([vfx.hold(tele), vfx.hold(teleSigil)]); // ponytail: three rings at once, a fourth nova goes unmarked
     if (this.boss.kind.phases?.marks) for (let i = 0; i < MARK.n * 2; i++) this.brands.push([vfx.hold(brandRing), vfx.hold(brandRunes)]);
+    if (!lazy) this.load();
+  }
+
+  private loading = false;
+  /** Fetch the bodies and stand everyone up, once (level 2's set waits for its quest: `lazy`). Until then nobody thinks. */
+  load(): void {
+    if (this.loading) return;
+    this.loading = true;
+    const vfx = this.vfx;
     const looks = [...LOOKS].filter(([k]) => this.all.some((f) => f.kind === k)); // only the bodies this set needs
     Promise.all(looks.flatMap(([, l]) => [loadModel(l.body), loadModel(l.prop)])).then((gltfs) => { // two kinds on one body each get their own copy
       const templates = new Map<CasterKind, Template>();

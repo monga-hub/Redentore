@@ -1,6 +1,6 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
-// dead staying dead, play time, the explored map, level-up picks and XP); slots and the reload handoff survive storage and refuse junk.
+// dead staying dead, play time, the explored map, level-up picks and XP, the bag); slots and the reload handoff survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { Quest } from '../src/quest/progress.ts';
@@ -9,6 +9,7 @@ import { deserialize, valid, save, serialize, setPending, slots, takePending, ty
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
+import { Bag } from '../src/loot/bag.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -23,6 +24,7 @@ function boot(): Game {
     mobs: spawnGroups(level.world).flat(),
     time: 0,
     fog: new Discovery(level.areas),
+    bag: new Bag(),
   };
 }
 const fogOf = (g: Game) => g.fog as Discovery;
@@ -37,6 +39,9 @@ const grata = a.quest.gates.find((g) => g.id === 'grata-nord')!;
 a.quest.open(grata);
 a.mobs[2].state = 'dead'; a.mobs[2].hp = 0;
 a.time = 754;
+a.bag.gold = 321;
+a.bag.add('rosario-bosso', 3);
+a.bag.add('chiodo');
 // Fog: the spawn's surroundings are seen, the far north is not; standing still reveals nothing new.
 const fa = fogOf(a);
 if (!fa.reveal(SPAWN.x, SPAWN.z) || fa.reveal(SPAWN.x, SPAWN.z)) fail('reveal at spawn');
@@ -69,6 +74,7 @@ if (b.quest.gates.some((g) => g.open && b.quest['world'].boxes.includes(g.box)))
 if (b.mobs[2].state !== 'dead' || b.mobs.filter((m) => m.state === 'dead').length !== 1) fail('dead mobs not restored');
 if (b.time !== 754) fail('play time not restored');
 if (fogOf(b).cells.join('') !== fa.cells.join('')) fail('explored map not restored');
+if (b.bag.gold !== 321 || b.bag.count('rosario-bosso') !== 3 || b.bag.count('chiodo') !== 1) fail(`bag restored as ${JSON.stringify(b.bag.encode())}`);
 
 // A save from before the fog loads fully fogged; a grid of another size or junk is refused untouched.
 const old = boot();
@@ -77,6 +83,11 @@ deserialize(old, legacy);
 if (fogOf(old).cells.some((v) => v)) fail('legacy save not fogged');
 if (old.fog.decode('3x3:AA==') || old.fog.decode('junk') || old.fog.decode(s.fog.replace(/:.*/, ':!!'))) fail('bad fog grid accepted');
 if (!valid(legacy) || valid({ ...s, fog: 5 })) fail('fog field validation');
+// A save from before the loot loads with an empty bag; a malformed bag is refused.
+const poor = boot();
+deserialize(poor, (({ bag: _g, ...o }) => o)(s));
+if (poor.bag.gold || poor.bag.items.length || !valid((({ bag: _g, ...o }) => o)(s))) fail('a save from before the loot loads with loot');
+if (valid({ ...s, bag: { gold: 'x', items: [] } }) || valid({ ...s, bag: { gold: 1, items: [[3, 1]] } })) fail('bag field validation');
 
 // The boss's fall carries the portone with it; a saved corpse player wakes alive.
 const c = boot();

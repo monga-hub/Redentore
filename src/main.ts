@@ -36,6 +36,9 @@ import { DiabloFx } from './fx/diabloFx.ts';
 import { GothicDressing } from './level/gothic.ts';
 import { audioReady, initAudio, tap, voices } from './audio/engine.ts';
 import { Director } from './audio/director.ts';
+import { Bag } from './loot/bag.ts';
+import { Drops } from './loot/drops.ts';
+import { BagPanel } from './ui/bag.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -133,7 +136,8 @@ const head = new THREE.Vector3();
 // Saved games index the mobs: the original friars and every priest first, as before the new friar groups and the bees, which follow.
 const old = GROUPS.flat().length;
 const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all];
-const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels };
+const bag = new Bag(); // gold and items picked up off the dead
+const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const loaded = takePending(); // a slot picked in the menu, carried across the reload
 if (loaded) {
@@ -184,6 +188,17 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
   { all: bees.all.filter((f) => f.kind === APETTA), height: Bees.HEIGHT.worker },
 ], kit.vfx, cam.camera, CHEST);
 scene.add(dfx.root);
+const drops = new Drops([ // gold and items out of the dead, walked over into the bag (after a load, so its dead drop nothing)
+  { all: friars.all, tier: 'friar' },
+  { all: priests.all.filter((f) => f.kind === PRIEST), tier: 'priest' },
+  { all: priests.all.filter((f) => f.kind === SACERDOTE), tier: 'elite' },
+  { all: [priests.boss], tier: 'boss' },
+  { all: [bees.queen], tier: 'elite' },
+  { all: bees.all.filter((f) => f.kind === APETTA), tier: 'worker' },
+], level.world, bag, cam.camera);
+scene.add(drops.root);
+const bagPanel = new BagPanel(bag); // B or the satchel button
+bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
 level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
@@ -239,18 +254,18 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { bag, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.05);
-  if (menu.paused || worldMap.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, dialogue or level-up; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open || bagPanel.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but Fra' Zuane talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
     input.consume();
     input.endFrame();
-    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open, pressed); // the dialogue window ducks the music itself
+    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open, pressed); // the dialogue window ducks the music itself
     fx.render();
     return;
   }
@@ -282,6 +297,7 @@ renderer.setAnimationLoop(() => {
     else menu.toggle();
   }
   if (input.pressed('KeyM')) openMap();
+  if (input.pressed('KeyB')) bagPanel.toggle();
   game.time += dt;
   playerStats.update(dt);
   if (dying > 0 && (dying -= dt) <= 0) wake();
@@ -294,6 +310,8 @@ renderer.setAnimationLoop(() => {
   priests.update(dt, player.pos);
   bees.update(dt, player.pos);
   dfx.update(dt, quest.accepted && !quest.key);
+  for (const text of drops.update(dt, player.pos, quest.bossDead)) kit.system.notices.push({ kind: 'error', text }); // before the victory: the boss drops, those he takes with him don't
+  bagPanel.update();
   for (const text of questView.update(dt, player.pos, pressed, priests.boss)) kit.system.notices.push({ kind: 'info', text });
   const boss = priests.boss, rage = boss.fight >= REVERENDISSIMO.phases!.berserk; // the boss's acts and berserk, called out as they come
   if (boss.phase > bossAct) kit.system.notices.push({ kind: 'error', text: boss.phase === 1 ? 'Il Reverendissimo marchia il pavimento: esci dai cerchi!' : 'Il Reverendissimo è furibondo: colpisce sempre più spesso!' });

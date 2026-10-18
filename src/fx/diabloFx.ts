@@ -52,7 +52,7 @@ function splats(): THREE.Texture {
 }
 
 // Gradient for the beams: bright at the foot, gone at the top.
-function beamTexture(): THREE.Texture {
+export function beamTexture(): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 4;
   c.height = 128;
@@ -266,7 +266,7 @@ export class DiabloFx {
 }
 
 /** Soft round glow, for the beam's footprint. */
-function discTexture(): THREE.Texture {
+export function discTexture(): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const g = c.getContext('2d')!, r = g.createRadialGradient(32, 32, 0, 32, 32, 32);

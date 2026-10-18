@@ -1,11 +1,12 @@
 // Saved games: the state worth keeping as plain JSON (player, quest flags, who is dead, play
-// time, the map explored so far, level, XP and level-up picks), three localStorage slots, and the handoff that carries a loaded game across a reload.
+// time, the map explored so far, level, XP and level-up picks, the bag), three localStorage slots, and the handoff that carries a loaded game across a reload.
 // Loading and "Nuova partita" reload the page so every system boots clean (no stray bolts,
 // cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
 import { CARD, levelOf } from '../player/levels.ts';
 import type { Quest } from '../quest/progress.ts';
+import type { Bag, BagState } from '../loot/bag.ts';
 
 const VERSION = 1;
 const SLOT_KEY = (i: number) => `redentore.save.${i}`;
@@ -26,6 +27,7 @@ export interface GameState {
   // saves from before the levels: they load at level 1 with the starting kit, and as XP is the worth of the
   // dead, the level-ups their kills earned are offered one after another right after the load.
   build?: { xp: number; lv: number; picks: string[] };
+  bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -39,6 +41,7 @@ export interface Game {
   mobs: { state: string; hp: number; t: number }[];
   time: number;
   fog: { encode(): string; decode(s: string): boolean };
+  bag: Bag;
 }
 
 export function serialize(g: Game): GameState {
@@ -51,6 +54,7 @@ export function serialize(g: Game): GameState {
     time: g.time,
     fog: g.fog.encode(),
     build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks] },
+    bag: g.bag.encode(),
   };
 }
 
@@ -75,6 +79,7 @@ export function deserialize(g: Game, s: GameState): void {
   for (const m of dead) m.t = GONE;
   g.time = s.time;
   if (s.fog) g.fog.decode(s.fog); // a grid from another build's level is dropped: fogged, not garbled
+  if (s.bag) g.bag.decode(s.bag);
 }
 
 /** Shape check for anything read back from storage: a hand-edited or older save is refused, not half-applied. */
@@ -85,7 +90,8 @@ export function valid(s: unknown): s is GameState {
     && !!o.quest && typeof o.quest.key === 'boolean' && typeof o.quest.bossDead === 'boolean' && Array.isArray(o.quest.gates)
     && ['accepted', 'out'].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out']))
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
-    && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')));
+    && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))
+    && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))));
 }
 
 export interface Slot { label: string; savedAt: number; state: GameState }

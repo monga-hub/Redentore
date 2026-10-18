@@ -40,7 +40,7 @@ npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
 npm run balance  # banco di bilanciamento headless: un bot gioca la missione (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino e borsa
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -69,6 +69,7 @@ caricata parte senza intro.
 | 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato). Si parte con Caduta d'ossa (1), Nube di peste (2), Preghiera di suffragio (3) e la pozione (9); le altre arrivano coi livelli |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
+| B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,

@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "balance": "node scripts/balance.ts",
-    "check": "node scripts/check-walkable.ts && node scripts/check-abilities.ts && node scripts/check-spells.ts && node scripts/check-enemies.ts && node scripts/check-target.ts && node scripts/check-save.ts && node scripts/check-levels.ts && node scripts/check-intro.ts && node scripts/check-quest.ts"
+    "check": "node scripts/check-walkable.ts && node scripts/check-abilities.ts && node scripts/check-spells.ts && node scripts/check-enemies.ts && node scripts/check-target.ts && node scripts/check-save.ts && node scripts/check-levels.ts && node scripts/check-intro.ts && node scripts/check-quest.ts && node scripts/check-loot.ts"
   },
   "dependencies": {
     "three": "^0.186.1"

@@ -64,7 +64,7 @@ export class WorldMap {
     this.el.setAttribute('role', 'dialog');
     this.el.setAttribute('aria-modal', 'true');
     this.el.setAttribute('aria-label', 'Mappa');
-    this.el.innerHTML = `<div class="panel"><h2>Redentore · Giudecca</h2>
+    this.el.innerHTML = `<div class="panel"><h2>Giudecca · Redentore e Zitelle</h2>
       <button class="x" aria-label="Chiudi mappa">✕</button><canvas></canvas>
       <div class="foot"><span class="place"></span><span class="found"></span><span><i>M · Esc · </i>tocca per chiudere</span></div></div>`;
     this.canvas = this.el.querySelector('canvas')!;

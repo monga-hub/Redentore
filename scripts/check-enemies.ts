@@ -8,7 +8,8 @@
 import { buildLevel } from '../src/level/index.ts';
 import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
-import { CHOIR_DOOR } from '../src/quest/progress.ts';
+import { ANDITO, CHOIR_DOOR, CROCE } from '../src/quest/progress.ts';
+import { GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, VELO, spawnLevel2 } from '../src/enemies/zitelle.ts';
 import { FRIAR, GROUPS, MORE, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, spawnApiary, cloisterPlan, fly, gardenPlan, lagoonPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
@@ -420,4 +421,79 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   for (let t = 0; t < 600; t += 0.5) casterThink(q, pl, fl, 0.5, bolts);
   if (q.state !== 'dead') fail('apiary: the giant got up again');
   console.log(`apiary ok (${sting} sting + ${swarm} swarm, workers ${worker})`);
+}
+
+// Level 2 (enemies/zitelle.ts): every pack stands on open ground inside its bounds and the real level's walls; the
+// gondolieri chase on in sight (no bolts to lose); lace lines cut only who stays on them; the Governatrice calls two
+// girls at each of her first two thresholds, her veil holds while they live, and her fuso sweeps who stands still.
+{
+  const level = buildLevel();
+  const l2 = spawnLevel2(level.world);
+  for (const m of l2.all) {
+    const b = m.bounds, at = `${m.kind === GOVERNATRICE ? 'Governatrice' : 'level 2'} spot (${m.x}, ${m.z})`;
+    if (m.x < b.x0 || m.x > b.x1 || m.z < b.z0 || m.z > b.z1) fail(`${at} outside its bounds`);
+    if (level.world.blocked(m.x, m.z, m.y, m.kind.radius)) fail(`${at} inside a wall`);
+  }
+  if (l2.all.filter((m) => m.kind === MAESTRA).length !== 1 || l2.boss.wards?.length !== 4 || l2.wards.some((w) => w.kind !== VELO)) fail('level 2: one Maestra, four wards for the Governatrice');
+  for (const [x, z] of [[ANDITO.x, ANDITO.z], [CROCE.x, CROCE.z]]) for (const m of l2.all) if (m.kind.aggro && Math.hypot(m.x - x, m.z - z) < m.kind.aggro + 1 && Math.abs(m.y - level.world.standHeight(x, z)) < 2.5) fail(`checkpoint (${x}, ${z}) in reach of a ${m.kind.hp} hp mob at (${m.x}, ${m.z})`);
+
+  const fl = new World();
+  fl.add(0, 0, 100, 100, -1, 0);
+  const B = { x0: -40, x1: 40, z0: -40, z1: 40 }, bolts: Bolt[] = [];
+  // A gondoliere in sight never gives up the chase, and never casts.
+  const [g] = spawnPriests(fl, [[[0, 0, 0]]], [B], [[GONDOLIERE]])[0];
+  const pg: Target = { x: 0, y: 0, z: -5 };
+  let oar = 0;
+  for (let t = 0; t < GONDOLIERE.blind * 3; t += 1 / 60) { oar += casterThink(g, pg, fl, 1 / 60, bolts); pg.x = Math.sin(t) * 3; }
+  if (g.state === 'evade' || g.state === 'pray' || bolts.length || !oar) fail(`gondoliere: ${g.state}, ${bolts.length} bolts, ${oar} oar damage`);
+
+  // Lace lines: the Maestra's cut a player who stays, spare one who steps aside.
+  for (const stay of [true, false]) {
+    const [m] = spawnPriests(fl, [[[0, 0, 0]]], [B], [[MAESTRA]])[0];
+    const pm: Target = { x: 0, y: 0, z: -12 };
+    casterHurt(m, 1);
+    let cut = 0, laid = false;
+    for (let t = 0; t < MAESTRA.lines!.every + MAESTRA.lines!.cast + 1; t += 1 / 60) {
+      const was = m.lines.length;
+      const d = casterThink(m, pm, fl, 1 / 60, bolts);
+      m.x = 0; m.z = 0; // held off: only her lines can land
+      if (m.state === 'swing' || m.state === 'cast') { m.state = 'chase'; m.t = 0; }
+      if (m.lines.length < was) cut += d;
+      if (m.lines.length) { laid = true; if (!stay) pm.x = 3; }
+    }
+    bolts.length = 0;
+    if (!laid || (stay ? cut < MAESTRA.lines!.damage : cut > 0)) fail(`lace lines: ${stay ? 'stayed' : 'stepped aside'}, ${cut} damage`);
+  }
+
+  // The Governatrice: wards called at 70% and 40%, the veil while they live, the fuso under 25%.
+  const gov = spawnLevel2(fl), boss = gov.boss, pb: Target = { x: GOV_AT.x, y: 0, z: GOV_AT.z - 6 };
+  for (const m of [boss, ...gov.wards]) { m.bounds = { x0: 200, x1: 280, z0: -50, z1: 30 }; m.y = 0; }
+  casterHurt(boss, 1);
+  const step = (s: number) => { for (let t = 0; t < s; t += 1 / 60) { casterThink(boss, pb, fl, 1 / 60, bolts); for (const w of gov.wards) casterThink(w, pb, fl, 1 / 60, bolts); } bolts.length = 0; };
+  step(0.5);
+  if (gov.wards.some((w) => w.state !== 'pray')) fail('governatrice: wards up before 70%');
+  boss.hp = GOVERNATRICE.hp * 0.69;
+  step(0.5);
+  const up = gov.wards.filter((w) => w.state !== 'pray');
+  if (up.length !== 2) fail(`governatrice: ${up.length} wards called at 70%`);
+  const h0 = boss.hp;
+  casterHurt(boss, 1000);
+  if (Math.abs(h0 - boss.hp - 1000 * (1 - GOVERNATRICE.veil!.cut)) > 1e-6) fail(`governatrice: the veil let ${h0 - boss.hp} of 1000 through`);
+  for (const w of up) casterHurt(w, w.kind.hp);
+  const h1 = boss.hp;
+  casterHurt(boss, 1000);
+  if (h1 - boss.hp !== 1000) fail('governatrice: veiled with her wards dead');
+  boss.hp = GOVERNATRICE.hp * 0.39;
+  step(0.5);
+  if (gov.wards.filter((w) => w.state !== 'pray' && w.state !== 'dead').length !== 2) fail('governatrice: two more wards not called at 40%');
+  for (const w of gov.wards) killAll([w]);
+  boss.hp = GOVERNATRICE.hp * 0.24;
+  boss.spinCd = 0;
+  let spun = 0, sawSpin = false;
+  for (let t = 0; t < GOVERNATRICE.spin!.time + 2; t += 1 / 60) {
+    const d = casterThink(boss, pb, fl, 1 / 60, bolts);
+    if (boss.state === 'spin') { sawSpin = true; spun += d; boss.x = GOV_AT.x; boss.z = GOV_AT.z; }
+  }
+  if (!sawSpin || spun < GOVERNATRICE.spin!.dps * 0.3) fail(`governatrice: the fuso ${sawSpin ? `swept ${spun.toFixed(0)}` : 'never spun'} on a player standing in it`);
+  console.log(`level 2 ok (${l2.all.length} casters, lines cut ${MAESTRA.lines!.damage}, veil ${GOVERNATRICE.veil!.cut * 100}%, fuso ${spun.toFixed(0)} on one who stood)`);
 }

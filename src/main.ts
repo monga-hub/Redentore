@@ -298,6 +298,19 @@ function openMap(): void {
   worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal() });
 }
 const pressed = (code: string) => input.pressed(code);
+/**
+ * Zone streaming, by the hero's x: past the Ponte de la Croce the Redentore's complex and its dead are skipped
+ * (frustum culling already drops their draw calls, this spares the scene walk: ~1 ms a frame on a laptop, more on
+ * a phone), and level 2 west of it. ponytail: two halves on one axis; per-zone bounds if a third level comes.
+ */
+const LEVEL1 = ['chiesa', 'convento', 'orto', 'corpo-nord', 'giardini', 'laguna', 'calle'].map((z) => level.zones.get(z)!), LEVEL2 = ['giudecca', 'zitelle'].map((z) => level.zones.get(z)!);
+function stream(x: number): void {
+  const one = x < 100, two = x > 50;
+  for (const g of LEVEL1) g.visible = one;
+  friars.root.visible = priests.root.visible = bees.root.visible = one;
+  for (const g of LEVEL2) g.visible = two;
+  zitelle.root.visible = two;
+}
 
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
@@ -420,6 +433,7 @@ renderer.setAnimationLoop(() => {
   kit.vfx.applyShake(cam.camera, dt); // big hits shake the lens; trails face it
   occlusion.update(dt, player.pos, cam.camera);
   targeting.update(dt, player.pos);
+  stream(player.pos.x);
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);

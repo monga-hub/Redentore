@@ -1,7 +1,8 @@
 # redentore-dungeon
 
 Dungeon 3D esplorabile (stile WoW / Scarlet Monastery) basato sulla Chiesa del
-Redentore + Orto dei Frati, Giudecca, Venezia.
+Redentore + Orto dei Frati, Giudecca, Venezia; il livello 2 prosegue lungo la fondamenta
+fino alla chiesa delle Zitelle.
 
 - Three.js nel browser, build Vite.
 - Terza persona, controlli WASD.
@@ -29,6 +30,31 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
   Reverendissimo, tutti i nemici cadono e il portone si apre: uscire sulla fondamenta chiude la
   missione. L'obiettivo corrente sta sotto la minimappa (a sinistra su touch); Fra' Zuane ha una
   battuta per ogni fase e nessuno può attaccarlo.
+- **Livello 2, "La dote delle Zitelle"**: uscito dal portone, si torna da Fra' Zuane (ricompensa: 150
+  esperienza e 80 oro); le sue catene ora sono di merletto, e la seconda missione racconta l'altra metà del voto:
+  la Governatrice della Pia Casa delle Zitelle cuciva i morti contati dal Reverendissimo in un velo per la
+  Madonna della Presentazione. Accettata la missione, le catene spettrali sul Ponte de la Croce cadono e la
+  fondamenta della Giudecca si apre verso levante (`src/level/zones/giudecca.ts`): rio de la Croce e il suo
+  ponte a gradini, Fondamenta de la Croce con sotoportego e campiello, il Campo de Santa Croce davanti alla chiesa
+  chiusa, il rio e il ponte del Squero, lo squero con la gondola sui cavalletti, la Casa dei Tre Oci; oltre il
+  canale Zattere, Salute e San Giorgio. Le Zitelle (`src/level/zones/zitelle.ts`): facciata bianca a due ordini
+  col timpano e il finestrone termale, due campaniletti, cupola con lanterna; dentro l'aula quadrata ad angoli
+  smussati sotto la cupola, i coretti con le grate, l'altar maggiore in un presbiterio a botte; attorno l'ospizio
+  a ferro di cavallo (portineria, refettorio, sala del merletto, infermeria, dormitorio), il cortile col pozzo
+  dietro l'abside e l'orto. Nemici (`src/enemies/zitelle.ts`, modelli Meshy): gondolieri annegati (remo, solo
+  mischia) e codeghe, i portatori di lanterna della notte veneziana (fuochi fatui) lungo la fondamenta; zitelle
+  spettrali con la rocca (fili) nell'ospizio; élite il Gastaldo dei gondolieri nello squero (vortice del remo,
+  fuori strada) e la Maestra del merletto nella sala del merletto (forbici, linee di merletto a terra: un passo
+  di lato e le eviti), che porta la chiave della chiesa: la porta si apre dal cortile, dietro l'altare. Il boss,
+  la Governatrice, sotto la cupola: linee di merletto attraverso il giocatore, al 70% e al 40% chiama due zitelle
+  ciascuna volta che le tengono il velo (finché vivono incassa l'80% in meno), sotto il 25% il fuso (fili
+  incrociati che le girano attorno: si corre con loro, negli spazi), dopo 5 minuti e mezzo ogni colpo triplica.
+  Morta lei, tutti i suoi cadono e il portone delle Zitelle si apre sul sagrato; Fra' Zuane chiude la missione
+  (300 esperienza, 200 oro) e accenna a chi ha teso il filo. Bottino di livello 2: pezzi verdi, blu e nove epici
+  nuovi con livello oggetto più alto (Velo della Governatrice, Scettro della Governatrice...), più oro; Fra' Bortolo
+  li vende una volta accettata la missione e dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
+  Croce, poi nell'andito dietro l'altare. Il salvataggio tiene la nuova missione (i salvataggi vecchi si caricano:
+  a livello 1 finito si riparte dal rapporto a Fra' Zuane, la nebbia di guerra resta al suo posto).
 - Nella serra dell'orto Fra' Bortolo, il fantasma dello speziale (punto esclamativo dorato finché non
   gli si parla), racconta l'antefatto che l'intro accenna: le fosse dell'orto, il conto del
   Reverendissimo, la ruta che ha lasciato al Risorto il suo nome. Una volta per partita congeda con la
@@ -53,8 +79,8 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e il boss da solo ai livelli 1/6/8/9, tabella per zona; il bot indossa il bottino migliore e vende il resto, il boss da solo in set iniziale, tipico, con epici comprati o tutto epico
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2 (vedi scripts/balance.ts)
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
 npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, CHROME=... per il binario)
 ```
 
@@ -289,6 +315,8 @@ src/
                              e nova; spawn della chiesa, della laguna e dell'apiario, `killAll` alla vittoria) (preghiera, aggro con linea di vista, lancio
                              con cooldown, dardi a ricerca, indietreggiare restando nel
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
+  enemies/zitelle.ts         livello 2: gondolieri, codeghe, zitelle, il Gastaldo, la Maestra, la Governatrice (velo,
+                             linee di merletto, fuso) e i loro gruppi; il cervello è quello di caster.ts
   enemies/bees.ts            ape gigante e operaie: un calabrone Meshy statico animato in codice (volo
                              librato, ali che battono nel vertex shader, picchiata col pungiglione,
                              sciame velenoso, sussulto ai colpi, caduta da morta); IA: caster.ts `APE`
@@ -330,6 +358,8 @@ src/
                              fasci di luna, baldacchino, tappeto, stendardi, lampadari
     convento.ts              ingresso, cortile degli ulivi, chiostrino, corridoio, 3 chiostri
     orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est
+    giudecca.ts              livello 2: fondamenta fino alle Zitelle, rii e ponti, campo, squero, Tre Oci, skyline
+    zitelle.ts               livello 2: chiesa delle Zitelle, ospizio, cortile, orto
     nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest

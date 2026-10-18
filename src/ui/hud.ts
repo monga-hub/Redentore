@@ -1,5 +1,7 @@
+import { playSfx } from '../audio/engine.ts';
 import type { PlayerStats } from '../player/stats.ts';
-import { ICONS } from './icons.ts';
+
+const CHARGE = 0.8; // share of a level where the XP bar starts to crackle
 
 /** Area name banner, player frame (portrait, health and mana bars) and damage text. Plain DOM, styled in index.html. */
 export class Hud {
@@ -11,9 +13,11 @@ export class Hud {
   private lv = document.querySelector<HTMLElement>('#unit .lv')!;
   private lastLv = 0;
   private lastHp = -1;
+  private charged = false;
 
   constructor() {
-    document.querySelector('#unit .portrait')!.innerHTML = ICONS.will;
+    document.querySelector('#unit .portrait')!.innerHTML = `<img alt="" src="${import.meta.env.BASE_URL}models/reietto.webp">`;
+    this.xp.el.addEventListener('animationend', (e) => { if (e.animationName === 'xpburst') this.xp.el.classList.remove('up'); }); // drops the frame back under the level-up veil
   }
 
   setArea(label: string | undefined): void {
@@ -26,14 +30,25 @@ export class Hud {
     if (text) this.zone.classList.add('show');
   }
 
-  /** Level badge and the XP bar into the next level (full at the cap); the badge pops on a level-up. */
+  /** Level badge and the XP bar into the next level (full at the cap); the badge pops on a level-up.
+   *  From CHARGE of the level the bar crackles, harder towards the top (`--charge` 0..1), with a zap
+   *  once on the way in; the level-up itself bursts on it. */
   setLevel(lv: number, into: number, next: number): void {
     if (next) this.xp.set(into, next);
     else this.xp.set(1, 1);
+    const k = next ? Math.max(0, (into / next - CHARGE) / (1 - CHARGE)) : 0, on = next > 0 && into >= next * CHARGE;
+    this.xp.el.style.setProperty('--charge', k.toFixed(2));
+    if (on !== this.charged) {
+      this.charged = on;
+      this.xp.el.classList.toggle('charged', on);
+      if (on && lv === this.lastLv) playSfx('zap', null, { ui: true, gain: 0.5, rate: 1.4 });
+    }
     if (lv === this.lastLv) return;
     this.lv.textContent = String(lv);
     this.lv.title = `Livello ${lv}`;
-    if (this.lastLv) { this.lv.classList.remove('up'); void this.lv.offsetWidth; this.lv.classList.add('up'); }
+    if (this.lastLv) {
+      for (const el of [this.lv, this.xp.el]) { el.classList.remove('up'); void el.offsetWidth; el.classList.add('up'); }
+    }
     this.lastLv = lv;
   }
 

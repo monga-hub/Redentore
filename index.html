@@ -32,7 +32,7 @@
         position: relative; z-index: 1; flex: none; width: 62px; height: 62px; border-radius: 50%; overflow: hidden;
         background: #000; border: 2px solid #c9a45c; box-shadow: 0 0 0 2px #000, 0 3px 10px rgba(0,0,0,.7);
       }
-      #unit .portrait svg { display: block; width: 100%; height: 100%; }
+      #unit .portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
       #unit .frame {
         width: 190px; margin-left: -16px; padding: 4px 8px 6px 22px;
         background: linear-gradient(rgba(34,25,16,.88), rgba(10,7,5,.88)); border: 1px solid #6b5332; border-left: 0;
@@ -65,6 +65,28 @@
       .res.xp .fill { background: linear-gradient(#e2b8ff, #9a4ae0 55%, #4a1080); }
       .res.xp .lag { background: #f3e2ff; }
       .res.xp span { display: none; }
+      /* Near the level (src/ui/hud.ts): from 80% the bar swells, glows and crackles, harder and faster as --charge
+         climbs to 1; the level-up itself bursts it, lifted over the level-up window's veil while it lasts. */
+      .res.xp { --glow: 205,140,255; transform-origin: 0 50%; }
+      .res.xp.charged { overflow: visible; transform: scaleY(calc(1 + var(--charge) * .7));
+        animation: xpcharge calc(1s - var(--charge) * .7s) ease-in-out infinite alternate; }
+      @keyframes xpcharge {
+        from { box-shadow: inset 0 1px 4px #000, 0 0 0 1px rgba(var(--glow),.45), 0 0 calc(2px + var(--charge) * 6px) rgba(var(--glow),.45); }
+        to { box-shadow: inset 0 1px 4px #000, 0 0 0 1px rgba(var(--glow),.9), 0 0 calc(6px + var(--charge) * 18px) calc(1px + var(--charge) * 4px) rgba(var(--glow),.95); }
+      }
+      .res.xp.charged .fill::before { content: ''; position: absolute; inset: 0; opacity: calc(.35 + var(--charge) * .65);
+        background: repeating-linear-gradient(110deg, transparent 0 5px, rgba(255,255,255,.95) 6px, transparent 7px 13px); animation: xpcrackle .24s steps(3) infinite; }
+      .res.xp.charged .fill::after { content: ''; position: absolute; right: -4px; top: -4px; bottom: -4px; width: 8px; border-radius: 50%;
+        background: radial-gradient(#fff, rgba(var(--glow),.9) 45%, transparent 72%); animation: xpflick .14s steps(2) infinite; }
+      .res.xp.charged::before { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; pointer-events: none; opacity: var(--charge);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='17'%3E%3Cpath d='M0 9 L6 3 L11 10 L17 5 L22 13 L29 2 L34 11 L40 6 L46 14 L52 4 L60 9' fill='none' stroke='white' stroke-width='1.2' stroke-linejoin='bevel'/%3E%3C/svg%3E") 0 50% / 60px 100% repeat-x;
+        filter: drop-shadow(0 0 2px rgb(var(--glow))); animation: xpbolt .3s steps(4) infinite; }
+      @keyframes xpcrackle { to { background-position: 39px 0; } }
+      @keyframes xpflick { 50% { opacity: .35; transform: scale(.7); } }
+      @keyframes xpbolt { 0% { background-position: 0 50%; } 25% { background-position: 23px 50%; opacity: 0; } 50% { background-position: 41px 50%; } 75% { background-position: 13px 50%; transform: scaleY(-1); } }
+      .res.xp.up { animation: xpburst .9s ease-out; }
+      @keyframes xpburst { 0%, 15% { transform: scaleY(3); filter: brightness(2.4); box-shadow: 0 0 0 1px #fff, 0 0 26px 9px rgba(var(--glow),1); } }
+      #unit:has(.xp.up) { z-index: 20; }
       #unit .lv {
         position: absolute; left: 42px; top: 44px; z-index: 2; min-width: 24px; height: 24px; padding: 0 3px; box-sizing: border-box; border-radius: 12px;
         background: radial-gradient(#4a3418, #120a04); border: 2px solid #c9a45c; box-shadow: 0 0 0 1px #000, 0 2px 6px #000;
@@ -301,7 +323,7 @@
       body.diablo .res.mp { height: 6px; margin-top: 5px; }
       body.diablo .res.mp span { display: none; }
       body.diablo .res.mp .fill { background: linear-gradient(#5a9cff, #1440b0); }
-      body.diablo .res.xp { height: 4px; margin-top: 4px; }
+      body.diablo .res.xp { --glow: 255,150,50; height: 4px; margin-top: 4px; }
       body.diablo .res.xp .fill { background: linear-gradient(#ffd27a, #b07a10); }
       body.diablo #unit .lv { left: 46px; top: 48px; border-radius: 2px; border-color: #77705f; background: radial-gradient(#2b2520, #0b0908); color: #ff8a5a; }
       body.diablo .res .lag { background: #ffe0b8; }

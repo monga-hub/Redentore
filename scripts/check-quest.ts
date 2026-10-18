@@ -1,11 +1,12 @@
 // Quest flow check (`npm run check`): Fra' Zuane's quest from first word to the fondamenta, on the
 // real level's colliders. He is reachable from the spawn and talks at every stage; the chest stays
 // sealed until his quest is accepted; then key -> grate -> boss -> out of the portone, the stage
-// and the tracker's objective following each step.
+// and the tracker's objective following each step. Fra' Bortolo in the serra: reachable in peace, blesses once.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { CHEST, NPC, Quest, type Stage } from '../src/quest/progress.ts';
-import { OBJECTIVE, TALK } from '../src/quest/dialogue.ts';
+import { BLESSING, CHEST, NPC, Quest, SPEZIALE, type Stage } from '../src/quest/progress.ts';
+import { OBJECTIVE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, TALK } from '../src/quest/dialogue.ts';
+import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
 
 let failed = 0;
 const fail = (why: string) => { failed++; console.error(`FAIL ${why}`); };
@@ -56,7 +57,19 @@ if (!quest.update(feet(0, 12))) fail('walking out of the portone did not end the
 want('done');
 if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once it is over");
 
-console.log(`quest ok: talk -> key -> grate -> boss -> leave -> done`);
+// Fra' Bortolo in the serra: out of every friar's pull, talks at any time, blesses once.
+const bortolo = feet(SPEZIALE.x, SPEZIALE.z - 1.2);
+if (level.world.blocked(bortolo.x, bortolo.z, bortolo.y)) fail("no room to stand by Fra' Bortolo");
+if (quest.prompt(bortolo)?.talk !== 'speziale') fail("no 'talk' prompt next to Fra' Bortolo");
+for (const [x, z] of [...GROUPS, ...MORE].flat()) if (Math.hypot(x - bortolo.x, z - bortolo.z) < FRIAR.aggro + 1) fail(`a friar at (${x}, ${z}) hoes within reach of Fra' Bortolo`);
+for (const t of [SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
+if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('blessed before talking to Fra\' Bortolo');
+if (!quest.bless() || quest.castMul !== BLESSING.cast || quest.dmgMul !== BLESSING.dmg) fail('the blessing does not quicken casts and harden blows');
+if (quest.bless()) fail('the blessing was given twice');
+quest.blessLeft = 0;
+if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('the blessing outlived its time');
+
+console.log(`quest ok: talk -> key -> grate -> boss -> leave -> done, Fra' Bortolo blesses once`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);
   process.exit(1);

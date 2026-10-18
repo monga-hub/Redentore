@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { loadModel, stand } from '../core/models.ts';
-import { NPC, type Stage } from './progress.ts';
 
 // Fra' Zuane on the fondamenta (see quest/dialogue.ts for who he is): a Meshy ghost of an old
 // Capuchin porter, rigged with Meshy and animated from its library. He breathes in place, turns
 // to whoever talks to him and talks with his hands, and wears WoW's gold "!" while his quest is
 // on offer. Not a mob: no collider beyond his own small box (quest/progress.ts), no health, and
-// nothing in the game targets or hurts him.
+// nothing in the game targets or hurts him. Fra' Bortolo in the serra is the same ghost glowing
+// green: `Npc` takes where it stands and the tint.
 
 const HEIGHT = 1.75;
 const FADE = 0.4; // s between idle and talking
 const TURN = 4; // rad/s toward the player while talking
-const GHOST = new THREE.Color(0x8fdcff); // the self-glow's tint
+const GHOST = 0x8fdcff; // Fra' Zuane's self-glow
 
 /** The gold "!" over a quest giver's head, drawn on a canvas. */
 function marker(): THREE.Sprite {
@@ -34,8 +34,12 @@ function marker(): THREE.Sprite {
   return s;
 }
 
+/** Where an NPC stands and faces at rest. */
+export interface Spot { x: number; z: number; yaw: number }
+
 export class Npc {
   readonly root = new THREE.Group();
+  private at: Spot;
   private mixer?: THREE.AnimationMixer;
   private idle?: THREE.AnimationAction;
   private talks: THREE.AnimationAction[] = [];
@@ -44,9 +48,11 @@ export class Npc {
   private time = 0;
   talking = false;
 
-  constructor() {
-    this.root.position.set(NPC.x, 0, NPC.z);
-    this.root.rotation.y = NPC.yaw;
+  /** `tint`: the colour his body glows. */
+  constructor(at: Spot, tint = GHOST) {
+    this.at = at;
+    this.root.position.set(at.x, 0, at.z);
+    this.root.rotation.y = at.yaw;
     this.mark.position.y = HEIGHT + 0.55;
     this.root.add(this.mark);
     loadModel('zuane.glb').then((gltf) => {
@@ -55,7 +61,7 @@ export class Npc {
       model.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
         const m = o.material as THREE.MeshStandardMaterial;
-        m.emissive.copy(GHOST); // the colour map glows pale cyan: a ghost at night
+        m.emissive.setHex(tint); // the colour map glows: a ghost at night
         m.emissiveIntensity = 1.8;
       });
       this.root.add(model);
@@ -74,12 +80,13 @@ export class Npc {
     this.current = a;
   }
 
-  /** `player`: the hero's feet; `stage` decides the "!". */
-  update(dt: number, player: THREE.Vector3, stage: Stage): void {
+  /** `player`: the hero's feet; `offer`: he has something for the hero, the "!" is up. */
+  update(dt: number, player: THREE.Vector3, offer: boolean): void {
+    const at = this.at;
     this.time += dt;
-    this.mark.visible = stage === 'talk' && !this.talking;
+    this.mark.visible = offer && !this.talking;
     this.mark.position.y = HEIGHT + 0.55 + Math.sin(this.time * 2.5) * 0.06;
-    const want = this.talking ? Math.atan2(-(player.x - NPC.x), -(player.z - NPC.z)) : NPC.yaw;
+    const want = this.talking ? Math.atan2(-(player.x - at.x), -(player.z - at.z)) : at.yaw;
     const d = Math.atan2(Math.sin(want - this.root.rotation.y), Math.cos(want - this.root.rotation.y));
     this.root.rotation.y += Math.sign(d) * Math.min(Math.abs(d), TURN * dt);
     if (!this.mixer || !this.idle) return;

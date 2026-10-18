@@ -95,6 +95,8 @@ export class AbilitySystem<C extends Caster = Caster> {
   /** Charge gained per cast ×; after a special the bar restarts at `chargeAfter` (level-up cards). */
   chargeMul = 1;
   chargeAfter = 0;
+  /** Cast times × (Fra' Bortolo's blessing); channels keep their length. */
+  castMul = 1;
   /** What each bar slot shows: its ability once owned. The player rearranges it by dragging (`swap`). */
   readonly slots: (Ability<C> | undefined)[];
   private bar: (string | null)[];
@@ -144,7 +146,7 @@ export class AbilitySystem<C extends Caster = Caster> {
 
     if (!a.offGcd) this.gcds.set(a.school ?? '', GCD);
     if (a.cast || a.channel) {
-      const total = a.cast ?? a.channel!.duration;
+      const total = a.cast ? a.cast * this.castMul : a.channel!.duration;
       this.casting = { ability: a, t: 0, total, channel: !a.cast, ticks: 0, pushed: 0 };
       if (a.channel) this.start(a); // channels start their cooldown at once
     } else {

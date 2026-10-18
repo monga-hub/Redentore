@@ -49,13 +49,23 @@ export const CHOIR_DOOR = { x: 0, z: -61, yaw: Math.PI } as const;
 /** Fra' Zuane, chained to the fondamenta a few steps ahead and right of the spawn, turned toward it. */
 export const NPC = { x: 3, z: 12.5, yaw: Math.atan2(-(SPAWN.x - 3), -(SPAWN.z - 12.5)), r: 0.35, name: "Fra' Zuane" } as const;
 
+/**
+ * Fra' Bortolo, the speziale's ghost, at the back of the serra (zones/orto.ts: x -5..3, z -91..-86,
+ * its door at x -1 on the orto side) between the potting benches, facing the door. Out of every
+ * friar's pull (the nearest hoes 11 m off, behind the glass), so a talk with him is never a fight.
+ */
+export const SPEZIALE = { x: -0.6, z: -87.2, yaw: 0, r: 0.35, name: "Fra' Bortolo" } as const;
+
+/** His infusion of rue, once a run: casts this much quicker and every blow this much harder, for `time` s. */
+export const BLESSING = { name: 'Benedizione della serra', time: 180, cast: 0.8, dmg: 1.1 } as const;
+
 /** z past which a player is back out on the fondamenta (the foot of the scalinata). */
 const OUTSIDE = 10;
 
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string; talk?: true }
+export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' }
 
 export class Quest {
   accepted = false; // Fra' Zuane's quest taken
@@ -63,6 +73,8 @@ export class Quest {
   chestOpen = false;
   bossDead = false;
   out = false; // back on the fondamenta after the boss
+  blessed = false; // Fra' Bortolo's blessing taken (once a run)
+  blessLeft = 0; // s of it still running
   readonly gates: Gate[];
   private world: World;
 
@@ -76,6 +88,7 @@ export class Quest {
     });
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
     world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
+    world.add(SPEZIALE.x, SPEZIALE.z, SPEZIALE.r, SPEZIALE.r, 0, 1.8);
   }
 
   get stage(): Stage {
@@ -115,6 +128,18 @@ export class Quest {
     for (const g of this.gates) if (g.needs === 'boss') this.open(g);
   }
 
+  /** Fra' Bortolo's blessing, the first time only. */
+  bless(): boolean {
+    if (this.blessed) return false;
+    this.blessed = true;
+    this.blessLeft = BLESSING.time;
+    return true;
+  }
+
+  /** Cast time × and damage × while the blessing runs. */
+  get castMul(): number { return this.blessLeft > 0 ? BLESSING.cast : 1; }
+  get dmgMul(): number { return this.blessLeft > 0 ? BLESSING.dmg : 1; }
+
   /**
    * Where a fallen player wakes: at the choir door once it is open, so a boss attempt
    * is a short walk away instead of the whole route again; on the fondamenta before that.
@@ -125,7 +150,8 @@ export class Quest {
 
   /** The nearest thing to interact with around the player's feet `p`, if any. */
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
-    if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: true };
+    if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: 'zuane' };
+    if (Math.hypot(p.x - SPEZIALE.x, p.z - SPEZIALE.z) < REACH && p.y < 1.5) return { text: `Parla con ${SPEZIALE.name}`, act: () => '', talk: 'speziale' };
     if (!this.chestOpen && Math.hypot(p.x - CHEST.x, p.z - CHEST.z) < REACH && Math.abs(p.y - CHEST.y) < 1.5) {
       if (!this.accepted) return { text: 'Un sigillo spettrale chiude il baule' };
       return { text: 'Apri il baule', act: () => { this.takeKey(); return 'Hai trovato la chiave del chiostro grande'; } };

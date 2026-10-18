@@ -34,6 +34,15 @@ eq(['a', 'off'], 'cast not done yet');
 step(0.3);
 eq(['a', 'off', 'cast'], 'cast fires when the bar fills');
 
+step(GCD + 10);
+sys.castMul = 0.8; // Fra' Bortolo's blessing: the 2 s cast fills in 1.6 s
+sys.tryCast(3);
+step(1.7);
+eq(['a', 'off', 'cast', 'cast'], 'a blessed cast fills sooner');
+sys.castMul = 1;
+fired.length = 0;
+fired.push('a', 'off', 'cast');
+
 step(GCD);
 sys.tryCast(4); // channel 4 s, tick 2 s
 step(4.1);

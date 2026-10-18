@@ -120,7 +120,7 @@ function wake(): void {
   player.model.revive();
   kit.system.notices.push({ kind: 'error', text: at === SPAWN ? 'Sei caduto. Ti risvegli sulla fondamenta.' : 'Sei caduto. Ti risvegli alla porta del coro.' });
 }
-kit.hurt = (inside, n) => { n *= tune.dmg; friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
+kit.hurt = (inside, n) => { n *= tune.dmg * quest.dmgMul; friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all];
 kit.foes = () => foes;
@@ -261,7 +261,7 @@ renderer.setAnimationLoop(() => {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.05);
   if (menu.paused || worldMap.open || bagPanel.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, dialogue or level-up; drags and wheel turns made meanwhile are dropped
-    if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but Fra' Zuane talks on
+    if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
     input.consume();
     input.endFrame();
@@ -304,6 +304,7 @@ renderer.setAnimationLoop(() => {
   player.frozen = dying > 0;
   const diablo = isDiablo();
   if (!player.frozen) dctl.update(dt, input); // click-to-move steering, click-attack swings
+  kit.system.castMul = quest.castMul; // Fra' Bortolo's blessing, while it lasts
   kit.update(dt, player.frozen ? () => false : pressed); // before the player moves: casts see last frame's motion
   player.update(dt, input, diablo ? dcam.yaw : cam.yaw, !diablo && (input.buttons & 2) !== 0, dctl.steer);
   friars.update(dt, player.pos);

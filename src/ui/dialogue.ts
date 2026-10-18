@@ -1,6 +1,5 @@
-import { DECLINE, QUEST_TITLE, TALK, type Talk } from '../quest/dialogue.ts';
+import { DECLINE, QUEST_TITLE, type Talk } from '../quest/dialogue.ts';
 import { duck, playSfx, unduck } from '../audio/engine.ts';
-import type { Stage } from '../quest/progress.ts';
 
 // The quest-giver's window, WoW style: a parchment page in a gold frame with the speaker's
 // portrait and name, the text typed out, Continua between pages and Accetta / Rifiuta on the
@@ -51,13 +50,16 @@ body.diablo #talk .portrait { border-color: #77705f; }
 
 const CPS = 55; // characters typed per second
 
-export interface Speaker { name: string; portrait: string }
+/** `tint`: a CSS filter on the portrait (Fra' Bortolo is Fra' Zuane's picture turned green). */
+export interface Speaker { name: string; portrait: string; tint?: string }
 
 export class Dialogue {
   private el = document.createElement('div');
   private textEl: HTMLElement;
   private titleEl: HTMLElement;
   private btns: HTMLElement;
+  private whoEl: HTMLElement;
+  private img: HTMLImageElement;
   private talk: Talk = { pages: [] };
   private page = 0;
   private text = '';
@@ -68,15 +70,16 @@ export class Dialogue {
   /** Called when the window closes, after the accept handler if the quest was taken. */
   onClose?: () => void;
 
-  constructor(who: Speaker) {
+  constructor() {
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.append(style);
     this.el.id = 'talk';
     this.el.setAttribute('role', 'dialog');
-    this.el.setAttribute('aria-label', who.name);
-    this.el.innerHTML = `<div class="page"><div class="portrait"><img alt="" src="${who.portrait}"></div>
-      <h3 class="who">${who.name}</h3><p class="title"></p><p class="text" aria-live="polite"></p><div class="btns"></div></div>`;
+    this.el.innerHTML = `<div class="page"><div class="portrait"><img alt=""></div>
+      <h3 class="who"></h3><p class="title"></p><p class="text" aria-live="polite"></p><div class="btns"></div></div>`;
+    this.whoEl = this.el.querySelector('.who')!;
+    this.img = this.el.querySelector('img')!;
     this.textEl = this.el.querySelector('.text')!;
     this.titleEl = this.el.querySelector('.title')!;
     this.btns = this.el.querySelector('.btns')!;
@@ -108,9 +111,13 @@ export class Dialogue {
     return this.typed < this.text.length;
   }
 
-  /** Opens on what the speaker says at `stage`; `accept` runs if the offered quest is taken. */
-  show(stage: Stage, accept: () => void): void {
-    this.talk = TALK[stage];
+  /** Opens on `talk` in `who`'s voice; `accept` runs if the offered quest is taken. */
+  show(who: Speaker, talk: Talk, accept?: () => void): void {
+    this.el.setAttribute('aria-label', who.name);
+    this.whoEl.textContent = who.name;
+    this.img.src = who.portrait;
+    this.img.style.filter = who.tint ?? '';
+    this.talk = talk;
     this.onAccept = accept;
     this.titleEl.textContent = this.talk.offer ? QUEST_TITLE : '';
     this.el.classList.add('show');

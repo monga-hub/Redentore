@@ -28,6 +28,11 @@ Redentore + Orto dei Frati, Giudecca, Venezia.
   Reverendissimo, tutti i nemici cadono e il portone si apre: uscire sulla fondamenta chiude la
   missione. L'obiettivo corrente sta sotto la minimappa (a sinistra su touch); Fra' Zuane ha una
   battuta per ogni fase e nessuno può attaccarlo.
+- Nella serra dell'orto Fra' Bortolo, il fantasma dello speziale (punto esclamativo dorato finché non
+  gli si parla), racconta l'antefatto che l'intro accenna: le fosse dell'orto, il conto del
+  Reverendissimo, la ruta che ha lasciato al Risorto il suo nome. Una volta per partita congeda con la
+  Benedizione della serra: per 3 minuti lanci il 20% più rapidi e +10% ai danni (icona e conto alla
+  rovescia sotto il ritratto). La serra è fuori dalla portata dei frati.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile

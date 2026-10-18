@@ -7,7 +7,7 @@
 import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { CHEST, CHOIR_DOOR, Quest } from '../src/quest/progress.ts';
+import { CHEST, CHOIR_DOOR, Quest, SPEZIALE } from '../src/quest/progress.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
 {
@@ -73,6 +73,7 @@ const locked = (a: { zone: string; label: string }) => a.zone === 'chiesa' || a.
 const start = flood();
 const near = [[0, 0.8], [-0.8, 0], [0.8, 0], [0, -0.8]].some(([dx, dz]) => at(start, CHEST.x + dx * 1.2, CHEST.z + dz * 1.2));
 if (!near) fail('quest      the key chest on the pontile is out of reach');
+if (![[0, -1.2], [0.8, -1], [-0.8, -1]].some(([dx, dz]) => at(start, SPEZIALE.x + dx, SPEZIALE.z + dz))) fail("serra      no room to talk to Fra' Bortolo");
 console.log('-- gates shut (start of the game)');
 const seen = new Set<string>();
 for (const a of level.areas) {

@@ -187,4 +187,9 @@ export const ICONS: Record<string, string> = {
     <path d="M10 44 A22 22 0 0 1 54 44" fill="none" stroke="#2a0a04" stroke-width="8" stroke-linecap="round"/>
     <path d="M10 44 A22 22 0 0 1 48 28" fill="none" stroke="#ff5a2a" stroke-width="5" stroke-linecap="round"/>
     <path d="M32 50 C26 44 28 36 32 30 C34 36 38 38 36 44 C40 42 40 38 40 36 C44 42 40 50 32 50 Z" fill="#ffc85a"/>`),
+  // Fra' Bortolo's blessing: a sprig of rue, the herb of grace, with a gold glint
+  ruta: icon('ruta', '#3a8a3a', '#041206', `
+    <path d="M32 58 C31 44 30 30 34 12" fill="none" stroke="#c8f0a0" stroke-width="2.5"/>
+    <path d="M32 46 C24 46 18 40 18 34 C24 34 30 38 32 46 Z M32 40 C40 40 46 34 46 28 C40 28 34 32 32 40 Z M33 30 C26 29 22 23 23 18 C28 19 32 24 33 30 Z M33 24 C39 22 42 16 41 11 C36 13 33 18 33 24 Z" fill="#58c85a" stroke="#d8ffb8" stroke-width="1.2"/>
+    <circle cx="44" cy="46" r="2.2" fill="#ffd75e"/><path d="M44 40 v12 M38 46 h12" stroke="#ffd75e" stroke-width="1.2" opacity=".8"/>`),
 };

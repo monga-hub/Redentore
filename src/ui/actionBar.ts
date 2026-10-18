@@ -15,6 +15,8 @@ import { ICONS } from './icons.ts';
 // A half-ring over the main button (slot 0, the big one on touch) shows the charge bar,
 // green → yellow → red when full; until then the specials stay greyed out. It shows once a special
 // is on the bar; abilities unlocked by a level-up appear in their slot by themselves.
+// The cooldown sweep shows each slot's school GCD, so after an ice spell only the ice slots sweep;
+// a hit that sets the cast bar back flashes it red as the fill jumps back.
 
 /** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px]. */
 const RING: Record<number, [number, number, number]> = {
@@ -51,6 +53,7 @@ export class ActionBar<C extends Caster> {
   private castHold = 0; // s the finished/interrupted cast bar stays up
   private gauge?: SVGElement;
   private charge = -1;
+  private pushed = 0; // pushbacks of the cast on the bar, seen so far
   private sys: AbilitySystem<C>;
   private ghost?: HTMLElement; // the icon being dragged
 
@@ -128,7 +131,7 @@ export class ActionBar<C extends Caster> {
       const a = s.ability;
       if (!a) return;
       if (pressed(KEYS[i])) this.press(s);
-      const cd = sys.cooldown(a), gcd = a.offGcd ? 0 : sys.gcd;
+      const cd = sys.cooldown(a), gcd = sys.gcd(a); // only the slots of the school just used sweep
       const [left, total] = cd >= gcd ? [cd, a.cooldown] : [gcd, GCD];
       const p = left > 0 ? `${((left / total) * 100).toFixed(1)}%` : '0%';
       if (p !== s.p) s.el.style.setProperty('--p', (s.p = p));
@@ -161,6 +164,8 @@ export class ActionBar<C extends Caster> {
       const cls = `castbar show${c.channel ? ' channel' : ''}`;
       if (this.castbar.className !== cls) this.castbar.className = cls;
       this.castFill.style.width = `${(c.channel ? 1 - p : p) * 100}%`;
+      if (c.pushed > this.pushed) flash(this.castFill, 'pushed'); // a hit set the bar back
+      this.pushed = c.pushed;
       this.castName.textContent = c.ability.name;
       this.castTime.textContent = `${num(c.total - c.t)} s`;
     } else if (this.castHold > 0 && (this.castHold -= dt) <= 0) {

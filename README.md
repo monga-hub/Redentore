@@ -66,7 +66,7 @@ caricata parte senza intro.
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato). Si parte con Caduta d'ossa (1), Nube di peste (2) e la pozione (9); le altre arrivano coi livelli |
+| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato). Si parte con Caduta d'ossa (1), Nube di peste (2), Preghiera di suffragio (3) e la pozione (9); le altre arrivano coi livelli |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
@@ -81,7 +81,7 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
 ## Abilità
 
-Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste e la fiala; ai livelli pari arrivano due
+Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste, Preghiera di suffragio (la cura) e la fiala; ai livelli pari arrivano due
 carte di nuove abilità (la seconda, una volta su due, della stessa scuola di una già posseduta), agli altri
 potenziamenti, passivi e fusioni (`src/player/levels.ts`: 16 abilità da sbloccare, 56 carte di potenziamento di cui 6 fusioni). Le
 abilità sbloccate prendono il primo tasto libero della barra (le prime sette posizioni sono quelle del ventaglio touch).
@@ -93,6 +93,13 @@ abilità sbloccate prendono il primo tasto libero della barra (le prime sette po
 | fuoco | Fuoco fatuo · Rogo dell'eretico (lancio lungo 2,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) |
 | gelo | Dardo di brina (rallenta) · Acquasantiera gelata (congela sul posto chi è vicino) · Stiletto di ghiaccio (triplo su chi è congelato) |
 | fulmine | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) |
+| sacro | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, recupero 25 s) |
+
+Ogni scuola ha il suo tempo di recupero globale (1,5 s): dopo un'abilità di gelo aspettano solo quelle di gelo, mentre
+fuoco, fulmine, ossa o peste partono subito, e sulla barra gira solo la lancetta dei tasti della stessa scuola. Come in
+WoW, ogni colpo subito durante un lancio fa arretrare la barra di 0,5 s (al massimo 3 volte per lancio, la barra
+lampeggia di rosso); i canali come Turbine d'ossa non arretrano. La cura si lancia quindi lontano dalla mischia, o si
+paga in tempo.
 
 Le magie non attraversano i muri (`World.ray` in `src/core/physics.ts`, un test esatto contro i box di collisione,
 porte e grate chiuse comprese): i dardi dell'eroe e dei preti si infrangono sul muro che incontrano, un bersaglio
@@ -230,7 +237,7 @@ src/
   ui/hud.ts                  nome dell'area corrente
   ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,
                              tooltip, errori, testo di combattimento); ui/icons.ts icone SVG
-  abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s, off-GCD,
+  abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s per scuola, off-GCD, pushback,
                              lanci, canalizzate, interruzione al movimento. Nessun DOM/three
   abilities/forsaken.ts      le abilità del Reietto (tabella `ABILITIES`, ordine `BAR`), numeri vivi in `tune`, e i loro effetti
   abilities/grimoire.ts      regole di fuoco, gelo, fulmine e dei colpi nuovi (dardi a ricerca, fiamme a terra, catena,
@@ -295,7 +302,7 @@ src/
     nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest
-scripts/check-abilities.ts   GCD, cooldown, lanci, canali e interruzioni del sistema abilità
+scripts/check-abilities.ts   GCD per scuola, pushback, cooldown, lanci, canali e interruzioni del sistema abilità
 scripts/check-spells.ts      stati dei nemici e loro effetto sulle IA, regole degli incantesimi nuovi e delle fusioni
 scripts/check-levels.ts      curva XP, offerte delle carte su molte partite casuali, fusioni, slot riservati
 scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e carte veri, giocati da un bot sul percorso della missione

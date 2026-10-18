@@ -108,7 +108,7 @@ playerStats.onDeath = () => { // the hero falls; the fight is over at once, the 
   player.model.die();
   dying = FALLEN;
 };
-playerStats.onHurt = (n) => player.model.flinch(n);
+playerStats.onHurt = (n) => { player.model.flinch(n); kit.system.pushback(); }; // a hit sets a cast bar back
 /** ponytail: wake at the last checkpoint at full health; a death screen can come later. */
 function wake(): void {
   const at = quest.checkpoint();

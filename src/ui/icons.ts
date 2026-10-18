@@ -64,6 +64,16 @@ export const ICONS: Record<string, string> = {
     <path d="M32 18 v26 M24 26 h16" stroke="#ffc85a" stroke-width="4"/>
     <path d="M6 58 q26 -8 52 0" stroke="#ffc85a" stroke-width="2" fill="none" opacity=".6"/>`),
   // corked vial of green grave-sap
+  // a votive candle burning with grave-light, a halo of souls round its flame
+  mend: icon('mend', '#2f6a4a', '#03100a', `
+    <circle cx="32" cy="20" r="13" fill="none" stroke="#58ff9a" stroke-width="1.5" opacity=".55"/>
+    <path d="M32 6 C37 13 38 19 32 26 C26 19 27 13 32 6 z" fill="#b8ffd4" stroke="#58ff9a" stroke-width="1.5"/>
+    <path d="M32 14 C34 18 34 21 32 24 C30 21 30 18 32 14 z" fill="#ffffff"/>
+    <path d="M32 26 v4" stroke="#2a1a10" stroke-width="2"/>
+    <path d="M24 30 h16 v22 h-16 z" fill="#e6dcc2" stroke="#efe6d2" stroke-width="1.5"/>
+    <path d="M27 33 v12 q0 3 -2 4" stroke="#bfb293" stroke-width="2" fill="none"/>
+    <path d="M18 52 h28 l-3 6 h-22 z" fill="#5a4630" stroke="#c8a870" stroke-width="1.5"/>
+    <path d="M14 22 q2 -3 5 -2 M50 22 q-2 -3 -5 -2" stroke="#d8ffe4" stroke-width="1.5" fill="none" opacity=".7"/>`),
   potion: icon('potion', '#2a6a3a', '#04120a', `
     <path d="M27 10 h10 v5 h-10 z" fill="#8a6a44" stroke="#e6d2a8" stroke-width="1.5"/>
     <path d="M28 15 v9 C18 28 14 36 16 44 C18 52 25 56 32 56 C39 56 46 52 48 44 C50 36 46 28 36 24 V15 z" fill="#123a1c" stroke="#d8ffe4" stroke-width="2"/>

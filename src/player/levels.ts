@@ -5,7 +5,7 @@
 // Each level offers two cards. Even levels up to 10 offer two new abilities (the specials from level 6; the second
 // card leans to a school already owned, so fire, frost or lightning can make a build);
 // the others a modifier of an owned ability (or a fusion) against a stat passive. The run starts with
-// Caduta d'ossa and Nube di peste, the potion stays as an item. Everything an upgrade changes is a field
+// Caduta d'ossa, Nube di peste and Preghiera di suffragio (the heal), the potion stays as an item. Everything an upgrade changes is a field
 // of `Tune`, replayed from the picks (`tuneOf`), so a save only needs the pick list.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
@@ -47,7 +47,7 @@ export interface Tune {
   fxShatter: boolean; fxStorm: boolean; fxFrostWhirl: boolean; // fusions: fire on frost, lightning through plague, a whirl of frost
 }
 
-export const START = ['fall', 'plague', 'potion'];
+export const START = ['fall', 'plague', 'mend', 'potion'];
 export const SPECIALS = ['strike', 'nova', 'ward'];
 const BASE: Tune = {
   owned: START,
@@ -78,7 +78,7 @@ const pct = (k: number) => `${Math.round(k * 100)}%`;
 
 export type CardKind = 'ability' | 'mod' | 'passive' | 'fusion' | 'filler';
 /** An ability's school: the second card of an ability level leans towards the schools already owned. */
-export type School = 'bone' | 'plague' | 'shadow' | 'fire' | 'frost' | 'storm';
+export type School = 'bone' | 'plague' | 'shadow' | 'fire' | 'frost' | 'storm' | 'holy';
 export interface Card {
   id: string; kind: CardKind; name: string; icon: string; text: string; max: number;
   /** The owned ability a mod belongs to; for an ability card, the one it unlocks (= id). */
@@ -92,8 +92,8 @@ export interface Card {
 
 const special = (_c: (id: string) => number, owns: (a: string) => boolean) => SPECIALS.some(owns);
 const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text: string): Card => ({ id, kind: 'ability', name, icon: id, text, max: 1, of: id, tier, school });
-/** The school of each ability, the starting ones too. */
-export const SCHOOL: Record<string, School> = { fall: 'bone', plague: 'plague' };
+/** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
+export const SCHOOL: Record<string, School> = { fall: 'bone', plague: 'plague', mend: 'holy' };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
   ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
 const passive = (id: string, name: string, text: string, max: number, apply: (t: Tune) => void, needs?: Card['needs']): Card =>

@@ -98,7 +98,7 @@ if (offer(all).map((c) => c.id).join() !== 'linfa') fail(`exhausted offer ${offe
 // Replay: numbers from picks, stacks past max and unknown ids ignored, order-free, survives JSON.
 const t = tuneOf(['dmg', 'dmg', 'dmg', 'dmg', 'hp', 'plague_size', 'junk', 'nova', 'wisp_fast']);
 if (Math.abs(t.dmg - 1.24) > 1e-9 || t.hp !== 1.15 || Math.abs(t.plagueR - 2.75) > 1e-9 || t.wispCast !== 0) fail(`tune ${JSON.stringify(t)}`);
-if (t.owned.join() !== 'fall,plague,potion,nova' || t.fury !== 1) fail('owned / fury');
+if (t.owned.join() !== 'fall,plague,mend,potion,nova' || t.fury !== 1) fail('owned / fury');
 if (tuneOf([]).fury !== 0 || tuneOf([]).owned.join() !== START.join()) fail('the start');
 const picks = ['veil', 'armor', 'strike', 'fury', 'ward', 'ward_long'];
 if (JSON.stringify(tuneOf(JSON.parse(JSON.stringify(picks)))) !== JSON.stringify(tuneOf(picks))) fail('replay after JSON');

@@ -215,6 +215,8 @@
       .castbar.channel .fill { background: linear-gradient(#7ddf64, #2f8f2a); }
       .castbar.done .fill { background: linear-gradient(#8cff7a, #2fa82a); }
       .castbar.fail .fill { background: linear-gradient(#ff5a4a, #9a1a10); }
+      .castbar .fill.pushed { animation: pushed .35s ease-out; } /* a hit set the cast back */
+      @keyframes pushed { 0% { filter: brightness(1.6) hue-rotate(-45deg) saturate(2.5); box-shadow: 0 0 10px 2px #ff4a2a; } 100% { filter: none; box-shadow: none; } }
       .castbar span { position: absolute; top: 0; font: 11px/16px system-ui, sans-serif; color: #fff; text-shadow: 1px 1px 1px #000; }
       .castbar .name { left: 0; right: 0; text-align: center; }
       .castbar .time { right: 6px; }

@@ -238,11 +238,11 @@ export class Director {
     const c = k.system.charge;
     if (c >= CHARGE_MAX && this.charge < CHARGE_MAX) playSfx('charge_ready');
     this.charge = c;
-    // Fuoco fatuo's cast bar (stopped if it breaks) and its end.
+    // Fuoco fatuo's and the prayer's cast bar (stopped if it breaks) and the wisp's end.
     const cast = k.system.casting?.ability.id ?? null;
     if (cast !== this.casting) {
-      if (this.casting === 'wisp' && !(k.wisp > 59)) stop(this.castVoice, 0.15);
-      if (cast === 'wisp') this.castVoice = playSfx('wisp_cast', p);
+      if ((this.casting === 'wisp' && !(k.wisp > 59)) || this.casting === 'mend') stop(this.castVoice, 0.15);
+      if (cast === 'wisp' || cast === 'mend') this.castVoice = playSfx('wisp_cast', p); // the prayer gathers like the wisp
       this.casting = cast;
     }
     if (this.wisp > 0 && k.wisp <= 0) playSfx('wisp_end', k.wispAt);

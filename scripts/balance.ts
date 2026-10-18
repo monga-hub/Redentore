@@ -5,7 +5,7 @@
 // whatever it pulls with one build's picks, and dies and wakes at the checkpoint like the game.
 // Only the looks are gone; the plague clouds and the wisp, which live in the Forsaken class with its
 // three.js, are re-done here in a few lines. The bot is fair but plain: it faces and hits the nearest
-// foe, keeps its cooldowns rolling, drinks under 45% health, and if it dodges it runs straight out of
+// foe, keeps its cooldowns rolling, prays (the heal) under 55% and between pulls, drinks under 45% health, and if it dodges it runs straight out of
 // every telegraphed area (novas, the swarm, the boss's marks) with no finesse, like a phone player.
 //
 // Every run is seeded (the bot's picks and dodges, and Math.random for the mobs), so a run replays exactly.
@@ -279,6 +279,7 @@ class Run {
   swingTrail(): void {}
   blinkHide(): void {}
   beam(): void {}
+  healBurst(): void {}
   summonWisp(): void { const p = this.player.pos; this.wispAt.set(p.x, p.y + 2.2, p.z); this.wisp = 60; }
   strikeTarget(): Mob | undefined {
     if (this.target && this.target.state !== 'dead') return this.target;
@@ -458,6 +459,8 @@ class Run {
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
       const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE);
       if (!this.system.casting) {
+        // the heal: a long cast, pushed back by every hit taken, so only worth it below 55%
+        if (low < 0.55 && this.ready('mend')) { if (this.cast('mend') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.wisp <= 0 && this.ready('wisp') && d > 3) { if (this.cast('wisp') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('plague') && d < 20) this.cast('plague');
         if (this.ready('strike') && d < 30) this.cast('strike');
@@ -481,6 +484,9 @@ class Run {
         if (!wait && d > tune.fallRange - 0.5) this.go(t.x, t.z, 1.5, dt);
         if (d < tune.fallRange) this.cast('fall');
       }
+    } else if (low < 0.85 && !this.system.casting && this.ready('mend')) { // between pulls the prayer heals up
+      this.cast('mend');
+    } else if (this.system.casting?.ability.id === 'mend') { // stand still for it
     } else if (!(this.dodge && ((low < 0.7 && !this.ready('potion')) || (goal.boss && s.mana < s.manaMax * 0.6)))) { // a careful player waits for the potion before the next pull, for mana before the boss
       this.travel(goal.x, goal.z, goal.r, dt);
     }
@@ -501,7 +507,7 @@ class Run {
     }
     separate(this.casters, this.world);
     dmg += fly(this.bolts, p, dt, [], this.world);
-    if (dmg > 0) s.takeDamage(dmg);
+    if (dmg > 0 && s.takeDamage(dmg) > 0) this.system.pushback(); // the game's onHurt
     if (t) {
       const z = this.zone(this.zoneOf(t));
       z.time += dt;

@@ -1,10 +1,14 @@
 // WoW-style ability runner: 12 bar slots on 1..0 - =, per-ability cooldowns, a 1.5 s global
-// cooldown, instant / cast-time / channelled abilities, movement interrupts. No DOM and no
-// three.js here, so `npm run check` exercises it in Node (scripts/check-abilities.ts).
+// cooldown per school (an ice spell holds back the ice ones, not fire or the club), instant /
+// cast-time / channelled abilities, movement interrupts, cast pushback when the hero is hit. No DOM
+// and no three.js here, so `npm run check` exercises it in Node (scripts/check-abilities.ts).
 
 export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
 export const GCD = 1.5;
 export const CHARGE_MAX = 100;
+/** WoW pushback: each hit taken during a cast sets its bar back this many s, at most PUSHBACKS times per cast. */
+export const PUSHBACK = 0.5;
+export const PUSHBACKS = 3;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
 const LAYOUT = 'redentore.bar';
@@ -43,6 +47,8 @@ export interface Ability<C extends Caster = Caster> {
   cast?: number; // cast time in s; absent = instant
   channel?: { duration: number; tick: number };
   offGcd?: boolean;
+  /** The GCD this ability starts and waits for: one per school (absent: the shared '' one). */
+  school?: string;
   /** A channel that goes on while the caster runs (Turbine d'ossa). */
   mobile?: boolean;
   /** A blow of the club (Caduta d'ossa): off the GCD, but the hands are busy while a cast or a channel runs. */
@@ -68,12 +74,15 @@ export interface Casting<C extends Caster> {
   total: number;
   channel: boolean;
   ticks: number;
+  /** Times hits have set the bar back (PUSHBACKS at most). */
+  pushed: number;
 }
 
 export type Notice = { kind: 'error' | 'heal' | 'info' | 'done' | 'fail'; text: string };
 
 export class AbilitySystem<C extends Caster = Caster> {
-  gcd = 0;
+  /** s left of each school's global cooldown. */
+  private gcds = new Map<string, number>();
   casting: Casting<C> | null = null;
   /** UI feedback since the last drain: error messages, combat text, cast bar outcomes. */
   notices: Notice[] = [];
@@ -114,12 +123,17 @@ export class AbilitySystem<C extends Caster = Caster> {
     return this.cds.get(a.id) ?? 0;
   }
 
+  /** s left of the global cooldown `a` waits for: its school's; 0 off the GCD. */
+  gcd(a: Ability<C>): number {
+    return a.offGcd ? 0 : this.gcds.get(a.school ?? '') ?? 0;
+  }
+
   /** Press slot `i` (keyboard, click or tap). Returns true if something started. */
   tryCast(i: number): boolean {
     const a = this.slots[i];
     if (!a) return false;
     if (this.cooldown(a) > 0) return this.fail('Abilità non ancora pronta.');
-    if (!a.offGcd && this.gcd > 0) return false; // WoW stays silent on the GCD
+    if (this.gcd(a) > 0) return false; // WoW stays silent on the GCD
     if (this.casting && (!a.offGcd || a.swing)) return this.fail("Un'altra azione è in corso.");
     if ((a.cast || (a.channel && !a.mobile)) && this.moving) return this.fail('Non puoi farlo mentre ti muovi.');
     if (!this.affordable(a)) return this.fail('Mana insufficiente.');
@@ -128,10 +142,10 @@ export class AbilitySystem<C extends Caster = Caster> {
     const why = a.check?.(this.ctx);
     if (why) return this.fail(why);
 
-    if (!a.offGcd) this.gcd = GCD;
+    if (!a.offGcd) this.gcds.set(a.school ?? '', GCD);
     if (a.cast || a.channel) {
       const total = a.cast ?? a.channel!.duration;
-      this.casting = { ability: a, t: 0, total, channel: !a.cast, ticks: 0 };
+      this.casting = { ability: a, t: 0, total, channel: !a.cast, ticks: 0, pushed: 0 };
       if (a.channel) this.start(a); // channels start their cooldown at once
     } else {
       this.start(a);
@@ -146,7 +160,10 @@ export class AbilitySystem<C extends Caster = Caster> {
     this.moving = dt > 0 && Math.hypot(p.x - this.last.x, p.y - this.last.y, p.z - this.last.z) / dt > MOVING;
     this.last = { x: p.x, y: p.y, z: p.z };
 
-    this.gcd = Math.max(0, this.gcd - dt);
+    for (const [k, t] of this.gcds) {
+      if (t <= dt) this.gcds.delete(k);
+      else this.gcds.set(k, t - dt);
+    }
     for (const [id, t] of this.cds) {
       if (t <= dt) this.cds.delete(id);
       else this.cds.set(id, t - dt);
@@ -210,6 +227,14 @@ export class AbilitySystem<C extends Caster = Caster> {
 
   private fill(): void {
     this.bar.forEach((id, i) => { this.slots[i] = id && this.owned.has(id) ? this.byId.get(id) : undefined; });
+  }
+
+  /** The hero was hit: a cast bar (not a channel) goes back PUSHBACK s, PUSHBACKS times a cast at most. */
+  pushback(): void {
+    const c = this.casting;
+    if (!c || c.channel || c.pushed >= PUSHBACKS) return;
+    c.pushed++;
+    c.t = Math.max(0, c.t - PUSHBACK);
   }
 
   /** Interrupt whatever is being cast (e.g. Esc). */

@@ -1,7 +1,7 @@
-// Headless ability-system check (`npm run check`): GCD, off-GCD, cooldowns, one cast per
-// key press, cast completion and movement interrupts, channel ticks, mana costs, charge bar and
+// Headless ability-system check (`npm run check`): GCD, off-GCD, a GCD per school, cooldowns, one cast per
+// key press, cast completion and movement interrupts, cast pushback from hits, channel ticks, mana costs, charge bar and
 // specials, player stats (Velo spettrale, immunity), dragging slots around the bar and remembering it.
-import { AbilitySystem, CHARGE_MAX, GCD, loadBar, saveBar, type Ability } from '../src/abilities/system.ts';
+import { AbilitySystem, CHARGE_MAX, GCD, PUSHBACK, PUSHBACKS, loadBar, saveBar, type Ability } from '../src/abilities/system.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { plagueSpot } from '../src/abilities/forsaken.ts';
 
@@ -118,7 +118,7 @@ const bar = new AbilitySystem([ab('x'), ab('y')], loadBar(def, mem), ctx);
 fired.length = 0;
 bar.swap(0, 1);
 bar.swap(0, 2); // onto an empty slot: a move
-if (fired.length || bar.gcd || bar.cooldown(bar.slots[1]!)) throw new Error('rearranging the bar must not cast');
+if (fired.length || bar.gcd(bar.slots[1]!) || bar.cooldown(bar.slots[1]!)) throw new Error('rearranging the bar must not cast');
 if (first3(bar.layout()) !== ',x,y') throw new Error(`layout after swaps: ${bar.layout()}`);
 bar.tryCast(2);
 if (fired.join() !== 'y' || bar.cooldown(bar.slots[2]!) !== 10) throw new Error('key 3 must cast y, now in slot 3, and y cools down');
@@ -138,4 +138,36 @@ sighted.tryCast(0);
 visible = false;
 for (let t = 0; t < 1.2; t += 0.1) sighted.update(0.1, () => false);
 if (fired.length || sighted.pool.mana !== mana0 || sighted.cooldown(sighted.slots[0]!) || !sighted.notices.some((n) => n.text === 'Bersaglio non in vista.')) throw new Error('a cast at a hidden target must cost nothing');
+// A GCD per school: an ice spell holds the ice ones back, fire and the shared '' ones go at once.
+const schools = new AbilitySystem([ab('ice1', { school: 'frost' }), ab('ice2', { school: 'frost' }), ab('fire', { school: 'fire' }), ab('none')], ['ice1', 'ice2', 'fire', 'none'], ctx);
+fired.length = 0;
+schools.tryCast(0);
+schools.tryCast(1);
+eq(['ice1'], 'same school waits for its GCD');
+schools.tryCast(2);
+schools.tryCast(3);
+eq(['ice1', 'fire', 'none'], 'other schools are free');
+if (schools.gcd(schools.slots[1]!) !== GCD || schools.gcd(schools.slots[2]!) !== GCD) throw new Error('each school runs its own GCD');
+for (let t = 0; t < GCD + 0.05; t += 0.1) schools.update(0.1, () => false);
+schools.tryCast(1);
+eq(['ice1', 'fire', 'none', 'ice2'], 'school GCD wears off');
+// Pushback: each hit sets a cast back PUSHBACK s, PUSHBACKS times at most; a channel is not set back.
+const push = new AbilitySystem([ab('long', { cast: 2 }), ab('ch', { channel: { duration: 2, tick: 1 }, offGcd: true })], ['long', 'ch'], ctx);
+fired.length = 0;
+push.tryCast(0);
+for (let i = 0; i < 10; i++) push.update(0.1, () => false); // 1 s in
+push.pushback();
+const back = push.casting!.t;
+if (Math.abs(back - (1 - PUSHBACK)) > 1e-6) throw new Error(`pushback: bar at ${back}, want ${1 - PUSHBACK}`);
+for (let i = 0; i < PUSHBACKS + 3; i++) push.pushback();
+if (push.casting!.pushed !== PUSHBACKS || push.casting!.t !== 0) throw new Error(`pushback capped at ${PUSHBACKS}: pushed ${push.casting!.pushed}, bar ${push.casting!.t}`);
+for (let i = 0; i < 19; i++) push.update(0.1, () => false); // 1.9 s of the 2 s bar
+eq([], 'a pushed cast takes longer');
+for (let i = 0; i < 2; i++) push.update(0.1, () => false);
+eq(['long'], 'a pushed cast still lands');
+for (let t = 0; t < 10; t += 0.1) push.update(0.1, () => false);
+push.tryCast(1);
+push.update(0.5, () => false);
+push.pushback();
+if ((push.casting!.t as number) !== 0.5) throw new Error('channels are not set back');
 console.log('abilities ok');

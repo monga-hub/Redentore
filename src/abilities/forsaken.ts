@@ -3,7 +3,7 @@ import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
 import type { World } from '../core/physics.ts';
 import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
-import { START, tuneOf, type Tune } from '../player/levels.ts';
+import { SCHOOL, START, tuneOf, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
@@ -11,7 +11,7 @@ import { Grimoire, type Bolt, type SpellEvent } from './grimoire.ts';
 
 // The Forsaken kit: sixteen abilities and a potion, three of them specials that unlock when the charge
 // bar fills (system.ts): bone, plague and shadow, and fire, frost and lightning (their rules in grimoire.ts). Names are our own; flavour after the undead racials and shadow/plague classes.
-// The run starts with Caduta d'ossa, Nube di peste and the potion; level-ups (player/levels.ts) unlock
+// The run starts with Caduta d'ossa, Nube di peste, Preghiera di suffragio (the long-cast heal) and the potion; level-ups (player/levels.ts) unlock
 // the rest and change the numbers, which every ability reads live from `tune` (tooltips too).
 // Each one has its own clip on the Reietto (player/undead.ts) and layered effects (vfx.ts); a
 // blow's effects land with the clip's blow, `BLOW` s after the press, while the damage stays
@@ -31,6 +31,8 @@ const NOVA_RADIUS = 6; // m, the looks' shock wave
 const BLOW = 0.1; // s from the press to the clip's blow (swings, slams)
 const COMBO = 1.1; // s: a swing this soon after the last one carries the combo on
 const GLOB = 0.28; // s the plague glob flies (cosmetic: the cloud is there at the press)
+/** Preghiera di suffragio: a long prayer for a big heal, so it is cast out of reach, or paid for in pushback. */
+export const MEND = { cast: 3, heal: 0.35, cd: 25, mana: 120 };
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -443,6 +445,20 @@ export class Forsaken {
     if (stop) { this.vfx.ribbons.end(this.whirl); this.whirl = -1; return; }
     if (this.whirl < 0) this.whirl = this.vfx.ribbons.begin(whirlTrail, true);
     if (this.player.model.edges(this.a, this.b)) this.vfx.ribbons.push(this.whirl, this.a.x, this.a.y, this.a.z, this.b.x, this.b.y, this.b.z);
+  }
+
+  /** The potion's and the prayer's heal: two strands winding up the body, a flare and runes; `k` scales it. */
+  healBurst(k: number): void {
+    const p = this.player.pos, v = this.vfx;
+    for (let i = 0; i < 64 * k; i++) {
+      const t = i / (64 * k), a = t * Math.PI * 6 + (i % 2) * Math.PI, r = (0.75 - t * 0.35) * k;
+      v.spawn(heal, p.x + Math.cos(a) * r, p.y + t * 2, p.z + Math.sin(a) * r, -Math.sin(a) * 1.4, 1.4, Math.cos(a) * 1.4);
+    }
+    v.burst(healStar, p.x, p.y + 1, p.z, 8 * k, 0.6, 0.6);
+    v.burst(healGlow, p.x, p.y + 0.6, p.z, 5 * k, 0.4, 0.4);
+    v.decal(healRing, p.x, p.y + 0.05, p.z);
+    v.decal(healRunes, p.x, p.y + 0.04, p.z);
+    v.pulse(p.x, p.y + 1, p.z, GRAVE, 18 * k);
   }
 
   /** A swing's club trail in `style`, drawn for `t` s. */
@@ -1266,6 +1282,31 @@ export const ABILITIES: Ability<Forsaken>[] = [
     active: (k) => k.stats.immune > 0,
   },
   {
+    id: 'mend', name: 'Preghiera di suffragio', icon: 'mend', mana: MEND.mana, charge: 5, cast: MEND.cast,
+    get cooldown() { return MEND.cd * tune.cdr; },
+    get desc() { return `Reciti a mani alzate il suffragio dei morti e le anime del purgatorio ti ricuciono la carne: recuperi il ${MEND.heal * 100}% della salute. Lancio lungo: muoverti lo interrompe, e ogni colpo che subisci lo fa arretrare.`; },
+    check: (k) => (k.stats.hp >= k.stats.hpMax ? 'Sei già in piena salute.' : undefined),
+    during(k, prog, dt) {
+      k.player.model.channel(true); // arms raised over the cast bar, as for the wisp
+      const p = k.player.pos, v = k.vfx;
+      for (let n = v.count(20 + prog * 50, dt); n > 0; n--) { // grave-light rising round the body into the hands
+        const a = rnd(0, Math.PI * 2), r = rnd(0.5, 1.1);
+        v.spawn(heal, p.x + Math.cos(a) * r, p.y + rnd(0, 0.4), p.z + Math.sin(a) * r, -Math.sin(a) * 0.8, rnd(1.2, 2.2), Math.cos(a) * 0.8);
+      }
+      for (let n = v.count(3 + 6 * prog, dt); n > 0; n--) v.spawn(healGlow, p.x + rnd(-0.3, 0.3), p.y + 2 + rnd(-0.1, 0.1), p.z + rnd(-0.3, 0.3), 0, 0.4, 0);
+      if (Math.random() < dt * 2.5) v.decal(healRunes, p.x, p.y + 0.03, p.z);
+    },
+    fire(k) {
+      const h = k.stats.heal(k.stats.hpMax * MEND.heal);
+      playSfx('potion', chest(k));
+      playSfx('ward', chest(k), { gain: -10 });
+      k.healBurst(1.4);
+      k.player.model.play('spread', 0.2);
+      k.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
+    },
+    end(k) { k.player.model.channel(false); },
+  },
+  {
     id: 'potion', name: 'Fiala di linfa tombale', icon: 'potion', offGcd: true,
     get cooldown() { return tune.potionCd * tune.cdr; },
     get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${tune.potion * 100}% della salute e il ${tune.potion * 100}% del mana.`; },
@@ -1273,20 +1314,13 @@ export const ABILITIES: Ability<Forsaken>[] = [
       const s = k.stats, h = s.heal(s.hpMax * tune.potion);
       playSfx('potion', chest(k));
       s.restoreMana(s.manaMax * tune.potion);
-      const p = k.player.pos, v = k.vfx;
-      for (let i = 0; i < 64; i++) { // two strands winding up the body
-        const t = i / 64, a = t * Math.PI * 6 + (i % 2) * Math.PI, r = 0.75 - t * 0.35;
-        v.spawn(heal, p.x + Math.cos(a) * r, p.y + t * 2, p.z + Math.sin(a) * r, -Math.sin(a) * 1.4, 1.4, Math.cos(a) * 1.4);
-      }
-      v.burst(healStar, p.x, p.y + 1, p.z, 8, 0.6, 0.6);
-      v.burst(healGlow, p.x, p.y + 0.6, p.z, 5, 0.4, 0.4);
-      v.decal(healRing, p.x, p.y + 0.05, p.z);
-      v.decal(healRunes, p.x, p.y + 0.04, p.z);
-      v.pulse(p.x, p.y + 1, p.z, GRAVE, 18);
+      k.healBurst(1);
       k.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
     },
   },
 ];
 
-/** Slot order on the bar; 0 - = stay free for later items. */
-export const BAR: (string | null)[] = ['fall', 'plague', 'wisp', 'strike', 'nova', 'veil', 'step', 'ward', 'potion', null, null, null];
+for (const a of ABILITIES) a.school = SCHOOL[a.id]; // each school its own global cooldown
+
+/** Slot order on the bar; 0 - = stay free for later items. The wisp, like the other unlocks, takes the first free slot. */
+export const BAR: (string | null)[] = ['fall', 'plague', 'mend', 'strike', 'nova', 'veil', 'step', 'ward', 'potion', null, null, null];

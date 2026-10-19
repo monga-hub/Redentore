@@ -326,7 +326,7 @@ Object.assign(window, { zitelle, l2, bag, gear, sheet, vendor, drops, bagPanel, 
 
 // The autosave (core/save.ts): every few seconds and when the tab is hidden (iOS may kill it then), only
 // while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
-const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova']);
+const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin']); // 'spin': the Governatrice's fuso
 const KEEP = 5; // s
 let kept = KEEP;
 const keep = () => { if (!flying() && dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state))) autosave(serialize(game)); };

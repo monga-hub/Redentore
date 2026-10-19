@@ -154,6 +154,12 @@ if (resume(store)) fail('junk autosave resumed');
 autosave(s, store);
 clearAutosave(store);
 if (resume(store)) fail('autosave survived a new game');
+// Level 2 through the autosave: the second quest's stage, its open doors and its checkpoint come back.
+autosave(zs, store);
+const zr = boot();
+deserialize(zr, resume(store)!);
+if (zr.quest.stage !== 'boss2' || !zr.quest.gate('coro-zitelle').open || zr.quest.checkpoint().x !== 240) fail(`level 2 resumed at ${zr.quest.stage}`);
+clearAutosave(store);
 // Levels: picks and XP round-trip; an hp pick's raised max is in place before the saved hp is clamped to it.
 const lv = boot();
 lv.levels.picks = ['step', 'hp', 'dmg'];

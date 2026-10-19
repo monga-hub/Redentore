@@ -9,6 +9,7 @@
 //
 //   npm run soak                       ~2 minutes of fight
 //   SOAK_SECONDS=600 npm run soak      a longer one
+//   SOAK_LEVEL=2 npm run soak           the Governatrice under the Zitelle's dome instead (level 2's bodies, lace and fuso)
 //   CHROME=/path/to/chrome npm run soak
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -17,6 +18,7 @@ import { join } from 'node:path';
 import { createServer } from 'vite';
 
 const SECONDS = Number(process.env.SOAK_SECONDS ?? 120);
+const LEVEL = Number(process.env.SOAK_LEVEL ?? 1);
 const BUDGET = 200; // MB of GPU buffers the phone profile may hold (it held ~380 before the phone tier)
 const SLACK = { prog: 4, geo: 12, tex: 4 }; // first uses that may still come late (a loot beam, a death's effects)
 const CHROME = process.env.CHROME ?? (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
@@ -58,20 +60,25 @@ function track(): void {
 }
 
 /** In the page once it has loaded: the church set for the boss, every ability on the bar, a bot that fights him. */
-function fight(seconds: number): void {
-  const w = window as any, { quest, priests, player, playerStats, levels, kit, targeting, fx } = w;
-  const boss = priests.boss, BERSERK = 240;
+function fight(seconds: number, level: number): void {
+  const w = window as any, { quest, priests, zitelle, player, playerStats, levels, kit, targeting, fx } = w;
+  const boss = level === 2 ? zitelle.boss : priests.boss, BERSERK = boss.kind.phases.berserk;
   quest.accepted = true;
   quest.takeKey();
   for (const g of quest.gates) if (g.needs === 'key') quest.open(g);
+  if (level === 2) { // the Reverendissimo dead, the second quest taken, the Zitelle's back door open
+    quest.win(); quest.out = true; quest.report(); quest.accept2(); quest.arrived = true; quest.takeKey2();
+    quest.open(quest.gates.find((g: { id: string }) => g.id === 'coro-zitelle'));
+  }
   levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
   levels.apply();
-  player.respawn({ x: 0, z: -28, yaw: 0 });
+  player.respawn(level === 2 ? { x: 240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
+  const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
   let next = 0, degraded = false, raged = false;
   const tick = () => {
     const t = (performance.now() - t0) / 1000;
-    if (boss.state === 'dead' && t > seconds) { w.SOAK.done = true; w.SOAK.won = quest.bossDead; return; }
+    if (boss.state === 'dead' && t > seconds) { w.SOAK.done = true; w.SOAK.won = level === 2 ? quest.boss2Dead : quest.bossDead; return; }
     requestAnimationFrame(tick);
     playerStats.hp = playerStats.hpMax; // the fight, not the hero, is under test
     playerStats.mana = playerStats.manaMax;
@@ -80,8 +87,8 @@ function fight(seconds: number): void {
     if (!raged && t > seconds * 0.3) { raged = true; boss.fight = Math.max(boss.fight, BERSERK - 5); } // the berserk without four minutes of waiting
     const dx = boss.x - player.pos.x, dz = boss.z - player.pos.z, d = Math.hypot(dx, dz) || 1;
     player.facing = Math.atan2(-dx, -dz);
-    targeting.target = { kind: targeting.kinds[3], mob: boss };
-    if ((boss.state === 'nova' || boss.marks.length) && player.pos.z - (dz / d) * 0.25 < -27.5) { player.pos.x -= (dx / d) * 0.25; player.pos.z -= (dz / d) * 0.25; } // dodge: out of the nova, off the brands
+    targeting.target = { kind: targeting.kinds.find((k: { all: object[] }) => k.all.includes(boss)), mob: boss };
+    if ((boss.state === 'nova' || boss.marks.length) && player.pos.z - (dz / d) * 0.25 < floor) { player.pos.x -= (dx / d) * 0.25; player.pos.z -= (dz / d) * 0.25; } // dodge: out of the nova, off the brands
     for (let i = 0; i < 12; i++) kit.system.tryCast(i);
     if (t >= next) {
       next = t + 1;
@@ -155,7 +162,10 @@ try {
   if (!(await evaluate("matchMedia('(pointer: coarse)').matches"))) fail('the emulated phone is not taken for a phone');
   for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro
   await sleep(3000);
-  await evaluate(`(${fight})(${SECONDS})`);
+  await evaluate(`(${fight})(${SECONDS}, ${LEVEL})`);
+  if (LEVEL === 2) { // level 2's bodies load with its quest
+    while (!(await evaluate('window.zitelle.root.children.length > 0'))) { if (Date.now() - t0 > 240e3) throw new Error("level 2's bodies never loaded"); await sleep(500); }
+  }
   while (!(await evaluate('!!window.SOAK.done'))) {
     if ((await evaluate('performance.now()')) > (SECONDS + 300) * 1000) throw new Error('the boss never fell');
     await sleep(2000);
@@ -181,7 +191,7 @@ try {
   if (low >= r.before.gpu) fail(`the slow-frame fallback kept its buffers: ${r.before.gpu.toFixed(0)} -> ${low.toFixed(0)} MB`);
   const progLow = Math.max(...s.filter((x) => x.low).map((x) => x.prog));
   if (progLow > r.before.prog) fail(`the slow-frame fallback piled up programs: ${r.before.prog} -> ${progLow}`);
-  console.log(`boss soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU ${high.toFixed(0)} MB, ${low.toFixed(0)} MB after the fallback; programs ${r.before.prog} -> ${progLow}`);
+  console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU ${high.toFixed(0)} MB, ${low.toFixed(0)} MB after the fallback; programs ${r.before.prog} -> ${progLow}`);
 } catch (e) {
   fail(String((e as Error).message));
 } finally {

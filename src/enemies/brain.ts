@@ -3,7 +3,7 @@
 // far. Pure math on the collision World, no three.js, so `npm run check` drives it in Node
 // (scripts/check-enemies.ts). friars.ts puts models on top.
 import { PLAYER, type World } from '../core/physics.ts';
-import { clear, control, pace, tick, type Control } from './control.ts';
+import { clear, control, exposed, pace, tick, type Control } from './control.ts';
 
 export const FRIAR = {
   hp: 120,
@@ -179,7 +179,7 @@ export function rise(f: Friar, p: Target, world: World, rnd: () => number = Math
 /** Damage a friar. Returns true if this killed it. Evading and dead friars ignore it. */
 export function hurt(f: Friar, n: number): boolean {
   if (f.state === 'dead' || f.state === 'evade' || n <= 0) return false;
-  f.hp -= n;
+  f.hp -= exposed(f.cc, n); // Febbre di palude
   if (f.hp > 0) { pull(f); return false; }
   f.hp = 0;
   enter(f, 'dead');

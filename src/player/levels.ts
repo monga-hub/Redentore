@@ -47,6 +47,25 @@ export interface Tune {
   graceDmg: number; graceMul: number; graceCd: number;
   chargeDmg: number; chargeStun: number; chargeCd: number;
   fxShatter: boolean; fxStorm: boolean; fxFrostWhirl: boolean; // fusions: fire on frost, lightning through plague, a whirl of frost
+  // five abilities a school: poison, the drain, fire, frost, lightning and holy ones (abilities/grimoire.ts)
+  spitDmg: number; spitStacks: number; venomDps: number; venomMax: number;
+  untoreDmg: number; untoreR: number;
+  miasmaDmg: number; miasmaR: number; miasmaStacks: number; miasmaCd: number;
+  feverK: number; feverR: number;
+  drainDmg: number; drainHeal: number;
+  pillarDmg: number; pillarR: number;
+  ceroDps: number; ceroDmg: number; ceroChain: boolean;
+  furnaceDmg: number; furnaceRange: number;
+  blizzardDmg: number; blizzardR: number;
+  orbDmg: number; orbSpeed: number;
+  shieldDmg: number; shieldOrbs: number;
+  rodDmg: number; rodTime: number; rodEvery: number;
+  squallDmg: number; squallR: number;
+  judgeDmg: number; judgeCd: number;
+  hallowDps: number; hallowR: number;
+  hammerStun: number; hammerCd: number;
+  bubbleCd: number;
+  fxVenomCloud: boolean; fxHolyFire: boolean; // fusions: poison in the plague cloud, the judgment set alight
 }
 
 export const START = ['fall', 'plague', 'mend', 'potion'];
@@ -73,6 +92,24 @@ const BASE: Tune = {
   graceDmg: 35, graceMul: 2, graceCd: 6,
   chargeDmg: 30, chargeStun: 1.5, chargeCd: 15,
   fxShatter: false, fxStorm: false, fxFrostWhirl: false,
+  spitDmg: 18, spitStacks: 1, venomDps: 4, venomMax: 5,
+  untoreDmg: 30, untoreR: 6,
+  miasmaDmg: 30, miasmaR: 7, miasmaStacks: 3, miasmaCd: 12,
+  feverK: 0.2, feverR: 4,
+  drainDmg: 16, drainHeal: 0.02,
+  pillarDmg: 70, pillarR: 3.5,
+  ceroDps: 12, ceroDmg: 60, ceroChain: false,
+  furnaceDmg: 50, furnaceRange: 8,
+  blizzardDmg: 18, blizzardR: 4,
+  orbDmg: 15, orbSpeed: 5,
+  shieldDmg: 45, shieldOrbs: 4,
+  rodDmg: 22, rodTime: 12, rodEvery: 1,
+  squallDmg: 60, squallR: 6,
+  judgeDmg: 70, judgeCd: 6,
+  hallowDps: 14, hallowR: 4,
+  hammerStun: 4, hammerCd: 30,
+  bubbleCd: 120,
+  fxVenomCloud: false, fxHolyFire: false,
 };
 
 const it = (n: number) => n.toLocaleString('it', { maximumFractionDigits: 2 });
@@ -93,6 +130,8 @@ export interface Card {
 }
 
 const special = (_c: (id: string) => number, owns: (a: string) => boolean) => SPECIALS.some(owns);
+/** A school's abilities, for the fusions with any of them. */
+const FROST = ['frost', 'font', 'lance', 'blizzard', 'orb'], STORM = ['chain', 'toll', 'shield', 'rod', 'squall'], FIRE = ['pyre', 'wisp', 'pillar', 'cero', 'furnace'];
 const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text: string): Card => ({ id, kind: 'ability', name, icon: id, text, max: 1, of: id, tier, school });
 /** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
 export const SCHOOL: Record<string, School> = { fall: 'bone', plague: 'plague', mend: 'holy' };
@@ -118,6 +157,24 @@ export const CARDS: Card[] = [
   ability('whirl', "Turbine d'ossa", 'A', 'bone', `Per ${BASE.whirlTime} s giri su te stesso con la clava, anche correndo: ${BASE.whirlDmg} danni ogni mezzo secondo entro 3 m, e paghi il 30% in meno dei colpi. 35 mana, recupero 10 s.`),
   ability('grace', 'Colpo di grazia', 'A', 'bone', `Un fendente a due mani davanti a te: ${BASE.graceDmg} danni, fino al triplo sui nemici già feriti. 20 mana, recupero ${BASE.graceCd} s.`),
   ability('charge', 'Carica del dannato', 'A', 'shadow', `Ti scagli sul nemico (4-20 m): ${BASE.chargeDmg} danni e stordito ${it(BASE.chargeStun)} s. Riempie la furia. Recupero ${BASE.chargeCd} s.`),
+  // five a school: poison (Diablo's Witch Doctor and Necromancer, WoW's poisons), WoW's warlock drain, mage, shaman and paladin
+  ability('spit', 'Sputo di bile', 'A', 'plague', `Istantaneo: un grumo di bile velenosa da ${BASE.spitDmg} danni e una dose di veleno (${BASE.venomDps} danni al secondo per dose per 8 s, fino a ${BASE.venomMax} dosi). 18 mana.`),
+  ability('untore', "Unguento dell'untore", 'A', 'plague', `Ungi il bersaglio: ${BASE.untoreDmg} danni e il suo veleno (almeno 2 dosi) passa a ogni nemico entro ${BASE.untoreR} m. 30 mana, recupero 10 s.`),
+  ability('miasma', 'Fiato della fossa', 'A', 'plague', `Un anello di miasma esplode da te: ${BASE.miasmaDmg} danni e ${BASE.miasmaStacks} dosi di veleno a chi è entro ${BASE.miasmaR} m. 45 mana, recupero ${BASE.miasmaCd} s.`),
+  ability('fever', 'Febbre di palude', 'A', 'plague', `Il bersaglio e chi gli sta entro ${BASE.feverR} m prendono il ${pct(BASE.feverK)} di danni in più da tutto per 12 s (la metà sui più forti). 30 mana, recupero 15 s.`),
+  ability('drain', "Risucchio d'anima", 'A', 'shadow', `Canalizzato 3 s: strappi l'anima al bersaglio, ${BASE.drainDmg} danni ogni mezzo secondo, e ognuno ti cura del ${pct(BASE.drainHeal)}. 40 mana, recupero 8 s.`),
+  ability('pillar', 'Colonna di fiamme', 'A', 'fire', `Lancio 1,5 s: una colonna di fuoco sotto il bersaglio, ${BASE.pillarDmg} danni entro ${it(BASE.pillarR)} m, chi c'è brucia e il pavimento arde. 50 mana, recupero 10 s.`),
+  ability('cero', 'Cero funebre', 'A', 'fire', `Istantaneo: accendi un cero nel bersaglio, ${BASE.ceroDps} danni al secondo per 4 s, poi scoppia: ${BASE.ceroDmg} danni entro 4 m. 30 mana, recupero 3 s.`),
+  ability('furnace', 'Fornace di Murano', 'A', 'fire', `Il soffio della fornace davanti a te, fino a ${BASE.furnaceRange} m: ${BASE.furnaceDmg} danni, chi colpisce brucia ed è stordito 2 s. 45 mana, recupero 14 s.`),
+  ability('blizzard', 'Bufera di bora', 'A', 'frost', `Canalizzato 4 s: la bora gelida sul bersaglio, ${BASE.blizzardDmg} danni ogni mezzo secondo entro ${BASE.blizzardR} m e rallentati del 50%. 55 mana, recupero 12 s.`),
+  ability('orb', 'Globo di brina', 'A', 'frost', `Un globo di ghiaccio che rotola per 15 m: ${BASE.orbDmg} danni ogni mezzo secondo a chi passa entro 3,5 m, rallentati, e alla fine scoppia. 50 mana, recupero 16 s.`),
+  ability('shield', 'Scudo di saette', 'A', 'storm', `Per 20 s ${BASE.shieldOrbs} saette ti girano attorno: ognuna fulmina il primo nemico che ti arriva entro 3 m (${BASE.shieldDmg} danni). 40 mana, recupero 20 s.`),
+  ability('rod', 'Parafulmine', 'A', 'storm', `Pianti un parafulmine ai tuoi piedi: per ${BASE.rodTime} s ogni secondo fulmina il nemico più vicino entro 9 m (${BASE.rodDmg} danni). 45 mana, recupero 18 s.`),
+  ability('squall', 'Burrasca', 'A', 'storm', `Un colpo di tuono attorno a te: ${BASE.squallDmg} danni entro ${BASE.squallR} m e i nemici sbalzati via di 5 m (meno i più forti). 40 mana, recupero 15 s.`),
+  ability('judge', 'Giudizio del Redentore', 'A', 'holy', `Istantaneo: un martello di luce sul bersaglio, ${BASE.judgeDmg} danni. 25 mana, recupero ${BASE.judgeCd} s.`),
+  ability('hallow', 'Terra consacrata', 'A', 'holy', `Consacri il suolo attorno a te per 8 s: ${BASE.hallowDps} danni al secondo ai nemici entro ${BASE.hallowR} m, e finché ci stai sopra recuperi l'1% della salute al secondo. 40 mana, recupero 12 s.`),
+  ability('hammer', 'Martello della penitenza', 'A', 'holy', `Istantaneo: un martello d'oro sul bersaglio, 30 danni e stordito ${BASE.hammerStun} s (molto meno sui più forti). 30 mana, recupero ${BASE.hammerCd} s.`),
+  ability('bubble', 'Aureola del redento', 'A', 'holy', `Fuori dal tempo di recupero globale: per 5 s un'aureola ti rende immune a ogni danno. 60 mana, recupero ${BASE.bubbleCd} s.`),
 
   passive('dmg', 'Ossa più dure', '+8% a tutti i danni che infliggi.', 3, (t) => { t.dmg += 0.08; }),
   passive('hp', 'Carne di tomba', '+15% di salute massima (+192), e la recuperi subito.', 3, (t) => { t.hp += 0.15; }),
@@ -169,6 +226,23 @@ export const CARDS: Card[] = [
   mod('grace', 'grace_cd', 'Lama del boia', `Colpo di grazia: recupero da ${BASE.graceCd} a 3,5 s.`, 1, (t) => { t.graceCd = 3.5; }),
   mod('charge', 'charge_stun', 'Carica brutale', `Carica del dannato: +20 danni (base ${BASE.chargeDmg}), stordito 2,5 s invece di ${it(BASE.chargeStun)}.`, 1, (t) => { t.chargeDmg += 20; t.chargeStun = 2.5; }),
   mod('charge', 'charge_cd', 'Carica instancabile', `Carica del dannato: recupero da ${BASE.chargeCd} a 9 s.`, 1, (t) => { t.chargeCd = 9; }),
+  mod('spit', 'spit_twin', 'Doppio sputo', 'Sputo di bile: due dosi di veleno a colpo invece di una.', 1, (t) => { t.spitStacks = 2; }),
+  mod('untore', 'untore_far', 'Unzione diffusa', `Unguento dell'untore: il veleno passa entro 10 m (era ${BASE.untoreR}), +20 danni.`, 1, (t) => { t.untoreR = 10; t.untoreDmg += 20; }),
+  mod('miasma', 'miasma_more', 'Fossa comune', `Fiato della fossa: 5 dosi di veleno invece di ${BASE.miasmaStacks}, recupero da ${BASE.miasmaCd} a 9 s.`, 1, (t) => { t.miasmaStacks = 5; t.miasmaCd = 9; }),
+  mod('fever', 'fever_deep', 'Febbre terzana', `Febbre di palude: +35% di danni subiti invece del ${pct(BASE.feverK)}, entro 6 m.`, 1, (t) => { t.feverK = 0.35; t.feverR = 6; }),
+  mod('drain', 'drain_deep', 'Sete del dannato', `Risucchio d'anima: +8 danni ogni mezzo secondo (base ${BASE.drainDmg}), e ognuno ti cura del 3%.`, 1, (t) => { t.drainDmg += 8; t.drainHeal = 0.03; }),
+  mod('pillar', 'pillar_big', "Rogo del Sant'Uffizio", `Colonna di fiamme: +35 danni (base ${BASE.pillarDmg}), raggio da ${it(BASE.pillarR)} a 4,5 m.`, 1, (t) => { t.pillarDmg += 35; t.pillarR = 4.5; }),
+  mod('cero', 'cero_chain', 'Processione', 'Cero funebre: lo scoppio accende un cero in due dei nemici che colpisce (i loro non si propagano).', 1, (t) => { t.ceroChain = true; }),
+  mod('furnace', 'furnace_hot', 'Maestro vetraio', `Fornace di Murano: +30 danni (base ${BASE.furnaceDmg}), arriva a 11 m.`, 1, (t) => { t.furnaceDmg += 30; t.furnaceRange = 11; }),
+  mod('blizzard', 'blizzard_big', 'Bora scura', `Bufera di bora: +6 danni ogni mezzo secondo (base ${BASE.blizzardDmg}), raggio da ${BASE.blizzardR} a 5,5 m.`, 1, (t) => { t.blizzardDmg += 6; t.blizzardR = 5.5; }),
+  mod('orb', 'orb_slow', 'Globo pigro', `Globo di brina: rotola a 3,5 m/s invece di ${BASE.orbSpeed} (più colpi), +4 danni a colpo.`, 1, (t) => { t.orbSpeed = 3.5; t.orbDmg += 4; }),
+  mod('shield', 'shield_more', 'Corona di saette', `Scudo di saette: 6 saette invece di ${BASE.shieldOrbs}, +10 danni.`, 1, (t) => { t.shieldOrbs = 6; t.shieldDmg += 10; }),
+  mod('rod', 'rod_long', 'Parafulmine di San Marco', `Parafulmine: dura 18 s invece di ${BASE.rodTime} e fulmina ogni 0,7 s.`, 1, (t) => { t.rodTime = 18; t.rodEvery = 0.7; }),
+  mod('squall', 'squall_big', 'Fortunale', `Burrasca: +25 danni (base ${BASE.squallDmg}), raggio da ${BASE.squallR} a 8 m.`, 1, (t) => { t.squallDmg += 25; t.squallR = 8; }),
+  mod('judge', 'judge_dmg', 'Giudizio universale', `Giudizio del Redentore: +30 danni (base ${BASE.judgeDmg}), recupero da ${BASE.judgeCd} a 4,5 s.`, 1, (t) => { t.judgeDmg += 30; t.judgeCd = 4.5; }),
+  mod('hallow', 'hallow_big', 'Sagrato', `Terra consacrata: raggio da ${BASE.hallowR} a 5,5 m, 20 danni al secondo.`, 1, (t) => { t.hallowR = 5.5; t.hallowDps = 20; }),
+  mod('hammer', 'hammer_cd', 'Penitenza severa', `Martello della penitenza: recupero da ${BASE.hammerCd} a 20 s, stordito 5 s.`, 1, (t) => { t.hammerCd = 20; t.hammerStun = 5; }),
+  mod('bubble', 'bubble_cd', 'Santità', `Aureola del redento: recupero da ${BASE.bubbleCd} a 80 s.`, 1, (t) => { t.bubbleCd = 80; }),
   { id: 'fury_start', kind: 'mod', name: 'Rancore', icon: 'fury', max: 1, text: 'Dopo una speciale la barra della furia riparte da 30 invece che da 0.',
     needs: special, apply: (t) => { t.furyStart = 30; } },
 
@@ -180,11 +254,15 @@ export const CARDS: Card[] = [
     needs: (c, owns) => owns('fall') && c('plague_dps') >= 1, apply: (t) => { t.fxFall = true; } },
 
   { id: 'fx_shatter', kind: 'fusion', name: 'Frantumazione', icon: 'pyre', max: 1, text: "Fusione. Rogo dell'eretico su un nemico rallentato o congelato: +60% di danni e il ghiaccio esplode in schegge (30 danni entro 3 m).",
-    needs: (_c, owns) => owns('pyre') && (owns('frost') || owns('font') || owns('lance')), apply: (t) => { t.fxShatter = true; } },
+    needs: (_c, owns) => owns('pyre') && FROST.some(owns), apply: (t) => { t.fxShatter = true; } },
   { id: 'fx_storm', kind: 'fusion', name: 'Miasma elettrico', icon: 'chain', max: 1, text: 'Fusione. Le saette fanno +50% di danni a chi sta in una nube di peste, e la catena rimbalza su tutti loro (fino a 3 salti in più).',
-    needs: (_c, owns) => (owns('chain') || owns('toll')) && owns('plague'), apply: (t) => { t.fxStorm = true; } },
+    needs: (_c, owns) => STORM.some(owns) && owns('plague'), apply: (t) => { t.fxStorm = true; } },
   { id: 'fx_frostwhirl', kind: 'fusion', name: 'Turbine di brina', icon: 'whirl', max: 1, text: "Fusione. Turbine d'ossa gela chi colpisce (rallentato del 40%) e fa il doppio dei danni a chi è congelato.",
-    needs: (_c, owns) => owns('whirl') && (owns('frost') || owns('font') || owns('lance')), apply: (t) => { t.fxFrostWhirl = true; } },
+    needs: (_c, owns) => owns('whirl') && FROST.some(owns), apply: (t) => { t.fxFrostWhirl = true; } },
+  { id: 'fx_venomcloud', kind: 'fusion', name: 'Miasma velenoso', icon: 'plague', max: 1, text: 'Fusione. Nube di peste dà una dose di veleno al secondo a chi ci sta dentro.',
+    needs: (_c, owns) => owns('plague') && (owns('spit') || owns('untore') || owns('miasma')), apply: (t) => { t.fxVenomCloud = true; } },
+  { id: 'fx_holyfire', kind: 'fusion', name: 'Giudizio ardente', icon: 'judge', max: 1, text: 'Fusione. Giudizio del Redentore incendia il bersaglio (brucia 4 s), e su chi già brucia fa +50% di danni.',
+    needs: (_c, owns) => owns('judge') && FIRE.some(owns), apply: (t) => { t.fxHolyFire = true; } },
 
   // Repeatable, offered only once the cards above run short.
   { id: 'linfa', kind: 'filler', name: 'Linfa tombale', icon: 'potion', max: Infinity, text: 'Recuperi il 30% della salute e del mana.' },
@@ -254,8 +332,8 @@ export function offer(picks: readonly string[], rnd: () => number = Math.random,
 }
 const FILLERS = CARDS.filter((c) => c.kind === 'filler');
 
-/** A merchant's tome: every ability of a school, for gold (ui/vendor.ts). The cost is per ability it would still teach.
- * Peste and Sacro have none: the run starts with their only abilities. */
+/** A merchant's tome: every ability of a school, for gold (ui/vendor.ts). The cost is per ability it would still teach:
+ * four or five a school, the starting Nube di peste and Preghiera di suffragio aside. */
 export interface Tome { school: School; name: string; icon: string }
 export const TOMES: Tome[] = [
   { school: 'bone', name: 'Tomo delle Ossa', icon: 'strike' },
@@ -263,9 +341,11 @@ export const TOMES: Tome[] = [
   { school: 'fire', name: 'Tomo del Fuoco', icon: 'pyre' },
   { school: 'frost', name: 'Tomo del Gelo', icon: 'frost' },
   { school: 'storm', name: 'Tomo del Fulmine', icon: 'chain' },
+  { school: 'plague', name: 'Tomo della Peste', icon: 'miasma' },
+  { school: 'holy', name: 'Tomo del Sacro', icon: 'judge' },
 ];
 /** Gold a tome asks for each ability it teaches: a special costs more. */
-export const TOME_PRICE = { A: 250, B: 400 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: a small tome by then, the Ossa's 1550 a level-2 goal
+export const TOME_PRICE = { A: 200, B: 350 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: Peste or Sacro (800) by then, the five-ability ones (1000-1300) a level-2 goal
 /** What `tome` would teach someone owning `owned`, and its price; a tome with nothing left to teach is not sold. */
 export function tomeOf(tome: Tome, owned: readonly string[]): { teaches: Card[]; price: number } {
   const teaches = CARDS.filter((c) => c.kind === 'ability' && c.school === tome.school && !owned.includes(c.id));

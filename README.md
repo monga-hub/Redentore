@@ -92,7 +92,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (5 build, due con fuoco/gelo e fulmini/colpi nuovi, + uno che non schiva) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2 (vedi scripts/balance.ts)
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle due carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2; `TOMES=plague,holy` parte coi tomi di quelle scuole letti (vedi scripts/balance.ts)
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
 npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, CHROME=... per il binario)
 ```
@@ -146,15 +146,15 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
 Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste, Preghiera di suffragio (la cura) e la fiala; ai livelli pari fino al 10
 arrivano due carte di nuove abilità, dopo il 10 una nuova abilità contro un potenziamento; agli altri
-potenziamenti, passivi e fusioni (`src/player/levels.ts`: 16 abilità da sbloccare, 56 carte di potenziamento di cui 6 fusioni). Ogni carta
+potenziamenti, passivi e fusioni (`src/player/levels.ts`: 33 abilità da sbloccare, cinque per scuola contando quelle iniziali e lasciando a parte l'attacco primario; 75 carte di potenziamento di cui 8 fusioni). Ogni carta
 esce a caso tra tutte quelle non ancora prese, qualunque cosa si sia scelto prima: nessuna scuola si chiude. Non c'è un livello massimo
 (servono 20 × livello esperienza per salire); finite le carte escono Linfa tombale e due potenziamenti piccoli ripetibili. Le
 abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch; con gli otto posti pieni aspettano nel libro.
 
-**Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Ombra, Fuoco, Gelo, Fulmine; Peste e Sacro non ne hanno, le
-loro uniche abilità si hanno dall'inizio), insegna subito tutte le abilità della scuola che non si conoscono ancora, che vanno nel
-Libro delle abilità pronte da equipaggiare. Costa 250 oro per abilità e 400 per una speciale, solo per quelle che insegna davvero
-(Ossa completo 1550, Ombra 1150, Gelo 750, Fuoco e Fulmine 500); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
+**Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), insegna subito
+tutte le abilità della scuola che non si conoscono ancora, che vanno nel Libro delle abilità pronte da equipaggiare. Costa 200 oro per
+abilità e 350 per una speciale, solo per quelle che insegna davvero (Ossa completo 1300, Ombra 1150, Fuoco, Gelo e Fulmine 1000, Peste e
+Sacro 800: Nube di peste e Preghiera di suffragio si hanno dall'inizio); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
 non escono più come carte, i loro potenziamenti sì. Nel salvataggio (`build.learned`; i vecchi si caricano senza).
 
 **Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come
@@ -170,14 +170,21 @@ posto sulla lista per toglierlo. L'attacco primario (il tasto grande) e la pozio
 libro anche ricaricando, una carta appena scelta va comunque sulla barra. La disposizione resta salvata nel browser e
 quella di prima (dodici tasti con la pozione) si converte da sola.
 
+Cinque abilità per scuola (Caduta d'ossa, l'attacco primario, a parte), sul modello di WoW e Diablo:
+
 | Scuola | Abilità |
 |---|---|
-| ossa | Caduta d'ossa · Balzo del sepolcro (balzo fino a 12 m, stordisce all'atterraggio) · Turbine d'ossa (3 s di rotazione, anche correndo) · Colpo di grazia (fendente a due mani, fino al triplo sui feriti) · Sentenza e Lamento (speciali) |
-| peste, ombra | Nube di peste · Passo d'ombra · Velo spettrale · Carica del dannato (a testa bassa sul nemico, stordisce, riempie la furia) · Patto della tomba (speciale) |
-| fuoco | Fuoco fatuo · Rogo dell'eretico (lancio lungo 2,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) |
-| gelo | Dardo di brina (rallenta) · Acquasantiera gelata (congela sul posto chi è vicino) · Stiletto di ghiaccio (triplo su chi è congelato) |
-| fulmine | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) |
-| sacro | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, nessun recupero: la limita solo il mana) |
+| ossa | Balzo del sepolcro (balzo fino a 12 m, stordisce all'atterraggio) · Turbine d'ossa (3 s di rotazione, anche correndo) · Colpo di grazia (fendente a due mani, fino al triplo sui feriti) · Sentenza e Lamento (speciali) |
+| peste (veleno: Witch Doctor e Necromante di Diablo, veleni del ladro di WoW) | Nube di peste · Sputo di bile (istantaneo, 18 danni e una dose di veleno: 4 al secondo per dose per 8 s, fino a 5 dosi) · Unguento dell'untore (come gli untori del 1630: il veleno del bersaglio, almeno 2 dosi, passa a chi gli sta entro 6 m) · Fiato della fossa (nova di miasma: 30 danni e 3 dosi entro 7 m) · Febbre di palude (Amplifica danno: +20% di danni subiti per 12 s entro 4 m, la metà sui boss) |
+| ombra | Passo d'ombra · Velo spettrale · Carica del dannato (a testa bassa sul nemico, stordisce, riempie la furia) · Risucchio d'anima (Drain Life: canalizzato 3 s, 16 danni ogni mezzo secondo e il 2% della salute a te) · Patto della tomba (speciale) |
+| fuoco (mago) | Fuoco fatuo · Rogo dell'eretico (lancio lungo 2,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) · Colonna di fiamme (Flamestrike: lancio 1,5 s, 70 danni entro 3,5 m sotto il bersaglio, brucia e lascia il pavimento in fiamme) · Cero funebre (Living Bomb: 12 al secondo per 4 s, poi scoppia per 60 entro 4 m) · Fornace di Murano (Dragon's Breath: cono di 8 m, 50 danni, brucia e stordisce 2 s) |
+| gelo (mago) | Dardo di brina (rallenta) · Acquasantiera gelata (congela sul posto chi è vicino) · Stiletto di ghiaccio (triplo su chi è congelato) · Bufera di bora (Blizzard: canalizzato 4 s sul bersaglio, 18 danni ogni mezzo secondo entro 4 m, rallenta) · Globo di brina (Frozen Orb: rotola 15 m, 15 danni ogni mezzo secondo a chi sfiora, poi scoppia) |
+| fulmine (sciamano) | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) · Scudo di saette (Lightning Shield: 4 saette per 20 s, 45 danni a chi ti arriva entro 3 m) · Parafulmine (un totem: per 12 s fulmina ogni secondo il più vicino entro 9 m, 22 danni) · Burrasca (Thunderstorm: 60 danni entro 6 m e i nemici sbalzati via di 5 m, i boss un terzo) |
+| sacro (paladino) | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, nessun recupero: la limita solo il mana) · Giudizio del Redentore (Judgment: martello di luce, 70 danni, recupero 6 s) · Terra consacrata (Consecration: 14 al secondo per 8 s entro 4 m, e a te l'1% della salute al secondo se ci stai sopra) · Martello della penitenza (Hammer of Justice: 30 danni e stordito 4 s, un terzo sui boss, recupero 30 s) · Aureola del redento (Divine Shield: fuori dal recupero globale, 5 s di immunità, recupero 2 minuti) |
+
+Ogni abilità nuova ha un potenziamento (Doppio sputo, Fossa comune, Processione, Bora scura, Corona di saette, Parafulmine di San
+Marco, Giudizio universale, Santità...). Tutte si fermano ai muri come le altre (`World.ray`/`sees`): la Burrasca non sbalza nessuno
+oltre un muro o giù da un gradino, il globo scoppia contro il muro, i lanci (Colonna di fiamme) arretrano se colpiti.
 
 Ogni scuola ha il suo tempo di recupero globale (1,5 s): dopo un'abilità di gelo aspettano solo quelle di gelo, mentre
 fuoco, fulmine, ossa o peste partono subito, e sulla barra gira solo la lancetta dei tasti della stessa scuola. Come in
@@ -192,8 +199,9 @@ non salta oltre un muro, novae, acquasantiera, turbine, nube di peste, fuoco a t
 dall'altra parte. I frati non si accorgono di chi è dietro un muro e, se restano bloccati a inseguirlo senza vederlo,
 dopo 6 s tornano a zappare.
 
-Fusioni nuove: Frantumazione (fuoco su gelo: +60% e schegge), Miasma elettrico (fulmini +50% e catena più lunga su
-chi sta nella peste), Turbine di brina (il turbine gela e raddoppia sui congelati). I lanci si interrompono muovendosi
+Fusioni nuove: Frantumazione (fuoco su gelo: +60% e schegge), Miasma elettrico (fulmini, parafulmine e scudo di saette +50% e catena più lunga su
+chi sta nella peste), Turbine di brina (il turbine gela e raddoppia sui congelati), Miasma velenoso (la Nube di peste dà una dose di veleno al
+secondo), Giudizio ardente (il Giudizio incendia, +50% su chi brucia). Frantumazione e Turbine di brina valgono con qualunque abilità di gelo. I lanci si interrompono muovendosi
 (il turbine no) e mentre si lancia o si canalizza la clava resta ferma. Rallentamenti, congelamenti e stordimenti
 (`src/enemies/control.ts`) si vedono sui nemici (tinta gelida, corpo fermo nel ghiaccio, stelle, fiamme), hanno
 rendimenti decrescenti (metà, un quarto, poi immune per 15 s); sacerdoti e api li scuotono via prima e il

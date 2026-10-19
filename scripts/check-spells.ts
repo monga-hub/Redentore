@@ -2,12 +2,15 @@
 // boss's resistance, what a stun, a root and a chill do to a friar's and a priest's brain, and the rules of the
 // fire, frost and lightning spells and the new blows (abilities/grimoire.ts): bolts homing and landing, splash
 // and burning, the chill, the frozen shattering, the chain's jumps, the thunderbolt's delay, the leap's travel,
-// the execute's scaling, Miasma elettrico, Frantumazione, the whirl's parry, and walls: bolts (the hero's and
-// the priests') burst on them, a hidden target refuses the cast, the chain and the novas don't pass them.
+// the execute's scaling, Miasma elettrico, Frantumazione, the whirl's parry; the rest of the five a school (poison doses,
+// the untore, the miasma, the fever and its cap on the bosses, the drain, the pillar, the candle, the furnace, the
+// blizzard, the orb, the lightning shield, the rod, the squall's knockback, the judgment, the consecrated ground, the
+// hammer's stun on the boss, their fusions); and walls: bolts (the hero's and the priests') burst on them, a hidden
+// target refuses the cast, the chain, the novas, the orb and the knockback don't pass them.
 import { World } from '../src/core/physics.ts';
 import { FRIAR, think as friarThink, type Friar } from '../src/enemies/brain.ts';
 import { PRIEST, REVERENDISSIMO, fly as casterFly, think as casterThink, spawnPriests, type Bolt as Shadow } from '../src/enemies/caster.ts';
-import { control, chill, root, stun, pace, tick } from '../src/enemies/control.ts';
+import { control, chill, root, stun, pace, tick, exposed } from '../src/enemies/control.ts';
 import { Grimoire, maxHp } from '../src/abilities/grimoire.ts';
 import { tuneOf } from '../src/player/levels.ts';
 import type { Mob } from '../src/ui/target.ts';
@@ -71,6 +74,7 @@ const host = {
   aimed: () => foes[0],
   foes: () => foes,
   clouded: (x: number, z: number) => Math.hypot(x - 0, z + 20) < 3,
+  stats: new PlayerStats(),
 };
 const book = new Grimoire(host, tune);
 const run = (t: number) => { for (let s = 0; s < t; s += 1 / 30) book.update(1 / 30); };
@@ -174,6 +178,169 @@ shatter.shoot('pyre', { x: 0, y: 1.3, z: 0 });
 for (let s = 0; s < 1; s += 1 / 30) shatter.update(1 / 30);
 if (!(dmg(foes[0]) >= tuneOf([]).pyreDmg * 1.6) || foes[0].cc!.slow > 0) fail('Frantumazione: +60% and the ice gone');
 
+// --- the five a school ---
+const home = () => { host.player.pos.x = 0; host.player.pos.y = 0; host.player.pos.z = 0; host.player.facing = 0; };
+const fresh = () => { hits.clear(); book.reset(); book.events.length = 0; home(); };
+const within = (a: number, b: number, why: string, k = 0.06) => { if (Math.abs(a - b) > Math.abs(b) * k + 1e-6) fail(`${why}: ${a} want ${b}`); };
+// poison: doses stack to the cap and tick per dose; Sputo di bile lands one
+fresh();
+foes = [foe(0, -8), foe(2, -8), foe(0, -20)];
+for (let i = 0; i < 8; i++) book.envenom(foes[0], 1);
+near(book.venom(foes[0]), tune.venomMax, 'poison doses cap');
+run(2);
+within(dmg(foes[0]), 2 * tune.venomMax * tune.venomDps, 'poison ticks per dose');
+if (!(foes[0].cc!.poison > 0)) fail('the poisoned show it');
+hits.clear();
+book.shoot('venom', { x: 0, y: 1.3, z: 0 });
+run(0.6);
+if (!book.events.some((e) => e.type === 'venom') || dmg(foes[0]) < tune.spitDmg) fail('Sputo di bile lands');
+// Unguento dell'untore: the target's doses pass to those within untoreR, no further
+fresh();
+foes = [foe(0, -8), foe(3, -8), foe(0, -20)];
+book.envenom(foes[0], 4);
+book.untore({ x: 0, y: 1.3, z: 0 });
+if (book.venom(foes[1]) !== 4 || book.venom(foes[2])) fail(`the untore spreads: ${book.venom(foes[1])}, ${book.venom(foes[2])}`);
+fresh();
+foes = [foe(0, -8), foe(3, -8)];
+book.untore({ x: 0, y: 1.3, z: 0 });
+if (book.venom(foes[0]) !== 2 || book.venom(foes[1]) !== 2) fail('the untore passes two doses at least');
+// Fiato della fossa: a ring of doses round the hero
+fresh();
+foes = [foe(0, -3), foe(4, 4), foe(0, -12)];
+book.miasma();
+if (book.venom(foes[0]) !== tune.miasmaStacks || book.venom(foes[1]) !== tune.miasmaStacks || book.venom(foes[2]) || dmg(foes[0]) !== tune.miasmaDmg) fail('the miasma nova');
+// Febbre di palude: +20% on everything near the target, half that at most on the boss
+fresh();
+foes = [foe(0, -8), foe(2, -9), foe(0, -20)];
+book.fever();
+near(exposed(foes[1].cc, 100), 100 * (1 + tune.feverK), 'the fever exposes');
+near(exposed(foes[2].cc, 100), 100, 'the fever stays near its target');
+const feverish = { ...foe(0, -8), cc: control(REVERENDISSIMO.resist) };
+foes = [feverish];
+book.fever();
+near(exposed(feverish.cc, 100), 100 * (1 + tune.feverK * 0.5), 'the boss takes half the fever');
+tick(feverish.cc!, 12.1);
+near(exposed(feverish.cc, 100), 100, 'the fever breaks');
+// Risucchio d'anima: hurts the target, heals the hero; nothing with no target
+fresh();
+host.stats.hp = 500;
+foes = [foe(0, -10)];
+if (!book.drain({ x: 0, y: 1.3, z: 0 }) || dmg(foes[0]) !== tune.drainDmg) fail('the drain hurts');
+near(host.stats.hp, 500 + host.stats.hpMax * tune.drainHeal, 'the drain heals');
+foes = [];
+if (book.drain({ x: 0, y: 1.3, z: 0 })) fail('a drain with no target');
+// Colonna di fiamme: falls a beat later, burns those in it and the floor
+fresh();
+foes = [foe(0, -8), foe(2, -8), foe(0, -14)];
+book.pillar();
+run(0.3);
+if (dmg(foes[0])) fail('the pillar waits');
+run(0.4);
+if (dmg(foes[0]) < tune.pillarDmg || dmg(foes[1]) < tune.pillarDmg || dmg(foes[2]) || !(foes[1].cc!.burn > 0) || !book.fires.length) fail('the pillar of fire');
+// Cero funebre: burns its mark, then bursts on its neighbours; bursts at once if the mark dies
+fresh();
+foes = [foe(0, -8), foe(2, -8)];
+book.cero({ x: 0, y: 1.3, z: 0 });
+run(2);
+if (!dmg(foes[0]) || dmg(foes[1])) fail('the candle burns its mark only');
+run(2.2);
+if (dmg(foes[1]) !== tune.ceroDmg || book.candles.size) fail(`the candle bursts: ${dmg(foes[1])}`);
+fresh();
+foes = [foe(0, -8), foe(2, -8)];
+book.cero({ x: 0, y: 1.3, z: 0 });
+foes[0].state = 'dead';
+run(0.1);
+if (dmg(foes[1]) !== tune.ceroDmg) fail('the candle bursts when its mark dies');
+const procession = new Grimoire(host, tuneOf(['cero', 'cero_chain']));
+hits.clear();
+foes = [foe(0, -8), foe(2, -8), foe(-2, -8), foe(0, -10)];
+procession.cero({ x: 0, y: 1.3, z: 0 });
+for (let s = 0; s < 4.2; s += 1 / 30) procession.update(1 / 30);
+if (procession.candles.size !== 2 || [...procession.candles.values()].some((c) => !c.child)) fail('Processione lights two more, which do not spread');
+// Fornace di Murano: a cone ahead burns and stuns; behind, nothing
+fresh();
+foes = [foe(0, -5), foe(0, 5), foe(0, -12)];
+book.furnace();
+if (dmg(foes[0]) !== tune.furnaceDmg || !(foes[0].cc!.stun > 0) || !(foes[0].cc!.burn > 0) || dmg(foes[1]) || dmg(foes[2])) fail('the furnace cone');
+// Bufera di bora: blows where it was called, hurting and chilling
+fresh();
+foes = [foe(0, -10), foe(3, -10), foe(0, -20)];
+book.blizzardStart();
+book.blizzard();
+if (dmg(foes[0]) !== tune.blizzardDmg || dmg(foes[1]) !== tune.blizzardDmg || dmg(foes[2]) || !(foes[0].cc!.slow > 0)) fail('the blizzard');
+// Globo di brina: rolls, striking those it passes, and bursts at the end
+fresh();
+foes = [foe(0, -6), foe(0, -40)];
+book.orb();
+run(1.5);
+if (!dmg(foes[0]) || !(foes[0].cc!.slow > 0) || !book.orbs.length) fail('the orb strikes as it rolls');
+run(3);
+if (book.orbs.length || !book.events.some((e) => e.type === 'orb') || dmg(foes[1])) fail('the orb bursts after 15 m');
+// Scudo di saette: a charge a second on a foe within 3 m, until they are spent
+fresh();
+foes = [foe(0, -2), foe(0, -6)];
+book.shield();
+run(0.1);
+if (dmg(foes[0]) !== tune.shieldDmg || dmg(foes[1]) || book.sparks !== tune.shieldOrbs - 1) fail('the shield zaps');
+run(5);
+if (dmg(foes[0]) !== tune.shieldDmg * tune.shieldOrbs || book.sparks) fail('the shield spends its charges, one a second');
+// Parafulmine: strikes the nearest within 9 m every rodEvery s, until it is gone
+fresh();
+foes = [foe(0, -7), foe(0, -12)];
+book.rod();
+run(3);
+if (!dmg(foes[0]) || dmg(foes[1])) fail('the rod');
+run(tune.rodTime);
+const rodHits = dmg(foes[0]);
+run(2);
+if (book.rods.length || dmg(foes[0]) !== rodHits) fail('the rod goes');
+// Burrasca: throws foes back 5 m, the boss barely
+fresh();
+foes = [foe(0, -3), { ...foe(3, 0), cc: control(REVERENDISSIMO.resist) }];
+book.squall();
+if (dmg(foes[0]) !== tune.squallDmg || Math.abs(foes[0].z + 8) > 0.3) fail(`the squall throws back: z ${foes[0].z}`);
+if (!(foes[1].x < 5.5 && foes[1].x > 3.5)) fail(`the boss barely budges: x ${foes[1].x}`);
+// Giudizio del Redentore; Giudizio ardente sets alight and burns brighter on the burning
+fresh();
+foes = [foe(0, -8)];
+book.shoot('judge', { x: 0, y: 1.3, z: 0 });
+run(0.6);
+if (dmg(foes[0]) !== tune.judgeDmg || foes[0].cc!.burn > 0) fail('the judgment');
+const ardent = new Grimoire(host, tuneOf(['judge', 'cero', 'fx_holyfire']));
+hits.clear();
+foes = [foe(0, -8)];
+ardent.shoot('judge', { x: 0, y: 1.3, z: 0 });
+for (let s = 0; s < 0.6; s += 1 / 30) ardent.update(1 / 30);
+if (!(foes[0].cc!.burn > 0)) fail('Giudizio ardente sets alight');
+hits.clear();
+ardent.shoot('judge', { x: 0, y: 1.3, z: 0 });
+for (let s = 0; s < 0.5; s += 1 / 30) ardent.update(1 / 30);
+if (dmg(foes[0]) < tune.judgeDmg * 1.5) fail('Giudizio ardente on the burning');
+// Martello della penitenza: a long stun, a third of it on the boss
+fresh();
+foes = [foe(0, -8)];
+book.shoot('hammer', { x: 0, y: 1.3, z: 0 });
+run(0.5);
+near(foes[0].cc!.stun, tune.hammerStun, 'the hammer stuns', 0.05);
+foes = [{ ...foe(0, -8), cc: control(REVERENDISSIMO.resist) }];
+book.shoot('hammer', { x: 0, y: 1.3, z: 0 });
+run(0.5);
+if (foes[0].cc!.stun > tune.hammerStun * 0.36) fail(`the hammer on the boss: ${foes[0].cc!.stun} s`);
+// Terra consacrata: hurts those on it and heals the hero standing on it
+fresh();
+host.stats.hp = 500;
+foes = [foe(0, -2), foe(0, -9)];
+book.hallow();
+run(2);
+within(dmg(foes[0]), 2 * tune.hallowDps, 'the consecrated ground burns');
+if (dmg(foes[1]) || !(host.stats.hp > 500 + host.stats.hpMax * 0.015)) fail('the consecrated ground heals the hero on it');
+// Miasma velenoso: a dose a second in the plague
+const seep = new Grimoire(host, tuneOf(['spit', 'fx_venomcloud']));
+foes = [foe(0, -20), foe(0, -8)];
+for (let s = 0; s < 2.1; s += 1 / 30) seep.update(1 / 30);
+if (seep.venom(foes[0]) !== 2 || seep.venom(foes[1])) fail('Miasma velenoso');
+fresh();
+
 // Walls: spells never pass through them (the captain's rule). A wall 6 m north of the hero, 2.5 m tall.
 host.player.pos.x = 0; host.player.pos.y = 0; host.player.pos.z = 0; host.player.facing = 0;
 const wall = world.add(0, -6, 6, 0.25, 0, 2.5);
@@ -205,6 +372,19 @@ const pinned = friar(0, -7); pinned.mates.push(pinned);
 let gaveUp = false;
 for (let t = 0; t < FRIAR.blind + 0.5; t += 0.05) { friarThink(pinned, { x: 0, y: 0, z: -2 }, world, 0.05); gaveUp ||= pinned.state === 'evade'; }
 if (!gaveUp) fail('a friar pinned behind a wall should give up');
+// the orb bursts on the wall, the squall can't throw a foe through it, the miasma stops at it
+hits.clear(); book.reset(); book.events.length = 0;
+foes = [foe(0, -9)];
+book.orb();
+run(2);
+if (book.orbs.length || dmg(foes[0]) || !book.events.some((e) => e.type === 'orb')) fail('the orb rolled through a wall');
+foes = [foe(0, -4.5)];
+host.player.pos.z = -2;
+book.squall();
+if (foes[0].z < -5.75 - 0.01) fail(`the squall threw a foe through a wall: z ${foes[0].z}`);
+foes = [foe(0, -7)];
+book.miasma();
+if (book.venom(foes[0])) fail('the miasma went through a wall');
 world.boxes.splice(world.boxes.indexOf(wall), 1);
 host.player.pos.z = 0;
 
@@ -215,4 +395,4 @@ near(me.takeDamage(100), 100 * (1 - GUARD_CUT), 'the whirl parries');
 me.update(0.2);
 near(me.takeDamage(100), 100, 'the parry ends with the whirl');
 
-console.log('spells ok (control, diminishing returns, boss resist, brains, bolts, chain, thunderbolt, leap, execute, fusions, walls, parry)');
+console.log('spells ok (control, diminishing returns, boss resist, brains, bolts, chain, thunderbolt, leap, execute, poison, fever, drain, pillar, candle, furnace, blizzard, orb, shield, rod, squall, judgment, hammer, consecrated ground, fusions, walls, parry)');

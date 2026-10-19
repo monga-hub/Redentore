@@ -242,11 +242,13 @@ export class AbilitySystem<C extends Caster = Caster> {
    * Show ability `id` on the bar as it becomes owned: in the slot the layout keeps for it, else the first empty slot, else
    * the first that only remembers an ability not owned now (SPARE order: the touch ring's thumb order), unless the player took
    * it off; with every slot taken it waits in the book. Owning it already changes nothing, so a removed one stays off.
+   * Several at once (a load replaying the picks and the tomes) are all owned before any is placed, so one waiting in the
+   * book never takes the slot the bar keeps for another.
    */
-  unlock(id: string): void {
-    if (this.owned.has(id)) return;
-    this.owned.add(id);
-    this.place(id);
+  unlock(...ids: string[]): void {
+    const fresh = ids.filter((id) => !this.owned.has(id));
+    for (const id of fresh) this.owned.add(id);
+    for (const id of fresh) this.place(id);
     this.fill();
   }
 

@@ -24,6 +24,7 @@
 //   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
+//   TOMES=plague,holy node scripts/balance.ts ...  the hero starts with those schools' tomes read (every ability of theirs; the cards offer the rest)
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
@@ -39,7 +40,7 @@ import { ABILITIES, BAR, MEND, plagueSpot, tune, wispFoe, type Forsaken } from '
 import { Grimoire } from '../src/abilities/grimoire.ts';
 import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
-import { START, levelOf, offer, tuneOf } from '../src/player/levels.ts';
+import { START, TOMES, levelOf, offer, tomeOf, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
 import { SIDE } from '../src/quest/squero.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
@@ -65,7 +66,17 @@ export const BUILDS: Record<string, string[]> = {
     'frost_deep', 'font_cd', 'lance_dmg', 'potion_big', 'cdr', 'veil_heal', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
   storm: ['chain', 'veil', 'toll', 'ward', 'leap', 'whirl', 'grace', 'fx_storm', 'charge', 'chain_fast', 'toll_long', 'whirl_dmg', 'grace_mul', 'leap_big', 'dmg', 'hp', 'armor', 'regen',
     'mana', 'chain_long', 'toll_big', 'leap_cd', 'whirl_long', 'grace_cd', 'charge_stun', 'potion_big', 'leech', 'fury', 'ward_long', 'fall_dmg'],
+  // five a school: a poisoner with the drain, a paladin, and a mage-shaman of the new fire, frost and lightning
+  venom: ['spit', 'fever', 'untore', 'miasma', 'drain', 'veil', 'spit_twin', 'fx_venomcloud', 'miasma_more', 'untore_far', 'fever_deep', 'drain_deep', 'plague_dps', 'regen', 'mana',
+    'plague_size', 'dmg', 'hp', 'armor', 'cdr', 'ward', 'potion_big', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
+  holy: ['judge', 'hallow', 'hammer', 'bubble', 'veil', 'judge_dmg', 'hallow_big', 'hammer_cd', 'bubble_cd', 'ward', 'dmg', 'hp', 'armor', 'regen', 'mana', 'fall_dmg', 'fall_third',
+    'cdr', 'leech', 'potion_big', 'strike', 'fury', 'ward_long', 'potion_cd'],
+  tempest: ['pillar', 'cero', 'blizzard', 'orb', 'shield', 'furnace', 'rod', 'squall', 'veil', 'ward', 'pillar_big', 'cero_chain', 'blizzard_big', 'orb_slow', 'shield_more', 'furnace_hot',
+    'rod_long', 'squall_big', 'regen', 'mana', 'dmg', 'hp', 'armor', 'cdr', 'fx_storm', 'potion_big', 'leech', 'fury', 'ward_long'],
 };
+
+/** TOMES=plague,holy: the abilities those schools' tomes teach, owned from the start. */
+const LEARNED = (process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, START).teaches.map((c) => c.id));
 
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
@@ -77,9 +88,13 @@ function picksTo(build: string, lv: number): string[] {
   while (picks.length < lv - 1) picks.push(choose(build, picks));
   return picks;
 }
+/** Past a build's own list, what any player would rather take: with 33 abilities in the offers, often neither card is the build's. */
+const GENERIC = ['veil', 'ward', 'pyre', 'strike', 'drain', 'cero', 'judge', 'hallow', 'spit', 'pillar', 'chain', 'grace', 'toll', 'frost', 'leap', 'whirl', 'furnace',
+  'miasma', 'fever', 'blizzard', 'wisp', 'font', 'lance', 'step', 'charge', 'nova', 'rod', 'orb', 'shield', 'squall', 'hammer', 'bubble', 'untore',
+  'dmg', 'hp', 'armor', 'leech', 'potion_big', 'regen', 'mana', 'cdr', 'fury', 'speed'];
 function choose(build: string, picks: string[]): string {
-  const pref = BUILDS[build] ?? [], rank = (id: string) => (pref.includes(id) ? pref.indexOf(id) : 999);
-  const cards = offer(picks, rnd);
+  const pref = BUILDS[build] ?? [], rank = (id: string) => (pref.includes(id) ? pref.indexOf(id) : GENERIC.includes(id) ? 500 + GENERIC.indexOf(id) : 999);
+  const cards = offer(picks, rnd, LEARNED);
   return cards.reduce((a, b) => (rank(b.id) < rank(a.id) ? b : a)).id;
 }
 
@@ -282,7 +297,7 @@ class Run {
   constructor(build: string, dodge: boolean) {
     this.build = build;
     this.dodge = dodge;
-    Object.assign(tune, tuneOf([]));
+    Object.assign(tune, tuneOf([], LEARNED));
     const c = spawnCasters(this.world, this.level.areas), a = spawnApiary(this.world);
     this.l2 = spawnLevel2(this.world);
     this.casters = [...c.all, ...a.all, ...this.l2.all];
@@ -431,7 +446,7 @@ class Run {
     }
   }
   apply(): void {
-    Object.assign(tune, tuneOf(this.picks));
+    Object.assign(tune, tuneOf(this.picks, LEARNED));
     this.worn = effects(this.gear.totals);
     this.stats.grow(tune.hp, tune.mana, this.worn.hp, this.worn.mana);
     this.stats.armor = tune.armor * (1 - this.worn.cut);
@@ -439,7 +454,7 @@ class Run {
     this.system.castMul = 1 / this.worn.haste;
     this.system.chargeMul = tune.fury;
     this.system.chargeAfter = tune.furyStart;
-    for (const id of tune.owned) this.system.unlock(id);
+    this.system.unlock(...tune.owned);
   }
   get lv(): number { return this.picks.length + 1; }
 
@@ -543,6 +558,7 @@ class Run {
     const low = s.hp / s.hpMax;
     if (low < 0.45 || (!engaged.length && low < 0.7)) { if (this.ready('potion') && this.cast('potion')) this.zone(t ? this.zoneOf(t) : 'viaggio').potions++; }
     if (engaged.length && low < 0.4 && this.ready('ward')) this.cast('ward');
+    if (engaged.length && low < 0.3 && this.stats.immune <= 0 && this.ready('bubble')) this.cast('bubble');
     if (engaged.length && low < 0.6 && s.veil <= 0 && this.ready('veil')) this.cast('veil');
 
     if (this.magic.dashing) { this.tickWorld(dt, hp0, t); return; } // carried by a leap or a charge
@@ -572,6 +588,24 @@ class Run {
         if (!this.magic.dashing && this.ready('leap') && d > 4 && d < 11) this.cast('leap');
         if (this.ready('whirl') && (around(3) >= 2 || (big && d < 3))) this.cast('whirl');
         if (this.ready('grace') && d < 2.8 && t.hp < (isCaster(t) ? t.kind.hp : FRIAR.hp) * 0.6) this.cast('grace');
+        // the five a school: instants first, then the channels and the casts
+        const nearT = (r: number) => engaged.filter((m) => Math.hypot(m.x - t.x, m.z - t.z) < r).length;
+        if (this.ready('shield') && this.magic.sparks === 0 && d < 8) this.cast('shield');
+        if (this.ready('hallow') && (around(tune.hallowR) >= 2 || (big && d < 3.5))) this.cast('hallow');
+        if (this.ready('rod') && d < 7) this.cast('rod');
+        if (this.ready('squall') && (around(tune.squallR - 1) >= 3 || (low < 0.6 && around(4) >= 2))) this.cast('squall');
+        if (this.ready('furnace') && d < tune.furnaceRange - 1 && (around(tune.furnaceRange) >= 2 || big)) this.cast('furnace');
+        if (this.ready('miasma') && (around(tune.miasmaR - 1) >= 2 || (big && d < tune.miasmaR - 1))) this.cast('miasma');
+        if (this.ready('fever') && d < 28 && (big || nearT(tune.feverR) >= 3)) this.cast('fever');
+        if (this.ready('untore') && d < 28 && this.magic.venom(t) >= 2 && nearT(tune.untoreR) >= 2) this.cast('untore');
+        if (this.ready('hammer') && d < 28 && (big || t.state === 'cast')) this.cast('hammer');
+        if (this.ready('judge') && d < 28) this.cast('judge');
+        if (this.ready('cero') && d < 28 && !this.magic.candles.has(t)) this.cast('cero');
+        if (this.ready('orb') && d < 14) this.cast('orb');
+        if (this.ready('spit') && d < 28 && (this.magic.venom(t) < tune.venomMax || cool)) this.cast('spit');
+        if (this.ready('drain') && d < 24 && (low < 0.8 || cool)) { if (this.cast('drain') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
+        if (this.ready('blizzard') && d < 25 && (big ? d > 5 : nearT(tune.blizzardR) >= 2)) { if (this.cast('blizzard') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } } // a channel: not in a big one's reach
+        if (this.ready('pillar') && d < 28 && (cool || nearT(tune.pillarR) >= 2)) { if (this.cast('pillar') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('chain') && d < 28 && (cool || around(10) >= 2)) { if (this.cast('chain') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('pyre') && d < 28 && cool) { if (this.cast('pyre') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('frost') && d < 28 && d > tune.fallRange && cool) { if (this.cast('frost') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }

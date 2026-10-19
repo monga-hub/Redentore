@@ -101,7 +101,7 @@ levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on t
   player.speed = tune.speed;
   kit.system.chargeMul = tune.fury;
   kit.system.chargeAfter = tune.furyStart;
-  for (const id of tune.owned) kit.system.unlock(id);
+  kit.system.unlock(...tune.owned); // all owned before any is placed: the bar keeps its slots across a reload
 };
 gear.onChange = () => levels.apply();
 levels.apply(); // the starter set's stats (a load lays its own again)
@@ -164,7 +164,7 @@ kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
 const MAIN = ABILITIES.find((a) => a.id === 'fall')!; // Caduta d'ossa, the swing a click-attack repeats, wherever it sits on the bar
 dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(kit.system.slots.indexOf(MAIN));
-const AIMED = new Set(['fall', 'step', 'plague', 'strike', 'pyre', 'frost', 'lance', 'chain', 'toll', 'leap', 'grace', 'charge']); // casts that go where the hero faces
+const AIMED = new Set(['fall', 'step', 'plague', 'strike', 'pyre', 'frost', 'lance', 'chain', 'toll', 'leap', 'grace', 'charge', 'spit', 'untore', 'fever', 'drain', 'pillar', 'cero', 'furnace', 'blizzard', 'orb', 'judge', 'hammer']); // casts that go where the hero faces
 kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
 const occlusion = new Occlusion([level.root, fx.torches.root], level, [ // walls drop, roofs and props in the way fade out, Diablo view
   [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], [bees.root, 0xff3b2e], [zitelle.root, 0xff3b2e], // x-ray silhouettes behind what still hides them

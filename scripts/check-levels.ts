@@ -1,4 +1,4 @@
-// Levels check (`npm run check`): the 56 upgrade cards (every ability with a school and its modifiers), the XP curve against the mobs' worth (first level after two friars, the quest
+// Levels check (`npm run check`): the 75 upgrade cards (every ability with a school and its modifiers, five abilities a school), the XP curve against the mobs' worth (first level after two friars, the quest
 // route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11, no cap), the two-card offers over many random runs to level 30 (never an owned or maxed card,
 // never a mod for a locked ability, new abilities on even levels with the specials from level 6, one past 10, fusions only
 // with both parents, every ability as likely as any other whatever was picked), the repeatable cards when everything is taken, the
@@ -23,7 +23,12 @@ for (const [xp, lv] of [[560, 8], [720, 9], [875, 9], [900, 10], [19, 1], [20, 2
 const l = levelOf(70);
 if (l.lv !== 3 || l.into !== 10 || l.next !== 60) fail(`levelOf(70) = ${JSON.stringify(l)}`);
 if (levelOf(2400 + 5).next !== need(16) || levelOf(2400 + 5).into !== 5) fail('the curve stops at 16');
-if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 56) fail('56 upgrade cards');
+if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 75) fail('75 upgrade cards');
+// Five abilities a school, the starting ones counted, the primary attack (Caduta d'ossa) and the potion apart.
+for (const school of ['bone', 'plague', 'shadow', 'fire', 'frost', 'storm', 'holy']) {
+  const of = [...START, ...CARDS.filter((c) => c.kind === 'ability').map((c) => c.id)].filter((id) => id !== 'fall' && SCHOOL[id] === school);
+  if (of.length !== 5) fail(`${school}: ${of.length} abilities (${of}), want 5`);
+}
 // Every ability card has a school, an icon of its own and two modifiers; the new ten are offered from level 2.
 const NEW = ['pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge'];
 for (const c of CARDS.filter((c) => c.kind === 'ability')) {
@@ -71,7 +76,7 @@ for (let run = 0; run < 400; run++) {
   if (t.owned.length <= START.length + 5) fail(`run ${run}: no ability learnt past level 10`);
   if (t.fury === 0 && SPECIALS.some((s) => t.owned.includes(s))) fail('a special owned but the charge bar off');
 }
-if (fusionsSeen.size !== 6) fail(`fusions offered: ${[...fusionsSeen]}`);
+if (fusionsSeen.size !== 8) fail(`fusions offered: ${[...fusionsSeen]}`);
 // No lean: whatever was picked, every ability still to learn is as likely as any other, at 4 and past 10 alike.
 for (const [before, lv] of [[['frost', 'dmg'], 4], [['chain', 'dmg'], 4], [['frost', 'dmg', 'pyre', 'hp', 'nova', 'regen', 'lance', 'mana', 'font', 'speed'], 12]] as const) {
   const seen = new Map<string, number>(), N = 20000;
@@ -87,7 +92,10 @@ if (has([], 'fx_fallplague') || !has(['plague_dps'], 'fx_fallplague')) fail('Oss
 if (has(['step'], 'fury') || has(['step'], 'fury_start') || !has(['nova'], 'fury')) fail('charge cards need a special');
 if (has(['pyre'], 'fx_shatter') || has(['frost'], 'fx_shatter') || !has(['pyre', 'lance'], 'fx_shatter')) fail('Frantumazione needs fire and frost');
 if (!has(['chain'], 'fx_storm') || !has(['toll'], 'fx_storm') || has(['frost'], 'fx_storm')) fail('Miasma elettrico needs lightning (plague is owned)');
-if (has(['whirl'], 'fx_frostwhirl') || !has(['whirl', 'font'], 'fx_frostwhirl')) fail('Turbine di brina needs the whirl and frost');
+if (has(['whirl'], 'fx_frostwhirl') || !has(['whirl', 'font'], 'fx_frostwhirl') || !has(['whirl', 'orb'], 'fx_frostwhirl')) fail('Turbine di brina needs the whirl and frost');
+if (!has(['pyre', 'blizzard'], 'fx_shatter') || !has(['rod'], 'fx_storm')) fail('the new frost and lightning open the old fusions');
+if (has([], 'fx_venomcloud') || !has(['spit'], 'fx_venomcloud') || !has(['miasma'], 'fx_venomcloud')) fail('Miasma velenoso needs a poison');
+if (has(['judge'], 'fx_holyfire') || has(['cero'], 'fx_holyfire') || !has(['judge', 'cero'], 'fx_holyfire')) fail('Giudizio ardente needs the judgment and fire');
 if (has([], 'wisp_dps') || !has(['wisp'], 'wisp_dps') || !has([], 'potion_big')) fail('mods need their ability (the potion is owned)');
 
 // Everything taken: two of the repeatable cards (the heal, the small damage and health ones), and they stack.
@@ -109,18 +117,19 @@ const learnable = CARDS.filter((c) => c.kind === 'ability').map((c) => c.id);
 if (TOMES.flatMap((t) => tomeOf(t, START).teaches.map((c) => c.id)).sort().join() !== [...learnable].sort().join()) fail('the tomes do not teach every ability');
 for (const t of TOMES) {
   const { teaches, price } = tomeOf(t, START);
-  if (teaches.length < 2 || teaches.some((c) => c.school !== t.school) || price !== teaches.reduce((s, c) => s + TOME_PRICE[c.tier!], 0)) fail(`${t.name}: ${teaches.map((c) => c.id)} for ${price}`);
+  if (teaches.length < 4 || teaches.some((c) => c.school !== t.school) || price !== teaches.reduce((s, c) => s + TOME_PRICE[c.tier!], 0)) fail(`${t.name}: ${teaches.map((c) => c.id)} for ${price}`);
 }
+if (TOMES.length !== 7 || !TOMES.some((t) => t.school === 'plague') || !TOMES.some((t) => t.school === 'holy')) fail('a tome for every school, Peste and Sacro too');
 const gelo = TOMES.find((t) => t.school === 'frost')!;
-if (tomeOf(gelo, [...START, 'frost']).price !== tomeOf(gelo, START).price - TOME_PRICE.A || tomeOf(gelo, [...START, 'frost', 'font', 'lance']).teaches.length) fail('a tome charges for what is known');
+if (tomeOf(gelo, [...START, 'frost']).price !== tomeOf(gelo, START).price - TOME_PRICE.A || tomeOf(gelo, [...START, 'frost', 'font', 'lance', 'blizzard', 'orb']).teaches.length) fail('a tome charges for what is known');
 // Learnt from a tome: owned, never offered again, its upgrades open, and the other schools still offered at the same odds.
 const tomed = tuneOf(['dmg'], ['frost', 'font', 'lance']);
 if (!['frost', 'font', 'lance'].every((id) => tomed.owned.includes(id)) || tuneOf([], ['hp', 'nope']).owned.join() !== START.join()) fail(`tome abilities owned: ${tomed.owned}`);
 if (tuneOf(['frost'], ['frost']).owned.filter((id) => id === 'frost').length !== 1) fail('an ability picked and learnt counts once');
 {
-  const ok = eligible(['dmg'], ['frost', 'font', 'lance']);
-  if (ok.some((c) => c.school === 'frost') || !ok.some((c) => c.id === 'frost_fast') || !ok.some((c) => c.id === 'pyre')) fail('tome abilities in the offers');
-  for (let i = 0; i < 500; i++) if (offer(['dmg'], rnd, ['frost', 'font', 'lance']).some((c) => c.kind === 'ability' && c.school === 'frost')) fail('a learnt ability offered');
+  const gelo = ['frost', 'font', 'lance', 'blizzard', 'orb'], ok = eligible(['dmg'], gelo);
+  if (ok.some((c) => c.school === 'frost') || !ok.some((c) => c.id === 'frost_fast') || !ok.some((c) => c.id === 'orb_slow') || !ok.some((c) => c.id === 'pyre')) fail('tome abilities in the offers');
+  for (let i = 0; i < 500; i++) if (offer(['dmg'], rnd, gelo).some((c) => c.kind === 'ability' && c.school === 'frost')) fail('a learnt ability offered');
   if (has(['pyre'], 'fx_shatter') || !eligible(['pyre'], ['lance']).some((c) => c.id === 'fx_shatter')) fail('a fusion needs a tome ability');
 }
 
@@ -155,4 +164,12 @@ const later = ['nova', 'veil', 'strike', 'step', 'ward'];
 const run = new AbilitySystem([...START, ...later].map(ab), BAR, { player: { pos: { x: 0, y: 0, z: 0 } } }, START);
 for (const id of later) run.unlock(id);
 if (run.layout().bar.join() !== ['fall', 'plague', 'mend', ...later, null, 'potion'].join()) fail(`unlocks out of thumb order: ${run.layout().bar}`);
+// A reload with a full bar and abilities waiting in the book (tomes): replaying them all keeps every slot where it was.
+{
+  const kept = ['fall', 'miasma', 'spit', 'fever', 'pillar', 'furnace', 'blizzard', 'squall', 'hallow', 'potion'], book = ['leap', 'whirl', 'grace', 'untore'];
+  const ids = [...new Set([...START, ...kept, ...book])];
+  const re = new AbilitySystem(ids.map(ab), kept, { player: { pos: { x: 0, y: 0, z: 0 } } }, START, ['plague', 'mend']);
+  re.unlock(...book, ...kept);
+  if (re.layout().bar.join() !== kept.join()) fail(`a reload scrambled the bar: ${re.layout().bar}`);
+}
 console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 400 runs to level 30 offered cleanly, offers even, ${TOMES.length} tomes)`);

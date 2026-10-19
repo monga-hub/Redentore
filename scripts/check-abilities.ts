@@ -1,9 +1,12 @@
 // Headless ability-system check (`npm run check`): GCD, off-GCD, a GCD per school, cooldowns, one cast per
 // key press, cast completion and movement interrupts, cast pushback from hits, channel ticks, mana costs, charge bar and
-// specials, player stats (Velo spettrale, immunity), dragging slots around the bar and remembering it.
+// specials, player stats (Velo spettrale, immunity), dragging slots around the bar and remembering it; and the kit's table:
+// every ability card has its ability, a school, a painted icon in the atlas and a tooltip with real numbers.
 import { AbilitySystem, CHARGE_MAX, GCD, PUSHBACK, PUSHBACKS, loadBar, saveBar, type Ability } from '../src/abilities/system.ts';
 import { PlayerStats } from '../src/player/stats.ts';
-import { plagueSpot } from '../src/abilities/forsaken.ts';
+import { ABILITIES, plagueSpot } from '../src/abilities/forsaken.ts';
+import { CARDS, SCHOOL } from '../src/player/levels.ts';
+import { ATLAS } from '../src/ui/iconAtlas.ts';
 
 const fired: string[] = [];
 const ab = (id: string, extra: Partial<Ability> = {}): Ability =>
@@ -215,4 +218,14 @@ push.tryCast(1);
 push.update(0.5, () => false);
 push.pushback();
 if ((push.casting!.t as number) !== 0.5) throw new Error('channels are not set back');
-console.log('abilities ok');
+// The kit's table: one ability per card, each with a school (its GCD), an icon of the atlas and a tooltip with no holes.
+const table = new Map(ABILITIES.map((a) => [a.id, a]));
+for (const c of CARDS) if (c.kind === 'ability' && !table.has(c.id)) throw new Error(`card ${c.id} has no ability`);
+for (const a of ABILITIES) {
+  if (a.id !== 'potion' && (!a.school || a.school !== SCHOOL[a.id])) throw new Error(`${a.id} has no school`); // the potion: the shared GCD-free slot
+  if (!(ATLAS as readonly string[]).includes(a.icon)) throw new Error(`${a.id}: icon ${a.icon} not in the atlas`);
+  if (/undefined|NaN/.test(a.desc) || !/\d/.test(a.desc)) throw new Error(`${a.id}: tooltip "${a.desc}"`);
+  if (!(a.cooldown >= 0) || (a.mana !== undefined && !(a.mana > 0))) throw new Error(`${a.id}: cooldown ${a.cooldown}, mana ${a.mana}`);
+}
+for (const c of CARDS) if (c.kind !== 'filler' && !(ATLAS as readonly string[]).includes(c.icon)) throw new Error(`card ${c.id}: icon ${c.icon} not in the atlas`);
+console.log(`abilities ok (${ABILITIES.length} in the kit)`);

@@ -1,5 +1,5 @@
-// Crowd control on enemies, WoW style: slows (chill), roots (frozen in ice), stuns, and burning for the
-// looks. Every mob carries one `Control`; abilities lay effects on it (abilities/grimoire.ts), the brains
+// Crowd control on enemies, WoW style: slows (chill), roots (frozen in ice), stuns, burning and poison for the
+// looks, and Febbre di palude's vulnerability (every hit lands harder). Every mob carries one `Control`; abilities lay effects on it (abilities/grimoire.ts), the brains
 // read it (brain.ts, caster.ts: a stunned mob does nothing and loses its cast, a rooted one can't walk,
 // a slowed one walks slower) and the views tint and freeze the bodies (friars.ts, priests.ts, bees.ts).
 // Hard control (roots, stuns) has diminishing returns per mob: each one within DR_RESET s of the last
@@ -15,12 +15,15 @@ export interface Control {
   root: number; // s frozen in place
   stun: number; // s stunned
   burn: number; // s burning (damage is the caster's, this is the look)
+  poison: number; // s poisoned (the same: the look)
+  vuln: number; // s exposed: every hit lands vulnK harder (the brains' `hurt`)
+  vulnK: number;
   dr: number; // hard controls in a row
   drT: number; // s since the last one
   resist: number; // 0..1: durations ×, slows ×
 }
 
-export const control = (resist = 1): Control => ({ slow: 0, slowK: 1, root: 0, stun: 0, burn: 0, dr: 0, drT: DR_RESET, resist });
+export const control = (resist = 1): Control => ({ slow: 0, slowK: 1, root: 0, stun: 0, burn: 0, poison: 0, vuln: 0, vulnK: 0, dr: 0, drT: DR_RESET, resist });
 
 /** Every frame: timers run down (the evading and the dead are cleared by `clear`). */
 export function tick(c: Control, dt: number): void {
@@ -28,11 +31,13 @@ export function tick(c: Control, dt: number): void {
   c.root = Math.max(0, c.root - dt);
   c.stun = Math.max(0, c.stun - dt);
   c.burn = Math.max(0, c.burn - dt);
+  c.poison = Math.max(0, c.poison - dt);
+  c.vuln = Math.max(0, c.vuln - dt);
   if ((c.drT += dt) >= DR_RESET) c.dr = 0;
 }
 
 export function clear(c: Control): void {
-  c.slow = c.root = c.stun = c.burn = 0;
+  c.slow = c.root = c.stun = c.burn = c.poison = c.vuln = 0;
   c.slowK = 1;
 }
 
@@ -63,6 +68,15 @@ export function stun(c: Control, t: number): number {
   c.stun = Math.max(c.stun, d);
   return d;
 }
+
+/** Exposed for `t` s: every hit lands `k` harder (+0.2 = +20%); resist halves it at most, so the bosses take a little more, not much. */
+export function expose(c: Control, t: number, k: number): void {
+  c.vulnK = Math.max(c.vuln > 0 ? c.vulnK : 0, k * Math.max(c.resist, 0.5));
+  c.vuln = Math.max(c.vuln, t);
+}
+
+/** Damage `n` as an exposed mob takes it. */
+export const exposed = (c: Control | undefined, n: number) => (c && c.vuln > 0 ? n * (1 + c.vulnK) : n);
 
 /** How fast the mob may walk now: 0 rooted or stunned, the chill's share slowed. */
 export const pace = (c: Control) => (c.stun > 0 || c.root > 0 ? 0 : c.slow > 0 ? c.slowK : 1);

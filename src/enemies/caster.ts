@@ -7,7 +7,7 @@
 // helpers it shares; priests.ts puts models and spell effects on top.
 import type { World } from '../core/physics.ts';
 import { RISE, face, feet, walk, type Target } from './brain.ts';
-import { clear, control, pace, tick, type Control } from './control.ts';
+import { clear, control, exposed, pace, tick, type Control } from './control.ts';
 
 export interface CasterKind {
   hp: number; xp: number; aggro: number; leash: number; blind: number; range: number; keep: number; backoff: number;
@@ -653,7 +653,7 @@ export function rise(f: Priest, p: Target, world: World, rnd: () => number = Mat
 export function hurt(f: Priest, n: number): boolean {
   if (f.state === 'dead' || f.state === 'evade' || n <= 0) return false;
   if (veiled(f)) n *= 1 - f.kind.veil!.cut; // the Governatrice's veil
-  f.hp -= n;
+  f.hp -= exposed(f.cc, n); // Febbre di palude
   if (f.hp > 0) { pull(f); return false; }
   f.hp = 0;
   enter(f, 'dead');

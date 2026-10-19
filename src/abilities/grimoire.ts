@@ -1,30 +1,38 @@
 // The rules of the fire, frost and lightning spells and the new blows, without their looks: bolts that home
 // on their mark, burning floors, the burning on a foe, the chain of lightning, the bell tower's thunderbolt
 // falling a beat after the call, the leap and the charge carrying the hero, the crowd control they lay
-// (enemies/control.ts). The game's Forsaken kit (forsaken.ts) draws every one of them from `bolts`, `fires`,
-// `tolls`, `dash` and the `events` they leave; scripts/balance.ts plays the same rules with no looks at all.
+// (enemies/control.ts); and the rest of the five a school: poison stacking on a foe and spreading, the fever,
+// the drain, fire pillars, candles and the furnace, the blizzard and the rolling orb, the lightning shield,
+// rods and the squall's knockback, the judgment, the consecrated ground and the hammer. The game's Forsaken kit
+// (forsaken.ts) draws every one of them from `bolts`, `fires`, `tolls`, `pillars`, `orbs`, `rods`, `hallows`,
+// `dash` and the `events` they leave; scripts/balance.ts plays the same rules with no looks at all.
 // No three.js here.
 import type { World } from '../core/physics.ts';
 import { FRIAR } from '../enemies/brain.ts';
-import { chill, chilled, frozen, root, stun, type Control } from '../enemies/control.ts';
+import { chill, chilled, expose, frozen, root, stun, type Control } from '../enemies/control.ts';
 import type { Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 
 interface P { x: number; y: number; z: number }
-export type BoltKind = 'pyre' | 'frost' | 'lance';
+export type BoltKind = 'pyre' | 'frost' | 'lance' | 'venom' | 'judge' | 'hammer';
 export interface Bolt { kind: BoltKind; x: number; y: number; z: number; to: Mob; speed: number; t: number; dmg: number }
 export interface Fire { x: number; y: number; z: number; r: number; t: number; life: number; dps: number }
 export interface Toll { x: number; y: number; z: number; t: number }
+export interface Zone { x: number; y: number; z: number; r: number; t: number; life: number }
+export interface Orb { x: number; y: number; z: number; dx: number; dz: number; left: number; tick: number }
+export interface Rod { x: number; y: number; z: number; t: number; tick: number }
 export interface Dash { kind: 'leap' | 'charge'; pts: P[]; len: number; t: number; total: number; to?: Mob }
 /** Something the looks should show where it happened (`pts`: the chain's path, hand first). */
 export type SpellEvent =
-  | { type: 'pyre' | 'frost' | 'lance' | 'shatter' | 'thaw' | 'font' | 'toll' | 'leap' | 'charge' | 'grace' | 'fizzle' | 'wall'; x: number; y: number; z: number; big?: boolean; kind?: BoltKind }
-  | { type: 'chain'; pts: P[] };
+  | { type: 'pyre' | 'frost' | 'lance' | 'shatter' | 'thaw' | 'font' | 'toll' | 'leap' | 'charge' | 'grace' | 'fizzle' | 'wall'
+      | 'venom' | 'judge' | 'hammer' | 'miasma' | 'fever' | 'pillar' | 'cero' | 'furnace' | 'blizzard' | 'orb' | 'squall' | 'hallow'; x: number; y: number; z: number; big?: boolean; kind?: BoltKind; r?: number; dir?: number }
+  | Path<'chain' | 'zap' | 'drain' | 'spread'>;
+type Path<T> = T extends string ? { type: T; pts: P[] } : never; // one member each, so a `type` check narrows
 
 export const RANGE = 30; // m: bolts, the chain and the thunderbolt reach this far
 const ARC = 0.5; // no target: the nearest foe within ~120° in front
 const CHEST = 1.2; // m above the feet where bolts strike
-const SPEED: Record<BoltKind, number> = { pyre: 14, frost: 20, lance: 34 };
+const SPEED: Record<BoltKind, number> = { pyre: 14, frost: 20, lance: 34, venom: 22, judge: 30, hammer: 26 };
 const SPLASH = 0.5; // the fireball's share on its neighbours
 const BURN = { t: 4, dps: 8 }; // the fireball sets its mark burning
 const FIRE = { life: 4, dps: 12 }; // and the floor under it
@@ -40,6 +48,21 @@ const LEAP = { range: 12, time: 0.55, stop: 1.2, stun: 1, over: 1.3 }; // over: 
 const CHARGE = { min: 4, max: 20, speed: 24, stop: 1.3 };
 const WHIRL_R = 3, WHIRL_CHILL = 0.6, WHIRL_FROZEN = 2;
 const GRACE = { range: 3, arc: Math.cos(1.1) };
+const VENOM_T = 8; // s a dose of poison lasts (a new dose refreshes them all)
+const UNTORE_MIN = 2; // doses Unguento dell'untore passes on at least
+const FEVER_T = 12;
+const DRAIN_RANGE = 25;
+const PILLAR_DELAY = 0.5;
+const CERO = { t: 4, r: 4, chain: 2 };
+const FURNACE = { arc: Math.cos(0.8), stun: 2 };
+const BLIZZARD_CHILL = 0.5;
+const ORB = { range: 15, r: 3.5, tick: 0.5, burst: 40, chill: 0.6 };
+const SHIELD = { t: 20, r: 3, every: 1 };
+const ROD = { r: 9, top: 2.6, max: 2 };
+const SQUALL_PUSH = 5; // m, × the foe's resist
+const HALLOW = { t: 8, heal: 0.01, max: 2 };
+const HAMMER_DMG = 30;
+const HOLY_FIRE = 1.5; // Giudizio ardente on the burning
 
 /** What the grimoire needs from whoever casts: the hero, the damage dealer, the foes, the plague clouds. */
 export interface Host {
@@ -47,8 +70,10 @@ export interface Host {
   hurt?: (inside: (x: number, z: number, mob: Mob) => boolean, n: number) => void;
   aimed?: () => Mob | undefined;
   foes?: () => Iterable<Mob>;
-  /** A plague cloud covers (x, z) (Miasma elettrico). */
+  /** A plague cloud covers (x, z) (Miasma elettrico, Miasma velenoso). */
   clouded?: (x: number, z: number) => boolean;
+  /** The hero's health: the drain and the consecrated ground heal it. */
+  stats?: { hpMax: number; heal(n: number): number };
 }
 
 const alive = (m: Mob) => m.state !== 'dead' && m.state !== 'evade';
@@ -62,6 +87,20 @@ export class Grimoire {
   fires: Fire[] = [];
   tolls: Toll[] = [];
   dash?: Dash;
+  pillars: Toll[] = []; // Colonna di fiamme, waiting to fall
+  orbs: Orb[] = [];
+  rods: Rod[] = [];
+  hallows: Zone[] = [];
+  /** Bufera di bora's spot while it is channelled. */
+  blizzardAt?: P;
+  /** Scudo di saette: charges left, s left, s to the next zap. */
+  sparks = 0;
+  sparkT = 0;
+  private sparkCd = 0;
+  /** Poison doses on each foe and s left; Cero funebre's candles (`child`: lit by another's burst, it won't spread). */
+  readonly poisons = new Map<Mob, { n: number; t: number }>();
+  readonly candles = new Map<Mob, { t: number; child: boolean }>();
+  private seepT = 1;
   /** Since the looks last read them (forsaken.ts drains it every frame; the balance bench clears it). */
   events: SpellEvent[] = [];
   private burns = new Map<Mob, number>();
@@ -110,7 +149,7 @@ export class Grimoire {
   shoot(kind: BoltKind, from: P): void {
     const to = this.target();
     if (!to) { this.events.push({ type: 'fizzle', ...from }); return; }
-    const t = this.tune, dmg = kind === 'pyre' ? t.pyreDmg : kind === 'frost' ? t.frostDmg : t.lanceDmg;
+    const t = this.tune, dmg = { pyre: t.pyreDmg, frost: t.frostDmg, lance: t.lanceDmg, venom: t.spitDmg, judge: t.judgeDmg, hammer: HAMMER_DMG }[kind];
     this.bolts.push({ kind, x: from.x, y: from.y, z: from.z, to, speed: SPEED[kind], t: 0, dmg });
   }
 
@@ -127,11 +166,22 @@ export class Grimoire {
       }
       this.hit(m, dmg);
       for (const o of this.near(m, t.pyreR)) if (o !== m) this.hit(o, b.dmg * SPLASH);
-      this.burns.set(m, BURN.t);
-      if (c) c.burn = BURN.t;
-      this.fires.push({ ...at, r: t.pyreR * 0.8, t: FIRE.life, life: FIRE.life, dps: FIRE.dps });
-      if (this.fires.length > 4) this.fires.shift();
+      this.ignite(m);
+      this.floor(at, t.pyreR * 0.8);
       this.events.push({ type: 'pyre', ...at, big: true });
+    } else if (b.kind === 'venom') {
+      this.hit(m, b.dmg);
+      this.envenom(m, t.spitStacks);
+      this.events.push({ type: 'venom', ...at });
+    } else if (b.kind === 'judge') {
+      const burning = this.burns.has(m);
+      this.hit(m, t.fxHolyFire && burning ? b.dmg * HOLY_FIRE : b.dmg);
+      if (t.fxHolyFire) this.ignite(m);
+      this.events.push({ type: 'judge', ...at, big: t.fxHolyFire && burning });
+    } else if (b.kind === 'hammer') {
+      this.hit(m, b.dmg);
+      if (c) stun(c, t.hammerStun);
+      this.events.push({ type: 'hammer', ...at, big: true });
     } else if (b.kind === 'frost') {
       this.hit(m, b.dmg);
       if (c) chill(c, CHILL_T, t.frostSlow);
@@ -142,6 +192,187 @@ export class Grimoire {
       if (shatter && t.lanceSplit) for (const o of this.near(m, LANCE_R)) if (o !== m) this.hit(o, b.dmg * LANCE_FROZEN * LANCE_SPLIT);
       this.events.push({ type: shatter ? 'shatter' : 'lance', ...at, big: shatter });
     }
+  }
+
+  /** `m` burns for BURN.t s (the look on its control too). */
+  private ignite(m: Mob): void {
+    this.burns.set(m, BURN.t);
+    if (m.cc) m.cc.burn = BURN.t;
+  }
+  /** The floor at `at` burns for FIRE.life s; four at most, the oldest gives way. */
+  private floor(at: P, r: number): void {
+    this.fires.push({ x: at.x, y: at.y, z: at.z, r, t: FIRE.life, life: FIRE.life, dps: FIRE.dps });
+    if (this.fires.length > 4) this.fires.shift();
+  }
+  /** The target's feet, or 8 m ahead short of a wall: where Rintocco, Colonna di fiamme and Bufera di bora come down. */
+  private mark(): P {
+    const p = this.host.player.pos, f = this.host.player.facing, m = this.target();
+    if (m) return { x: m.x, y: m.y, z: m.z };
+    const k = Math.max(0, this.host.player.world.ray(p.x, p.y + 1.2, p.z, p.x - Math.sin(f) * 8, p.y + 1.2, p.z - Math.cos(f) * 8) - 0.06);
+    return { x: p.x - Math.sin(f) * 8 * k, y: p.y, z: p.z - Math.cos(f) * 8 * k };
+  }
+
+  // --- poison: Sputo di bile, Unguento dell'untore, Fiato della fossa, Febbre di palude ---
+
+  /** Doses of poison on `m`. */
+  venom(m: Mob): number {
+    return this.poisons.get(m)?.n ?? 0;
+  }
+  /** `n` more doses on `m` (up to tune.venomMax), all of them refreshed. */
+  envenom(m: Mob, n: number): void {
+    const k = Math.min(this.tune.venomMax, this.venom(m) + n);
+    if (k <= 0) return;
+    this.poisons.set(m, { n: k, t: VENOM_T });
+    if (m.cc) m.cc.poison = VENOM_T;
+  }
+  /** Unguento dell'untore: the target is hurt and its poison (UNTORE_MIN doses at least) passes to every foe near it. */
+  untore(from: P): void {
+    const m = this.target(), t = this.tune;
+    if (!m) { this.events.push({ type: 'fizzle', ...from }); return; }
+    const n = Math.max(UNTORE_MIN, this.venom(m)), pts: P[] = [{ x: m.x, y: m.y + CHEST, z: m.z }];
+    this.hit(m, t.untoreDmg);
+    this.envenom(m, n - this.venom(m));
+    for (const o of this.near(m, t.untoreR)) if (o !== m) { this.envenom(o, n - this.venom(o)); pts.push({ x: o.x, y: o.y + CHEST, z: o.z }); }
+    this.events.push({ type: 'spread', pts });
+  }
+  /** Fiato della fossa: a ring of miasma from the hero. */
+  miasma(): void {
+    const p = this.host.player.pos, t = this.tune;
+    for (const m of this.near(p, t.miasmaR)) { this.hit(m, t.miasmaDmg); this.envenom(m, t.miasmaStacks); }
+    this.events.push({ type: 'miasma', ...p, r: t.miasmaR });
+  }
+  /** Febbre di palude: the target and those round it take more from every hit for FEVER_T s. */
+  fever(): void {
+    const m = this.target(), t = this.tune;
+    if (!m) return;
+    for (const o of new Set([m, ...this.near(m, t.feverR)])) if (o.cc) expose(o.cc, FEVER_T, t.feverK);
+    this.events.push({ type: 'fever', x: m.x, y: m.y, z: m.z, r: t.feverR });
+  }
+
+  // --- shadow: Risucchio d'anima ---
+
+  /** One tick of the drain from `from` (the hands): the target hurt, the hero healed; false with no target in reach and sight. */
+  drain(from: P): boolean {
+    const m = this.target(DRAIN_RANGE), t = this.tune, s = this.host.stats;
+    if (!m) return false;
+    this.hit(m, t.drainDmg);
+    s?.heal(s.hpMax * t.drainHeal);
+    this.events.push({ type: 'drain', pts: [{ x: m.x, y: m.y + CHEST, z: m.z }, { ...from }] });
+    return true;
+  }
+
+  // --- fire: Colonna di fiamme, Cero funebre, Fornace di Murano ---
+
+  /** Colonna di fiamme: marked under the target, it falls PILLAR_DELAY s later. */
+  pillar(): void {
+    this.pillars.push({ ...this.mark(), t: PILLAR_DELAY });
+  }
+  private blaze(k: Toll): void {
+    const t = this.tune;
+    for (const m of this.near(k, t.pillarR)) { this.hit(m, t.pillarDmg); this.ignite(m); }
+    this.floor(k, t.pillarR * 0.8);
+    this.events.push({ type: 'pillar', x: k.x, y: k.y, z: k.z, r: t.pillarR, big: true });
+  }
+  /** Cero funebre: a candle lit in the target, burning CERO.t s before it bursts. */
+  cero(from: P): void {
+    const m = this.target();
+    if (!m) { this.events.push({ type: 'fizzle', ...from }); return; }
+    this.candles.set(m, { t: CERO.t, child: false });
+  }
+  private burst(m: Mob, child: boolean): void {
+    const t = this.tune;
+    let lit = 0;
+    for (const o of this.near(m, CERO.r)) {
+      this.hit(o, t.ceroDmg);
+      if (t.ceroChain && !child && o !== m && lit < CERO.chain && !this.candles.has(o)) { this.candles.set(o, { t: CERO.t, child: true }); lit++; }
+    }
+    this.events.push({ type: 'cero', x: m.x, y: m.y, z: m.z, r: CERO.r, big: true });
+  }
+  /** Fornace di Murano: the furnace's breath in a cone ahead, burning and stunning. */
+  furnace(): void {
+    const h = this.host.player, p = h.pos, fx = -Math.sin(h.facing), fz = -Math.cos(h.facing), t = this.tune;
+    for (const m of this.near(p, t.furnaceRange)) {
+      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
+      if (d > 0.8 && (dx * fx + dz * fz) / d < FURNACE.arc) continue;
+      this.hit(m, t.furnaceDmg);
+      this.ignite(m);
+      if (m.cc) stun(m.cc, FURNACE.stun);
+    }
+    this.events.push({ type: 'furnace', ...p, r: t.furnaceRange, dir: h.facing });
+  }
+
+  // --- frost: Bufera di bora, Globo di brina ---
+
+  /** Bufera di bora: where it blows, chosen as the channel starts. */
+  blizzardStart(): void {
+    this.blizzardAt = this.mark();
+  }
+  /** One gust: hurt and chill everyone in the storm. */
+  blizzard(): void {
+    const at = this.blizzardAt, t = this.tune;
+    if (!at) return;
+    for (const m of this.near(at, t.blizzardR)) { this.hit(m, t.blizzardDmg); if (m.cc) chill(m.cc, 2, BLIZZARD_CHILL); }
+    this.events.push({ type: 'blizzard', ...at, r: t.blizzardR });
+  }
+  /** Globo di brina: rolls from the hero towards the target (or ahead) ORB.range m, stopping at a wall. */
+  orb(): void {
+    const h = this.host.player, p = h.pos, m = this.target();
+    let dx = -Math.sin(h.facing), dz = -Math.cos(h.facing);
+    if (m) { const d = Math.max(flat(m, p), 1e-3); dx = (m.x - p.x) / d; dz = (m.z - p.z) / d; }
+    this.orbs.push({ x: p.x + dx * 0.8, y: p.y, z: p.z + dz * 0.8, dx, dz, left: ORB.range, tick: 0 });
+  }
+  private shatterOrb(o: Orb): void {
+    for (const m of this.near(o, ORB.r)) { this.hit(m, ORB.burst); if (m.cc) chill(m.cc, 3, ORB.chill); }
+    this.events.push({ type: 'orb', x: o.x, y: o.y, z: o.z, r: ORB.r, big: true });
+  }
+
+  // --- lightning: Scudo di saette, Parafulmine, Burrasca ---
+
+  /** Scudo di saette: charges round the hero for SHIELD.t s. */
+  shield(): void {
+    this.sparks = this.tune.shieldOrbs;
+    this.sparkT = SHIELD.t;
+    this.sparkCd = 0;
+  }
+  /** A bolt of `n` from `from` at `m` (the shield, the rods): +50% on the clouded with Miasma elettrico. */
+  private zap(from: P, m: Mob, n: number): void {
+    this.hit(m, this.tune.fxStorm && this.host.clouded?.(m.x, m.z) ? n * STORM : n);
+    this.events.push({ type: 'zap', pts: [from, { x: m.x, y: m.y + CHEST, z: m.z }] });
+  }
+  private nearest(c: P, r: number): Mob | undefined {
+    let best: Mob | undefined, bd = r;
+    for (const m of this.near(c, r)) { const d = flat(m, c); if (d < bd) { bd = d; best = m; } }
+    return best;
+  }
+  /** Parafulmine at the hero's feet; ROD.max at once, the oldest gives way. */
+  rod(): void {
+    const p = this.host.player.pos;
+    this.rods.push({ x: p.x, y: p.y, z: p.z, t: this.tune.rodTime, tick: 0.3 });
+    if (this.rods.length > ROD.max) this.rods.shift();
+  }
+  /** Burrasca: a thunderclap round the hero, every foe thrown back (by its resist: the bosses barely budge). */
+  squall(): void {
+    const p = this.host.player.pos, t = this.tune, w = this.host.player.world;
+    for (const m of this.near(p, t.squallR)) {
+      this.hit(m, t.squallDmg);
+      const d = Math.max(flat(m, p), 1e-3), dx = (m.x - p.x) / d, dz = (m.z - p.z) / d;
+      for (let s = 0; s < SQUALL_PUSH * (m.cc?.resist ?? 1); s += 0.25) { // step by step: a wall, a ledge or the water stops it
+        const x = m.x + dx * 0.25, z = m.z + dz * 0.25, g = w.groundAt(x, z, m.y + 0.6);
+        if (g === -Infinity || Math.abs(g - m.y) > 0.6 || w.blocked(x, z, g)) break;
+        m.x = x; m.z = z; m.y = g;
+      }
+    }
+    this.events.push({ type: 'squall', ...p, r: t.squallR, big: true });
+  }
+
+  // --- holy: Terra consacrata (Giudizio and the hammer are bolts) ---
+
+  /** Terra consacrata under the hero; HALLOW.max at once. */
+  hallow(): void {
+    const p = this.host.player.pos;
+    this.hallows.push({ x: p.x, y: p.y, z: p.z, r: this.tune.hallowR, t: HALLOW.t, life: HALLOW.t });
+    if (this.hallows.length > HALLOW.max) this.hallows.shift();
+    this.events.push({ type: 'hallow', ...p, r: this.tune.hallowR });
   }
 
   /** Acquasantiera gelata: everyone round the hero is hurt and frozen in place. */
@@ -180,10 +411,7 @@ export class Grimoire {
 
   /** Rintocco del campanile: a mark on the target's floor (or 8 m ahead), struck TOLL_DELAY s later. */
   toll(): void {
-    const p = this.host.player.pos, f = this.host.player.facing, m = this.target();
-    const k = m ? 1 : Math.max(0, this.host.player.world.ray(p.x, p.y + 1.2, p.z, p.x - Math.sin(f) * 8, p.y + 1.2, p.z - Math.cos(f) * 8) - 0.06); // no foe: 8 m ahead, short of a wall
-    const at = m ? { x: m.x, y: m.y, z: m.z } : { x: p.x - Math.sin(f) * 8 * k, y: p.y, z: p.z - Math.cos(f) * 8 * k };
-    this.tolls.push({ ...at, t: TOLL_DELAY });
+    this.tolls.push({ ...this.mark(), t: TOLL_DELAY });
   }
 
   private strike(k: Toll): void {
@@ -322,6 +550,56 @@ export class Grimoire {
       this.hit(m, BURN.dps * dt);
     }
     for (let i = this.tolls.length - 1; i >= 0; i--) if ((this.tolls[i].t -= dt) <= 0) this.strike(this.tolls.splice(i, 1)[0]);
+    for (let i = this.pillars.length - 1; i >= 0; i--) if ((this.pillars[i].t -= dt) <= 0) this.blaze(this.pillars.splice(i, 1)[0]);
+    const t = this.tune, w = this.host.player.world;
+    for (const [m, v] of this.poisons) {
+      if (!alive(m) || v.t <= dt) { this.poisons.delete(m); if (m.cc) m.cc.poison = 0; continue; }
+      v.t -= dt;
+      this.hit(m, v.n * t.venomDps * dt);
+    }
+    if (t.fxVenomCloud && (this.seepT -= dt) <= 0) { // Miasma velenoso: a dose a second in the clouds
+      this.seepT = 1;
+      for (const m of this.host.foes?.() ?? []) if (alive(m) && this.host.clouded?.(m.x, m.z)) this.envenom(m, 1);
+    }
+    for (const [m, c] of this.candles) {
+      if (alive(m)) this.hit(m, t.ceroDps * Math.min(dt, c.t));
+      if ((c.t -= dt) <= 0 || !alive(m)) { this.candles.delete(m); this.burst(m, c.child); }
+    }
+    for (let i = this.orbs.length - 1; i >= 0; i--) {
+      const o = this.orbs[i], s = Math.min(t.orbSpeed * dt, o.left), nx = o.x + o.dx * s, nz = o.z + o.dz * s;
+      const g = w.groundAt(nx, nz, o.y + 0.8);
+      if (w.ray(o.x, o.y + 1, o.z, nx, o.y + 1, nz) < 1 || g === -Infinity || Math.abs(g - o.y) > 0.8) { this.orbs.splice(i, 1); this.shatterOrb(o); continue; }
+      o.x = nx; o.z = nz; o.y = g; o.left -= s;
+      if ((o.tick -= dt) <= 0) {
+        o.tick += ORB.tick;
+        for (const m of this.near(o, ORB.r)) { this.hit(m, t.orbDmg); if (m.cc) chill(m.cc, 2, ORB.chill); }
+      }
+      if (o.left <= 0) { this.orbs.splice(i, 1); this.shatterOrb(o); }
+    }
+    if (this.sparks > 0) {
+      this.sparkCd -= dt;
+      if ((this.sparkT -= dt) <= 0) this.sparks = 0;
+      else if (this.sparkCd <= 0) {
+        const m = this.nearest(p, SHIELD.r);
+        if (m) { this.zap({ x: p.x, y: p.y + CHEST, z: p.z }, m, t.shieldDmg); this.sparks--; this.sparkCd = SHIELD.every; }
+      }
+    }
+    for (let i = this.rods.length - 1; i >= 0; i--) {
+      const r = this.rods[i];
+      if ((r.tick -= dt) <= 0) {
+        r.tick += t.rodEvery;
+        const m = this.nearest(r, ROD.r);
+        if (m) this.zap({ x: r.x, y: r.y + ROD.top, z: r.z }, m, t.rodDmg);
+      }
+      if ((r.t -= dt) <= 0) this.rods.splice(i, 1);
+    }
+    for (let i = this.hallows.length - 1; i >= 0; i--) {
+      const z = this.hallows[i];
+      this.host.hurt?.((x, zz, m) => Math.hypot(x - z.x, zz - z.z) < z.r && w.sees(z, m), t.hallowDps * dt);
+      const s = this.host.stats;
+      if (s && Math.hypot(p.x - z.x, p.z - z.z) < z.r && Math.abs(p.y - z.y) < 1.5) s.heal(s.hpMax * HALLOW.heal * dt);
+      if ((z.t -= dt) <= 0) this.hallows.splice(i, 1);
+    }
     const k = this.dash;
     if (k) {
       const u = Math.min(1, (k.t += dt) / k.total);
@@ -333,8 +611,12 @@ export class Grimoire {
 
   /** The hero fell: whatever was flying or burning is gone. */
   reset(): void {
-    this.bolts.length = this.fires.length = this.tolls.length = 0;
+    this.bolts.length = this.fires.length = this.tolls.length = this.pillars.length = this.orbs.length = this.rods.length = this.hallows.length = 0;
     this.burns.clear();
+    this.poisons.clear();
+    this.candles.clear();
+    this.sparks = 0;
+    this.blizzardAt = undefined;
     this.dash = undefined;
   }
 }

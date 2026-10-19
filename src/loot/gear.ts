@@ -105,7 +105,7 @@ const DEFS: [string, string, Slot, Rarity, string, string?][] = [
   ['ruta-oro', 'Ruta d’oro di Fra’ Bortolo', 'amuleto', 'epico', 'spirito intelletto potenza', 'Un rametto d’erba della grazia, chiuso nell’oro.'],
   ['anello-1576', 'Anello del voto del 1576', 'anello', 'epico', 'critico potenza vigore', 'Dentro la fascia: «Liberaci, e ti alzeremo un tempio».'],
   // Fra' Zuane's thanks for his corona (quest/view.ts): no table rolls a legendary piece.
-  ['medaglia-portinaio', 'Medaglia del portinaio', 'amuleto', 'leggendario', 'vigore spirito critico', 'San Francesco, consumato da quattro secoli di Ave Maria. «Ti guardi le spalle, dove io non arrivo.»'],
+  ['medaglia-portinaio', 'Medaglia del portinaio', 'amuleto', 'leggendario', 'vigore spirito', 'San Francesco, consumato da quattro secoli di Ave Maria. Ti guarda le spalle, dove Fra’ Zuane non arriva.'],
 ];
 
 // Level 2: off the dead of the fondamenta and the Pia Casa (loot/bag.ts roll at level 2).

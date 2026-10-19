@@ -1,9 +1,10 @@
-// WoW-style ability runner: 12 bar slots on 1..0 - =, per-ability cooldowns, a 1.5 s global
+// WoW-style ability runner: the primary attack on 1, eight slots the player fills from the ability book on 2..9, the
+// potion on R; per-ability cooldowns, a 1.5 s global
 // cooldown per school (an ice spell holds back the ice ones, not fire or the club), instant /
 // cast-time / channelled abilities, movement interrupts, cast pushback when the hero is hit. No DOM
 // and no three.js here, so `npm run check` exercises it in Node (scripts/check-abilities.ts).
 
-export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
+export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'KeyR'];
 export const GCD = 1.5;
 export const CHARGE_MAX = 100;
 /** WoW pushback: each hit taken during a cast sets its bar back this many s, at most PUSHBACKS times per cast. */
@@ -12,25 +13,37 @@ export const PUSHBACKS = 3;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
 const LAYOUT = 'redentore.bar';
-/** Where a newly unlocked ability without a slot of its own goes, best first: the touch fan's slots 1-8 in thumb order, then the keys left, the big button last. */
-const SPARE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0];
+/** The slots the player fills (ability book, drags), in the order a new unlock takes them: the touch fan's thumb order.
+ *  The others are fixed: slot 0 the primary attack (the big button), slot 9 the potion; they keep what the default bar puts there. */
+export const SPARE = [1, 2, 3, 4, 5, 6, 7, 8];
+export const PRIMARY = 0, POTION = 9;
+
+/** The bar as ability ids (locked ones too), and the abilities the player took off it, which unlocks leave in the book. */
+export interface Layout { bar: (string | null)[]; off: string[] }
 
 /**
- * The player's arrangement if one is stored and sound (12 slots, each empty or a distinct ability of `known`),
- * else `def`. The layout keeps abilities owned in earlier runs in their slots too (AbilitySystem shows only
- * the owned ones), so a slot the player gave an ability is kept for it, and unlocks never disturb a dragged bar.
+ * The player's arrangement if one is stored, made sound: the fixed slots as in `def`, each other slot empty or a distinct
+ * ability of `known`. The layout keeps abilities owned in earlier runs in their slots too (AbilitySystem shows only the
+ * owned ones), so a slot the player gave an ability is kept for it, and unlocks never disturb an arranged bar.
+ * A bar from before the book (12 slots, the potion and the club among them) keeps slots 1-8 where they were and moves
+ * what sat on 0, 9, 0, -, = into the free ones; the potion and the club go to their fixed slots.
  */
-export function loadBar(def: (string | null)[], store?: Storage, known: readonly string[] = def.filter((x): x is string => !!x)): (string | null)[] {
-  try {
-    const s: unknown = JSON.parse((store ?? localStorage).getItem(LAYOUT) ?? 'null');
-    if (!Array.isArray(s) || s.length !== def.length) return def;
-    const ids = s.filter((x) => x !== null);
-    return ids.every((x) => typeof x === 'string' && known.includes(x)) && new Set(ids).size === ids.length ? s : def;
-  } catch { return def; } // blocked storage or junk: the default bar
+export function loadBar(def: (string | null)[], store?: Storage, known: readonly string[] = def.filter((x): x is string => !!x)): Layout {
+  let raw: unknown;
+  try { raw = JSON.parse((store ?? localStorage).getItem(LAYOUT) ?? 'null'); } catch { /* blocked storage or junk */ }
+  const s: unknown[] | undefined = Array.isArray(raw) ? raw : Array.isArray((raw as Layout | null)?.bar) ? (raw as Layout).bar : undefined;
+  if (!s) return { bar: [...def], off: [] }; // nothing stored: the default bar
+  const bar = def.map((d, i) => (SPARE.includes(i) ? null : d));
+  const fit = (x: unknown): x is string => typeof x === 'string' && known.includes(x) && !bar.includes(x);
+  for (const i of SPARE) if (fit(s[i])) bar[i] = s[i];
+  for (const x of s) if (fit(x)) { const i = SPARE.find((k) => !bar[k]); if (i !== undefined) bar[i] = x; }
+  const o = (raw as Layout).off;
+  const off = Array.isArray(o) ? o.filter((x) => known.includes(x) && !bar.includes(x)) : [];
+  return { bar, off };
 }
 
 /** Remember the bar for `loadBar`. */
-export function saveBar(layout: (string | null)[], store?: Storage): void {
+export function saveBar(layout: Layout, store?: Storage): void {
   try { (store ?? localStorage).setItem(LAYOUT, JSON.stringify(layout)); } catch { /* not persisted, still applied */ }
 }
 
@@ -97,23 +110,25 @@ export class AbilitySystem<C extends Caster = Caster> {
   chargeAfter = 0;
   /** Cast times and the GCD × (Fra' Bortolo's blessing, Celerità on gear); channels keep their length. */
   castMul = 1;
-  /** What each bar slot shows: its ability once owned. The player rearranges it by dragging (`swap`). */
+  /** What each bar slot shows: its ability once owned. The player rearranges it from the book (`equip`, `remove`) or by dragging (`swap`). */
   readonly slots: (Ability<C> | undefined)[];
   private bar: (string | null)[];
   private byId: Map<string, Ability<C>>;
   private owned: Set<string>;
+  private off: Set<string>; // taken off the bar by the player: unlocks leave them in the book
   private cds = new Map<string, number>();
   private moving = false;
   private last: { x: number; y: number; z: number };
 
   readonly ctx: C;
 
-  /** `owned`: the abilities shown from the start (default all); `unlock` adds more. */
-  constructor(abilities: Ability<C>[], bar: (string | null)[], ctx: C, owned?: Iterable<string>) {
+  /** `owned`: the abilities shown from the start (default all); `unlock` adds more. `off`: the ones the player took off the bar. */
+  constructor(abilities: Ability<C>[], bar: (string | null)[], ctx: C, owned?: Iterable<string>, off: Iterable<string> = []) {
     this.ctx = ctx;
     this.byId = new Map(abilities.map((a) => [a.id, a]));
     this.bar = KEYS.map((_, i) => bar[i] ?? null);
     this.owned = new Set(owned ?? abilities.map((a) => a.id));
+    this.off = new Set(off);
     for (const id of this.owned) this.place(id);
     this.slots = [];
     this.fill();
@@ -195,26 +210,57 @@ export class AbilitySystem<C extends Caster = Caster> {
     KEYS.forEach((k, i) => { if (pressed(k)) this.tryCast(i); });
   }
 
-  /** Exchange two bar slots (one may look empty): keys and buttons follow the slots, cooldowns the abilities. */
+  /** Exchange two of the player's slots (one may look empty): keys and buttons follow the slots, cooldowns the abilities. The fixed ones stay. */
   swap(i: number, j: number): void {
+    if (!SPARE.includes(i) || !SPARE.includes(j)) return;
     [this.bar[i], this.bar[j]] = [this.bar[j], this.bar[i]];
     this.fill();
   }
 
+  /** The book's Equipaggia: owned ability `id` into the player's slot `i`. One already on the bar swaps places; one
+   *  from the book sends what was there back to the book. */
+  equip(id: string, i: number): void {
+    if (!SPARE.includes(i) || !this.owned.has(id) || (this.bar.includes(id) && !SPARE.includes(this.bar.indexOf(id)))) return; // the fixed ones stay
+    if (this.bar.includes(id)) return this.swap(this.bar.indexOf(id), i);
+    const was = this.bar[i];
+    if (was && this.owned.has(was)) this.off.add(was);
+    this.bar[i] = id;
+    this.off.delete(id);
+    this.fill();
+  }
+
+  /** The book's Rimuovi: empty the player's slot `i`; its ability stays in the book until equipped again. */
+  remove(i: number): void {
+    const id = this.bar[i];
+    if (!SPARE.includes(i) || !id) return;
+    if (this.owned.has(id)) this.off.add(id);
+    this.bar[i] = null;
+    this.fill();
+  }
+
   /**
-   * Show ability `id` on the bar: in the slot the layout keeps for it, else the first slot that is empty or
-   * only remembers an ability not owned now (SPARE order: the touch ring's slots first). There are more
-   * abilities than slots, never more owned ones.
+   * Show ability `id` on the bar as it becomes owned: in the slot the layout keeps for it, else the first empty slot, else
+   * the first that only remembers an ability not owned now (SPARE order: the touch ring's thumb order), unless the player took
+   * it off; with every slot taken it waits in the book. Owning it already changes nothing, so a removed one stays off.
    */
   unlock(id: string): void {
+    if (this.owned.has(id)) return;
+    this.owned.add(id);
+    this.place(id);
+    this.fill();
+  }
+
+  /** A level-up card picked just now: `id` goes on the bar even if an earlier run took it off. */
+  learn(id: string): void {
+    this.off.delete(id);
     this.owned.add(id);
     this.place(id);
     this.fill();
   }
 
   private place(id: string): void {
-    if (this.bar.includes(id)) return;
-    const i = SPARE.find((k) => !this.bar[k] || !this.owned.has(this.bar[k]!));
+    if (this.bar.includes(id) || this.off.has(id)) return;
+    const i = SPARE.find((k) => !this.bar[k]) ?? SPARE.find((k) => !this.owned.has(this.bar[k]!)); // an empty one first: a load owns the rest only as it replays the picks
     if (i !== undefined) this.bar[i] = id;
   }
 
@@ -222,9 +268,9 @@ export class AbilitySystem<C extends Caster = Caster> {
     return this.owned.has(id);
   }
 
-  /** The bar as ability ids, locked ones too: the shape `loadBar` reads back. */
-  layout(): (string | null)[] {
-    return [...this.bar];
+  /** The bar as ability ids, locked ones too, and what the player took off: the shape `loadBar` reads back. */
+  layout(): Layout {
+    return { bar: [...this.bar], off: [...this.off] };
   }
 
   private fill(): void {

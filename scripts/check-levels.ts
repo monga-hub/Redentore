@@ -6,7 +6,8 @@
 import { CARD, CARDS, MAX_LEVEL, SCHOOL, SPECIALS, START, eligible, levelOf, need, offer, tuneOf, type Card } from '../src/player/levels.ts';
 import { FRIAR, spawnGroups } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from '../src/enemies/caster.ts';
-import { AbilitySystem, type Ability } from '../src/abilities/system.ts';
+import { AbilitySystem, KEYS, POTION, PRIMARY, SPARE, type Ability } from '../src/abilities/system.ts';
+import { BAR } from '../src/abilities/forsaken.ts';
 import { buildLevel } from '../src/level/index.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -108,20 +109,23 @@ if (!CARD.get('linfa') || CARD.get('linfa')!.kind !== 'filler') fail('filler');
 const ab = (id: string): Ability => ({ id, name: id, icon: '', desc: '', cooldown: 1, fire: () => {} });
 const sys = new AbilitySystem(['fall', 'plague', 'wisp', 'step'].map(ab), ['fall', 'plague', 'wisp', 'step'], { player: { pos: { x: 0, y: 0, z: 0 } } }, ['fall', 'plague']);
 if (sys.slots[2] || sys.slots[3] || !sys.slots[0] || sys.tryCast(3)) fail('locked abilities shown');
-sys.swap(0, 3); // fall dragged onto step's (empty-looking) slot
-if (sys.slots[3]?.id !== 'fall' || sys.slots[0]) fail('drag onto a locked slot');
+sys.swap(1, 3); // plague dragged onto step's (empty-looking) slot
+if (sys.slots[3]?.id !== 'plague' || sys.slots[1]) fail('drag onto a locked slot');
 sys.unlock('step');
-if (sys.slots[0]?.id !== 'step' || sys.slots[3]?.id !== 'fall' || sys.slots[1]?.id !== 'plague') fail(`unlock moved the bar: ${sys.layout()}`);
+if (sys.slots[1]?.id !== 'step' || sys.slots[3]?.id !== 'plague' || sys.slots[0]?.id !== 'fall') fail(`unlock moved the bar: ${sys.layout().bar}`);
 // More abilities than slots: an unlock takes the first slot that is empty or only remembers one not owned now.
-const names = ['fall', 'plague', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'potion', 'new1', 'new2'];
-const big = new AbilitySystem(names.map(ab), names.slice(0, 12), { player: { pos: { x: 0, y: 0, z: 0 } } }, ['fall', 'plague', 'potion']);
+const names = ['fall', 'plague', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'potion', 'new1', 'new2'];
+const big = new AbilitySystem(names.map(ab), names.slice(0, 10), { player: { pos: { x: 0, y: 0, z: 0 } } }, ['fall', 'plague', 'potion']);
 big.unlock('new1');
-if (big.slots[2]?.id !== 'new1' || big.layout().includes('a')) fail(`unlock without a slot: ${big.layout()}`);
+if (big.slots[2]?.id !== 'new1' || big.layout().bar.includes('a')) fail(`unlock without a slot: ${big.layout().bar}`);
 big.unlock('a'); // its old slot went to new1: the next free one
-if (big.slots[3]?.id !== 'a' || big.slots[2]?.id !== 'new1') fail(`re-placed: ${big.layout()}`);
-// The starting bar (abilities/forsaken.ts BAR): the kit on slots 0-3, each unlock on the next free slot, in the touch arc's thumb order.
-const kit = ['fall', 'plague', 'mend', 'potion'], later = ['nova', 'veil', 'strike', 'step', 'ward'];
-const run = new AbilitySystem([...kit, ...later].map(ab), [...kit, ...Array<null>(8).fill(null)], { player: { pos: { x: 0, y: 0, z: 0 } } }, START);
+if (big.slots[3]?.id !== 'a' || big.slots[2]?.id !== 'new1') fail(`re-placed: ${big.layout().bar}`);
+// The starting bar (abilities/forsaken.ts BAR): the primary attack fixed on 0, the potion on 9, the kit on 1-2, each
+// unlock (at most five: the cap) on the next free slot, in the touch arc's thumb order.
+if (BAR[PRIMARY] !== 'fall' || BAR[POTION] !== 'potion' || BAR.length !== KEYS.length) fail(`default bar ${BAR}`);
+const later = ['nova', 'veil', 'strike', 'step', 'ward'];
+const run = new AbilitySystem([...START, ...later].map(ab), BAR, { player: { pos: { x: 0, y: 0, z: 0 } } }, START);
 for (const id of later) run.unlock(id);
-if (run.layout().slice(0, 9).join() !== [...kit, ...later].join()) fail(`unlocks out of thumb order: ${run.layout()}`);
+if (run.layout().bar.join() !== ['fall', 'plague', 'mend', ...later, null, 'potion'].join()) fail(`unlocks out of thumb order: ${run.layout().bar}`);
+if (START.length - 2 + 5 > SPARE.length) fail('the eight slots hold every ability a run can own (the kit but the two fixed ones, five unlocks)');
 console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 400 runs offered cleanly)`);

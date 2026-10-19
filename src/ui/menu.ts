@@ -15,7 +15,7 @@ const CSS = `
   box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.7); touch-action: manipulation; }
 #menu-btn:hover, #menu-btn:focus-visible { filter: brightness(1.25); outline: none; }
 body.touch #menu-btn { transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
-body.touch #fullscreen { top: calc(56px + env(safe-area-inset-top)); } /* under the gear, in the column the minimap leaves free */
+body.touch #fullscreen { right: auto; left: calc(12px + env(safe-area-inset-left)); top: calc(20px + 76px * var(--k) + env(safe-area-inset-top)); } /* under the player frame: the right column is the panels' (bag, figure, book) */
 #menu { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
   background: rgba(0,0,0,.55); font: 15px/1.35 Georgia, serif; color: #f3e2b0; touch-action: auto; user-select: none; }
 #menu.show { display: flex; }
@@ -104,6 +104,7 @@ export interface MenuHooks {
   snapshot(): GameState;
   where(): string; // the area name, for the slot's label
   opened?(): void; // the game is about to pause
+  book?(): void; // open the ability book
 }
 
 export class Menu {
@@ -177,7 +178,8 @@ export class Menu {
     const back = '<button class="btn back" data-do="back">Indietro</button>';
     switch (v) {
       case 'main': return `<div class="panel"><h2>Menu di gioco</h2>${x}
-        <button class="btn" data-do="close">Torna al gioco</button><hr>
+        <button class="btn" data-do="close">Torna al gioco</button>
+        ${this.hooks.book ? '<button class="btn" data-do="book">Libro delle abilità</button>' : ''}<hr>
         <button class="btn" data-go="save">Salva partita</button>
         <button class="btn" data-go="load">Carica partita</button>
         <button class="btn" data-go="audio">Audio</button>
@@ -226,6 +228,7 @@ export class Menu {
     const { go, do: d, slot } = b.dataset;
     if (go) this.show(go as View);
     else if (d === 'close') this.close();
+    else if (d === 'book') { this.close(); this.hooks.book?.(); }
     else if (d === 'back') this.show(this.from);
     else if (d === 'new') { clearAutosave(); location.reload(); } // a clean boot is a clean start
     else if (d === 'exit') this.show('title');

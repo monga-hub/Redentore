@@ -123,7 +123,9 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 0 - = | barra delle abilità (anche clic/tap sui pulsanti; col mouse trascinale per scambiarle, l'ordine resta salvato). Si parte con Caduta d'ossa (1), Nube di peste (2), Preghiera di suffragio (3) e la pozione (9); le altre arrivano coi livelli |
+| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, Caduta d'ossa, fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Si parte con Nube di peste (2) e Preghiera di suffragio (3); le altre arrivano coi livelli |
+| R | la fiala di linfa tombale (la pozione), su un tasto suo fuori dagli otto |
+| K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un pezzo (secondo tocco su touch) per indossarlo: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
@@ -132,8 +134,10 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
 trascina sul resto dello schermo per la camera, pizzica per lo zoom; a destra le
-abilità diventano tasti tondi a ventaglio attorno all'angolo (stile action-RPG mobile),
-con salto e pozione tra i tasti piccoli.
+abilità diventano tasti tondi a ventaglio attorno all'angolo (stile action-RPG mobile): l'attacco
+primario grande nell'angolo, gli otto posti attorno, e fuori dagli otto, in basso a sinistra dove
+riposa il pollice, il salto e la pozione. In colonna sotto l'ingranaggio borsa, figura e libro;
+lo schermo intero (solo dove il browser lo permette) sta sotto il riquadro del personaggio.
 
 In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,
 anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
@@ -143,7 +147,20 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste, Preghiera di suffragio (la cura) e la fiala; ai livelli pari arrivano due
 carte di nuove abilità (la seconda, una volta su due, della stessa scuola di una già posseduta), agli altri
 potenziamenti, passivi e fusioni (`src/player/levels.ts`: 16 abilità da sbloccare, 56 carte di potenziamento di cui 6 fusioni). Le
-abilità sbloccate prendono il primo tasto libero della barra (le prime sette posizioni sono quelle del ventaglio touch).
+abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch.
+
+**Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come
+quello di Diablo Immortal (`src/ui/book.ts`): a sinistra tutte le abilità per scuola, gli attacchi primari a parte in cima,
+con icona, rango (1 più i potenziamenti scelti per lei) e una spunta se è sulla barra; quelle ancora da imparare restano
+grigie con come si ottengono (le carte dei livelli pari fino al 10, le speciali dal 6), così si vede in cosa può crescere
+una build. A destra una pagina di pergamena: icona grande, nome, scuola, costo, lancio, recupero, la descrizione con i
+numeri evidenziati, i potenziamenti, le fusioni e i passivi che la toccano, e sotto una copia piccola della barra (il
+ventaglio su touch e in Stile Diablo, la fila coi tasti altrimenti). *Equipaggia* (o *Sposta*) illumina gli otto posti:
+toccandone uno l'abilità va lì, scambiandosi con quella che c'era se era sulla barra, o rimandando nel libro quella che
+c'era; *Rimuovi* svuota il suo posto. Col mouse si trascina un'abilità dalla lista o da un posto su un altro posto, o un
+posto sulla lista per toglierlo. L'attacco primario (il tasto grande) e la pozione sono fissi; un'abilità tolta resta nel
+libro anche ricaricando, una carta appena scelta va comunque sulla barra. La disposizione resta salvata nel browser e
+quella di prima (dodici tasti con la pozione) si converte da sola.
 
 | Scuola | Abilità |
 |---|---|
@@ -298,13 +315,15 @@ src/
   fx/occlusion.ts            Stile Diablo: muri abbassati, tetti e prop svaniti, sagome x-ray
   fx/diabloFx.ts             Stile Diablo: numeri di danno, sangue, colonne di luce
   ui/hud.ts                  nome dell'area corrente
-  ui/actionBar.ts            barra abilità stile WoW (12 slot, sweep del cooldown, castbar,
+  ui/actionBar.ts            barra abilità stile WoW (primario, 8 posti e pozione, sweep del cooldown, castbar,
                              tooltip, errori, testo di combattimento); ui/icons.ts icone dipinte
                              (un atlante WebP, `ui/icons.webp`, dipinto e impacchettato da
                              `scripts/icons/build.py`); la pelle stile WoW (pietra e cornici dorate,
                              Stile Diablo in ferro) sta nelle variabili `--panel`/`--gilt` di index.html
+  ui/book.ts                 libro delle abilità: lista per scuola, pagina, Equipaggia / Rimuovi, barra in piccolo
   abilities/system.ts        esecutore abilità data-driven: cooldown, GCD 1,5 s per scuola, off-GCD, pushback,
-                             lanci, canalizzate, interruzione al movimento. Nessun DOM/three
+                             lanci, canalizzate, interruzione al movimento; la barra (posti fissi e gli otto del
+                             libro, `equip`/`remove`, salvataggio e conversione). Nessun DOM/three
   abilities/forsaken.ts      le abilità del Reietto (tabella `ABILITIES`, ordine `BAR`), numeri vivi in `tune`, e i loro effetti
   abilities/grimoire.ts      regole di fuoco, gelo, fulmine e dei colpi nuovi (dardi a ricerca, fiamme a terra, catena,
                              fulmine ritardato, balzo e carica, esecuzione), senza grafica: le usa anche il banco. Nessun three

@@ -20,8 +20,9 @@ const CSS = `
 #bag-btn:hover, #bag-btn:focus-visible, #sheet-btn:hover, #sheet-btn:focus-visible { filter: brightness(1.25); outline: none; }
 #bag-btn.got, #sheet-btn.got { animation: baggot .5s ease-out; }
 @keyframes baggot { 30% { transform: scale(1.25); box-shadow: 0 0 0 1px #000, 0 0 14px 4px rgba(255,200,90,.8); } }
-body.touch #bag-btn { top: calc(100px + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
-body.touch #sheet-btn { top: calc(100px + 52px * var(--k) / .72 + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
+/* Touch: gear, bag, figure and book (ui/book.ts) one under the other, 44 px apart at --k .72, clear of the thumb arc's top button. */
+body.touch #bag-btn { top: calc(12px + 44px * var(--k) / .72 + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
+body.touch #sheet-btn { top: calc(12px + 88px * var(--k) / .72 + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
 #bag { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center; overflow: auto;
   background: rgba(0,0,0,.5); font: 15px/1.35 Georgia, serif; color: #f3e2b0; user-select: none;
   --s: min(46px, calc((100vw - 80px) / 6), calc((100dvh - 120px) / 5)); }

@@ -13,6 +13,8 @@ import { ABILITIES, Forsaken, tune } from './abilities/forsaken.ts';
 import { CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
+import { AbilityBook } from './ui/book.ts';
+import { saveBar } from './abilities/system.ts';
 import { PlayerStats } from './player/stats.ts';
 import { Targeting } from './ui/target.ts';
 import { Friars } from './enemies/friars.ts';
@@ -201,6 +203,11 @@ function openLevelUp(): void {
   dctl.stop();
   levelUp.show(levels.picks.length + 2, offer(levels.picks), picked, (c: Card) => {
     levels.picks.push(c.id);
+    if (c.kind === 'ability') { // onto the first free slot, even if an earlier run took it off the bar
+      kit.system.learn(c.id);
+      saveBar(kit.system.layout());
+      book.nudge();
+    }
     levels.apply();
     if (c.id === 'linfa') {
       const h = playerStats.heal(playerStats.hpMax * 0.3);
@@ -223,6 +230,7 @@ const menu = new Menu({
   snapshot: () => serialize(game),
   where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
   opened: () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); },
+  book: () => book.show(),
 });
 const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.75 },
@@ -255,6 +263,9 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
   dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
 const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
+const book = new AbilityBook(kit.system, ABILITIES, () => levels.picks); // K, the book button or the menu: the ability book
+book.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); };
+bagPanel.keys.KeyK = () => book.show();
 questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(false) });
 questView.shop2 = () => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => SHOP2 });
 questView.reward = (gold) => { bag.gold += gold; };
@@ -363,7 +374,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { zitelle, l2, bag, gear, sheet, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { zitelle, l2, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 // The autosave (core/save.ts): every few seconds and when the tab is hidden (iOS may kill it then), only
 // while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
@@ -379,12 +390,12 @@ renderer.setAnimationLoop(() => {
   const real = Math.min(timer.getDelta(), 0.05);
   const since = FALLEN - dying; // s since the hero fell, while dying
   const dt = dying > 0 && since < SLOW_FOR ? real * (SLOW + (1 - SLOW) * since / SLOW_FOR) : real; // slow motion as the hero falls
-  if (menu.paused || worldMap.open || bagPanel.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, dialogue or level-up; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open || bagPanel.open || book.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
     input.consume();
     input.endFrame();
-    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open, pressed); // the dialogue window ducks the music itself
+    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open, pressed); // the dialogue window ducks the music itself
     fx.render();
     return;
   }
@@ -419,6 +430,7 @@ renderer.setAnimationLoop(() => {
   if (input.pressed('KeyM')) openMap();
   if (input.pressed('KeyB')) bagPanel.toggle();
   if (input.pressed('KeyC')) sheet.toggle();
+  if (input.pressed('KeyK')) book.toggle();
   game.time += dt;
   playerStats.update(dt);
   if (dying > 0 && (dying -= real) <= 0) wake();

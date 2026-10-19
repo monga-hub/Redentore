@@ -124,25 +124,55 @@ spot(near, plagueSpot(at, 0, mob(0, 5, 'dead'), [far, near]), 'dead target falls
 spot(far, plagueSpot(at, 0, undefined, [mob(1, 0, 'dead'), far]), 'dead foes ignored');
 const ahead = plagueSpot(at, 0, undefined, [mob(0, 100)]);
 if (ahead.z > -4 || Math.abs(ahead.x) > 1e-6) throw new Error(`no foe in reach: cloud must land well ahead (-Z), got ${ahead.x},${ahead.z}`);
-// Rearranging the bar: keys follow the slots, cooldowns the abilities; the layout survives storage and refuses junk.
+// Rearranging the bar: keys follow the slots, cooldowns the abilities; the fixed slots (primary 0, potion 9) stay; the book
+// equips and removes; the layout survives storage, sanitizes junk and migrates the 12-slot bar from before the book.
 const store = new Map<string, string>();
 const mem = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } } as Storage;
-const def = ['x', 'y', ...Array<null>(10).fill(null)];
-const first3 = (b: (string | null)[]) => b.slice(0, 3).join();
-const bar = new AbilitySystem([ab('x'), ab('y')], loadBar(def, mem), ctx);
+const def = ['p', 'x', 'y', null, null, null, null, null, null, 'pot'];
+const idAt = (b: AbilitySystem, i: number) => b.slots[i]?.id; // a call: no narrowing across the steps
+const span = (b: (string | null)[]) => b.slice(0, 4).join();
+const bar = new AbilitySystem([ab('p'), ab('x'), ab('y'), ab('z'), ab('pot')], loadBar(def, mem).bar, ctx, ['p', 'x', 'y', 'pot']);
+if (loadBar(def, mem).bar.join() !== def.join()) throw new Error('nothing stored: the default bar');
 fired.length = 0;
-bar.swap(0, 1);
-bar.swap(0, 2); // onto an empty slot: a move
-if (fired.length || bar.gcd(bar.slots[1]!) || bar.cooldown(bar.slots[1]!)) throw new Error('rearranging the bar must not cast');
-if (first3(bar.layout()) !== ',x,y') throw new Error(`layout after swaps: ${bar.layout()}`);
-bar.tryCast(2);
-if (fired.join() !== 'y' || bar.cooldown(bar.slots[2]!) !== 10) throw new Error('key 3 must cast y, now in slot 3, and y cools down');
+bar.swap(1, 2);
+bar.swap(1, 3); // onto an empty slot: a move
+bar.swap(0, 3); // the primary attack is fixed
+bar.swap(9, 1); // so is the potion
+if (fired.length || bar.gcd(bar.slots[2]!) || bar.cooldown(bar.slots[2]!)) throw new Error('rearranging the bar must not cast');
+if (span(bar.layout().bar) !== 'p,,x,y' || bar.layout().bar[9] !== 'pot') throw new Error(`layout after swaps: ${bar.layout().bar}`);
+bar.tryCast(3);
+if (fired.join() !== 'y' || bar.cooldown(bar.slots[3]!) !== 10) throw new Error('key 4 must cast y, now in slot 4, and y cools down');
+bar.remove(3); // Rimuovi: y back to the book
+bar.remove(0); // not the primary
+if (bar.slots[3] || bar.slots[0]?.id !== 'p' || bar.layout().off.join() !== 'y') throw new Error(`remove: ${JSON.stringify(bar.layout())}`);
+bar.unlock('y'); // owned already: a removed one stays off
+bar.unlock('z'); // a new one takes the first free slot
+if (idAt(bar, 1) !== 'z' || bar.slots.some((a) => a?.id === 'y')) throw new Error(`unlock after remove: ${bar.layout().bar}`);
+bar.equip('y', 1); // from the book onto z: z goes to the book
+if (idAt(bar, 1) !== 'y' || bar.layout().off.join() !== 'z') throw new Error(`equip from the book: ${JSON.stringify(bar.layout())}`);
+bar.equip('x', 1); // from the bar: a swap
+bar.equip('p', 4); // the fixed ones stay
+bar.equip('x', 0);
+if (span(bar.layout().bar) !== 'p,x,y,' || bar.slots[4]) throw new Error(`equip: ${bar.layout().bar}`);
 saveBar(bar.layout(), mem);
-if (first3(loadBar(def, mem)) !== ',x,y') throw new Error('saved layout not restored');
-for (const junk of [JSON.stringify([1, ...def.slice(1)]), JSON.stringify(['x', 'x', ...def.slice(2)]), JSON.stringify(['x', 'y', 'z', ...def.slice(3)]), '["y","x"]', 'nope']) {
+const saved = loadBar(def, mem, ['p', 'x', 'y', 'z', 'pot']);
+if (span(saved.bar) !== 'p,x,y,' || saved.off.join() !== 'z') throw new Error(`saved layout not restored: ${JSON.stringify(saved)}`);
+const relearn = new AbilitySystem([ab('p'), ab('x'), ab('y'), ab('z'), ab('pot')], saved.bar, ctx, ['p', 'x', 'pot'], saved.off);
+relearn.unlock('y'); // a load replays the picks: y back in its slot
+relearn.unlock('z'); // still off
+if (relearn.slots[2]?.id !== 'y' || relearn.slots.some((a) => a?.id === 'z')) throw new Error(`load keeps a removed one off: ${relearn.layout().bar}`);
+const fresh = new AbilitySystem([ab('p'), ab('x'), ab('z'), ab('pot')], saved.bar, ctx, ['p', 'x', 'pot'], saved.off);
+fresh.learn('z'); // a card picked now: on the bar even though an earlier run took it off, on the first empty slot
+if (fresh.slots[3]?.id !== 'z' || fresh.layout().off.length) throw new Error(`learn: ${JSON.stringify(fresh.layout())}`);
+for (const junk of [JSON.stringify([1, 'q', 'x', 'x']), JSON.stringify({ bar: ['x', 'pot', 'p'], off: ['p', 7] }), '{"bar":7}', 'nope']) {
   store.set('redentore.bar', junk);
-  if (loadBar(def, mem) !== def) throw new Error(`junk layout ${junk} accepted`);
+  const l = loadBar(def, mem);
+  if (l.bar[0] !== 'p' || l.bar[9] !== 'pot' || l.bar.filter((x) => x === 'x').length > 1 || l.bar.includes('q') || l.off.length) throw new Error(`junk layout ${junk}: ${JSON.stringify(l)}`);
 }
+// The 12-slot bar from before the book: slots 1-8 stay put, what sat on 9, 0, -, = moves into the free ones, the potion and the club to their own.
+store.set('redentore.bar', JSON.stringify(['y', 'z', 'pot', null, 'x', null, null, null, null, 'q', 'p', null]));
+const old = loadBar(def, mem, ['p', 'x', 'y', 'z', 'q', 'pot']);
+if (old.bar.join() !== 'p,z,y,q,x,,,,,pot') throw new Error(`old bar migrated: ${old.bar}`);
 // A cast whose target goes out of sight while the bar fills is refused at the end: no mana, no cooldown.
 let visible = true;
 const sighted = new AbilitySystem([ab('bolt', { cast: 1, mana: 10, check: () => (visible ? undefined : 'Bersaglio non in vista.') })], ['bolt'], ctx);

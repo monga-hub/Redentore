@@ -1,7 +1,8 @@
-import { CHARGE_MAX, GCD, KEYS, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
+import { CHARGE_MAX, GCD, KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { ICONS } from './icons.ts';
 
-// WoW-style action bar overlay: 12 square buttons on 1..0 - =, clockwise cooldown sweep
+// WoW-style action bar overlay: the primary attack on 1, the eight slots of the ability book (ui/book.ts) on 2..9 and the
+// potion on R, set a little apart; clockwise cooldown sweep
 // (a conic-gradient driven by one CSS variable), remaining seconds, key label, click/tap
 // to cast, tooltip, cast bar, red error line and floating combat text. Plain DOM, styled
 // in index.html; per frame it only writes values that changed.
@@ -9,7 +10,7 @@ import { ICONS } from './icons.ts';
 // one big button in the corner, an inner arc and an outer arc of smaller ones (RING).
 // There a quick tap casts on release and a press held for HOLD ms shows the tooltip
 // instead, until the finger lifts.
-// With a mouse, a click casts on release and a filled slot can be dragged onto another one to swap
+// With a mouse, a click casts on release and a filled slot among the eight can be dragged onto another one to swap
 // them instead (`grab`), without casting; keys still cast on press and stay
 // with the slots, so the player's own arrangement is what 1..0 cast. Touch is unchanged.
 // A half-ring over the main button (slot 0, the big one on touch) shows the charge bar,
@@ -21,11 +22,14 @@ import { ICONS } from './icons.ts';
 /** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px].
  *  About 20 px of gap between neighbours and between the arcs, so a thumb lands on one button only.
  *  Slots follow the thumb: the inner arc from its bottom-left button up to its top-right one, then the
- *  outer arc the same way, so keys 2..9 and the bar's fill order (SPARE in abilities/system.ts) match. */
-const RING: Record<number, [number, number, number]> = {
-  0: [0, 0, 96], // the big one, in the corner
+ *  outer arc the same way, so keys 2..9 and the bar's fill order (SPARE in abilities/system.ts) match.
+ *  Jump and the potion sit outside the eight, low on the left where the thumb rests: jump closing the outer arc
+ *  (index.html), the potion one step further along the bottom. The ability book's preview reuses this. */
+export const RING: Record<number, [number, number, number]> = {
+  0: [0, 0, 96], // the big one, in the corner: the primary attack
   1: [185, 120, 58], 2: [155, 120, 58], 3: [125, 120, 58], 4: [95, 120, 58],
   5: [158, 196, 54], 6: [136, 196, 54], 7: [114, 196, 54], 8: [92, 196, 54], // + jump at 180 (index.html)
+  [POTION]: [180, 272, 54],
 };
 
 interface Slot<C extends Caster> {
@@ -69,7 +73,8 @@ export class ActionBar<C extends Caster> {
 
     KEYS.forEach((code, i) => {
       const s: Slot<C> = { el: el('button', 'slot'), cd: el('span', 'cd'), key: el('span', 'key'), p: '', text: '', wasCd: false };
-      if (i === 0) {
+      if (i === POTION) s.el.classList.add('potion');
+      if (i === PRIMARY) {
         s.el.classList.add('main');
         s.el.insertAdjacentHTML('beforeend', '<svg class="charge" viewBox="0 0 100 100"><path d="M6 50 A44 44 0 0 1 94 50"/><path class="fill" pathLength="100" d="M6 50 A44 44 0 0 1 94 50"/></svg>');
         this.gauge = s.el.querySelector('.charge')!;
@@ -80,7 +85,7 @@ export class ActionBar<C extends Caster> {
         s.el.style.cssText = `--a:${ring[0]}deg;--r:${ring[1]}px;--d:${ring[2]}px`;
       }
       s.el.tabIndex = -1; // keys belong to the game, not to focus navigation
-      s.key.textContent = code.replace('Digit', '').replace('Minus', '-').replace('Equal', '=');
+      s.key.textContent = code.replace(/^(Digit|Key)/, '');
       let hold = 0, held = false;
       s.el.addEventListener('pointerdown', (e) => {
         e.preventDefault(); // no focus, no text selection, no double-tap zoom
@@ -201,7 +206,7 @@ export class ActionBar<C extends Caster> {
     const move = (e: PointerEvent) => {
       e.stopPropagation(); // captured ahead of core/input.ts: a held button over the bar must not orbit the camera
       if (!this.ghost) {
-        if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < DRAG) return;
+        if (!SPARE.includes(from) || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < DRAG) return; // the fixed ones only click
         this.ghost = el('div', 'drag-ghost');
         this.ghost.innerHTML = this.slots[from].el.querySelector('.icon')!.outerHTML;
         document.body.append(this.ghost);
@@ -209,7 +214,7 @@ export class ActionBar<C extends Caster> {
         this.tip.classList.remove('show');
       }
       this.ghost.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
-      const t = target(e);
+      const hit = target(e), t = SPARE.includes(this.slots.findIndex((s) => s.el === hit)) ? hit : undefined; // the fixed ones take no drop
       if (t !== over) { over?.classList.remove('drop'); over = t; over?.classList.add('drop'); }
     };
     const end = (e: PointerEvent) => {
@@ -223,7 +228,7 @@ export class ActionBar<C extends Caster> {
       over?.classList.remove('drop');
       this.slots[from].el.classList.remove('lifted');
       const to = this.slots.findIndex((s) => s.el === over);
-      if (e.type !== 'pointerup' || to < 0 || to === from) return;
+      if (e.type !== 'pointerup' || !SPARE.includes(to) || to === from) return;
       this.sys.swap(from, to);
       this.paint(from);
       this.paint(to);

@@ -197,13 +197,13 @@
       /* Action bar: WoW-style buttons on a carved stone bar in a gilded frame, a painted winged lion of San Marco
          on each end (--cap-img), conic cooldown sweep on --p. */
       .actionbar {
-        --s: min(46px, calc((100vw - 24px) / 12 - 4px));
+        --s: min(46px, calc((100vw - 48px) / 10 - 4px));
         position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%);
         display: flex; flex-direction: column; align-items: center; gap: 10px;
         user-select: none; -webkit-user-select: none; touch-action: none;
       }
       .actionbar .bar {
-        position: relative; display: grid; grid-template-columns: repeat(12, var(--s)); gap: 5px; padding: 6px 8px;
+        position: relative; display: grid; grid-template-columns: repeat(9, var(--s)) calc(var(--s) + 14px); gap: 5px; padding: 6px 8px;
         border: 3px solid transparent; border-radius: 5px; background: var(--panel); box-shadow: var(--panel-shadow);
       }
       .actionbar .bar::before, .actionbar .bar::after { /* the lions, sitting on the bar's ends and facing in */
@@ -217,6 +217,7 @@
         background: #0b0907; border: 1px solid #000; border-radius: 3px; outline: none;
         box-shadow: 0 0 0 1px rgba(217,173,82,.55), inset 0 0 6px #000; -webkit-tap-highlight-color: transparent;
       }
+      .slot.potion { justify-self: end; } /* the potion, a little apart from the eight */
       .slot.empty { cursor: default; background: radial-gradient(#1c1610, #080605); box-shadow: 0 0 0 1px rgba(217,173,82,.3), inset 0 0 10px #000; }
       .slot .icon { position: absolute; inset: 1px; overflow: hidden; border-radius: 2px; }
       .slot .sweep {
@@ -309,12 +310,12 @@
 
       /* Phones: two rows of six, bigger targets for thumbs. */
       @media (max-width: 600px) {
-        .actionbar { --s: min(48px, calc((100vw - 24px) / 6 - 5px)); }
-        .actionbar .bar { grid-template-columns: repeat(6, var(--s)); }
+        .actionbar { --s: min(48px, calc((100vw - 24px) / 5 - 5px)); }
+        .actionbar .bar { grid-template-columns: repeat(5, var(--s)); }
       }
 
       /* Touch, Albion-style: the bar dissolves into round buttons fanned around the bottom-right
-         corner. Each .ring sets --a (angle, 180deg = left of the corner), --r (radius) and --d
+         corner: the primary attack big in the corner, the eight around it, jump and potion low on the left. Each .ring sets --a (angle, 180deg = left of the corner), --r (radius) and --d
          (diameter). --k scales every touch control (ring, stick, player frame) together: tune it here,
          smaller on short or portrait screens; the smallest ring button stays ~30px. The cast bar
          floats above the character. Hold a ring button to read its tooltip (src/ui/actionBar.ts). */
@@ -344,6 +345,7 @@
       body:is(.touch, .diablo) .slot.ring.down { filter: brightness(1.3); transform: scale(.94); }
       body:is(.touch, .diablo) .slot.ring .cd { font-size: calc(var(--s) * .34); }
       body.diablo:not(.touch) { --k: .9; } /* Stile Diablo on desktop: the same fan, mouse-sized */
+      body.diablo:not(.touch) .slot.potion { --r: 196px !important; } /* no jump button there (Space): the potion takes its place */
       body.touch .tooltip { width: 230px; font-size: 11px; }
       body.touch .tooltip b { font-size: 13px; }
 

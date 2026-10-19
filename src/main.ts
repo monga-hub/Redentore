@@ -33,7 +33,8 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { autosave, deserialize, questXpIn, resume, serialize, takePending, type Game } from './core/save.ts';
+import { autosave, deserialize, questXpIn, resume, serialize, setPending, takePending, type Game } from './core/save.ts';
+import { BAR, install, migration, prepared } from './core/prepared.ts';
 import { isDiablo, onQuality, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
 import { DiabloControls } from './player/diabloControls.ts';
@@ -79,6 +80,8 @@ const blend = new CameraBlend(); // eases style switches and the intro's hand-ov
 const hud = new Hud();
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
+const swap = migration(); // once: the old saves make way for the hero ready for level 2 (core/prepared.ts)
+if (swap) saveBar(BAR); // its bar, before the kit reads it
 const kit = new Forsaken(player, playerStats); // abilities on 1..0 - =
 scene.add(kit.vfx.root);
 const questView = new QuestView(quest, kit.vfx); // gates, chest, Fra' Zuane and his dialogue, tracker
@@ -175,6 +178,8 @@ quest.side.bag = bag; // Mastro Iseppo's quest items go in and out of it
 const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const worthOf = (i: number) => ((mobs[i] as { again?: boolean }).again ? Math.ceil(worth[i] * RISE.xp) : worth[i]); // a risen friar, a quarter
+const levelTwo = prepared(serialize(game), mobs.length - zitelle.all.length, level.areas); // the hero ready for level 2, off this fresh boot (level 1's mobs come first)
+if (swap) install(levelTwo); // resumed just below
 const pending = takePending(); // a slot picked in the menu, carried across the reload
 const loaded = pending ?? resume(); // or the run in progress: a tab iOS killed for memory and reloaded, the home-screen app relaunched
 if (loaded) {
@@ -231,6 +236,7 @@ const menu = new Menu({
   where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
   opened: () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); },
   book: () => book.show(),
+  levelTwo: () => { saveBar(BAR); if (setPending(levelTwo)) location.reload(); },
 });
 const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.75 },

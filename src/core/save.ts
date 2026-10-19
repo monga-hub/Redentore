@@ -191,3 +191,9 @@ export function resume(store: Storage = localStorage): GameState | undefined {
 export function clearAutosave(store: Storage = localStorage): void {
   try { store.removeItem(AUTO); } catch { /* blocked storage: nothing was kept either */ }
 }
+
+/** Every slot and the autosave gone (core/prepared.ts's one-time migration). */
+export function wipe(store: Storage = localStorage): void {
+  for (let i = 0; i < SLOTS; i++) store.removeItem(SLOT_KEY(i));
+  store.removeItem(AUTO);
+}

@@ -105,6 +105,7 @@ export interface MenuHooks {
   where(): string; // the area name, for the slot's label
   opened?(): void; // the game is about to pause
   book?(): void; // open the ability book
+  levelTwo?(): void; // start over as the hero ready for level 2 (core/prepared.ts)
 }
 
 export class Menu {
@@ -184,11 +185,11 @@ export class Menu {
         <button class="btn" data-go="load">Carica partita</button>
         <button class="btn" data-go="audio">Audio</button>
         ${styleBtn()}${qualityBtn()}<hr>
-        <button class="btn" data-do="new">Nuova partita</button>
+        <button class="btn" data-do="new">Nuova partita</button>${this.l2btn()}
         <button class="btn" data-go="credits">Crediti</button>
         <button class="btn" data-do="exit">Esci</button></div>`;
       case 'title': return `<div class="panel"><div class="logo">Redentore Dungeon<small>Giudecca, Venezia</small></div>
-        <button class="btn" data-do="new">Nuova partita</button>
+        <button class="btn" data-do="new">Nuova partita</button>${this.l2btn()}
         <button class="btn" data-go="load">Carica partita</button>
         ${styleBtn()}
         <button class="btn" data-go="credits">Crediti</button></div>`;
@@ -214,6 +215,10 @@ export class Menu {
     }
   }
 
+  private l2btn(): string {
+    return this.hooks.levelTwo ? '<button class="btn" data-do="l2">Nuova partita: dal livello 2</button>' : '';
+  }
+
   private slotRow(v: 'save' | 'load', i: number, s: Slot | undefined): string {
     const info = s ? `<b>${esc(s.label)}</b><span>${new Date(s.savedAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })} · ${playTime(s.state.time)}</span>`
       : '<b>Vuoto</b><span>Nessuna partita salvata</span>';
@@ -231,6 +236,7 @@ export class Menu {
     else if (d === 'book') { this.close(); this.hooks.book?.(); }
     else if (d === 'back') this.show(this.from);
     else if (d === 'new') { clearAutosave(); location.reload(); } // a clean boot is a clean start
+    else if (d === 'l2') this.hooks.levelTwo?.();
     else if (d === 'exit') this.show('title');
     else if (d === 'style') {
       setDiablo(!isDiablo());

@@ -10,7 +10,9 @@ import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
 import { Bag } from '../src/loot/bag.ts';
-import { Equipment, STARTER, effects } from '../src/loot/gear.ts';
+import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
+import { eligible, levelOf as lvOf } from '../src/player/levels.ts';
+import { BAR, PICKS, install, migration, prepared } from '../src/core/prepared.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -230,4 +232,33 @@ if (before2.quest.asked || before2.quest.heads || before2.quest.boon) fail('a sa
 const odd2 = boot();
 deserialize(odd2, { ...hs, quest: { ...hs.quest, boon: 'from_the_future' } });
 if (odd2.quest.boon || valid({ ...hs, quest: { ...hs.quest, heads: 'x' } }) || valid({ ...hs, quest: { ...hs.quest, asked: 1 } }) || valid({ ...hs, quest: { ...hs.quest, boon: 3 } })) fail('heads field validation');
+// The hero ready for level 2: loads at Fra' Zuane's offer, level 12 with every card as `offer` would deal it, level 1's
+// purple on every slot, at full health; the migration swaps every old save for it once, and never again.
+const pg = boot(), ps = JSON.parse(JSON.stringify(prepared(serialize(pg), pg.mobs.length, buildLevel().areas)));
+if (!valid(ps)) fail('the prepared save is refused');
+const pb = boot();
+deserialize(pb, ps);
+if (pb.quest.stage !== 'offer' || !pb.quest.found || pb.quest.boon !== 'vigore' || !pb.quest.relicBack || pb.quest.bonusXp !== questXpIn(ps)) fail(`prepared save at ${pb.quest.stage}`);
+if (lvOf(pb.levels.xp).lv !== 12 || pb.levels.picks.join() !== PICKS.join() || pb.levels.picks.length !== 11) fail(`prepared level ${lvOf(pb.levels.xp).lv}, picks ${pb.levels.picks}`);
+PICKS.forEach((id, i) => {
+  const c = eligible(PICKS.slice(0, i)).find((k) => k.id === id), lv = i + 2;
+  if (!c || (c.kind === 'ability') !== (lv % 2 === 0 && lv <= 10)) fail(`card ${id} could not be dealt at level ${lv}`);
+});
+if (GEAR_SLOTS.some((sl) => GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.rarity !== 'epico' || GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.l2)) fail(`prepared gear ${JSON.stringify(pb.gear.worn)}`);
+if (pb.stats.hp !== pb.stats.hpMax || pb.stats.mana !== pb.stats.manaMax || pb.mobs.some((m) => m.state !== 'dead')) fail('prepared hero not full, or level 1 not cleared');
+if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(240, -20)) fail('prepared map not level 1 seen');
+const owned = new Set(['fall', 'plague', 'mend', 'potion', ...PICKS.filter((id) => ['step', 'frost', 'nova', 'lance', 'font'].includes(id))]);
+if (BAR.bar.filter((x) => x).length !== owned.size || BAR.bar.some((x) => x && !owned.has(x)) || BAR.bar[0] !== 'fall' || BAR.bar[9] !== 'potion') fail(`prepared bar ${BAR.bar}`);
+mem.clear();
+if (migration(store) || migration(store)) fail('a first launch with nothing saved lost its fresh game');
+mem.clear();
+save(0, { label: 'old', savedAt: 1, state: s }, store);
+save(2, { label: 'old', savedAt: 1, state: s }, store);
+autosave(s, store);
+if (!migration(store)) fail('migration did not run');
+install(ps, store);
+const after = slots(store);
+if (after[0]?.label !== 'Pronto per il livello 2' || after[1] || after[2] || resume(store)?.build?.xp !== ps.build.xp || !mem.get('redentore.bar')) fail('migration did not swap the saves');
+save(1, { label: 'later', savedAt: 2, state: s }, store);
+if (migration(store)) fail('migration ran twice');
 console.log('save system ok');

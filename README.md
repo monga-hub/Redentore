@@ -61,7 +61,7 @@ fino alla chiesa delle Zitelle.
   Benedizione della serra: per 3 minuti lanci il 20% più rapidi e +10% ai danni (icona e conto alla
   rovescia sotto il ritratto). La serra è fuori dalla portata dei frati. È anche un mercante
   (Commercia, in ogni pagina del dialogo): compra tutto quello che c'è nella borsa a un quarto del suo
-  prezzo (con una fila per riacquistare le vendite della visita) e vende i pezzi epici (viola) del livello 1.
+  prezzo (con una fila per riacquistare le vendite della visita) e vende i pezzi epici (viola) del livello 1 e i tomi delle scuole (vedi Abilità).
 - **Mastro Iseppo, el proto dello squero** (`src/quest/squero.ts`, modello Meshy): il fantasma del capomastro
   dello squero sul rio, in cortile accanto alla gondola sui cavalletti, fuori dalla portata dei mob. Sua figlia
   Marieta è ancora alle Zitelle; lui vuole finire l'ultima gondola per andarla a prendere. Missioni secondarie a
@@ -71,7 +71,7 @@ fino alla chiesa delle Zitelle.
   Maestra*, *L'ex voto del Redentore* (si torna nella chiesa del livello 1, terza cappella a destra); e *La lettera
   di Marieta*, che parte raccogliendo un drop raro delle zitelle (sicuro dopo la chiave della Maestra). Ognuna
   paga esperienza e oro (tabella `QUESTS`, banner "Missione completata") e un epico del livello 2; Iseppo vende
-  anche tutti gli epici del livello 2 (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
+  anche tutti gli epici del livello 2 e i tomi (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
   obiettivo, oggetti di missione col raggio dorato; gondolieri e codeghe risorgono come i frati (lontano dall'eroe,
   un quarto dell'esperienza, bottino magro) finché la Governatrice è viva; se cade prima, le missioni di raccolta e
   di uccisione si consegnano lo stesso. Tutto nel salvataggio (i vecchi si caricano senza).
@@ -144,15 +144,23 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
 ## Abilità
 
-Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste, Preghiera di suffragio (la cura) e la fiala; ai livelli pari arrivano due
-carte di nuove abilità (la seconda, una volta su due, della stessa scuola di una già posseduta), agli altri
-potenziamenti, passivi e fusioni (`src/player/levels.ts`: 16 abilità da sbloccare, 56 carte di potenziamento di cui 6 fusioni). Le
-abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch.
+Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste, Preghiera di suffragio (la cura) e la fiala; ai livelli pari fino al 10
+arrivano due carte di nuove abilità, dopo il 10 una nuova abilità contro un potenziamento; agli altri
+potenziamenti, passivi e fusioni (`src/player/levels.ts`: 16 abilità da sbloccare, 56 carte di potenziamento di cui 6 fusioni). Ogni carta
+esce a caso tra tutte quelle non ancora prese, qualunque cosa si sia scelto prima: nessuna scuola si chiude. Non c'è un livello massimo
+(servono 20 × livello esperienza per salire); finite le carte escono Linfa tombale e due potenziamenti piccoli ripetibili. Le
+abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch; con gli otto posti pieni aspettano nel libro.
+
+**Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Ombra, Fuoco, Gelo, Fulmine; Peste e Sacro non ne hanno, le
+loro uniche abilità si hanno dall'inizio), insegna subito tutte le abilità della scuola che non si conoscono ancora, che vanno nel
+Libro delle abilità pronte da equipaggiare. Costa 250 oro per abilità e 400 per una speciale, solo per quelle che insegna davvero
+(Ossa completo 1550, Ombra 1150, Gelo 750, Fuoco e Fulmine 500); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
+non escono più come carte, i loro potenziamenti sì. Nel salvataggio (`build.learned`; i vecchi si caricano senza).
 
 **Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come
 quello di Diablo Immortal (`src/ui/book.ts`): a sinistra tutte le abilità per scuola, gli attacchi primari a parte in cima,
 con icona, rango (1 più i potenziamenti scelti per lei) e una spunta se è sulla barra; quelle ancora da imparare restano
-grigie con come si ottengono (le carte dei livelli pari fino al 10, le speciali dal 6), così si vede in cosa può crescere
+grigie con come si ottengono (le carte dei livelli pari, le speciali dal 6, o il tomo della scuola), così si vede in cosa può crescere
 una build. A destra una pagina di pergamena: icona grande, nome, scuola, costo, lancio, recupero, la descrizione con i
 numeri evidenziati, i potenziamenti, le fusioni e i passivi che la toccano, e sotto una copia piccola della barra (il
 ventaglio su touch e in Stile Diablo, la fila coi tasti altrimenti). *Equipaggia* (o *Sposta*) illumina gli otto posti:

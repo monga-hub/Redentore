@@ -221,7 +221,7 @@ export class AbilityBook<C extends Caster> {
   private passives(a: Ability<C>): [string, number][] {
     const n = new Map<string, number>();
     for (const p of this.picks()) {
-      const ok = p === 'dmg' ? /\d danni/.test(a.desc) : p === 'cdr' ? a.cooldown > 0 && a.id !== this.sys.slots[PRIMARY]?.id : p === 'fury' ? !!a.special : false;
+      const ok = p === 'dmg' || p === 'ossa_eterne' ? /\d danni/.test(a.desc) : p === 'cdr' ? a.cooldown > 0 && a.id !== this.sys.slots[PRIMARY]?.id : p === 'fury' ? !!a.special : false;
       if (ok) n.set(p, (n.get(p) ?? 0) + 1);
     }
     return [...n];
@@ -256,8 +256,9 @@ export class AbilityBook<C extends Caster> {
     const mods = ups.length || pas.length ? `<p class="mods">${[...ups, ...pas].map(line).join('<br>')}</p>` : '';
     let note = '', acts = '';
     if (primary) note = "L'attacco primario sta sempre sul tasto grande: non si toglie e non si sposta.";
-    else if (!owned) note = a.special ? 'Non ancora appresa. Speciale: la sua carta esce ai passaggi di livello 6, 8 e 10.'
-      : 'Non ancora appresa. Ai passaggi di livello pari, fino al 10, una delle due carte insegna una nuova abilità: scegli la sua.';
+    else if (!owned) note = (a.special ? 'Non ancora appresa. Speciale: la sua carta può uscire dal livello 6 in poi, ai passaggi di livello pari.'
+      : 'Non ancora appresa. Ai passaggi di livello pari una delle carte può insegnarla: scegli la sua.')
+      + " Oppure compra il tomo della sua scuola da Fra' Bortolo o da Mastro Iseppo: insegna tutta la scuola.";
     else {
       const hint = this.armed ? `<p class="hint go">${touch ? 'Tocca' : 'Clic su'} un tasto illuminato per metterla lì.</p>`
         : at >= 0 ? `<p class="hint">Sulla barra${touch ? '' : `, tasto ${KEYS[at].replace(/^(Digit|Key)/, '')}`}.</p>` : `<p class="hint">Nel libro: non è sulla barra.${touch ? '' : ' Trascinala su un tasto.'}</p>`;

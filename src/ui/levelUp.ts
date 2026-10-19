@@ -139,7 +139,7 @@ export class LevelUp {
     this.title.textContent = `Livello ${lv}`;
     this.cardsEl.innerHTML = cards.map((c, i) => {
       const stacks = c.max > 1 && Number.isFinite(c.max) ? `<span>${count(c.id) + 1}/${c.max}</span>` : '';
-      return `<button class="card ${c.kind}" data-i="${i}" tabindex="-1"><span class="tag">${TAG[c.kind]}</span><div class="ic">${ICONS[c.icon] ?? ''}</div>`
+      return `<button class="card ${c.kind}" data-i="${i}" tabindex="-1"><span class="tag">${c.kind === 'filler' && c.apply ? 'Potenziamento' : TAG[c.kind]}</span><div class="ic">${ICONS[c.icon] ?? ''}</div>`
         + `<h3></h3><p></p><div class="foot">${stacks}<kbd>${i + 1}</kbd></div></button>`;
     }).join('');
     this.cardsEl.querySelectorAll('.card').forEach((b, i) => {

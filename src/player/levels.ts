@@ -3,23 +3,23 @@
 // curve is tuned to it. Full clear before the boss: 1145 XP, level 11; the quest route with the apiary
 // ~870 (scripts/balance.ts) and ~1020 with the key's and Fra' Bortolo's quest XP, level 10: the boss is tuned for 10-11.
 // Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
-// pays 950 XP in all, so a run with the side quests done too ends at the cap.
-// Each level offers two cards. Even levels up to 10 offer two new abilities (the specials from level 6; the second
-// card leans to a school already owned, so fire, frost or lightning can make a build);
-// the others a modifier of an owned ability (or a fusion) against a stat passive. The run starts with
-// Caduta d'ossa, Nube di peste and Preghiera di suffragio (the heal), the potion stays as an item. Everything an upgrade changes is a field
-// of `Tune`, replayed from the picks (`tuneOf`), so a save only needs the pick list.
+// pays 950 XP in all, ~16 with the side quests done too. There is no cap: the curve goes on, and the risen dead keep feeding it.
+// Each level offers two cards, drawn evenly from everything not yet learnt or maxed, whatever was picked before.
+// Even levels up to 10 offer two new abilities (the specials from level 6), past 10 a new ability against an upgrade;
+// the others a modifier of an owned ability (or a fusion) against a stat passive. With the finite cards all taken, small
+// repeatable ones (and the heal) keep coming. The run starts with Caduta d'ossa, Nube di peste and Preghiera di suffragio
+// (the heal), the potion stays as an item. The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
+// upgrade changes is a field of `Tune`, replayed from the picks and the tomes' abilities (`tuneOf`), so a save only needs both lists.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
-export const MAX_LEVEL = 16; // level 2 cleared and handed in, with every side quest, ends at 16
 /** XP from level `lv` to `lv + 1`. */
 export const need = (lv: number) => 20 * lv;
 
-/** Level reached with `xp`, XP gathered into it and XP the next one needs (0 at the cap). */
+/** Level reached with `xp`, XP gathered into it and XP the next one needs. */
 export function levelOf(xp: number): { lv: number; into: number; next: number } {
   let lv = 1;
-  while (lv < MAX_LEVEL && xp >= need(lv)) xp -= need(lv++);
-  return { lv, into: lv < MAX_LEVEL ? xp : 0, next: lv < MAX_LEVEL ? need(lv) : 0 };
+  while (xp >= need(lv)) xp -= need(lv++);
+  return { lv, into: xp, next: need(lv) };
 }
 
 /** Everything an upgrade can change; forsaken.ts, stats.ts and main.ts read it live. */
@@ -186,7 +186,10 @@ export const CARDS: Card[] = [
   { id: 'fx_frostwhirl', kind: 'fusion', name: 'Turbine di brina', icon: 'whirl', max: 1, text: "Fusione. Turbine d'ossa gela chi colpisce (rallentato del 40%) e fa il doppio dei danni a chi è congelato.",
     needs: (_c, owns) => owns('whirl') && (owns('frost') || owns('font') || owns('lance')), apply: (t) => { t.fxFrostWhirl = true; } },
 
-  { id: 'linfa', kind: 'filler', name: 'Linfa tombale', icon: 'potion', max: Infinity, text: 'Hai già tutto: recuperi il 30% della salute e del mana.' },
+  // Repeatable, offered only once the cards above run short.
+  { id: 'linfa', kind: 'filler', name: 'Linfa tombale', icon: 'potion', max: Infinity, text: 'Recuperi il 30% della salute e del mana.' },
+  { id: 'ossa_eterne', kind: 'filler', name: 'Ossa eterne', icon: 'dmg', max: Infinity, text: '+2% a tutti i danni che infliggi. Si ripete.', apply: (t) => { t.dmg += 0.02; } },
+  { id: 'carne_eterna', kind: 'filler', name: 'Carne eterna', icon: 'hp', max: Infinity, text: '+4% di salute massima. Si ripete.', apply: (t) => { t.hp += 0.04; } },
 ];
 export const CARD = new Map(CARDS.map((c) => [c.id, c]));
 for (const c of CARDS) if (c.school) SCHOOL[c.id] = c.school;
@@ -197,8 +200,8 @@ const counter = (picks: readonly string[]) => {
   return (id: string) => n.get(id) ?? 0;
 };
 
-/** The stats and ability numbers the picks add up to (unknown ids and stacks past `max` are ignored). */
-export function tuneOf(picks: readonly string[]): Tune {
+/** The stats and ability numbers the picks and the tomes' `learned` abilities add up to (unknown ids and stacks past `max` are ignored). */
+export function tuneOf(picks: readonly string[], learned: readonly string[] = []): Tune {
   const t: Tune = { ...BASE, owned: [...START] }, seen = new Map<string, number>();
   for (const id of picks) {
     const c = CARD.get(id), k = (seen.get(id) ?? 0) + 1;
@@ -207,22 +210,23 @@ export function tuneOf(picks: readonly string[]): Tune {
     if (c.kind === 'ability') t.owned.push(id);
     c.apply?.(t);
   }
+  for (const id of learned) if (CARD.get(id)?.kind === 'ability' && !t.owned.includes(id)) t.owned.push(id);
   if (!SPECIALS.some((s) => t.owned.includes(s))) t.fury = 0; // no special to spend it on: the bar stays empty and hidden
   return t;
 }
 
-/** Cards that may still be offered after `picks`: not maxed, their ability owned, their needs met. */
-export function eligible(picks: readonly string[]): Card[] {
-  const count = counter(picks), owned = tuneOf(picks).owned, owns = (a: string) => owned.includes(a);
-  return CARDS.filter((c) => c.kind !== 'filler' && count(c.id) < c.max && (!c.of || c.kind === 'ability' || owns(c.of)) && (!c.needs || c.needs(count, owns)));
+/** Cards that may still be offered after `picks` and the tomes' `learned`: not maxed nor owned, their ability owned, their needs met. */
+export function eligible(picks: readonly string[], learned: readonly string[] = []): Card[] {
+  const count = counter(picks), owned = tuneOf(picks, learned).owned, owns = (a: string) => owned.includes(a);
+  return CARDS.filter((c) => c.kind !== 'filler' && count(c.id) < c.max && (c.kind === 'ability' ? !owns(c.id) : !c.of || owns(c.of)) && (!c.needs || c.needs(count, owns)));
 }
 
 /**
- * The two cards for the next level-up (the one `picks.length + 2` reaches); one only if nothing else is
- * left. The card passed over goes back into the pool.
+ * The two cards for the next level-up (the one `picks.length + 2` reaches), each drawn evenly from its kind's pool;
+ * the repeatable ones fill in when the pool runs short. The card passed over goes back into the pool.
  */
-export function offer(picks: readonly string[], rnd: () => number = Math.random): Card[] {
-  const lv = picks.length + 2, ok = eligible(picks), out: Card[] = [];
+export function offer(picks: readonly string[], rnd: () => number = Math.random, learned: readonly string[] = []): Card[] {
+  const lv = picks.length + 2, ok = eligible(picks, learned), out: Card[] = [];
   const pick = (from: Card[]) => {
     const left = from.filter((c) => !out.includes(c));
     if (left.length) out.push(left[Math.floor(rnd() * left.length) % left.length]);
@@ -232,10 +236,10 @@ export function offer(picks: readonly string[], rnd: () => number = Math.random)
   if (lv % 2 === 0 && lv <= 10) {
     if (lv === 6 || lv === 8) pick(abilities.filter((c) => c.tier === 'B')); // the specials surface in time
     pick(abilities);
-    // Half the time the other card is of a school already owned, so fire, frost or lightning can grow into a build.
-    const schools = new Set(tuneOf(picks).owned.map((a) => SCHOOL[a])), kin = abilities.filter((c) => schools.has(c.school!));
-    pick(kin.length && rnd() < 0.5 ? kin : abilities);
     pick(abilities);
+  } else if (lv % 2 === 0 && abilities.length) { // past 10: keep learning, or grow what is owned
+    pick(abilities);
+    pick(rnd() < 0.5 ? passives : mods);
   } else {
     const fusions = mods.filter((c) => c.kind === 'fusion');
     pick(fusions.length && rnd() < 0.5 ? fusions : mods);
@@ -244,14 +248,35 @@ export function offer(picks: readonly string[], rnd: () => number = Math.random)
   pick(mods); // short: fill from the upgrades, then the heal
   pick(passives);
   pick(mods);
-  if (out.length < 2) out.push(CARD.get('linfa')!);
+  pick(FILLERS);
+  pick(FILLERS);
   return out.slice(0, 2);
 }
+const FILLERS = CARDS.filter((c) => c.kind === 'filler');
 
-/** Runtime level state: XP (main.ts sets it from the dead), the picks, and the hook that lays them on the kit. */
+/** A merchant's tome: every ability of a school, for gold (ui/vendor.ts). The cost is per ability it would still teach.
+ * Peste and Sacro have none: the run starts with their only abilities. */
+export interface Tome { school: School; name: string; icon: string }
+export const TOMES: Tome[] = [
+  { school: 'bone', name: 'Tomo delle Ossa', icon: 'strike' },
+  { school: 'shadow', name: "Tomo dell'Ombra", icon: 'step' },
+  { school: 'fire', name: 'Tomo del Fuoco', icon: 'pyre' },
+  { school: 'frost', name: 'Tomo del Gelo', icon: 'frost' },
+  { school: 'storm', name: 'Tomo del Fulmine', icon: 'chain' },
+];
+/** Gold a tome asks for each ability it teaches: a special costs more. */
+export const TOME_PRICE = { A: 250, B: 400 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: a small tome by then, the Ossa's 1550 a level-2 goal
+/** What `tome` would teach someone owning `owned`, and its price; a tome with nothing left to teach is not sold. */
+export function tomeOf(tome: Tome, owned: readonly string[]): { teaches: Card[]; price: number } {
+  const teaches = CARDS.filter((c) => c.kind === 'ability' && c.school === tome.school && !owned.includes(c.id));
+  return { teaches, price: teaches.reduce((s, c) => s + TOME_PRICE[c.tier ?? 'A'], 0) };
+}
+
+/** Runtime level state: XP (main.ts sets it from the dead), the picks, the tomes' abilities, and the hook that lays them on the kit. */
 export class Levels {
   xp = 0;
   picks: string[] = [];
+  learned: string[] = [];
   /** Lay `picks` on the kit, stats and bar (main.ts). */
   apply: () => void = () => {};
 

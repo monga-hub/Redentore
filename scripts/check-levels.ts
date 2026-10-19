@@ -1,12 +1,12 @@
 // Levels check (`npm run check`): the 56 upgrade cards (every ability with a school and its modifiers), the XP curve against the mobs' worth (first level after two friars, the quest
-// route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11), the two-card offers over many random runs (never an owned or maxed card,
-// never a mod for a locked ability, new abilities on even levels with the specials from level 6, fusions only
-// with both parents, the second ability card leaning to the schools owned), the heal when everything is taken, the
-// replay of picks into numbers, and the bar keeping a slot for an ability until it is unlocked, or finding one.
-import { CARD, CARDS, MAX_LEVEL, SCHOOL, SPECIALS, START, eligible, levelOf, need, offer, tuneOf, type Card } from '../src/player/levels.ts';
+// route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11, no cap), the two-card offers over many random runs to level 30 (never an owned or maxed card,
+// never a mod for a locked ability, new abilities on even levels with the specials from level 6, one past 10, fusions only
+// with both parents, every ability as likely as any other whatever was picked), the repeatable cards when everything is taken, the
+// replay of picks and tomes into numbers, the merchants' tomes, and the bar keeping a slot for an ability until it is unlocked, or finding one.
+import { CARD, CARDS, SCHOOL, SPECIALS, START, TOMES, TOME_PRICE, eligible, levelOf, need, offer, tomeOf, tuneOf, type Card } from '../src/player/levels.ts';
 import { FRIAR, spawnGroups } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from '../src/enemies/caster.ts';
-import { AbilitySystem, KEYS, POTION, PRIMARY, SPARE, type Ability } from '../src/abilities/system.ts';
+import { AbilitySystem, KEYS, POTION, PRIMARY, type Ability } from '../src/abilities/system.ts';
 import { BAR } from '../src/abilities/forsaken.ts';
 import { buildLevel } from '../src/level/index.ts';
 
@@ -19,9 +19,10 @@ if (friars !== 32) fail(`${friars} friars`);
 const full = friars * FRIAR.xp + 45 * PRIEST.xp + 7 * SACERDOTE.xp + APE.xp + 3 * APETTA.xp + REVERENDISSIMO.xp;
 if (full !== 1145 || levelOf(full).lv !== 11) fail(`full clear ${full} XP is level ${levelOf(full).lv}, want 1145 / 11`);
 if (levelOf(FRIAR.xp).lv !== 1 || levelOf(2 * FRIAR.xp).lv !== 2) fail('the first level must come with the second friar');
-for (const [xp, lv] of [[560, 8], [720, 9], [875, 9], [900, 10], [19, 1], [20, 2], [1e9, MAX_LEVEL]]) if (levelOf(xp).lv !== lv) fail(`${xp} XP is level ${levelOf(xp).lv}, want ${lv}`);
+for (const [xp, lv] of [[560, 8], [720, 9], [875, 9], [900, 10], [19, 1], [20, 2], [2399, 15], [2400, 16], [3800, 20], [10 * 40 * 39, 40]]) if (levelOf(xp).lv !== lv) fail(`${xp} XP is level ${levelOf(xp).lv}, want ${lv}`);
 const l = levelOf(70);
 if (l.lv !== 3 || l.into !== 10 || l.next !== 60) fail(`levelOf(70) = ${JSON.stringify(l)}`);
+if (levelOf(2400 + 5).next !== need(16) || levelOf(2400 + 5).into !== 5) fail('the curve stops at 16');
 if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 56) fail('56 upgrade cards');
 // Every ability card has a school, an icon of its own and two modifiers; the new ten are offered from level 2.
 const NEW = ['pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge'];
@@ -31,13 +32,13 @@ for (const c of CARDS.filter((c) => c.kind === 'ability')) {
 }
 for (const id of NEW) if (CARD.get(id)?.tier !== 'A') fail(`${id} must be a tier A ability`);
 
-// Offers over many seeded runs, picking at random among the two, up to the cap.
+// Offers over many seeded runs, picking at random among the two, to level 30.
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 const fusionsSeen = new Set<string>();
 for (let run = 0; run < 400; run++) {
   const picks: string[] = [];
-  for (let n = 0; n < MAX_LEVEL - 1; n++) {
+  for (let n = 0; n < 29; n++) {
     const lv = picks.length + 2, cards = offer(picks, rnd), ok = eligible(picks), t = tuneOf(picks);
     const count = (id: string) => picks.filter((p) => p === id).length;
     const ids = cards.map((c) => c.id).join();
@@ -56,29 +57,27 @@ for (let run = 0; run < 400; run++) {
       if (kinds.filter((k) => k === 'ability').length !== Math.min(2, open.length)) fail(`level ${lv}: ${ids} with ${open.length} abilities open`);
       if (lv < 6 && cards.some((c) => c.tier === 'B')) fail(`level ${lv}: a special before level 6`);
       if ((lv === 6 || lv === 8) && abilities.some((c) => c.tier === 'B') && !cards.some((c) => c.tier === 'B')) fail(`level ${lv}: no special offered`);
+    } else if (lv % 2 === 0 && abilities.length) {
+      if (kinds.filter((k) => k === 'ability').length !== 1) fail(`level ${lv}: ${ids}, want one new ability past 10`);
     } else {
       if (kinds.includes('ability')) fail(`level ${lv}: an ability off the ability levels`);
       if (ok.some((c) => c.kind === 'passive') && !kinds.includes('passive')) fail(`level ${lv}: no passive in ${ids}`);
       if (ok.some((c) => c.kind === 'mod' || c.kind === 'fusion') && !kinds.some((k) => k === 'mod' || k === 'fusion')) fail(`level ${lv}: no modifier in ${ids}`);
     }
     picks.push(cards[Math.floor(rnd() * 2)].id);
+    if (lv === 10 && tuneOf(picks).owned.length !== START.length + 5) fail(`run ${run}: ${tuneOf(picks).owned} owned at level 10, want 5 unlocks`);
   }
   const t = tuneOf(picks);
-  if (t.owned.length !== START.length + 5) fail(`run ${run}: ${t.owned} owned after the cap, want 5 unlocks`);
+  if (t.owned.length <= START.length + 5) fail(`run ${run}: no ability learnt past level 10`);
   if (t.fury === 0 && SPECIALS.some((s) => t.owned.includes(s))) fail('a special owned but the charge bar off');
 }
 if (fusionsSeen.size !== 6) fail(`fusions offered: ${[...fusionsSeen]}`);
-// The second card of an ability level leans toward the schools owned: frost after frost comes more often than chance.
-{
-  let kin = 0, n = 0;
-  for (let run = 0; run < 2000; run++) {
-    const at4 = offer(['frost', 'dmg'], rnd); // level 4: two new abilities
-    n++;
-    if (at4.some((c) => c.school === 'frost')) kin++;
-  }
-  const share = kin / n, open = CARDS.filter((c) => c.kind === 'ability' && c.tier === 'A' && c.id !== 'frost');
-  const chance = 1 - (1 - open.filter((c) => c.school === 'frost').length / open.length) ** 2;
-  if (share < chance + 0.1) fail(`frost offered after frost ${share.toFixed(2)} of the time, chance alone ${chance.toFixed(2)}`);
+// No lean: whatever was picked, every ability still to learn is as likely as any other, at 4 and past 10 alike.
+for (const [before, lv] of [[['frost', 'dmg'], 4], [['chain', 'dmg'], 4], [['frost', 'dmg', 'pyre', 'hp', 'nova', 'regen', 'lance', 'mana', 'font', 'speed'], 12]] as const) {
+  const seen = new Map<string, number>(), N = 20000;
+  for (let i = 0; i < N; i++) for (const c of offer(before, rnd)) if (c.kind === 'ability') seen.set(c.id, (seen.get(c.id) ?? 0) + 1);
+  const open = eligible(before).filter((c) => c.kind === 'ability' && (c.tier === 'A' || lv >= 6)), n = open.map((c) => seen.get(c.id) ?? 0);
+  if (seen.size !== open.length || Math.max(...n) > 1.15 * Math.min(...n)) fail(`level ${lv} after ${before}: abilities offered ${JSON.stringify([...seen])}`);
 }
 
 // Fusions need both parents; charge cards a special.
@@ -91,10 +90,39 @@ if (!has(['chain'], 'fx_storm') || !has(['toll'], 'fx_storm') || has(['frost'], 
 if (has(['whirl'], 'fx_frostwhirl') || !has(['whirl', 'font'], 'fx_frostwhirl')) fail('Turbine di brina needs the whirl and frost');
 if (has([], 'wisp_dps') || !has(['wisp'], 'wisp_dps') || !has([], 'potion_big')) fail('mods need their ability (the potion is owned)');
 
-// Everything taken: the heal alone is offered.
+// Everything taken: two of the repeatable cards (the heal, the small damage and health ones), and they stack.
 const all = CARDS.flatMap((c: Card) => (c.kind === 'filler' ? [] : Array(c.max).fill(c.id)));
 if (eligible(all).length) fail('cards left after taking everything');
-if (offer(all).map((c) => c.id).join() !== 'linfa') fail(`exhausted offer ${offer(all).map((c) => c.id)}`);
+for (let i = 0; i < 50; i++) {
+  const o = offer(all, rnd);
+  if (o.length !== 2 || o[0] === o[1] || o.some((c) => c.kind !== 'filler')) fail(`exhausted offer ${o.map((c) => c.id)}`);
+}
+if (Math.abs(tuneOf(['ossa_eterne', 'ossa_eterne', 'ossa_eterne']).dmg - 1.06) > 1e-9 || Math.abs(tuneOf(['carne_eterna', 'carne_eterna']).hp - 1.08) > 1e-9) fail('repeatable cards do not stack');
+// A run long past every finite card still gets two cards a level.
+{
+  const picks: string[] = [];
+  for (let n = 0; n < 150; n++) { const o = offer(picks, rnd); if (o.length !== 2) fail(`level ${n + 2}: ${o.length} cards`); picks.push(o[0].id); }
+}
+
+// Tomes: each teaches every ability of its school not owned, priced per ability (specials dearer); together they teach every ability.
+const learnable = CARDS.filter((c) => c.kind === 'ability').map((c) => c.id);
+if (TOMES.flatMap((t) => tomeOf(t, START).teaches.map((c) => c.id)).sort().join() !== [...learnable].sort().join()) fail('the tomes do not teach every ability');
+for (const t of TOMES) {
+  const { teaches, price } = tomeOf(t, START);
+  if (teaches.length < 2 || teaches.some((c) => c.school !== t.school) || price !== teaches.reduce((s, c) => s + TOME_PRICE[c.tier!], 0)) fail(`${t.name}: ${teaches.map((c) => c.id)} for ${price}`);
+}
+const gelo = TOMES.find((t) => t.school === 'frost')!;
+if (tomeOf(gelo, [...START, 'frost']).price !== tomeOf(gelo, START).price - TOME_PRICE.A || tomeOf(gelo, [...START, 'frost', 'font', 'lance']).teaches.length) fail('a tome charges for what is known');
+// Learnt from a tome: owned, never offered again, its upgrades open, and the other schools still offered at the same odds.
+const tomed = tuneOf(['dmg'], ['frost', 'font', 'lance']);
+if (!['frost', 'font', 'lance'].every((id) => tomed.owned.includes(id)) || tuneOf([], ['hp', 'nope']).owned.join() !== START.join()) fail(`tome abilities owned: ${tomed.owned}`);
+if (tuneOf(['frost'], ['frost']).owned.filter((id) => id === 'frost').length !== 1) fail('an ability picked and learnt counts once');
+{
+  const ok = eligible(['dmg'], ['frost', 'font', 'lance']);
+  if (ok.some((c) => c.school === 'frost') || !ok.some((c) => c.id === 'frost_fast') || !ok.some((c) => c.id === 'pyre')) fail('tome abilities in the offers');
+  for (let i = 0; i < 500; i++) if (offer(['dmg'], rnd, ['frost', 'font', 'lance']).some((c) => c.kind === 'ability' && c.school === 'frost')) fail('a learnt ability offered');
+  if (has(['pyre'], 'fx_shatter') || !eligible(['pyre'], ['lance']).some((c) => c.id === 'fx_shatter')) fail('a fusion needs a tome ability');
+}
 
 // Replay: numbers from picks, stacks past max and unknown ids ignored, order-free, survives JSON.
 const t = tuneOf(['dmg', 'dmg', 'dmg', 'dmg', 'hp', 'plague_size', 'junk', 'nova', 'wisp_fast']);
@@ -121,11 +149,10 @@ if (big.slots[2]?.id !== 'new1' || big.layout().bar.includes('a')) fail(`unlock 
 big.unlock('a'); // its old slot went to new1: the next free one
 if (big.slots[3]?.id !== 'a' || big.slots[2]?.id !== 'new1') fail(`re-placed: ${big.layout().bar}`);
 // The starting bar (abilities/forsaken.ts BAR): the primary attack fixed on 0, the potion on 9, the kit on 1-2, each
-// unlock (at most five: the cap) on the next free slot, in the touch arc's thumb order.
+// unlock on the next free slot, in the touch arc's thumb order (with the eight full, the rest wait in the book: `big` above).
 if (BAR[PRIMARY] !== 'fall' || BAR[POTION] !== 'potion' || BAR.length !== KEYS.length) fail(`default bar ${BAR}`);
 const later = ['nova', 'veil', 'strike', 'step', 'ward'];
 const run = new AbilitySystem([...START, ...later].map(ab), BAR, { player: { pos: { x: 0, y: 0, z: 0 } } }, START);
 for (const id of later) run.unlock(id);
 if (run.layout().bar.join() !== ['fall', 'plague', 'mend', ...later, null, 'potion'].join()) fail(`unlocks out of thumb order: ${run.layout().bar}`);
-if (START.length - 2 + 5 > SPARE.length) fail('the eight slots hold every ability a run can own (the kit but the two fixed ones, five unlocks)');
-console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 400 runs offered cleanly)`);
+console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 400 runs to level 30 offered cleanly, offers even, ${TOMES.length} tomes)`);

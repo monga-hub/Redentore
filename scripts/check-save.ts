@@ -22,7 +22,7 @@ function boot(): Game {
     player: { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: SPAWN.yaw },
     stats,
     kit: { charge: 0 },
-    levels: { xp: 0, picks: [], apply() { const t = tuneOf(this.picks), w = effects(gear.totals); stats.grow(t.hp, t.mana, w.hp, w.mana); } }, // main.ts lays the rest on the kit
+    levels: { xp: 0, picks: [], learned: [], apply() { const t = tuneOf(this.picks, this.learned), w = effects(gear.totals); stats.grow(t.hp, t.mana, w.hp, w.mana); } }, // main.ts lays the rest on the kit
     quest: new Quest(level.world),
     mobs: spawnGroups(level.world).flat(),
     time: 0,
@@ -225,6 +225,19 @@ const odd = boot();
 deserialize(odd, { ...ls, build: { ...ls.build, picks: ['hp', 'from_the_future'] } });
 if (odd.levels.picks.join() !== 'hp') fail('unknown card kept');
 if (!valid({ ...s, build: undefined }) || valid({ ...s, build: { xp: 1, lv: 1, picks: [3] } }) || valid({ ...s, build: { xp: '1', lv: 1, picks: [] } })) fail('build field validation');
+// The tomes' abilities round-trip; a save from before the tomes loads with none; a card that is no ability is dropped; junk is refused.
+const tl = boot();
+tl.levels.learned = ['pyre', 'wisp'];
+const ts = JSON.parse(JSON.stringify(serialize(tl))), tb = boot();
+deserialize(tb, ts);
+if (tb.levels.learned.join() !== 'pyre,wisp' || !tuneOf(tb.levels.picks, tb.levels.learned).owned.includes('pyre')) fail(`tomes' abilities after load: ${tb.levels.learned}`);
+const tOld = boot();
+deserialize(tOld, ls);
+if (tOld.levels.learned.length) fail('a save from before the tomes loads with abilities learnt');
+const tOdd = boot();
+deserialize(tOdd, { ...ts, build: { ...ts.build, learned: ['pyre', 'hp', 'from_the_future'] } });
+if (tOdd.levels.learned.join() !== 'pyre') fail(`tomes' junk kept: ${tOdd.levels.learned}`);
+if (!valid(ls) || !valid({ ...ls, build: { ...ls.build, learned: undefined } }) || valid({ ...ts, build: { ...ts.build, learned: [3] } }) || valid({ ...ts, build: { ...ts.build, learned: 'pyre' } })) fail('learned field validation');
 // Le teste dei frati: asked, the heads in hand and the boon round-trip; a save from before it loads with it not taken; junk is refused.
 const hq = boot();
 Object.assign(hq.quest, { asked: true, heads: 7 });

@@ -1,4 +1,5 @@
 import { ITEM, RARITY, type Bag, type Item } from '../loot/bag.ts';
+import { TOMES, tomeOf } from '../player/levels.ts';
 import { buy, buyPrice, sell, sellPrice, type Equipment } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
@@ -8,7 +9,8 @@ import { itemTip } from './tooltip.ts';
 // The merchants' window, WoW style (Fra' Bortolo's shop, Mastro Iseppo's): "Commercia" in their dialogue opens it
 // with the bag beside it. Left, their goods, purple pieces with their price; under them the buyback row of
 // what was sold this visit. While it is open a click on a bag slot sells the whole stack for a
-// quarter of its price (ui/bag.ts `selling`); goods and buyback are bought the same way.
+// quarter of its price (ui/bag.ts `selling`); goods and buyback are bought the same way. Before the goods, the tomes
+// (player/levels.ts TOMES): bought, one teaches at once every ability of its school the hero lacks, into the ability book.
 
 const CSS = `
 #bag .vendor { width: min(380px, calc(100vw - 24px)); }
@@ -27,24 +29,30 @@ const CSS = `
 #bag .vendor .back .cell { width: calc(var(--s) * .75); height: calc(var(--s) * .75); }
 #bag .vendor .foot small { font: 11px system-ui, sans-serif; color: #c9b48a; }
 @media (max-width: 760px) { #bag.duo .vendor .goods { grid-template-columns: minmax(0, 168px); max-height: calc(100dvh - 190px); overflow-y: auto; } }
+@media (max-height: 560px) { #bag .vendor .goods { max-height: calc(100dvh - 190px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; } } /* a phone on its side: the tomes and the gear scroll */
 `;
 const BACK = 6; // buyback slots, oldest dropped
 
 /** A shop: its keeper's name, the line under it and what is on sale. */
 export interface Merchant { name: string; sub: string; goods: () => readonly Item[] }
+/** What the tomes need: the abilities owned, and teaching new ones (main.ts). */
+export interface Learner { owned(): readonly string[]; learn(ids: string[]): void }
+const TOME_COLOR = RARITY.leggendario.color;
 
 export class VendorPanel {
   readonly el = document.createElement('div');
   private readonly host: BagPanel;
   private readonly bag: Bag;
   private readonly gear: Equipment;
+  private readonly learner: Learner;
   private sold: { id: string; n: number }[] = []; // this visit's sales, newest last
   private who: Merchant = { name: '', sub: '', goods: () => [] };
 
-  constructor(host: BagPanel, bag: Bag, gear: Equipment) {
+  constructor(host: BagPanel, bag: Bag, gear: Equipment, learner: Learner) {
     this.host = host;
     this.bag = bag;
     this.gear = gear;
+    this.learner = learner;
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.append(style);
@@ -62,6 +70,24 @@ export class VendorPanel {
       },
       use: (id) => this.buy(id, buyPrice(ITEM.get(id)!)),
     }, () => this.render());
+    host.kind('t', {
+      tip: (school, tap) => {
+        const t = TOMES.find((x) => x.school === school)!, { teaches, price } = tomeOf(t, this.learner.owned());
+        return `<div class="box"><b style="color: ${TOME_COLOR}">${t.name}</b><small><span>Tomo · ${teaches.length} abilità</span></small>`
+          + teaches.map((c) => `<span class="w">${c.name}${c.tier === 'B' ? ' (speciale)' : ''}</span>`).join('')
+          + '<p class="lore">«Le impari tutte appena lo compri: le trovi nel Libro delle abilità, pronte da equipaggiare.»</p>'
+          + `<small class="price"><span>Prezzo: ${price.toLocaleString('it-IT')} oro</span></small><span class="hint${this.bag.gold < price ? ' no' : ''}">${hint(tap, 'impara', price)}</span></div>`;
+      },
+      use: (school) => {
+        const t = TOMES.find((x) => x.school === school)!, { teaches, price } = tomeOf(t, this.learner.owned());
+        if (!teaches.length) return;
+        if (this.bag.gold < price) return this.host.say('Non hai abbastanza oro.');
+        this.bag.gold -= price;
+        this.learner.learn(teaches.map((c) => c.id));
+        playSfx('quest', null, { ui: true });
+        this.host.say(`Appreso: ${teaches.map((c) => c.name).join(', ')}`, true);
+      },
+    });
     host.kind('r', {
       tip: (i, tap) => {
         const s = this.sold[Number(i)], it = ITEM.get(s.id)!, p = sellPrice(it) * s.n;
@@ -110,7 +136,9 @@ export class VendorPanel {
     };
     this.el.innerHTML = `<h2>${this.who.name}</h2><button class="x" aria-label="Chiudi bottega">✕</button>
       <p class="sub">${this.who.sub}</p>
-      <div class="goods">${this.who.goods().map((it) => {
+      <div class="goods">${TOMES.map((t) => [t, tomeOf(t, this.learner.owned())] as const).filter(([, o]) => o.teaches.length).map(([t, o]) =>
+        `<div class="good"><button class="cell" data-k="t:${t.school}" style="--c: ${TOME_COLOR}" aria-label="${t.name}">${ICONS[t.icon]}</button><span><em style="color: ${TOME_COLOR}">${t.name}</em>`
+        + `<small class="${this.bag.gold < o.price ? 'no' : ''}"><i class="coin"></i>${o.price.toLocaleString('it-IT')}</small></span></div>`).join('')}${this.who.goods().map((it) => {
         const p = buyPrice(it);
         return `<div class="good">${cell(`s:${it.id}`, it.id)}<span><em style="color: ${RARITY[it.rarity].color}">${it.name}</em><small class="${this.bag.gold < p ? 'no' : ''}"><i class="coin"></i>${p.toLocaleString('it-IT')}</small></span></div>`;
       }).join('')}</div>

@@ -44,7 +44,8 @@ export interface GameState {
   // Level-up cards in the order picked, XP and the level it makes (lv is for readers: XP decides). Absent in
   // saves from before the levels: they load at level 1 with the starting kit, and as XP is the worth of the
   // dead, the level-ups their kills earned are offered one after another right after the load.
-  build?: { xp: number; lv: number; picks: string[] };
+  // learned: abilities taught by the merchants' tomes (player/levels.ts TOMES); absent in older saves: none.
+  build?: { xp: number; lv: number; picks: string[]; learned?: string[] };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
   gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
   side?: SideState; // Mastro Iseppo's quests taken, handed in and their kill counts; absent in saves from before him: none
@@ -56,7 +57,7 @@ export interface Game {
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
   kit: { charge: number };
   /** `apply` lays the picks on the kit and stats (raising hpMax), so a load runs it before restoring hp. */
-  levels: { xp: number; picks: string[]; apply(): void };
+  levels: { xp: number; picks: string[]; learned: string[]; apply(): void };
   quest: Quest;
   mobs: { state: string; hp: number; t: number; again?: boolean }[];
   time: number;
@@ -76,7 +77,7 @@ export function serialize(g: Game): GameState {
     again: g.mobs.flatMap((m, i) => (m.again ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
-    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks] },
+    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks], learned: [...g.levels.learned] },
     bag: g.bag.encode(),
     gear: g.gear.encode(),
     side: g.quest.side.encode(),
@@ -90,6 +91,7 @@ export function deserialize(g: Game, s: GameState): void {
   g.player.facing = p.yaw;
   g.levels.xp = s.build?.xp ?? 0;
   g.levels.picks = (s.build?.picks ?? []).filter((id) => CARD.has(id)); // a card from another build is dropped
+  g.levels.learned = (s.build?.learned ?? []).filter((id) => CARD.get(id)?.kind === 'ability');
   if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
   g.quest.boon = BOONS.some((b) => b.id === s.quest.boon) ? s.quest.boon! : ''; // before the clamp too: the rite's boon may raise it
   g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
@@ -145,7 +147,8 @@ export function valid(s: unknown): s is GameState {
     && [undefined, true, false].includes(o.quest.found) && (o.quest.done === undefined || (Array.isArray(o.quest.done) && o.quest.done.every((x) => typeof x === 'string')))
     && [undefined, true, false].includes(o.quest.asked) && (o.quest.heads === undefined || num(o.quest.heads)) && (o.quest.boon === undefined || typeof o.quest.boon === 'string')
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && (o.again === undefined || (Array.isArray(o.again) && o.again.every(Number.isInteger))) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
-    && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))
+    && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')
+      && (o.build.learned === undefined || (Array.isArray(o.build.learned) && o.build.learned.every((x) => typeof x === 'string')))))
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
     && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')))
     && (o.side === undefined || (!!o.side && [o.side.taken, o.side.done].every((a) => Array.isArray(a) && a.every((x) => typeof x === 'string'))

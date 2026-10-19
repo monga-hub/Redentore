@@ -92,7 +92,7 @@ const levelUp = new LevelUp(); // the two-card window
 const gear = new Equipment(); // what the hero wears: the hemp set and the bone club at first
 let worn = effects(gear.totals);
 levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on the kit and the stats
-  Object.assign(tune, tuneOf(levels.picks));
+  Object.assign(tune, tuneOf(levels.picks, levels.learned));
   BOONS.find((b) => b.id === quest.boon)?.apply(tune);
   worn = effects(gear.totals);
   playerStats.grow(tune.hp, tune.mana, worn.hp, worn.mana);
@@ -206,7 +206,7 @@ function openLevelUp(): void {
   kit.system.cancel();
   input.consume();
   dctl.stop();
-  levelUp.show(levels.picks.length + 2, offer(levels.picks), picked, (c: Card) => {
+  levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned), picked, (c: Card) => {
     levels.picks.push(c.id);
     if (c.kind === 'ability') { // onto the first free slot, even if an earlier run took it off the bar
       kit.system.learn(c.id);
@@ -268,7 +268,17 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
   lv: levels.lv, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
   dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
-const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
+const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commercia, Mastro Iseppo's; their tomes teach a school
+  owned: () => tune.owned,
+  learn: (ids) => {
+    levels.learned.push(...ids);
+    for (const id of ids) kit.system.learn(id);
+    levels.apply();
+    saveBar(kit.system.layout());
+    book.nudge();
+    kit.ascend();
+  },
+});
 const book = new AbilityBook(kit.system, ABILITIES, () => levels.picks); // K, the book button or the menu: the ability book
 book.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); };
 bagPanel.keys.KeyK = () => book.show();

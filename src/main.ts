@@ -46,6 +46,7 @@ import { BagPanel } from './ui/bag.ts';
 import { Equipment, SHOP2, crit, effects, shop } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { VendorPanel } from './ui/vendor.ts';
+import { DeathScreen } from './ui/death.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -124,8 +125,10 @@ const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.ca
   { name: 'Ape operaia', max: APETTA.hp, height: Bees.HEIGHT.worker, all: bees.all.filter((f) => f.kind === APETTA), ready: () => bees.root.children.length > 0 },
   ...L2_KINDS.map(([name, kind, height]) => ({ name, max: kind.hp, height, all: ofKind(kind), ready: () => zitelle.root.children.length > 0, ...(kind === GOVERNATRICE ? { ownBar: () => questView.bossShown } : {}) })),
 ]);
-const FALLEN = 2.6; // s the hero lies dead before waking
+const FALLEN = 3.6; // s the hero lies dead before waking
+const SLOW = 0.3, SLOW_FOR = 1.4; // the world's speed as the hero falls, easing back to 1 over SLOW_FOR s
 let dying = 0;
+const deathScreen = new DeathScreen(renderer.domElement);
 playerStats.onDeath = () => { // the hero falls; the fight is over at once, the wake-up follows
   kit.system.cancel();
   kit.magic.reset(); // bolts in flight, burning floors, a leap: gone with the hero
@@ -135,11 +138,13 @@ playerStats.onDeath = () => { // the hero falls; the fight is over at once, the 
   bees.wipe();
   zitelle.wipe();
   player.model.die();
+  deathScreen.show();
   dying = FALLEN;
 };
 playerStats.onHurt = (n) => { player.model.flinch(n); kit.system.pushback(); }; // a hit sets a cast bar back
-/** ponytail: wake at the last checkpoint at full health; a death screen can come later. */
+/** Wake at the last checkpoint at full health; the grey fades back out. */
 function wake(): void {
+  deathScreen.hide();
   const at = quest.checkpoint();
   player.respawn(at);
   playerStats.revive();
@@ -371,7 +376,9 @@ addEventListener('visibilitychange', () => { if (document.hidden) keep(); });
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {
   timer.update();
-  const dt = Math.min(timer.getDelta(), 0.05);
+  const real = Math.min(timer.getDelta(), 0.05);
+  const since = FALLEN - dying; // s since the hero fell, while dying
+  const dt = dying > 0 && since < SLOW_FOR ? real * (SLOW + (1 - SLOW) * since / SLOW_FOR) : real; // slow motion as the hero falls
   if (menu.paused || worldMap.open || bagPanel.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
@@ -414,7 +421,7 @@ renderer.setAnimationLoop(() => {
   if (input.pressed('KeyC')) sheet.toggle();
   game.time += dt;
   playerStats.update(dt);
-  if (dying > 0 && (dying -= dt) <= 0) wake();
+  if (dying > 0 && (dying -= real) <= 0) wake();
   player.frozen = dying > 0;
   const diablo = isDiablo();
   if (!player.frozen) dctl.update(dt, input); // click-to-move steering, click-attack swings

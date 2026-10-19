@@ -150,6 +150,18 @@ if (qo.quest.done.join() !== 'chiave,bortolo,reverendissimo' || questXpIn({ ...q
 deserialize((qo = boot(), qo), { ...qs, quest: { ...qs.quest, done: ['chiave', 'from_the_future'] } });
 if (qo.quest.done.join() !== 'chiave') fail('unknown quest kept');
 if (!valid({ ...qs, quest: oldQ }) || valid({ ...qs, quest: { ...qs.quest, done: [1] } }) || valid({ ...qs, quest: { ...qs.quest, found: 'yes' } })) fail('quests done validation');
+// Mastro Iseppo's quests: taken, handed in and counted survive a save, his quest items with the bag; a save from before him loads with none.
+z.quest.side.taken.push('lumi', 'ditale');
+z.quest.side.done.push('ferri');
+z.quest.complete('ferri');
+z.quest.side.kills.lumi = 4;
+z.bag.add('ditale-marieta');
+const ss = JSON.parse(JSON.stringify(serialize(z))), sb = boot();
+deserialize(sb, ss);
+if (sb.quest.side.taken.join() !== 'lumi,ditale' || sb.quest.side.done.join() !== 'ferri' || sb.quest.side.kills.lumi !== 4 || !sb.bag.count('ditale-marieta')) fail(`side quests restored as ${JSON.stringify(sb.quest.side.encode())}`);
+if (sb.quest.bonusXp !== z.quest.bonusXp || questXpIn(ss) !== z.quest.bonusXp) fail("a load does not count Mastro Iseppo's XP as before");
+if (old.quest.side.taken.length || old.quest.side.done.length || !valid((({ side: _s, ...o }) => o)(ss))) fail('a save from before Mastro Iseppo loads with his quests');
+if (valid({ ...ss, side: { taken: [1], done: [] } }) || valid({ ...ss, side: { taken: [], done: [], kills: { lumi: 'x' } } })) fail('side quest field validation');
 // A fog grid from before the level grew east keeps its cells where they were.
 const narrow = (() => { const f = new Discovery(buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle')); f.reveal(SPAWN.x, SPAWN.z); return f; })();
 const wide = fogOf(boot());

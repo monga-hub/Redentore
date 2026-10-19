@@ -47,6 +47,13 @@ export const ITEMS: readonly Item[] = [
   { id: 'corona-zuane', name: 'Corona del portinaio', rarity: 'leggendario', icon: 'rosary', lore: 'Grani d’ulivo e una medaglietta consumata dal pollice. Fra’ Zuane la perse nell’orto: riportagliela, sulla fondamenta.', quest: true },
   // Fra' Bortolo's heads (quest/progress.ts HEADS): off the friars while he wants them.
   { id: 'testa-frate', name: 'Testa di frate', rarity: 'comune', icon: 'skull', lore: 'Per il rito della ruta di Fra’ Bortolo. Sorride ancora, sotto il cappuccio.', quest: true },
+  // Mastro Iseppo's quests (quest/squero.ts): off the drowned, the elites, found in the Zitelle and the Redentore.
+  { id: 'ferro-iseppo', name: 'Ferro di Mastro Iseppo', rarity: 'noncomune', icon: 'nail', lore: 'Sei denti e una I incisa sotto il collo. Mastro Iseppo li rivuole, allo squero.', quest: true, l2: true },
+  { id: 'testa-gastaldo', name: 'Testa del Gastaldo', rarity: 'raro', icon: 'skull', lore: 'Ha ancora il cappello. Mastro Iseppo la vuole appesa al suo tezon.', quest: true, l2: true },
+  { id: 'forbici-maestra', name: 'Forbici della Maestra', rarity: 'raro', icon: 'nail', lore: 'Fini come un ago. Tirano verso le Zitelle, come un filo. Per Mastro Iseppo, allo squero.', quest: true, l2: true },
+  { id: 'ditale-marieta', name: 'Ditale di Marieta', rarity: 'raro', icon: 'medal', lore: 'Argento consumato fino al buco. Mastro Iseppo lo regalò a sua figlia.', quest: true, l2: true },
+  { id: 'ex-voto', name: 'Gondolina di pero', rarity: 'raro', icon: 'relic', lore: 'L’ex voto dello squero, 1577: una gondola lunga un palmo, il ferro d’argento a prua. Per Mastro Iseppo.', quest: true, l2: true },
+  { id: 'lettera-marieta', name: 'Lettera di Marieta', rarity: 'epico', icon: 'relic', lore: 'Ceralacca delle Zitelle, e sopra: «Al proto Iseppo, squero de la Zuecca». Mai spedita.', quest: true, l2: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

@@ -9,7 +9,8 @@ import { ICONS } from '../ui/icons.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
-import { QUEST_COLOR } from '../loot/bag.ts';
+import { ITEM, QUEST_COLOR } from '../loot/bag.ts';
+import { ISEPPO, SIDE, SIDE_BY, type SideQuest } from './squero.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -32,6 +33,7 @@ const rueLeaf: Style = { life: [1, 1.6], size: [0.08, 0.14], color: 0xb8ff9a, co
 const rueFlare: Style = { life: 0.6, size: 2.2, grow: 0.8, color: 0xeaffd8, color2: 0x7adf6a, hdr: 3, tex: T.star, fadeIn: 0.05 };
 const RUE = 0x8aff9a; // Fra' Bortolo's glow
 const riteSmoke: Style = { life: [1.4, 2.2], size: [0.4, 0.8], grow: 1.6, color: 0x9aff8a, color2: 0x0a2a10, hdr: 1.5, drag: 1.2, grav: -0.6 };
+const SQUERO = 0xffc27a; // Mastro Iseppo's, a lantern's
 const goldGlow: Style = { life: [0.6, 0.9], size: [0.5, 0.8], grow: 1.8, color: GOLD, color2: 0x803000, hdr: 2, drag: 2, grav: -1.5 };
 
 const CSS = `
@@ -65,10 +67,11 @@ body.touch #quest-done { font-size: 24px; }
 #quests span::before { content: '- '; }
 #quests span.new { animation: quest-new 1.6s ease-out; }
 @keyframes quest-new { 0% { color: #fff; text-shadow: 0 0 10px #ffd200; } }
-#quests.done span { color: #7dff64; }
+#quests.done span, #quests span.ok { color: #7dff64; }
 #quests span.heads { color: ${QUEST_COLOR}; }
 #quests span.heads.ready { color: #7dff64; }
-body.touch #quests { top: 0; right: calc(100% + 16px); width: 190px; font-size: 12px; }
+body.touch #quests { top: 0; right: calc(100% + 16px); width: 190px; font-size: 12px;
+  max-height: 42dvh; overflow: hidden; -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent); } /* several side quests: the list fades out above the buttons */
 body.diablo #quests b { color: #e9d6b0; }
 
 #buffs { position: fixed; left: calc(16px + env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); display: flex; gap: 6px; pointer-events: none; z-index: 4; }
@@ -96,6 +99,9 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
+  private iseppo = new Npc(ISEPPO, SQUERO, 'iseppo.glb');
+  private finds: { q: SideQuest; m: THREE.Mesh }[] = []; // a gold glint over each find spot while its quest wants it
+  private lines = ''; // Mastro Iseppo's tracker lines as drawn
   private talk = new Dialogue();
   private news: string[] = []; // notices raised outside update (the blessing, given as his window closes)
   private buffEl = document.createElement('div');
@@ -117,6 +123,8 @@ export class QuestView {
   bossShown = false;
   /** Fra' Bortolo's Commercia: main.ts opens the shop. */
   shop?: () => void;
+  /** Mastro Iseppo's: main.ts opens his shop. */
+  shop2?: () => void;
   /** A quest handed in: main.ts puts its gold in the bag. */
   reward?: (gold: number) => void;
   /** Fra' Zuane takes his corona back: main.ts swaps it in the bag for his medal and returns the medal's name. */
@@ -155,7 +163,15 @@ export class QuestView {
     this.key = key();
     this.key.visible = false;
     chest.add(this.lid, this.inside, this.glint, this.key);
-    this.root.add(chest, this.npc.root, this.speziale.root);
+    this.root.add(chest, this.npc.root, this.speziale.root, this.iseppo.root);
+    for (const q of SIDE) {
+      if (q.want.kind !== 'find') continue;
+      const m = new THREE.Mesh(this.glint.geometry, this.glint.material);
+      m.position.set(q.want.at.x, q.want.at.y + 0.45, q.want.at.z);
+      m.visible = false;
+      this.finds.push({ q, m });
+      this.root.add(m);
+    }
 
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -181,6 +197,7 @@ export class QuestView {
       if (this.speziale.talking) this.quest.meet(); // found, as Fra' Zuane asked
       if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
+      this.iseppo.talking = false;
     };
   }
 
@@ -237,6 +254,7 @@ export class QuestView {
   idle(dt: number, player: THREE.Vector3): void {
     this.npc.update(dt, player, this.offering());
     this.speziale.update(dt, player, this.blessing());
+    this.iseppo.update(dt, player, this.quest.side.marker(this.quest.boss2Dead));
   }
 
   /** Fra' Zuane has a quest to give or to hear about: his marker is up. */
@@ -301,7 +319,16 @@ export class QuestView {
       + (this.side.includes('r') ? `<b>${RELIC_TITLE}</b><span>${RELIC_OBJECTIVE}</span>` : '')
       + (this.side.includes('T') ? `<b>${QUESTS.teste.title}</b><span class="heads ready">Torna da Fra' Bortolo, nella serra</span>`
         : this.side.includes('t') ? `<b>${QUESTS.teste.title}</b><span class="heads">Teste di frate ${this.side.slice(this.side.indexOf('t') + 1)}</span>` : '');
-    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>${sides}`;
+    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>${sides}${this.lines}`;
+  }
+
+  /** Mastro Iseppo's quests running, for the tracker: their counts, green once ready to hand in. */
+  private sideLines(): string {
+    const q = this.quest, s = q.side;
+    return s.taken.map((id) => {
+      const sq = SIDE_BY.get(id)!, ok = s.ready(sq, q.boss2Dead);
+      return `<b>${QUESTS[id].title}</b><span class="${ok ? 'ok' : ''}">${ok ? `Torna da ${ISEPPO.name}, nello squero` : sq.line(s.progress(sq))}</span>`;
+    }).join('');
   }
 
   private gate(g: Gate, iron: THREE.Material): GateView {
@@ -385,6 +412,12 @@ export class QuestView {
         this.speziale.talking = true;
         const [t, accept] = this.spezialeTalk();
         this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t, accept, () => this.shop?.());
+      } else if (pr.talk === 'iseppo') { // a quest handed in is paid as his window opens (its XP, gold and banner are payout's), the epic with a notice
+        this.iseppo.talking = true;
+        const t = this.quest.side.talk(this.quest.boss2Dead), offered = t.talk.title;
+        if (t.paid) notices.push(`Ricompensa: ${ITEM.get(t.paid.reward)!.name}`);
+        const accept = t.accept && (() => { t.accept!(); playSfx('quest'); this.news.push(`Missione accettata: ${offered}`); });
+        this.talk.show({ name: ISEPPO.name, portrait: `${import.meta.env.BASE_URL}models/iseppo.webp` }, t.talk, accept, () => this.shop2?.());
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }
@@ -398,15 +431,24 @@ export class QuestView {
       else if (was && !done) notices.push(OBJECTIVE[stage]);
       if (was && !done) playSfx('quest');
       this.side = side;
+      this.lines = this.sideLines();
       this.track(stage, !!this.stage);
       this.stage = stage;
-    } else if (side !== this.side) {
+    } else if (side !== this.side || this.sideLines() !== this.lines) { // a side quest taken, counted, ready or handed in
       this.side = side;
+      this.lines = this.sideLines();
       this.track(stage, false);
     }
     this.payout(dt);
     this.npc.update(dt, player, this.offering());
     this.speziale.update(dt, player, this.blessing());
+    this.iseppo.update(dt, player, this.quest.side.marker(this.quest.boss2Dead));
+    const spots = this.quest.side.spots();
+    for (const f of this.finds) {
+      f.m.visible = spots.some((s) => s.q === f.q);
+      f.m.rotation.y = this.glint.rotation.y;
+      f.m.position.y = f.q.want.kind === 'find' ? f.q.want.at.y + 0.45 + Math.sin(performance.now() * 0.003) * 0.08 : 0;
+    }
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt);
     this.buff();
     const now = this.quest.prompt(player);

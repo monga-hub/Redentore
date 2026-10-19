@@ -1,12 +1,12 @@
-import { ITEM, RARITY, type Bag } from '../loot/bag.ts';
-import { buy, buyPrice, sell, sellPrice, shop, type Equipment } from '../loot/gear.ts';
+import { ITEM, RARITY, type Bag, type Item } from '../loot/bag.ts';
+import { buy, buyPrice, sell, sellPrice, type Equipment } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
 import { itemTip } from './tooltip.ts';
 
-// Fra' Bortolo's shop, WoW's merchant window: "Commercia" in his dialogue opens it with the bag
-// beside it. Left, his goods, every purple piece with its price; under them the buyback row of
+// The merchants' window, WoW style (Fra' Bortolo's shop, Mastro Iseppo's): "Commercia" in their dialogue opens it
+// with the bag beside it. Left, their goods, purple pieces with their price; under them the buyback row of
 // what was sold this visit. While it is open a click on a bag slot sells the whole stack for a
 // quarter of its price (ui/bag.ts `selling`); goods and buyback are bought the same way.
 
@@ -30,15 +30,16 @@ const CSS = `
 `;
 const BACK = 6; // buyback slots, oldest dropped
 
+/** A shop: its keeper's name, the line under it and what is on sale. */
+export interface Merchant { name: string; sub: string; goods: () => readonly Item[] }
+
 export class VendorPanel {
   readonly el = document.createElement('div');
   private readonly host: BagPanel;
   private readonly bag: Bag;
   private readonly gear: Equipment;
   private sold: { id: string; n: number }[] = []; // this visit's sales, newest last
-
-  /** On the road to the Zitelle he has level 2's epics too (main.ts). */
-  level2 = () => false;
+  private who: Merchant = { name: '', sub: '', goods: () => [] };
 
   constructor(host: BagPanel, bag: Bag, gear: Equipment) {
     this.host = host;
@@ -77,8 +78,9 @@ export class VendorPanel {
     });
   }
 
-  /** "Commercia": the shop and the bag. */
-  open(): void {
+  /** "Commercia": `who`'s shop and the bag. */
+  open(who: Merchant): void {
+    this.who = who;
     this.host.show(this.el, true);
     this.host.show(undefined, true);
     this.host.selling = this.sell;
@@ -106,9 +108,9 @@ export class VendorPanel {
       const it = ITEM.get(id)!;
       return `<button class="cell" data-k="${k}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}">${ICONS[it.icon]}${n > 1 ? `<b>${n}</b>` : ''}</button>`;
     };
-    this.el.innerHTML = `<h2>Fra' Bortolo</h2><button class="x" aria-label="Chiudi bottega">✕</button>
-      <p class="sub">Speziale · reliquie e paramenti dei morti</p>
-      <div class="goods">${shop(this.level2()).map((it) => {
+    this.el.innerHTML = `<h2>${this.who.name}</h2><button class="x" aria-label="Chiudi bottega">✕</button>
+      <p class="sub">${this.who.sub}</p>
+      <div class="goods">${this.who.goods().map((it) => {
         const p = buyPrice(it);
         return `<div class="good">${cell(`s:${it.id}`, it.id)}<span><em style="color: ${RARITY[it.rarity].color}">${it.name}</em><small class="${this.bag.gold < p ? 'no' : ''}"><i class="coin"></i>${p.toLocaleString('it-IT')}</small></span></div>`;
       }).join('')}</div>

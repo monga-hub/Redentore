@@ -20,7 +20,7 @@
 //   node scripts/balance.ts route melee [runs]     one build on the route (NODODGE=1: the bot that dodges nothing)
 //   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks; GEAR=start|typical|buy|epic, default typical)
 //   node scripts/balance.ts route2 melee [runs]    one build on the route, on into level 2 (Fra' Zuane, the fondamenta, the Zitelle, the Governatrice)
-//   node scripts/balance.ts boss2 plague 11 [runs] the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, epic)
+//   node scripts/balance.ts boss2 plague 11 [runs] the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, side2 with Mastro Iseppo's epics, epic)
 //   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
@@ -41,6 +41,7 @@ import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { START, levelOf, offer, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
+import { SIDE } from '../src/quest/squero.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
 const DT = 1 / 30;
@@ -334,7 +335,8 @@ class Run {
     if (kind === 'epic') { for (const it of shop(false)) this.gear.worn[it.slot!] = it.id; this.apply(); return; }
     if (kind === 'start') return;
     for (const [tier, n] of Object.entries(TYPICAL)) for (let i = 0; i < n; i++) this.loot(tier as Tier);
-    if (kind === 'typical2' || kind === 'buy2') for (const [tier, n] of Object.entries(TYPICAL2)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 2);
+    if (kind === 'typical2' || kind === 'buy2' || kind === 'side2') for (const [tier, n] of Object.entries(TYPICAL2)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 2);
+    if (kind === 'side2') for (const q of SIDE) this.take(q.reward); // and Mastro Iseppo's seven epics, his quests all handed in
     if (kind === 'buy' || kind === 'buy2') this.shop();
   }
 

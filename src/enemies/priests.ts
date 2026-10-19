@@ -5,7 +5,7 @@ import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type V
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, rise, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest } from './caster.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA } from './zitelle.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { barMat, flash, ownMaterials } from './friars.ts';
@@ -417,8 +417,12 @@ export class Priests {
   }
 
   /** AI, spells and animation. `player`: feet position. Bolts that land hit the player's stats. */
+  /** Which of the dead get up again (caster.ts `rise`): main.ts, level 2's drowned until the Governatrice falls. */
+  rising: (f: Priest) => boolean = () => false;
+
   update(dt: number, player: Target): void {
     if (!this.views.length) return;
+    for (const f of this.all) if (f.state === 'dead' && this.rising(f)) rise(f, player, this.world);
     let dmg = 0;
     const v = this.vfx;
     this.all.forEach((f, i) => {

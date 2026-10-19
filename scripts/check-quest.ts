@@ -7,6 +7,11 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
+import { DITALE, EXVOTO, ISEPPO, LETTER_DROP, SIDE, SIDE_BY, type SideId } from '../src/quest/squero.ts';
+import { Bag, ITEM } from '../src/loot/bag.ts';
+import { GONDOLIERE, PACKS, spawnLevel2 } from '../src/enemies/zitelle.ts';
+import { killAll, rise } from '../src/enemies/caster.ts';
+import { RISE } from '../src/enemies/brain.ts';
 
 let failed = 0;
 const fail = (why: string) => { failed++; console.error(`FAIL ${why}`); };
@@ -141,7 +146,83 @@ const h2 = new Quest(buildLevel().world);
 h2.asked = true; h2.heads = 3;
 if (h2.headsNeed(friars) !== HEADS.need || h2.headsNeed(0) !== 3 || !h2.headsReady(0)) fail('with the friars gone, the heads in hand do not do');
 
+
+// Mastro Iseppo in the squero: room to stand by him out of every pack's pull, his find spots standable, the chain and the letter
+// paid once each with their epic, kill and collect quests not stranded once the Governatrice is dead, his state saved.
+const iseppo = feet(ISEPPO.x, ISEPPO.z + 1.2);
+if (level.world.blocked(iseppo.x, iseppo.z, iseppo.y) || level.areaAt(ISEPPO.x, ISEPPO.z)?.label !== 'Squero') fail('no room to stand by Mastro Iseppo in the squero');
+for (const pk of PACKS) for (const [k, x, z] of pk.members) if (Math.hypot(x - iseppo.x, z - iseppo.z) < k.aggro + 0.5) fail(`a mob at (${x}, ${z}) is within its pull of Mastro Iseppo`);
+const sq = new Quest(level.world), side = sq.side, bag = new Bag();
+side.bag = bag;
+if (sq.prompt(iseppo)?.talk !== 'iseppo') fail("no 'talk' prompt next to Mastro Iseppo");
+for (const q of SIDE) {
+  for (const p of [...q.offer, q.busy, ...q.done]) if (p.length > 260) fail(`a page of ${q.id} is ${p.length} characters, too long for the window on a phone`);
+  if (QUESTS[q.id].xp < 0.6 * 20 * 11) fail(`${q.id} pays ${QUESTS[q.id].xp} XP, under most of level 11`);
+  if (!ITEM.get(q.reward)?.slot || ITEM.get(q.reward)!.rarity !== 'epico' || !ITEM.get(q.reward)!.l2 || !QUESTS[q.id]) fail(`${q.id} does not reward one of level 2's epics`);
+  if ('item' in q.want && !ITEM.get(q.want.item)?.quest) fail(`${q.id} wants ${q.want.item}, not a quest item`);
+}
+if (new Set(SIDE.map((q) => q.reward)).size !== SIDE.length) fail('two of his quests give the same epic');
+const spot = (at: { x: number; y: number; z: number }) => { const f = { x: at.x - 1, y: level.world.standHeight(at.x - 1, at.z), z: at.z }; if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - at.y) > 0.5) fail(`no room to stand by the find spot (${at.x}, ${at.z})`); return f; };
+const ditale = spot(DITALE), exvoto = spot(EXVOTO);
+if (sq.prompt(ditale)?.act) fail("Marieta's thimble can be picked up before its quest");
+const take = () => { const t = side.talk(); if (!t.accept) fail(`he offers nothing: ${t.talk.pages[0].slice(0, 40)}`); t.accept?.(); return t.talk.title; };
+const hand = (id: SideId) => { const xp = sq.bonusXp, t = side.talk(); if (t.paid?.id !== id) fail(`${id} is not handed in (${t.paid?.id})`); else if (sq.bonusXp !== xp + QUESTS[id].xp || !sq.done.includes(id) || !bag.count(t.paid.reward)) fail(`${id} does not pay its XP and its epic through Quest.complete`); };
+const order: string[] = [];
+order.push(take()!, take()!); // the two openers at once
+if (side.open().length) fail('a quest further down the chain is offered before its first step is done');
+for (let i = 0; i < 100 && bag.count('ferro-iseppo') < 6; i++) { const it = side.loot('gondoliere', () => 0, false, () => 0); if (it) bag.add(it); }
+if (bag.count('ferro-iseppo') !== 6 || side.loot('gondoliere', () => 0, false, () => 0)) fail('the drowned do not drop exactly the six ferri wanted');
+hand('ferri');
+for (let i = 0; i < 5; i++) side.killed('codega');
+if (side.ready(SIDE_BY.get('lumi')!)) fail('five codeghe were enough for six');
+if (!side.ready(SIDE_BY.get('lumi')!, true)) fail('the codeghe quest is stranded once the Governatrice is dead');
+side.killed('codega');
+const room = bag.items.length;
+for (let i = room; i < Bag.SLOTS; i++) bag.items.push({ id: 'canapa-testa', n: 1 }); // a full bag: no room for the epic
+if (side.talk().paid || !side.active('lumi')) fail('a quest was handed in with no room for its reward');
+bag.items.length = room;
+hand('lumi');
+order.push(take()!, take()!);
+if (side.tokens().map((t) => t.from).join() !== 'gastaldo') fail("the Gastaldo's head is not wanted off his body");
+bag.add('testa-gastaldo');
+hand('gastaldo');
+const pick = sq.prompt(ditale);
+if (!pick?.act) fail("no prompt to pick up Marieta's thimble under her bed");
+pick?.act?.();
+hand('ditale');
+order.push(take()!, take()!);
+bag.add('forbici-maestra');
+hand('maestra');
+if (sq.prompt(exvoto)?.act?.() !== "Hai trovato l'ex voto di Mastro Iseppo") fail('the ex voto cannot be picked up in the Redentore');
+hand('exvoto');
+if (side.open().length || side.marker()) fail('he still has something once the chain is done');
+let zk = 0;
+while (!side.loot('zitella', () => 0, false, never) && zk < 1000) zk++;
+if (zk !== Math.ceil((1 - LETTER_DROP.base) / LETTER_DROP.ramp)) fail(`the letter's bad-luck ramp ends after ${zk} kills`);
+if (side.loot('zitella', () => 1, true, never)) fail('a second letter falls while one lies on the ground');
+bag.add('lettera-marieta');
+if (side.update()?.id !== 'lettera' || side.update()) fail('picking up the letter does not start its quest once');
+hand('lettera');
+const total = SIDE.reduce((n, q) => n + QUESTS[q.id].xp, 0);
+if (sq.bonusXp !== total) fail(`his quests pay ${sq.bonusXp} XP, want ${total}`);
+const copy = new Quest(level.world);
+copy.side.decode(JSON.parse(JSON.stringify(side.encode())));
+if (copy.side.done.length !== SIDE.length || copy.side.taken.length) fail("his quests don't survive a save");
+copy.side.decode({ taken: ['lumi', 'nope'], done: ['ferri', 'lumi'], kills: { lumi: 3, nope: 2 } });
+if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.keys(copy.side.kills).length) fail('a saved side state from another build is not cleaned');
+
+// The drowned rise again like the orto's friars: late, out of the hero's way, at their spot, worth less.
+const l2 = spawnLevel2(level.world), g0 = l2.all.find((m) => m.kind === GONDOLIERE)!;
+const far = { x: g0.home.x + RISE.away + 5, y: 0, z: g0.home.z }, near = { x: g0.home.x + 5, y: 0, z: g0.home.z };
+g0.x += 3;
+killAll([g0]);
+if (rise(g0, far, level.world, () => 0)) fail('a gondoliere rose at once');
+g0.t = RISE.after[0] + 1;
+if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
+if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
+
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

@@ -8,6 +8,7 @@
 import { killAll } from '../enemies/caster.ts';
 import { CARD, levelOf } from '../player/levels.ts';
 import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
+import type { SideState } from '../quest/squero.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 
@@ -44,6 +45,7 @@ export interface GameState {
   build?: { xp: number; lv: number; picks: string[] };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
   gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
+  side?: SideState; // Mastro Iseppo's quests taken, handed in and their kill counts; absent in saves from before him: none
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -75,6 +77,7 @@ export function serialize(g: Game): GameState {
     build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks] },
     bag: g.bag.encode(),
     gear: g.gear.encode(),
+    side: g.quest.side.encode(),
   };
 }
 
@@ -112,6 +115,7 @@ export function deserialize(g: Game, s: GameState): void {
   g.time = s.time;
   if (s.fog) g.fog.decode(s.fog); // a grid from another build's level is dropped: fogged, not garbled
   if (s.bag) g.bag.decode(s.bag);
+  if (s.side) g.quest.side.decode(s.side);
 }
 
 /**
@@ -136,7 +140,9 @@ export function valid(s: unknown): s is GameState {
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && (o.again === undefined || (Array.isArray(o.again) && o.again.every(Number.isInteger))) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
-    && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')));
+    && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')))
+    && (o.side === undefined || (!!o.side && [o.side.taken, o.side.done].every((a) => Array.isArray(a) && a.every((x) => typeof x === 'string'))
+      && (o.side.kills === undefined || (!!o.side.kills && typeof o.side.kills === 'object' && Object.values(o.side.kills).every(num)))));
 }
 
 export interface Slot { label: string; savedAt: number; state: GameState }

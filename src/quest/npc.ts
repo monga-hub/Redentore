@@ -6,7 +6,7 @@ import { loadModel, stand } from '../core/models.ts';
 // to whoever talks to him and talks with his hands, and wears WoW's gold "!" while his quest is
 // on offer. Not a mob: no collider beyond his own small box (quest/progress.ts), no health, and
 // nothing in the game targets or hurts him. Fra' Bortolo in the serra is the same ghost glowing
-// green: `Npc` takes where it stands and the tint.
+// green, and Mastro Iseppo in the squero a Meshy boatwright glowing like a lantern: `Npc` takes where it stands, the tint and the body.
 
 const HEIGHT = 1.75;
 const FADE = 0.4; // s between idle and talking
@@ -48,14 +48,14 @@ export class Npc {
   private time = 0;
   talking = false;
 
-  /** `tint`: the colour his body glows. */
-  constructor(at: Spot, tint = GHOST) {
+  /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips. */
+  constructor(at: Spot, tint = GHOST, model = 'zuane.glb') {
     this.at = at;
     this.root.position.set(at.x, 0, at.z);
     this.root.rotation.y = at.yaw;
     this.mark.position.y = HEIGHT + 0.55;
     this.root.add(this.mark);
-    loadModel('zuane.glb').then((gltf) => {
+    loadModel(model).then((gltf) => {
       const model = gltf.scene;
       stand(model, HEIGHT);
       model.traverse((o) => {

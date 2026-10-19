@@ -4,8 +4,8 @@
 // on the kit: armor cuts damage taken (with diminishing returns), Vigore/Intelletto raise health
 // and mana, Spirito the mana regen, Potenza every ability's damage, Critico the chance of a 150%
 // blow, Celerità cast times and the GCD (main.ts and scripts/balance.ts lay them on). Prices:
-// buy by quality × slot, sell a quarter of it, flavour junk by rarity. Fra' Bortolo sells every
-// purple piece (SHOP). No three.js and no DOM, so `npm run check` drives it in Node.
+// buy by quality × slot, sell a quarter of it, flavour junk by rarity. Fra' Bortolo sells level 1's
+// purple pieces, Mastro Iseppo level 2's (SHOP). No three.js and no DOM, so `npm run check` drives it in Node.
 import type { Bag, Icon, Item, Rarity } from './bag.ts';
 
 export type Slot = 'testa' | 'spalle' | 'torso' | 'mani' | 'gambe' | 'piedi' | 'arma' | 'amuleto' | 'anello';
@@ -156,9 +156,11 @@ const make = (lvl: 1 | 2) => ([id, name, slot, rarity, focus, lore]: typeof DEFS
 };
 export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2))];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
-/** What Fra' Bortolo sells: every purple piece (level 2's once the hero is on the road to the Zitelle: `shop`). */
+/** Every purple piece on sale: level 1's from Fra' Bortolo, level 2's (`shop` with level2) from Mastro Iseppo. */
 export const SHOP = GEAR.filter((g) => g.rarity === 'epico');
 export const shop = (level2: boolean) => SHOP.filter((g) => level2 || !g.l2);
+/** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
+export const SHOP2 = SHOP.filter((g) => g.l2);
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club. */
 export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune').map((g) => [g.slot, g.id]));
 

@@ -6,7 +6,7 @@
 // nova around itself. Pure math on the collision World like brain.ts (friars), whose movement
 // helpers it shares; priests.ts puts models and spell effects on top.
 import type { World } from '../core/physics.ts';
-import { face, feet, walk, type Target } from './brain.ts';
+import { RISE, face, feet, walk, type Target } from './brain.ts';
 import { clear, control, pace, tick, type Control } from './control.ts';
 
 export interface CasterKind {
@@ -205,6 +205,8 @@ export interface Priest {
   bounds: Bounds; // the cloister's court (or garden, church floor): never leaves it
   mates: Priest[];
   cc: Control; // slows, roots, stuns laid by the hero's spells (control.ts)
+  again?: boolean; // risen again (`rise`): worth less, drops less
+  riseAt?: number; // s into its death it rises again (`rise`)
 }
 
 export interface Bolt {
@@ -599,7 +601,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       f.spinCd = 0;
       for (const w of f.wards ?? []) if (w.state !== 'dead' && w.state !== 'pray') { w.hp = w.kind.hp; enter(w, 'evade'); } // her girls go back to their places
       return 0;
-    case 'dead': // for good: nobody respawns
+    case 'dead': // until it rises again (`rise`, level 2's drowned), or for good
       return 0;
   }
 }
@@ -630,6 +632,21 @@ export function fly(bolts: Bolt[], p: Target, dt: number, spent: Bolt[] = [], wo
     bolts.splice(i, 1);
   }
   return dmg;
+}
+
+/**
+ * Level 2's drowned rise again like the orto's friars (brain.ts `rise`, RISE): at its own spot `after` s from its fall, once
+ * the hero is `away` m off it, worth `xp` of one and a worker's loot; Priests.rising says who and until when (main.ts).
+ */
+export function rise(f: Priest, p: Target, world: World, rnd: () => number = Math.random): boolean {
+  if (f.state !== 'dead') return false;
+  f.riseAt ??= f.t + RISE.after[0] + rnd() * (RISE.after[1] - RISE.after[0]); // a loaded corpse (t past the sink) too: after, from now
+  if (f.t < f.riseAt || Math.hypot(p.x - f.home.x, p.z - f.home.z) < RISE.away) return false;
+  Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: f.kind.hp, cd: 0, melee: 0, blind: 0, backoff: f.kind.backoff,
+    nova: f.kind.nova?.every ?? 0, cc: control(f.kind.resist), los: { ok: false, t: 0 }, again: true, riseAt: undefined });
+  f.marks.length = f.lines.length = 0;
+  enter(f, 'pray');
+  return true;
 }
 
 /** Damage a priest. Returns true if this killed it. Evading and dead priests ignore it. */

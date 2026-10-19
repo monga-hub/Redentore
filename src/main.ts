@@ -21,7 +21,8 @@ import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
 import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { ANDITO, BOONS, CHEST, CROCE, HEADS, NPC, Quest } from './quest/progress.ts';
+import { ANDITO, BOONS, CHEST, CROCE, HEADS, NPC, QUESTS, Quest } from './quest/progress.ts';
+import { ISEPPO, SIDE, type Foe } from './quest/squero.ts';
 import { QuestView } from './quest/view.ts';
 import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
 import { checkVersion } from './ui/version.ts';
@@ -42,7 +43,7 @@ import { Director } from './audio/director.ts';
 import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
-import { Equipment, crit, effects } from './loot/gear.ts';
+import { Equipment, SHOP2, crit, effects, shop } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { VendorPanel } from './ui/vendor.ts';
 
@@ -107,9 +108,12 @@ const bees = new Bees(level.world, kit.vfx, playerStats); // the giant hornet an
 scene.add(bees.root);
 const l2 = spawnLevel2(level.world); // level 2: the fondamenta to the Zitelle, the Pia Casa, the Governatrice
 const zitelle = new Priests(level.world, kit.vfx, playerStats, level.areas, l2, true); // its ~6 MB of bodies load with the second quest (stream)
+zitelle.rising = (f) => !quest.boss2Dead && (f.kind === GONDOLIERE || f.kind === CODEGA); // the drowned and the codeghe rise again for Mastro Iseppo's quests, until the Governatrice falls
 scene.add(zitelle.root);
 /** Level 2's kinds: name, kind, height. */
 const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85], ['Codega', CODEGA, 1.8], ['Zitella', ZITELLA, 1.65], ['Zitella del velo', VELO, 1.65], ['Il Gastaldo dei gondolieri', GASTALDO, 2.5], ['La Maestra del merletto', MAESTRA, 2.3], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
+/** Level 2's kinds Mastro Iseppo's quests count and loot. */
+const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra']]);
 const ofKind = (k: typeof L2_KINDS[number][1]) => zitelle.all.filter((f) => f.kind === k);
 const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, [ // click/tap an enemy, Tab for the nearest
   { name: 'Frate non-morto', max: FRIAR.hp, height: 1.75, all: friars.all, ready: () => friars.root.children.length > 0 },
@@ -160,6 +164,7 @@ const head = new THREE.Vector3();
 const old = GROUPS.flat().length;
 const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all, ...zitelle.all]; // level 2's last
 const bag = new Bag(); // gold and items picked up off the dead
+quest.side.bag = bag; // Mastro Iseppo's quest items go in and out of it
 const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const worthOf = (i: number) => ((mobs[i] as { again?: boolean }).again ? Math.ceil(worth[i] * RISE.xp) : worth[i]); // a risen friar, a quarter
@@ -226,6 +231,7 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
 scene.add(dfx.root);
 const standing = () => friars.all.reduce((n, f) => n + (f.state === 'dead' ? 0 : 1), 0); // friars left to give a head
 questView.friars = standing;
+const ground = (id: string) => drops.loose.filter((l) => l.id === id).length; // one quest item lying loose
 const drops: Drops = new Drops([ // gold and items out of the dead, walked over into the bag (after a load, so its dead drop nothing)
   { all: friars.all, tier: 'friar', quest: () => (quest.headDrop(standing(), drops.loose.filter((l) => l.id === HEADS.item).length) ? HEADS.item : undefined) }, // Fra' Bortolo's heads
   { all: priests.all.filter((f) => f.kind === PRIEST), tier: 'priest' },
@@ -233,7 +239,7 @@ const drops: Drops = new Drops([ // gold and items out of the dead, walked over 
   { all: [priests.boss], tier: 'boss' },
   { all: [bees.queen], tier: 'elite' },
   { all: bees.all.filter((f) => f.kind === APETTA), tier: 'worker' },
-].map((d) => ({ ...d, quiet: () => quest.bossDead }) as Dropper).concat(([[GONDOLIERE, 'friar'], [CODEGA, 'priest'], [ZITELLA, 'priest'], [VELO, 'priest'], [GASTALDO, 'elite'], [MAESTRA, 'elite'], [GOVERNATRICE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind(kind), tier, level: 2, quiet: () => quest.boss2Dead }))), level.world, bag, cam.camera);
+].map((d) => ({ ...d, quiet: () => quest.bossDead }) as Dropper).concat(([[GONDOLIERE, 'friar'], [CODEGA, 'priest'], [ZITELLA, 'priest'], [VELO, 'priest'], [GASTALDO, 'elite'], [MAESTRA, 'elite'], [GOVERNATRICE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind(kind), tier, level: 2, quiet: () => quest.boss2Dead, quest: FOE.has(kind) ? () => quest.side.loot(FOE.get(kind)!, ground, quest.key2) : undefined }))), level.world, bag, cam.camera); // Mastro Iseppo's quest items, Marieta's letter
 scene.add(drops.root);
 drops.extra = () => (!drops.loose.some((l) => l.id === RELIC) && quest.rollRelic() ? RELIC : undefined); // Fra' Zuane's corona, once a run (one on the ground at a time)
 drops.collect = (id) => id === HEADS.item && (questView.head(), true); // Fra' Bortolo's heads are counted, not bagged
@@ -244,12 +250,12 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
   dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
 const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
-questView.shop = () => vendor.open();
+questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(false) });
+questView.shop2 = () => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => SHOP2 });
 questView.reward = (gold) => { bag.gold += gold; };
 questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
 questView.boonTaken = () => levels.apply();
 questView.blockDoors(level.cameraBlockers); // shut doors stop the camera and the targeting rays
-vendor.level2 = () => quest.accepted2; // level 2's epics on the road to the Zitelle
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
 level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
@@ -302,6 +308,25 @@ const goal = () => {
     case 'boss2': return zitelle.boss;
     default: return undefined;
   }
+};
+/**
+ * The side quests' pins: Fra' Zuane while his corona is in the bag; Mastro Iseppo with a quest to hand in, a find spot,
+ * the elite a head or the shears are wanted off (or the token at its body), the nearest of the kind a collect or kill quest wants.
+ */
+const sidePins = () => {
+  const pins: { x: number; z: number }[] = quest.relic && !quest.relicBack ? [NPC] : [], s = quest.side;
+  for (const q of SIDE) {
+    if (!s.active(q.id)) continue;
+    const w = q.want;
+    if (s.ready(q, quest.boss2Dead)) pins.push(ISEPPO);
+    else if (w.kind === 'find') pins.push(w.at);
+    else if (w.kind === 'token') pins.push(drops.loose.find((l) => l.id === w.item) ?? (w.from === 'gastaldo' ? l2.gastaldo : l2.maestra));
+    else if (w.kind === 'collect' || w.kind === 'kill') {
+      const near = zitelle.all.filter((m) => FOE.get(m.kind) === w.from && m.state !== 'dead').sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
+      if (near) pins.push(near);
+    }
+  }
+  return pins;
 };
 function openMap(): void {
   if (menu.paused) return;
@@ -407,6 +432,12 @@ renderer.setAnimationLoop(() => {
     quest.relic = true;
     kit.system.notices.push({ kind: 'info', text: `Missione: ${RELIC_TITLE}. ${RELIC_OBJECTIVE}` });
   }
+  const letter = quest.side.update(); // Marieta's letter picked up: its quest starts
+  if (letter) kit.system.notices.push({ kind: 'info', text: `Missione: ${QUESTS.lettera.title}. ${letter.line(0)}` });
+  for (const t of quest.side.tokens()) { // a head or the shears a quest wants: at the elite's body once it is dead, until picked up
+    const e = t.from === 'gastaldo' ? l2.gastaldo : l2.maestra;
+    if (e.state === 'dead' && e.t > 1 && !ground(t.item)) drops.spawn(e.x, e.y, e.z, 0, t.item, 1.2);
+  }
   const boss = quest.bossDead ? zitelle.boss : priests.boss, rage = boss.fight >= boss.kind.phases!.berserk; // the boss's acts and berserk, called out as they come
   for (const text of questView.update(dt, player.pos, pressed, boss)) kit.system.notices.push({ kind: 'info', text });
   if (boss !== lastBoss) { lastBoss = boss; bossAct = boss.phase; bossRage = rage; } // the Reverendissimo's acts are not the Governatrice's
@@ -438,12 +469,16 @@ renderer.setAnimationLoop(() => {
     let fresh = 0;
     mobs.forEach((m, i) => {
       if (m.state !== 'dead') fell[i] = false; // risen again: its next death counts
-      else if (!fell[i]) { fell[i] = true; slain += worthOf(i); fresh++; }
+      else if (!fell[i]) {
+        fell[i] = true; slain += worthOf(i); fresh++;
+        const f = FOE.get((m as { kind?: object }).kind ?? FOE);
+        if (f) quest.side.killed(f); // Mastro Iseppo's kill quests
+      }
     });
     if (fresh && tune.leech) playerStats.heal(playerStats.hpMax * tune.leech * fresh);
     levels.xp = slain + quest.bonusXp;
     if (levels.lv > shownLv) levelUp.flash((shownLv = levels.lv));
-    if (levels.pending > 0 && dying <= 0 && !playerStats.dead) openLevelUp();
+    if (levels.pending > 0 && dying <= 0 && !playerStats.dead && !questView.talking) openLevelUp(); // not over a quest-giver handing in its reward: once the window closes
   }
   const lv = levelOf(levels.xp);
   hud.setLevel(lv.lv, lv.into, lv.next);
@@ -458,7 +493,7 @@ renderer.setAnimationLoop(() => {
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);
   fog.update(dt);
-  minimap.update(dt, player.pos, player.facing, area, foes, goal(), quest.relic && !quest.relicBack ? [NPC] : []); // and Fra' Zuane while his corona is in the bag
+  minimap.update(dt, player.pos, player.facing, area, foes, goal(), sidePins()); // and the side quests'
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
   audio.update(dt, cam.camera, undefined, false, pressed); // before the bar drains this frame's notices

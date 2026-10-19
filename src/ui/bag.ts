@@ -142,7 +142,7 @@ export class BagPanel {
       use: (what) => {
         const i = Number(what), it = ITEM.get(this.bag.items[i]?.id ?? '');
         if (!it) return;
-        if (it.quest) return this.say('Fra’ Zuane la aspetta, sulla fondamenta.');
+        if (it.quest) return this.say(it.id === 'corona-zuane' ? 'Fra’ Zuane la aspetta, sulla fondamenta.' : 'Mastro Iseppo lo aspetta, allo squero.');
         if (this.selling) return this.selling(i);
         if (!it.slot) return this.say('Questo non si indossa: Fra’ Bortolo potrebbe comprarlo.');
         this.say(this.gear.wear(this.bag, i));

@@ -51,8 +51,8 @@ fino alla chiesa delle Zitelle.
   incrociati che le girano attorno: si corre con loro, negli spazi), dopo 5 minuti e mezzo ogni colpo triplica.
   Morta lei, tutti i suoi cadono e il portone delle Zitelle si apre sul sagrato; Fra' Zuane chiude la missione
   (300 esperienza, 200 oro) e accenna a chi ha teso il filo. Bottino di livello 2: pezzi verdi, blu e nove epici
-  nuovi con livello oggetto più alto (Velo della Governatrice, Scettro della Governatrice...), più oro; Fra' Bortolo
-  li vende una volta accettata la missione e dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
+  nuovi con livello oggetto più alto (Velo della Governatrice, Scettro della Governatrice...), più oro; li vende
+  Mastro Iseppo nello squero (vedi sotto), e Fra' Bortolo dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
   Croce, poi nell'andito dietro l'altare. Il salvataggio tiene la nuova missione (i salvataggi vecchi si caricano:
   a livello 1 finito si riparte dal rapporto a Fra' Zuane, la nebbia di guerra resta al suo posto).
 - Nella serra dell'orto Fra' Bortolo, il fantasma dello speziale (punto esclamativo dorato finché non
@@ -61,7 +61,20 @@ fino alla chiesa delle Zitelle.
   Benedizione della serra: per 3 minuti lanci il 20% più rapidi e +10% ai danni (icona e conto alla
   rovescia sotto il ritratto). La serra è fuori dalla portata dei frati. È anche un mercante
   (Commercia, in ogni pagina del dialogo): compra tutto quello che c'è nella borsa a un quarto del suo
-  prezzo (con una fila per riacquistare le vendite della visita) e vende tutti i pezzi epici (viola).
+  prezzo (con una fila per riacquistare le vendite della visita) e vende i pezzi epici (viola) del livello 1.
+- **Mastro Iseppo, el proto dello squero** (`src/quest/squero.ts`, modello Meshy): il fantasma del capomastro
+  dello squero sul rio, in cortile accanto alla gondola sui cavalletti, fuori dalla portata dei mob. Sua figlia
+  Marieta è ancora alle Zitelle; lui vuole finire l'ultima gondola per andarla a prendere. Missioni secondarie a
+  catena (due alla volta, ognuna apre la successiva), stile WoW/Diablo: *I ferri di prua* (6 ferri dai gondolieri
+  annegati), *Lumi spenti* (abbatti 6 codeghe), *La testa del Gastaldo* (la testa resta sul corpo anche se l'hai già
+  ucciso), *Il ditale di Marieta* (sotto l'ultimo letto del dormitorio, un luccichio dorato), *Le forbici della
+  Maestra*, *L'ex voto del Redentore* (si torna nella chiesa del livello 1, terza cappella a destra); e *La lettera
+  di Marieta*, che parte raccogliendo un drop raro delle zitelle (sicuro dopo la chiave della Maestra). Ognuna
+  paga esperienza e oro (tabella `QUESTS`, banner "Missione completata") e un epico del livello 2; Iseppo vende
+  anche tutti gli epici del livello 2 (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
+  obiettivo, oggetti di missione col raggio dorato; gondolieri e codeghe risorgono come i frati (lontano dall'eroe,
+  un quarto dell'esperienza, bottino magro) finché la Governatrice è viva; se cade prima, le missioni di raccolta e
+  di uccisione si consegnano lo stesso. Tutto nel salvataggio (i vecchi si caricano senza).
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono
@@ -340,7 +353,7 @@ src/
   ui/dialogue.ts             finestra di dialogo stile WoW (ritratto, testo a macchina, Accetta / Rifiuta, Commercia)
   loot/gear.ts               equipaggiamento: posti, oggetti e budget di statistiche, armatura, critico, prezzi,
                              Equipment (indossa / togli), vendita e acquisto. Nessuna dipendenza da three
-  ui/bag.ts, ui/sheet.ts,    borsa, scheda del personaggio e bottega di Fra' Bortolo nella stessa finestra;
+  ui/bag.ts, ui/sheet.ts,    borsa, scheda del personaggio e botteghe di Fra' Bortolo e Mastro Iseppo nella stessa finestra;
   ui/vendor.ts, ui/tooltip.ts tooltip stile WoW con il pezzo indossato accanto e le differenze
   level/plan.ts              scala, assi, quote principali, spawn
   level/builder.ts           LevelBuilder: box, muri con porte, stanze, portici, scale,

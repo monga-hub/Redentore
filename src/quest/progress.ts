@@ -16,6 +16,7 @@ import type { Box, World } from '../core/physics.ts';
 import type { Tune } from '../player/levels.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 import { ZF } from '../level/zones/zitelle.ts';
+import { ISEPPO, SideQuests } from './squero.ts';
 
 export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2';
 
@@ -108,6 +109,14 @@ export const QUESTS = {
   zitelle: { title: 'La dote delle Zitelle', xp: 300, gold: 200 }, // handed in to Fra' Zuane, ~level 14
   teste: { title: 'Le teste dei frati', xp: 140, gold: 60 }, // Fra' Bortolo's side quest, in the orto, ~level 7
   relic: { title: 'La corona del portinaio', xp: 160, gold: 120 }, // Fra' Zuane's corona given back, a random drop, ~level 6-10
+  // Mastro Iseppo's, in the squero (quest/squero.ts), ~level 11-13: most of a level each, and one of level 2's epics.
+  ferri: { title: 'I ferri di prua', xp: 140, gold: 60 },
+  lumi: { title: 'Lumi spenti', xp: 140, gold: 50 },
+  gastaldo: { title: 'La testa del Gastaldo', xp: 160, gold: 80 },
+  ditale: { title: 'Il ditale di Marieta', xp: 150, gold: 50 },
+  maestra: { title: 'Le forbici della Maestra', xp: 170, gold: 80 },
+  exvoto: { title: 'L\'ex voto del Redentore', xp: 170, gold: 70 },
+  lettera: { title: 'La lettera di Marieta', xp: 160, gold: 40 }, // a rare drop off the zitelle
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -123,7 +132,7 @@ export const RELIC_DROP = { base: 0.02, ramp: 0.01 } as const;
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' }
+export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | 'iseppo' }
 
 export class Quest {
   accepted = false; // Fra' Zuane's quest taken
@@ -142,6 +151,8 @@ export class Quest {
   reported2 = false; // the second quest handed in
   relic = false; // Fra' Zuane's corona picked up (main.ts), once a run
   relicBack = false; // and given back to him
+  /** Mastro Iseppo's side quests in the squero (quest/squero.ts); their rewards go through `complete`. */
+  readonly side = new SideQuests();
   private relicKills = 0; // kills rolled for it so far (not saved: a load starts the ramp over)
   asked = false; // Le teste dei frati taken from Fra' Bortolo
   heads = 0; // friars' heads picked up for it
@@ -163,6 +174,8 @@ export class Quest {
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
     world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
     world.add(SPEZIALE.x, SPEZIALE.z, SPEZIALE.r, SPEZIALE.r, 0, 1.8);
+    world.add(ISEPPO.x, ISEPPO.z, ISEPPO.r, ISEPPO.r, 0, 1.8);
+    this.side.complete = (id) => this.complete(id);
   }
 
   get stage(): Stage {
@@ -340,6 +353,9 @@ export class Quest {
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
     if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: 'zuane' };
     if (Math.hypot(p.x - SPEZIALE.x, p.z - SPEZIALE.z) < REACH && p.y < 1.5) return { text: `Parla con ${SPEZIALE.name}`, act: () => '', talk: 'speziale' };
+    if (Math.hypot(p.x - ISEPPO.x, p.z - ISEPPO.z) < REACH && p.y < 1.5) return { text: `Parla con ${ISEPPO.name}`, act: () => '', talk: 'iseppo' };
+    const find = this.side.prompt(p);
+    if (find) return find;
     if (!this.chestOpen && Math.hypot(p.x - CHEST.x, p.z - CHEST.z) < REACH && Math.abs(p.y - CHEST.y) < 1.5) {
       if (!this.accepted) return { text: 'Un sigillo spettrale chiude il baule' };
       return { text: 'Apri il baule', act: () => { this.takeKey(); return 'Hai trovato la chiave del chiostro grande'; } };

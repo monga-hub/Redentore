@@ -18,7 +18,7 @@ import type { Talk } from './dialogue.ts';
 import { QUESTS, type QuestId } from './progress.ts';
 
 /** In the squero's yard by the quay, on the gravel between the gondola and the shed, facing the fondamenta. */
-export const ISEPPO = { x: 191, z: 1.5, yaw: Math.PI, r: 0.35, name: 'Mastro Iseppo' } as const;
+export const ISEPPO = { x: -191, z: 1.5, yaw: Math.PI, r: 0.35, name: 'Mastro Iseppo' } as const;
 
 /** The level-2 mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts kinds). */
 export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra';
@@ -52,7 +52,7 @@ export interface SideQuest {
 }
 
 /** Where his thimble-quest and ex-voto quest send the hero: Marieta's bed by the dormitory's east wall, a chapel of the Redentore. */
-export const DITALE = { x: 277.1, y: 0, z: -34.2 };
+export const DITALE = { x: -277.1, y: 0, z: -34.2 };
 export const EXVOTO = { x: 10.6, y: CHURCH_FLOOR, z: -23.25 };
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */

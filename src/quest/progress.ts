@@ -8,14 +8,14 @@
 // prompts, quest/npc.ts the porter, quest/dialogue.ts what he says.
 //
 // Level 2 (La dote delle Zitelle): back on the fondamenta the hero reports to Fra' Zuane (XP and gold),
-// who offers the second quest; the chains across the Ponte de la Croce fall, the hero walks east to the
+// who offers the second quest; the chains across the Ponte de la Croce fall, the hero walks east (-X) to the
 // Zitelle, takes the key of the church off the Maestra del merletto in the ospizio's lace hall, opens the
 // church's back door from the court and kills the Governatrice under the dome; her portone opens on the
 // sagrato, and Fra' Zuane hears it done.
 import type { Box, World } from '../core/physics.ts';
 import type { Tune } from '../player/levels.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
-import { ZF } from '../level/zones/zitelle.ts';
+import { ZCX, ZF } from '../level/zones/zitelle.ts';
 import { ISEPPO, SideQuests } from './squero.ts';
 
 export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2';
@@ -47,9 +47,9 @@ export const GATES: GateSpec[] = [
   { id: 'coro', label: 'la porta della chiesa', kind: 'door', axis: 'x', at: 0, c: -60, w: 2.4, t: 1, y0: F + 0.6, h: 3.4, needs: 'key' }, // choir back door
   { id: 'portone', label: 'il portone', kind: 'door', axis: 'x', at: 0, c: 0, w: 4, t: 1, y0: F, h: 8, needs: 'boss' }, // facade
   // Level 2 (zones/giudecca.ts, zones/zitelle.ts): appended, saved games name gates by id.
-  { id: 'catene', label: 'le catene del Ponte de la Croce', kind: 'chain', axis: 'z', at: 15, c: 56.5, w: 10, t: 0.6, y0: 0, h: 3, needs: 'quest2' }, // across the whole quay
-  { id: 'coro-zitelle', label: 'la porta della chiesa delle Zitelle', kind: 'door', axis: 'x', at: 240, c: -30, w: 2.4, t: 1, y0: ZF, h: 3.2, needs: 'key2' }, // the presbytery's back door, from the court
-  { id: 'portone-zitelle', label: 'il portone delle Zitelle', kind: 'door', axis: 'x', at: 240, c: 0, w: 3.4, t: 1, y0: ZF, h: 6, needs: 'boss2' }, // facade
+  { id: 'catene', label: 'le catene del Ponte de la Croce', kind: 'chain', axis: 'z', at: 15, c: -56.5, w: 10, t: 0.6, y0: 0, h: 3, needs: 'quest2' }, // across the whole quay
+  { id: 'coro-zitelle', label: 'la porta della chiesa delle Zitelle', kind: 'door', axis: 'x', at: ZCX, c: -30, w: 2.4, t: 1, y0: ZF, h: 3.2, needs: 'key2' }, // the presbytery's back door, from the court
+  { id: 'portone-zitelle', label: 'il portone delle Zitelle', kind: 'door', axis: 'x', at: ZCX, c: 0, w: 3.4, t: 1, y0: ZF, h: 6, needs: 'boss2' }, // facade
 ];
 
 /** The chest with the key, at the far end of the pontile (zones/nord.ts: x -38..-32, z -194..-186, deck at 0). */
@@ -76,12 +76,12 @@ export const BLESSING = { name: 'Benedizione della serra', time: 180, cast: 0.8,
 
 /** z past which a player is back out on the fondamenta (the foot of the scalinata). */
 const OUTSIDE = 10;
-/** x past which the hero has reached the Zitelle (their sagrato, zones/zitelle.ts). */
-const ZITELLE = 196;
+/** x past which (-X, east) the hero has reached the Zitelle (their sagrato, zones/zitelle.ts). */
+const ZITELLE = -196;
 
 /** Level 2 checkpoints: past the chains, the foot of the Ponte de la Croce's far side; once the church's back door is open, the andito at its steps. */
-export const CROCE = { x: 78, z: 15, yaw: -Math.PI / 2 } as const;
-export const ANDITO = { x: 240, z: -35, yaw: Math.PI } as const; // facing the back door
+export const CROCE = { x: -78, z: 15, yaw: Math.PI / 2 } as const;
+export const ANDITO = { x: ZCX, z: -35, yaw: Math.PI } as const; // facing the back door
 
 /**
  * What every quest is worth when done: experience on top of the dead's, gold into the bag, and the name on the
@@ -201,7 +201,7 @@ export class Quest {
   update(p: { x: number; z: number }): boolean {
     const s = this.stage;
     if (s === 'leave' && p.z >= OUTSIDE) return (this.out = true);
-    if (s === 'route' && p.x >= ZITELLE) return (this.arrived = true);
+    if (s === 'route' && p.x <= ZITELLE) return (this.arrived = true);
     return false;
   }
 

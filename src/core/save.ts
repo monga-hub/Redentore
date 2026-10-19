@@ -20,6 +20,8 @@ const PENDING = 'redentore.pending'; // sessionStorage: the state to apply on th
 const AUTO = 'redentore.auto'; // localStorage: the run in progress, resumed by a boot with nothing pending
 export const SLOTS = 3;
 const GONE = 1e3; // s a loaded corpse has lain: past the sink, so it is hidden from the start
+/** x past which nothing is walkable since level 2 moved to -X (level/plan.ts): the fondamenta's +X end. */
+const OLD_EAST = 60;
 
 export interface GameState {
   v: number;
@@ -105,6 +107,11 @@ export function deserialize(g: Game, s: GameState): void {
   if (s.quest.bossDead) g.quest.win();
   for (const k of LEVEL2) g.quest[k] = s.quest[k] ?? false;
   if (s.quest.boss2Dead) { g.quest.boss2Dead = false; g.quest.win2(); }
+  if (p.x > OLD_EAST) { // a save from when level 2 lay at +X: its hero stood out there, now open ground; woken at the checkpoint
+    const c = g.quest.checkpoint();
+    Object.assign(g.player.pos, { x: c.x, y: 0, z: c.z });
+    g.player.facing = c.yaw;
+  }
   g.quest.found = s.quest.found ?? g.quest.blessed;
   g.quest.done = s.quest.done ? s.quest.done.filter((id): id is QuestId => id in QUESTS) // one from another build is dropped
     : ([['chiave', g.quest.key], ['bortolo', g.quest.found], ['reverendissimo', g.quest.reported], ['zitelle', g.quest.reported2], ['relic', g.quest.relicBack]] as const).flatMap(([id, d]) => (d ? [id] : []));

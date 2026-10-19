@@ -25,9 +25,28 @@ export class Hud {
     if (text === this.last) return;
     this.last = text;
     this.zone.textContent = text;
+    this.fit();
     this.zone.classList.remove('show');
     void this.zone.offsetWidth; // restart the fade animation
     if (text) this.zone.classList.add('show');
+  }
+
+  /**
+   * On a phone held sideways the quest tracker (quest/view.ts) shares the title's row: the title then keeps to the band
+   * between the player frame and the tracker, a size down, wrapping if it must, so neither covers the other.
+   */
+  private fit(): void {
+    const z = this.zone;
+    z.style.left = z.style.right = '';
+    z.classList.remove('narrow');
+    const q = document.getElementById('quests')?.getBoundingClientRect(), t = z.getBoundingClientRect();
+    if (!q?.width || !z.textContent) return;
+    const words = document.createRange();
+    words.selectNodeContents(z);
+    if (q.top > t.top + 90 || q.bottom < t.top || q.left > (innerWidth + words.getBoundingClientRect().width) / 2 + 8) return;
+    z.style.left = `${document.getElementById('unit')!.getBoundingClientRect().right + 8}px`;
+    z.style.right = `${innerWidth - q.left + 8}px`;
+    z.classList.add('narrow');
   }
 
   /** Level badge and the XP bar into the next level (full at the cap); the badge pops on a level-up.

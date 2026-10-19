@@ -84,7 +84,7 @@ function choose(build: string, picks: string[]): string {
 }
 
 // --- walking: the flood fill of check-walkable.ts, then breadth-first fields towards each goal ---
-const STEP = 0.5, X0 = -62, X1 = 302, Z0 = -197, Z1 = 22;
+const STEP = 0.5, X0 = -302, X1 = 62, Z0 = -197, Z1 = 22;
 const nx = Math.round((X1 - X0) / STEP), nz = Math.round((Z1 - Z0) / STEP);
 const toI = (x: number) => Math.round((x - X0) / STEP), toJ = (z: number) => Math.round((z - Z0) / STEP);
 const inGrid = (i: number, j: number) => i >= 0 && j >= 0 && i < nx && j < nz;
@@ -666,7 +666,7 @@ function route(apiary: boolean): Goal[] {
  * key, the court, the back door, the Governatrice.
  */
 const ON_THE_WAY = [0, 2, 3, 4, 5, 6, 9, 10, 11, 12];
-const BACK = { x: 240, z: -33 };
+const BACK = { x: -240, z: -33 };
 function route2(r: Run): Goal[] {
   const pack = (i: number): Goal => {
     const p = PACKS[i], ms = r.l2.all.filter((m) => p.members.some(([k, x, z]) => m.kind === k && m.home.x === x && m.home.z === z));

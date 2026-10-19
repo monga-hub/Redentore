@@ -3,7 +3,7 @@
 // dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots, the reload handoff and the autosave survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { QUESTS, Quest } from '../src/quest/progress.ts';
+import { ANDITO, QUESTS, Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
 import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
@@ -164,10 +164,20 @@ if (sb.quest.side.taken.join() !== 'lumi,ditale' || sb.quest.side.done.join() !=
 if (sb.quest.bonusXp !== z.quest.bonusXp || questXpIn(ss) !== z.quest.bonusXp) fail("a load does not count Mastro Iseppo's XP as before");
 if (old.quest.side.taken.length || old.quest.side.done.length || !valid((({ side: _s, ...o }) => o)(ss))) fail('a save from before Mastro Iseppo loads with his quests');
 if (valid({ ...ss, side: { taken: [1], done: [] } }) || valid({ ...ss, side: { taken: [], done: [], kills: { lumi: 'x' } } })) fail('side quest field validation');
-// A fog grid from before the level grew east keeps its cells where they were.
-const narrow = (() => { const f = new Discovery(buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle')); f.reveal(SPAWN.x, SPAWN.z); return f; })();
+// A fog grid round-trips by its origin; one from before (no origin: level 2 at +X, x 60..300) keeps level 1's cells
+// where they were and lays level 2's on its new side, -X (level/plan.ts).
 const wide = fogOf(boot());
-if (narrow.x0 !== wide.x0 || narrow.z0 !== wide.z0 || narrow.rows !== wide.rows || !wide.decode(narrow.encode()) || !wide.seen(SPAWN.x, SPAWN.z) || wide.seen(SPAWN.x + 30, SPAWN.z)) fail('an old fog grid lost its place');
+const legacy1 = buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle');
+const narrow = new Discovery([...legacy1, { x0: 60, x1: 300, z0: -104, z1: 20 }]);
+narrow.reveal(SPAWN.x, SPAWN.z);
+narrow.reveal(78, 15); // the old Fondamenta de la Croce
+if (narrow.x0 !== -102 || narrow.z0 !== wide.z0 || !wide.decode(narrow.encode().replace(/@-?\d+/, '')) || !wide.seen(SPAWN.x, SPAWN.z) || !wide.seen(-78, 15) || wide.seen(78, 15) || wide.seen(SPAWN.x + 30, SPAWN.z)) fail('an old fog grid lost its place');
+const round = fogOf(boot());
+if (!round.decode(wide.encode()) || round.cells.join('') !== wide.cells.join('')) fail('a fog grid does not round-trip');
+// A save from when level 2 lay at +X wakes its hero at the checkpoint, not out on the open ground there.
+const moved = boot();
+deserialize(moved, { ...zs, player: { ...zs.player, x: 150, z: 15 } });
+if (moved.player.pos.x !== ANDITO.x || moved.player.pos.z !== ANDITO.z) fail(`an old level-2 save woke at (${moved.player.pos.x}, ${moved.player.pos.z})`);
 
 // Storage: three slots, empty ones undefined, junk refused; the pending handoff is taken once.
 const mem = new Map<string, string>();
@@ -191,7 +201,7 @@ if (resume(store)) fail('autosave survived a new game');
 autosave(zs, store);
 const zr = boot();
 deserialize(zr, resume(store)!);
-if (zr.quest.stage !== 'boss2' || !zr.quest.gate('coro-zitelle').open || zr.quest.checkpoint().x !== 240) fail(`level 2 resumed at ${zr.quest.stage}`);
+if (zr.quest.stage !== 'boss2' || !zr.quest.gate('coro-zitelle').open || zr.quest.checkpoint() !== ANDITO) fail(`level 2 resumed at ${zr.quest.stage}`);
 clearAutosave(store);
 // Levels: picks and XP round-trip; an hp pick's raised max is in place before the saved hp is clamped to it.
 const lv = boot();
@@ -246,7 +256,7 @@ PICKS.forEach((id, i) => {
 });
 if (GEAR_SLOTS.some((sl) => GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.rarity !== 'epico' || GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.l2)) fail(`prepared gear ${JSON.stringify(pb.gear.worn)}`);
 if (pb.stats.hp !== pb.stats.hpMax || pb.stats.mana !== pb.stats.manaMax || pb.mobs.some((m) => m.state !== 'dead')) fail('prepared hero not full, or level 1 not cleared');
-if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(240, -20)) fail('prepared map not level 1 seen');
+if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(-240, -20)) fail('prepared map not level 1 seen');
 const owned = new Set(['fall', 'plague', 'mend', 'potion', ...PICKS.filter((id) => ['step', 'frost', 'nova', 'lance', 'font'].includes(id))]);
 if (BAR.bar.filter((x) => x).length !== owned.size || BAR.bar.some((x) => x && !owned.has(x)) || BAR.bar[0] !== 'fall' || BAR.bar[9] !== 'potion') fail(`prepared bar ${BAR.bar}`);
 mem.clear();

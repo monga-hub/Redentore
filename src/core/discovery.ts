@@ -6,6 +6,9 @@
 export const CELL = 3; // m per cell
 export const SIGHT = 16; // m: how far around the player the fog lifts
 const MARGIN = 40; // m of open water around the areas, as the minimap's chart has
+/** Grids saved before level 2 moved to -X carry no origin: theirs was the level-1 fondamenta's west end (-60) less MARGIN, and
+ * their cells past the old chains (x > 60) were level 2's, now mirrored to -x (level/plan.ts). */
+const LEGACY = { x0: -102, east: 60 };
 
 interface Rect { x0: number; x1: number; z0: number; z1: number }
 
@@ -69,29 +72,33 @@ export class Discovery {
     return all > 0 && seen >= all * 0.4;
   }
 
-  /** `<cols>x<rows>:<base64 bitset>`. */
+  /** `<cols>x<rows>@<x0>:<base64 bitset>`. */
   encode(): string {
     const bits = new Uint8Array(Math.ceil(this.cells.length / 8));
     this.cells.forEach((v, i) => { if (v) bits[i >> 3] |= 1 << (i & 7); });
     let bin = '';
     for (const b of bits) bin += String.fromCharCode(b);
-    return `${this.cols}x${this.rows}:${btoa(bin)}`;
+    return `${this.cols}x${this.rows}@${this.x0}:${btoa(bin)}`;
   }
 
   /**
-   * Restore an `encode`d grid. A smaller one is a save from before the level grew east (level 2 kept the
-   * north-west corner where it was): its cells are laid at the same place. False (and nothing changed)
-   * when it is junk or from a level it can't fit.
+   * Restore an `encode`d grid, each seen cell laid where it lies in the world (the rows share this grid's z0, which no
+   * level has moved). One without an origin is from before level 2 moved to -X: see LEGACY. Cells off this grid are
+   * dropped. False (and nothing changed) when it is junk.
    */
   decode(s: string): boolean {
-    const m = /^(\d+)x(\d+):([A-Za-z0-9+/=]*)$/.exec(s);
-    const cols = m ? +m[1] : 0, rows = m ? +m[2] : 0;
-    if (!m || cols > this.cols || rows > this.rows || !cols || !rows) return false;
+    const m = /^(\d+)x(\d+)(?:@(-?\d+))?:([A-Za-z0-9+/=]*)$/.exec(s);
+    const cols = m ? +m[1] : 0, rows = m ? +m[2] : 0, old = m?.[3] === undefined, x0 = old ? LEGACY.x0 : +m![3];
+    if (!m || !cols || !rows) return false;
     let bin: string;
-    try { bin = atob(m[3]); } catch { return false; }
+    try { bin = atob(m[4]); } catch { return false; }
     if (bin.length !== Math.ceil((cols * rows) / 8)) return false;
     this.cells.fill(0);
-    for (let i = 0; i < cols * rows; i++) this.cells[Math.floor(i / cols) * this.cols + (i % cols)] = (bin.charCodeAt(i >> 3) >> (i & 7)) & 1;
+    for (let i = 0; i < cols * rows; i++) {
+      if (!((bin.charCodeAt(i >> 3) >> (i & 7)) & 1)) continue;
+      const x = x0 + ((i % cols) + 0.5) * CELL, j = this.index(old && x > LEGACY.east ? -x : x, this.z0 + (Math.floor(i / cols) + 0.5) * CELL);
+      if (j >= 0) this.cells[j] = 1;
+    }
     this.last = -1;
     return true;
   }

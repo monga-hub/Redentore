@@ -21,7 +21,8 @@ const HZ = 30; // redraws per second
 
 /**
  * WoW-style minimap, top right (styled in index.html): a round window on a top-down chart of the
- * complex, north up, centred on the player with an arrow turning with their facing, the unexplored
+ * complex, north up (the real north: +Z, the canal side, level/plan.ts; so the chart is drawn turned half round),
+ * centred on the player with an arrow turning with their facing, the unexplored
  * parts under the fog of war; red dots for living enemies in range and a gold marker for the
  * current objective, pinned to the rim when far. The book button opens the big map (ui/worldMap.ts).
  * The chart is baked once from the level's floor and wall boxes into an offscreen canvas, so a
@@ -84,7 +85,7 @@ export class Minimap {
     this.wait = 0;
   }
 
-  /** `facing`: player yaw (0 = north, -Z). `foes`: every mob. `goal`: the objective, if any; `also`: side quests' pins. */
+  /** `facing`: player yaw (0 = -Z, south: the arrow points down). `foes`: every mob. `goal`: the objective, if any; `also`: side quests' pins. */
   update(dt: number, p: { x: number; z: number }, facing: number, label: string | undefined, foes: Pin[], goal?: Pin, also: Pin[] = []): void {
     if ((label ?? '') !== this.label) this.name.textContent = this.label = label ?? '';
     if ((this.wait -= dt) > 0) return;
@@ -104,8 +105,12 @@ export class Minimap {
     c.clip();
     // The chart, scaled so 1 m = k px, with the player's spot at the centre.
     c.imageSmoothingEnabled = true;
+    c.save();
+    c.translate(size, size);
+    c.rotate(Math.PI); // north (+Z) up, east (-X) right
     c.drawImage(this.chart, (p.x - this.x0) * PX - r / k * PX, (p.z - this.z0) * PX - r / k * PX, size / k * PX, size / k * PX, 0, 0, size, size);
     this.fog.draw(c, p.x - r / k, p.z - r / k, k, size, size);
+    c.restore();
     // Inner shade towards the rim, like a lens.
     const shade = c.createRadialGradient(r, r, r * 0.6, r, r, r);
     shade.addColorStop(0, 'rgba(0,0,0,0)');
@@ -113,7 +118,7 @@ export class Minimap {
     c.fillStyle = shade;
     c.fillRect(0, 0, size, size);
 
-    const at = (q: Pin) => [r + (q.x - p.x) * k, r + (q.z - p.z) * k] as const;
+    const at = (q: Pin) => [r - (q.x - p.x) * k, r - (q.z - p.z) * k] as const; // turned half round, like the chart
     c.lineWidth = 1;
     c.strokeStyle = '#000';
     c.fillStyle = '#ff2a1a';
@@ -143,10 +148,10 @@ export class Minimap {
       c.restore();
     }
 
-    // The player: a bright arrow turning with their facing (yaw 0 points up, north).
+    // The player: a bright arrow turning with their facing (yaw 0 points down, south).
     c.save();
     c.translate(r, r);
-    c.rotate(-facing);
+    c.rotate(Math.PI - facing);
     c.beginPath();
     c.moveTo(0, -8);
     c.lineTo(5.5, 6);

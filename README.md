@@ -270,8 +270,10 @@ Push su `main` → GitHub Actions (`.github/workflows/deploy.yml`) builda e pubb
 
 ## Scala e coordinate
 
-- **1 unità = 1 metro.** +X = est, +Y = alto, −Z = nord (laguna), +Z = sud
-  (Fondamenta). Origine = centro della facciata della chiesa, quota fondamenta.
+- **1 unità = 1 metro.** −X = est, +Y = alto, +Z = nord (Fondamenta e canale della Giudecca), −Z = sud
+  (laguna), come sull'isola vera: guardando la facciata dal canale le Zitelle (livello 2) sono a sinistra.
+  Origine = centro della facciata della chiesa, quota fondamenta. Il codice del livello 1 tiene i nomi della
+  piantina letta dal basso (`X.west`, "nord" per la laguna); minimappa e mappa mostrano il nord vero in alto.
 - Calibrazione: corpo della chiesa (navata + cappelle) ≈ 26 m di larghezza, fronte
   del tempio ≈ 20 m → ≈ 0,12 m per pixel della piantina a 1500 px di larghezza.
   Tutto il resto è posizionato con lo stesso fattore e arrotondato al mezzo metro.

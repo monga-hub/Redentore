@@ -46,6 +46,7 @@
         opacity: 0;
       }
       #zone.show { animation: zone 3.5s ease forwards; }
+      #zone.narrow { font-size: 20px; line-height: 1.2; } /* between the player frame and the quest tracker (src/ui/hud.ts fit) */
       @keyframes zone { 0% { opacity: 0 } 15% { opacity: 1 } 70% { opacity: 1 } 100% { opacity: 0 } }
       /* Player frame (src/ui/hud.ts): round portrait, name, health and mana with cur / max. */
       #unit {
@@ -355,6 +356,7 @@
          instead of WoW's gold. */
       body.diablo #zone { font: 600 24px Georgia, serif; text-transform: uppercase; letter-spacing: 5px; color: #e9d6b0;
         text-shadow: 0 0 10px #000, 0 2px 3px #000, 0 0 22px rgba(170,30,10,.6); }
+      body.diablo #zone.narrow { font-size: 17px; line-height: 1.25; letter-spacing: 3px; }
       body.diablo #unit .portrait { width: 64px; height: 64px; border: 3px solid #1d1a17;
         box-shadow: 0 0 0 2px #77705f, 0 0 0 4px #0a0908, 0 0 16px rgba(170,25,12,.55), inset 0 0 14px #000;
         background: radial-gradient(circle at 50% 35%, #3a1a14, #050303); }

@@ -4,7 +4,7 @@ import type { FogLayer } from './fog.ts';
 import { PX, WATER, type Minimap, type Pin } from './minimap.ts';
 
 // The big map, WoW style: M (or the book button on the minimap) opens the whole complex in a
-// framed overlay, north up, under the same fog as the minimap. Discovered places carry their
+// framed overlay, north up (+Z, turned half round like the minimap), under the same fog as the minimap. Discovered places carry their
 // names, the player shows as an arrow and the objective as a gold diamond. The game pauses while
 // it is open; M, Esc, a click or a tap close it. Its DOM is styled here, like ui/menu.ts.
 
@@ -108,14 +108,18 @@ export class WorldMap {
     // fit the complex, centred, 1 m = k px
     const k = Math.min(w / (b.x1 - b.x0), h / (b.z1 - b.z0));
     const ox = (b.x0 + b.x1) / 2 - w / 2 / k, oz = (b.z0 + b.z1) / 2 - h / 2 / k;
-    const at = (x: number, z: number) => [(x - ox) * k, (z - oz) * k] as const;
+    const at = (x: number, z: number) => [w - (x - ox) * k, h - (z - oz) * k] as const; // north (+Z) up, east (-X) right
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.fillStyle = WATER;
     c.fillRect(0, 0, w, h);
     c.imageSmoothingEnabled = true;
     const m = this.chart;
+    c.save();
+    c.translate(w, h);
+    c.rotate(Math.PI);
     c.drawImage(m.chart, (ox - m.x0) * PX, (oz - m.z0) * PX, w / k * PX, h / k * PX, 0, 0, w, h);
     this.fog.draw(c, ox, oz, k, w, h);
+    c.restore();
     const shade = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) / 2);
     shade.addColorStop(0, 'rgba(0,0,0,0)');
     shade.addColorStop(1, 'rgba(0,0,0,.5)');
@@ -163,7 +167,7 @@ export class WorldMap {
     c.beginPath();
     c.arc(0, 0, 14, 0, Math.PI * 2);
     c.fill();
-    c.rotate(-v.facing);
+    c.rotate(Math.PI - v.facing);
     c.beginPath();
     c.moveTo(0, -11);
     c.lineTo(7.5, 8);

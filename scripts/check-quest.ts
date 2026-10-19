@@ -71,12 +71,12 @@ const xp0 = quest.bonusXp;
 if (!quest.report() || quest.report() || quest.bonusXp !== xp0 + questXp('reverendissimo')) fail('the report to Fra\' Zuane does not pay its reward exactly once');
 want('offer');
 const chains = quest.gate('catene');
-if (chains.open || quest.prompt(feet(55, 15))?.act) fail('the chains on the Ponte de la Croce open before the second quest');
+if (chains.open || quest.prompt(feet(-55, 15))?.act) fail('the chains on the Ponte de la Croce open before the second quest');
 quest.accept2();
 if (!chains.open) fail('accepting La dote delle Zitelle did not drop the chains');
 want('route');
-if (quest.update(feet(150, 15))) fail('arrived at the Zitelle halfway along the fondamenta');
-if (!quest.update(feet(220, 5))) fail('reaching the sagrato of the Zitelle did not count');
+if (quest.update(feet(-150, 15))) fail('arrived at the Zitelle halfway along the fondamenta');
+if (!quest.update(feet(-220, 5))) fail('reaching the sagrato of the Zitelle did not count');
 want('ospizio');
 const back = quest.gate('coro-zitelle'), bc = quest.centre(back);
 const shut = quest.prompt({ x: bc.x, y: 0.8, z: bc.z + 1.2 });
@@ -162,8 +162,8 @@ for (const q of SIDE) {
   if ('item' in q.want && !ITEM.get(q.want.item)?.quest) fail(`${q.id} wants ${q.want.item}, not a quest item`);
 }
 if (new Set(SIDE.map((q) => q.reward)).size !== SIDE.length) fail('two of his quests give the same epic');
-const spot = (at: { x: number; y: number; z: number }) => { const f = { x: at.x - 1, y: level.world.standHeight(at.x - 1, at.z), z: at.z }; if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - at.y) > 0.5) fail(`no room to stand by the find spot (${at.x}, ${at.z})`); return f; };
-const ditale = spot(DITALE), exvoto = spot(EXVOTO);
+const spot = (at: { x: number; y: number; z: number }, dx = -1) => { const f = { x: at.x + dx, y: level.world.standHeight(at.x + dx, at.z), z: at.z }; if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - at.y) > 0.5) fail(`no room to stand by the find spot (${at.x}, ${at.z})`); return f; };
+const ditale = spot(DITALE, 1), exvoto = spot(EXVOTO); // the thimble under a bed by the dormitory's -X wall, from the room's side
 if (sq.prompt(ditale)?.act) fail("Marieta's thimble can be picked up before its quest");
 const take = () => { const t = side.talk(); if (!t.accept) fail(`he offers nothing: ${t.talk.pages[0].slice(0, 40)}`); t.accept?.(); return t.talk.title; };
 const hand = (id: SideId) => { const xp = sq.bonusXp, t = side.talk(); if (t.paid?.id !== id) fail(`${id} is not handed in (${t.paid?.id})`); else if (sq.bonusXp !== xp + QUESTS[id].xp || !sq.done.includes(id) || !bag.count(t.paid.reward)) fail(`${id} does not pay its XP and its epic through Quest.complete`); };

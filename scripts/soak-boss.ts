@@ -73,7 +73,7 @@ function fight(seconds: number, level: number): void {
   }
   levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
   levels.apply();
-  player.respawn(level === 2 ? { x: 240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
+  player.respawn(level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
   const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
   let next = 0, raged = false;

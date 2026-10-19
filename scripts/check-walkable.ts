@@ -28,7 +28,7 @@ import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
 const level = buildLevel();
 const { world } = level;
 const quest = new Quest(world); // shut gates and the key chest, as at the start of a game
-const STEP = 0.5, X0 = -62, X1 = 302, Z0 = -197, Z1 = 22;
+const STEP = 0.5, X0 = -302, X1 = 66, Z0 = -197, Z1 = 22;
 const nx = Math.round((X1 - X0) / STEP), nz = Math.round((Z1 - Z0) / STEP);
 const idx = (i: number, j: number) => j * nx + i;
 const toI = (x: number) => Math.round((x - X0) / STEP), toJ = (z: number) => Math.round((z - Z0) / STEP);
@@ -117,11 +117,12 @@ for (const a of level.areas) {
   else console.log(`ok   ${a.zone.padEnd(11)} ${a.label} (${shut ? 'locked' : `${hit} cells`})`);
 }
 if (quest.checkpoint() !== CROCE || !at(road, CROCE.x, CROCE.z)) fail('quest      past the chains a death should wake at the foot of the Ponte de la Croce, on open ground');
-let east = -Infinity, south = Infinity;
-for (let n = 0; n < road.length; n++) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx; if (X0 + i * STEP > 60) { east = Math.max(east, X0 + i * STEP); south = Math.min(south, Z0 + j * STEP); } }
-if (east > 300.5 || south < -104.5) {
-  fail(`level 2 leaks: walkable as far as x ${east}, z ${south}`);
-  for (let n = 0; n < road.length; n += 1) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP; if (x > 60 && (x > 300.5 || z < -104.5) && (i + j) % 40 === 0) console.log('  leak at', x, z); }
+// Level 2 runs east, -X (level/plan.ts): nothing walkable past its quay's end or south of the Zitelle's orto, nor past the fondamenta's +X end.
+let east = Infinity, south = Infinity, west = -Infinity;
+for (let n = 0; n < road.length; n++) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP; west = Math.max(west, x); if (x < -60) { east = Math.min(east, x); south = Math.min(south, Z0 + j * STEP); } }
+if (east < -300.5 || south < -104.5 || west > 60.5) {
+  fail(`level 2 leaks: walkable as far as x ${east}..${west}, z ${south}`);
+  for (let n = 0; n < road.length; n += 1) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP; if ((x < -300.5 || x > 60.5 || (x < -60 && z < -104.5)) && (i + j) % 40 === 0) console.log('  leak at', x, z); }
 }
 quest.takeKey2();
 quest.open(quest.gate('coro-zitelle'));

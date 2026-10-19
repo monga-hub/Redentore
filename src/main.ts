@@ -318,7 +318,7 @@ onStyle((diablo) => { // the menu's "Stile Diablo" switch, applied mid-game with
   blend.start(cam.camera);
 });
 /** The objective's pin: Fra' Zuane, the key, the Reverendissimo; then Fra' Zuane, the Zitelle, the Maestra, the church's back door, the Governatrice, Fra' Zuane. */
-const ZITELLE_AT = { x: 219, z: 3 }, BACK_DOOR = { x: 240, z: -31 };
+const ZITELLE_AT = { x: -219, z: 3 }, BACK_DOOR = { x: -240, z: -31 };
 const goal = () => {
   switch (quest.stage) {
     case 'talk': case 'report': case 'offer': case 'return': return NPC;
@@ -358,13 +358,13 @@ function openMap(): void {
 }
 const pressed = (code: string) => input.pressed(code);
 /**
- * Zone streaming, by the hero's x: past the Ponte de la Croce the Redentore's complex and its dead are skipped
+ * Zone streaming, by the hero's x: past the Ponte de la Croce (-X) the Redentore's complex and its dead are skipped
  * (frustum culling already drops their draw calls, this spares the scene walk: ~1 ms a frame on a laptop, more on
- * a phone), and level 2 west of it. ponytail: two halves on one axis; per-zone bounds if a third level comes.
+ * a phone), and level 2 on the church's side of it. ponytail: two halves on one axis; per-zone bounds if a third level comes.
  */
 const LEVEL1 = ['chiesa', 'convento', 'orto', 'corpo-nord', 'giardini', 'laguna', 'calle'].map((z) => level.zones.get(z)!), LEVEL2 = ['giudecca', 'zitelle'].map((z) => level.zones.get(z)!);
 function stream(x: number): void {
-  const one = x < 100, two = x > 50;
+  const one = x > -100, two = x < -50;
   for (const g of LEVEL1) g.visible = one;
   friars.root.visible = priests.root.visible = bees.root.visible = one;
   for (const g of LEVEL2) g.visible = two;

@@ -475,7 +475,7 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
 
   // The Governatrice: wards called at 70% and 40%, the veil while they live, the fuso under 25%.
   const gov = spawnLevel2(fl), boss = gov.boss, pb: Target = { x: GOV_AT.x, y: 0, z: GOV_AT.z - 6 };
-  for (const m of [boss, ...gov.wards]) { m.bounds = { x0: 200, x1: 280, z0: -50, z1: 30 }; m.y = 0; }
+  for (const m of [boss, ...gov.wards]) { m.bounds = { x0: -280, x1: -200, z0: -50, z1: 30 }; m.y = 0; }
   casterHurt(boss, 1);
   const step = (s: number) => { for (let t = 0; t < s; t += 1 / 60) { casterThink(boss, pb, fl, 1 / 60, bolts); for (const w of gov.wards) casterThink(w, pb, fl, 1 / 60, bolts); } bolts.length = 0; };
   step(0.5);

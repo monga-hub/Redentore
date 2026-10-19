@@ -70,39 +70,39 @@ export const GOVERNATRICE: CasterKind = {
 };
 
 /** The hall under the dome, less her bulk's margin: where she walks. */
-export const GOV_AT = { x: 240, z: -10 };
+export const GOV_AT = { x: -240, z: -10 };
 
 type Spot = [number, number];
 interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][] }
 const rect = (x0: number, x1: number, z0: number, z1: number): Bounds => ({ x0, x1, z0, z1 });
-const QUAY = rect(70, 166, 10, 19.5), CAMPO = rect(104, 132, -13.5, 10), CAMPIELLO = rect(76.5, 99.5, -29.5, -16.5);
-const SQUERO = rect(173, 196, -25.5, 10), ZQUAY = rect(160, 299, 0, 19.5);
+const QUAY = rect(-166, -70, 10, 19.5), CAMPO = rect(-132, -104, -13.5, 10), CAMPIELLO = rect(-99.5, -76.5, -29.5, -16.5);
+const SQUERO = rect(-196, -173, -25.5, 10), ZQUAY = rect(-299, -160, 0, 19.5);
 
 /**
  * Every pack of level 2, in the order saved games index them (appended after level 1's mobs). `at`: where
  * the pack faces at rest (the middle of their circle); `members`: kind and spot.
  */
 export const PACKS: Pack[] = [
-  { label: 'Fondamenta de la Croce', at: [97.5, 15.5], bounds: QUAY, members: [[GONDOLIERE, 96, 14], [GONDOLIERE, 99, 17]] },
-  { label: 'Campiello de la Croce', at: [88, -25], bounds: CAMPIELLO, members: [[GONDOLIERE, 83, -25], [GONDOLIERE, 93, -25], [CODEGA, 88, -28.5]] },
-  { label: 'Campo de Santa Croce', at: [118, -3], bounds: CAMPO, members: [[GONDOLIERE, 112, 0], [GONDOLIERE, 124, 0], [CODEGA, 118, -9]] },
-  { label: 'Fondamenta de la Croce', at: [147.5, 15], bounds: QUAY, members: [[CODEGA, 145, 13], [CODEGA, 150, 17], [GONDOLIERE, 148, 15]] },
-  { label: 'Ponte del Squero', at: [178, 15], bounds: ZQUAY, members: [[GONDOLIERE, 178, 13], [GONDOLIERE, 178, 17], [CODEGA, 182, 15]] },
-  { label: 'Squero', at: [188, -16], bounds: SQUERO, members: [[GASTALDO, 189, -18], [GONDOLIERE, 182, -10], [GONDOLIERE, 192, -9]] },
-  { label: 'Sagrato delle Zitelle', at: [207, 5], bounds: rect(196.5, 229, 0.5, 19.5), members: [[GONDOLIERE, 204, 6], [GONDOLIERE, 210, 6], [CODEGA, 207, 3]] },
-  { label: 'Sagrato delle Zitelle', at: [268, 6], bounds: rect(251, 283.5, 0.5, 19.5), members: [[CODEGA, 265, 5], [CODEGA, 271, 5], [GONDOLIERE, 268, 8]] },
-  { label: 'Refettorio', at: [204, -6], bounds: rect(198.8, 209.4, -11.4, -0.6), members: [[ZITELLA, 202, -9.5], [ZITELLA, 206, -2.5]] },
-  { label: 'Portineria dell\'ospizio', at: [222, -6], bounds: rect(210.6, 228.9, -11.4, -0.6), members: [[ZITELLA, 214, -9], [ZITELLA, 226, -9]] },
-  { label: 'Sala del merletto', at: [222, -25], bounds: rect(198.8, 229, -35.4, -12.6), members: [[MAESTRA, 222, -27], [ZITELLA, 218, -20], [ZITELLA, 226, -20], [ZITELLA, 219, -33]] },
-  { label: 'Cortile delle Zitelle', at: [226, -54], bounds: rect(198.8, 281.2, -61.4, -36.6), members: [[ZITELLA, 226, -51], [ZITELLA, 222, -56], [ZITELLA, 230, -57]] },
-  { label: 'Cortile delle Zitelle', at: [254, -54], bounds: rect(198.8, 281.2, -61.4, -36.6), members: [[ZITELLA, 254, -51], [ZITELLA, 250, -57], [ZITELLA, 258, -56]] },
-  { label: 'Dormitorio delle zitelle', at: [266, -26], bounds: rect(251.1, 281.4, -35.4, -12.6), members: [[ZITELLA, 262, -30], [ZITELLA, 270, -30], [ZITELLA, 266, -21]] },
-  { label: 'Infermeria', at: [266, -6.5], bounds: rect(251.1, 281.4, -11.4, -0.6), members: [[ZITELLA, 259, -6.5], [ZITELLA, 273, -6.5]] },
-  { label: 'Orto delle Zitelle', at: [240, -90], bounds: rect(198.8, 281.2, -103.4, -74.6), members: [[CODEGA, 228, -89], [CODEGA, 252, -89], [GONDOLIERE, 240, -95]] },
+  { label: 'Fondamenta de la Croce', at: [-97.5, 15.5], bounds: QUAY, members: [[GONDOLIERE, -96, 14], [GONDOLIERE, -99, 17]] },
+  { label: 'Campiello de la Croce', at: [-88, -25], bounds: CAMPIELLO, members: [[GONDOLIERE, -83, -25], [GONDOLIERE, -93, -25], [CODEGA, -88, -28.5]] },
+  { label: 'Campo de Santa Croce', at: [-118, -3], bounds: CAMPO, members: [[GONDOLIERE, -112, 0], [GONDOLIERE, -124, 0], [CODEGA, -118, -9]] },
+  { label: 'Fondamenta de la Croce', at: [-147.5, 15], bounds: QUAY, members: [[CODEGA, -145, 13], [CODEGA, -150, 17], [GONDOLIERE, -148, 15]] },
+  { label: 'Ponte del Squero', at: [-178, 15], bounds: ZQUAY, members: [[GONDOLIERE, -178, 13], [GONDOLIERE, -178, 17], [CODEGA, -182, 15]] },
+  { label: 'Squero', at: [-188, -16], bounds: SQUERO, members: [[GASTALDO, -189, -18], [GONDOLIERE, -182, -10], [GONDOLIERE, -192, -9]] },
+  { label: 'Sagrato delle Zitelle', at: [-207, 5], bounds: rect(-229, -196.5, 0.5, 19.5), members: [[GONDOLIERE, -204, 6], [GONDOLIERE, -210, 6], [CODEGA, -207, 3]] },
+  { label: 'Sagrato delle Zitelle', at: [-268, 6], bounds: rect(-283.5, -251, 0.5, 19.5), members: [[CODEGA, -265, 5], [CODEGA, -271, 5], [GONDOLIERE, -268, 8]] },
+  { label: 'Refettorio', at: [-204, -6], bounds: rect(-209.4, -198.8, -11.4, -0.6), members: [[ZITELLA, -202, -9.5], [ZITELLA, -206, -2.5]] },
+  { label: 'Portineria dell\'ospizio', at: [-222, -6], bounds: rect(-228.9, -210.6, -11.4, -0.6), members: [[ZITELLA, -214, -9], [ZITELLA, -226, -9]] },
+  { label: 'Sala del merletto', at: [-222, -25], bounds: rect(-229, -198.8, -35.4, -12.6), members: [[MAESTRA, -222, -27], [ZITELLA, -218, -20], [ZITELLA, -226, -20], [ZITELLA, -219, -33]] },
+  { label: 'Cortile delle Zitelle', at: [-226, -54], bounds: rect(-281.2, -198.8, -61.4, -36.6), members: [[ZITELLA, -226, -51], [ZITELLA, -222, -56], [ZITELLA, -230, -57]] },
+  { label: 'Cortile delle Zitelle', at: [-254, -54], bounds: rect(-281.2, -198.8, -61.4, -36.6), members: [[ZITELLA, -254, -51], [ZITELLA, -250, -57], [ZITELLA, -258, -56]] },
+  { label: 'Dormitorio delle zitelle', at: [-266, -26], bounds: rect(-281.4, -251.1, -35.4, -12.6), members: [[ZITELLA, -262, -30], [ZITELLA, -270, -30], [ZITELLA, -266, -21]] },
+  { label: 'Infermeria', at: [-266, -6.5], bounds: rect(-281.4, -251.1, -11.4, -0.6), members: [[ZITELLA, -259, -6.5], [ZITELLA, -273, -6.5]] },
+  { label: 'Orto delle Zitelle', at: [-240, -90], bounds: rect(-281.2, -198.8, -103.4, -74.6), members: [[CODEGA, -228, -89], [CODEGA, -252, -89], [GONDOLIERE, -240, -95]] },
 ];
 
 /** Her girls, praying along the hall's side walls under the grated choirs. */
-const WARDS: Spot[] = [[232.6, -7], [247.4, -13], [232.6, -13], [247.4, -7]];
+const WARDS: Spot[] = [[-232.6, -7], [-247.4, -13], [-232.6, -13], [-247.4, -7]];
 
 export interface Level2 { all: Priest[]; boss: Priest; maestra: Priest; gastaldo: Priest; wards: Priest[] }
 

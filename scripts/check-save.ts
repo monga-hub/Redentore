@@ -5,7 +5,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { autosave, clearAutosave, deserialize, resume, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
+import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
@@ -137,6 +137,19 @@ deserialize(rz, { ...zs, quest: { ...zs.quest, relic: true, relicBack: true } })
 const rs = JSON.parse(JSON.stringify(serialize(rz)));
 if (!rz.quest.relic || !rz.quest.relicBack || !rs.quest.relic || !rs.quest.relicBack) fail('the corona\'s flags do not survive a save');
 if (old.quest.relic || old.quest.relicBack) fail('a save from before the corona loads with it found');
+// The quests done round-trip and their XP is what the save counted; a save from before them is rebuilt from its flags,
+// with only Fra' Zuane's old report reward counted in its XP (the rest is paid on load); an unknown quest is dropped.
+z.quest.meet();
+const qs = JSON.parse(JSON.stringify(serialize(z))), qb = boot();
+deserialize(qb, qs);
+if (qb.quest.done.join() !== 'chiave,reverendissimo,bortolo' || !qb.quest.found || questXpIn(qs) !== qb.quest.bonusXp) fail(`quests done restored as ${qb.quest.done}`);
+const { found: _f, done: _d, ...oldQ } = qs.quest;
+let qo = boot();
+deserialize(qo, { ...qs, quest: { ...oldQ, blessed: true } });
+if (qo.quest.done.join() !== 'chiave,bortolo,reverendissimo' || questXpIn({ ...qs, quest: oldQ }) !== 150) fail(`an old save's quests rebuilt as ${qo.quest.done}`);
+deserialize((qo = boot(), qo), { ...qs, quest: { ...qs.quest, done: ['chiave', 'from_the_future'] } });
+if (qo.quest.done.join() !== 'chiave') fail('unknown quest kept');
+if (!valid({ ...qs, quest: oldQ }) || valid({ ...qs, quest: { ...qs.quest, done: [1] } }) || valid({ ...qs, quest: { ...qs.quest, found: 'yes' } })) fail('quests done validation');
 // A fog grid from before the level grew east keeps its cells where they were.
 const narrow = (() => { const f = new Discovery(buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle')); f.reveal(SPAWN.x, SPAWN.z); return f; })();
 const wide = fogOf(boot());

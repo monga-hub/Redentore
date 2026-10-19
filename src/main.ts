@@ -30,7 +30,7 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { autosave, deserialize, resume, serialize, takePending, type Game } from './core/save.ts';
+import { autosave, deserialize, questXpIn, resume, serialize, takePending, type Game } from './core/save.ts';
 import { isDiablo, onQuality, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
 import { DiabloControls } from './player/diabloControls.ts';
@@ -174,10 +174,10 @@ const ACTS = [
   ['Il Reverendissimo marchia il pavimento: esci dai cerchi!', 'Il Reverendissimo è furibondo: colpisce sempre più spesso!'],
   ['La Governatrice chiama le sue figlie: finché vivono, il velo la protegge!', 'Altre due zitelle accorrono al velo: abbattile!', 'La Governatrice gira il fuso: stai fuori dai fili!'],
 ];
-// XP is what the hero killed plus Fra' Zuane's rewards. The dead of a load were counted into its saved XP (a save from
+// XP is what the hero killed plus the quests' rewards. The dead of a load were counted into its saved XP (a save from
 // before the levels: the worth of its dead, short of a won fight's), and a victory's dead are worth nothing.
 const fell = mobs.map((m) => m.state === 'dead');
-let slain = loaded?.build ? loaded.build.xp - quest.bonusXp : quest.bossDead ? 0 : worth.reduce((s, w, i) => s + (fell[i] ? w : 0), 0);
+let slain = loaded?.build ? loaded.build.xp - questXpIn(loaded) : quest.bossDead ? 0 : worth.reduce((s, w, i) => s + (fell[i] ? w : 0), 0);
 const sweep = () => mobs.forEach((m, i) => { if (m.state === 'dead') fell[i] = true; }); // after a victory: its dead count for nothing
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
 const picked = (id: string) => levels.picks.filter((p) => p === id).length;

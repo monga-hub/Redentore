@@ -1,7 +1,7 @@
 // Headless balance harness (`npm run balance`; not in `npm run check`, it plays whole runs).
 // The real level, collision, mob brains, ability table (costs, cooldowns, the GCD, charge), mana,
 // potion, XP curve and level-up offers, played by a bot: it walks the quest route on a grid path
-// (Fra' Zuane, the apiary, the key on the pontile, the grate, the choir door, the boss), fights
+// (Fra' Zuane, the apiary, the key on the pontile, Fra' Bortolo in the serra, the grate, the choir door, the boss), fights
 // whatever it pulls with one build's picks, and dies and wakes at the checkpoint like the game.
 // Only the looks are gone; the plague clouds and the wisp, which live in the Forsaken class with its
 // three.js, are re-done here in a few lines. The bot is fair but plain: it faces and hits the nearest
@@ -28,7 +28,7 @@ import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
-import { CHEST, CHOIR_DOOR, NPC, Quest } from '../src/quest/progress.ts';
+import { CHEST, CHOIR_DOOR, NPC, Quest, SPEZIALE } from '../src/quest/progress.ts';
 import { GASTALDO, GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, PACKS, VELO, ZITELLA, spawnLevel2, type Level2 } from '../src/enemies/zitelle.ts';
 import { onLine, veiled } from '../src/enemies/caster.ts';
 import { ZF } from '../src/level/zones/zitelle.ts';
@@ -650,6 +650,7 @@ function route(apiary: boolean): Goal[] {
     { name: 'npc', x: NPC.x, z: NPC.z, r: 2.2, done: (r) => { r.quest.accepted = true; } },
     ...(apiary ? [{ name: 'apiario', x: APIARY.x, z: APIARY.z + 3, r: 2, until: (r: Run) => r.bees.every((b) => b.state === 'dead') }] : []),
     { name: 'chiave', x: CHEST.x, z: CHEST.z, r: 2.2, done: (r) => r.quest.takeKey() },
+    { name: 'serra', x: SPEZIALE.x, z: SPEZIALE.z - 1.2, r: 1.2, done: (r) => { r.quest.meet(); } }, // Fra' Bortolo, as Fra' Zuane asks
     { name: 'grata', x: GRATE.x, z: GRATE.z, r: 2.2, done: (r) => { r.quest.open(r.quest.gates.find((g) => g.id === 'grata-nord')!); r.paths.reset(); } },
     { name: 'coro', x: CHOIR_DOOR.x, z: CHOIR_DOOR.z, y: CHURCH_FLOOR + 0.6, r: 1.6, done: (r) => { r.quest.open(r.quest.gates.find((g) => g.id === 'coro')!); r.paths.reset(); } },
     { name: 'boss', x: BOSS_AT.x, z: BOSS_AT.z, r: 3, boss: true, until: (r) => r.boss.state === 'dead' },

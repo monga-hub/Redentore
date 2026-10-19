@@ -2,7 +2,7 @@
 // nobody respawns, so XP is the worth of the mobs lying dead (main.ts derives it every frame) and the
 // curve is tuned to it. Full clear before the boss: 1145 XP, level 11; the quest route with the apiary
 // ~870 (scripts/balance.ts), level 9: the boss is tuned for 8-9. Level 2 (the Zitelle) brings the route to ~1730
-// by the Governatrice, level 13, and Fra' Zuane's rewards (quest/progress.ts REWARD) add 450.
+// by the Governatrice, level 13, and the quests' rewards (quest/progress.ts QUESTS) add up to 970.
 // Each level offers two cards. Even levels up to 10 offer two new abilities (the specials from level 6; the second
 // card leans to a school already owned, so fire, frost or lightning can make a build);
 // the others a modifier of an owned ability (or a fusion) against a stat passive. The run starts with

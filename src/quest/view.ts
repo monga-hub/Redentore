@@ -6,9 +6,9 @@ import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Dialogue } from '../ui/dialogue.ts';
 import { ICONS } from '../ui/icons.ts';
-import { OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, titleOf } from './dialogue.ts';
+import { BORTOLO_OBJECTIVE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, titleOf } from './dialogue.ts';
 import { Npc } from './npc.ts';
-import { BLESSING, CHEST, NPC, REWARD, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
+import { BLESSING, CHEST, NPC, QUESTS, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -22,6 +22,7 @@ const OPEN_TIME = 1.6; // s for a gate to open
 const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls
 const GOLD = 0xffd36a;
 const LOOT = 2.2; // s of the chest's opening: lid, burst, the key rising and fading
+const BANNER = 4; // s a "Missione completata" banner stays up; quests done together queue
 
 const goldSpark: Style = { life: [0.6, 1.2], size: [0.05, 0.09], color: 0xfff0b0, color2: 0xff9a20, hdr: 4, tex: T.spark, stretch: 0.04, drag: 1.5, grav: 2 };
 const goldMote: Style = { life: [1.2, 2], size: [0.08, 0.16], color: GOLD, color2: 0xff7a10, hdr: 3, tex: T.ember, drag: 0.6, grav: -0.8 };
@@ -49,6 +50,13 @@ body.touch #quest-prompt kbd { display: none; }
   font: 700 38px/1.2 Georgia, serif; color: #ffe39a; text-shadow: 0 0 18px #a06a10, 0 2px 4px #000; }
 #victory small { display: block; margin-top: 10px; font-size: 18px; color: #f3e6c4; }
 #victory.show { display: block; animation: victory 8s ease forwards; }
+#quest-done { position: fixed; left: 0; right: 0; top: 18%; text-align: center; pointer-events: none; display: none; z-index: 5;
+  font: 700 30px/1.2 Georgia, serif; color: #ffd200; text-shadow: 0 0 14px #a06a10, 0 2px 4px #000; }
+#quest-done small { display: block; margin-top: 6px; font-size: 19px; color: #f3e6c4; }
+#quest-done i { display: block; margin-top: 8px; font: 600 16px/1.3 Georgia, serif; color: #d6b8ff; }
+#quest-done i b { color: #ffd36a; }
+#quest-done.show { display: block; animation: victory ${BANNER}s ease forwards; }
+body.touch #quest-done { font-size: 24px; }
 #quests { position: absolute; top: calc(100% + 34px); right: -6px; width: 230px; text-align: right; pointer-events: none;
   font: 13px/1.35 Georgia, serif; color: #f3e6c4; text-shadow: 0 1px 2px #000, 0 0 6px #000; }
 #quests b { display: block; font-size: 14px; color: #ffd200; }
@@ -96,6 +104,10 @@ export class QuestView {
   private bossFill: HTMLElement;
   private bossText: HTMLElement;
   private victoryEl = document.createElement('div');
+  private doneEl = document.createElement('div');
+  private paidOut = 0; // quests in quest.done whose banner and gold have been given
+  private bannerT = 0;
+  private side = ''; // the side quests on the tracker: 'b' Fra' Bortolo's errand, 'r' the corona to give back
   private bossName?: object; // the kind the boss bar is named for
   /** The boss bar is up: the target frame and the boss's own nameplate bar give way to it. */
   bossShown = false;
@@ -106,7 +118,6 @@ export class QuestView {
   /** Fra' Zuane takes his corona back: main.ts swaps it in the bag for his medal and returns the medal's name. */
   relicBack?: () => string;
   private returning = false; // his window is the corona's
-  private side = false; // the corona's line is on the tracker
   private shown = '';
   private tapped = false;
 
@@ -151,33 +162,39 @@ export class QuestView {
     this.victoryEl.innerHTML = 'Il Reverendissimo è caduto<small>Le porte della chiesa si aprono sulla fondamenta</small>';
     this.trackEl.id = 'quests';
     this.buffEl.id = 'buffs';
-    document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.buffEl);
+    this.doneEl.id = 'quest-done';
+    document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl, this.buffEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
       if (this.returning) this.thanked(); // his corona back
-      else if (this.npc.talking) this.paid(); // a report heard, even if the next quest is turned down
+      else if (this.npc.talking) this.quest.report() || this.quest.report2(); // a report heard, even if the next quest is turned down
       this.returning = false;
       this.npc.talking = false;
+      if (this.speziale.talking) this.quest.meet(); // found, as Fra' Zuane asked
       if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
     };
   }
 
-  /** Fra' Zuane hears a quest done: its reward, once (the XP is derived from the flags, main.ts). */
-  private paid(): void {
-    const r = this.quest.report() ? REWARD.report : this.quest.report2() ? REWARD.return : undefined;
-    if (!r) return;
+  /** The next quest done and not yet paid: its gold into the bag and WoW's "Missione completata" (its XP is main.ts's, from quest.done). */
+  private payout(dt: number): void {
+    if ((this.bannerT -= dt) > 0 || this.paidOut >= this.quest.done.length) return;
+    const r = QUESTS[this.quest.done[this.paidOut++]];
     this.reward?.(r.gold);
-    this.news.push(`Ricompensa: ${r.xp} esperienza, ${r.gold} oro`);
+    this.doneEl.innerHTML = `Missione completata<small>${r.title}</small><i>+${r.xp} esperienza · <b>+${r.gold} oro</b></i>`;
+    this.doneEl.classList.remove('show');
+    void this.doneEl.offsetWidth; // replay the fade
+    this.doneEl.classList.add('show');
+    playSfx('quest', null, { rate: 0.84, gain: 1.3 });
+    this.vfx.burst(goldMote, this.hero.x, this.hero.y + 0.6, this.hero.z, 24, 0.5, 1, 1.5);
+    this.bannerT = BANNER;
   }
 
-  /** Fra' Zuane has his corona back: the medal, the gold and the XP (derived from the flags, main.ts), once. */
+  /** Fra' Zuane has his corona back: his medal, once (its XP and gold are payout's). */
   private thanked(): void {
     if (!this.quest.returnRelic()) return;
-    const r = REWARD.relic, medal = this.relicBack?.();
-    this.reward?.(r.gold);
-    playSfx('quest', null, { rate: 0.84, gain: 1.3 });
-    this.news.push(`Missione compiuta: ${RELIC_TITLE}`, `Ricompensa: ${r.xp} esperienza, ${r.gold} oro${medal ? `, ${medal}` : ''}`);
+    const medal = this.relicBack?.();
+    if (medal) this.news.push(`Ricompensa: ${medal}`);
   }
 
   /** Fra' Bortolo's blessing lands on the hero: a rush of rue and gold round them, a chime, a notice. */
@@ -225,11 +242,12 @@ export class QuestView {
     return !q.blessed || (q.accepted2 && !q.blessed2 && !q.boss2Dead);
   }
 
-  /** The tracker's lines; `fresh` flashes the objective as new. */
+  /** The tracker's lines: the quest's, then Fra' Bortolo's errand while it is open; `fresh` flashes the objective as new. */
   private track(stage: Stage, fresh: boolean): void {
     this.trackEl.classList.toggle('done', stage === 'done');
-    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>`
-      + (this.side ? `<b>${RELIC_TITLE}</b><span>${RELIC_OBJECTIVE}</span>` : '');
+    const sides = (this.side.includes('b') ? `<b>${QUESTS.bortolo.title}</b><span class="${fresh ? 'new' : ''}">${BORTOLO_OBJECTIVE}</span>` : '')
+      + (this.side.includes('r') ? `<b>${RELIC_TITLE}</b><span>${RELIC_OBJECTIVE}</span>` : '');
+    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>${sides}`;
   }
 
   private gate(g: Gate, iron: THREE.Material): GateView {
@@ -307,7 +325,7 @@ export class QuestView {
       if (pr.talk === 'zuane') {
         this.npc.talking = true;
         const stage = this.quest.stage, relic = this.returning = this.quest.relic && !this.quest.relicBack; // the corona first: the quest's talk waits for the next one
-        const accept = relic ? undefined : stage === 'talk' ? () => { this.quest.accepted = true; } : stage === 'report' || stage === 'offer' ? () => { this.paid(); this.quest.accept2(); } : undefined;
+        const accept = relic ? undefined : stage === 'talk' ? () => { this.quest.accepted = true; } : stage === 'report' || stage === 'offer' ? () => { this.quest.report(); this.quest.accept2(); } : undefined;
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, relic ? RELIC_TALK : TALK[stage], accept);
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
@@ -319,22 +337,21 @@ export class QuestView {
     }
     this.tapped = false;
     this.quest.update(player);
-    const stage = this.quest.stage;
+    const q = this.quest, stage = q.stage, side = (q.accepted && !q.found ? 'b' : '') + (q.relic && !q.relicBack ? 'r' : '');
     if (stage !== this.stage) {
-      const was = this.stage, done = was === 'report' || was === 'return';
-      if (was === 'report') notices.push(`Missione compiuta: ${QUEST_TITLE}`);
-      if (was === 'return') notices.push(`Missione compiuta: ${QUEST2_TITLE}`);
+      const was = this.stage, done = was === 'report' || was === 'return'; // complete: its banner and chime are payout's
       if (was === 'talk') notices.push(`Missione accettata: ${QUEST_TITLE}`);
       else if (stage === 'route') notices.push(`Missione accettata: ${QUEST2_TITLE}`);
       else if (was && !done) notices.push(OBJECTIVE[stage]);
-      if (was) playSfx('quest', null, done ? { rate: 0.84, gain: 1.3 } : {}); // complete: lower and fuller
-      this.side = this.quest.relic && !this.quest.relicBack;
+      if (was && !done) playSfx('quest');
+      this.side = side;
       this.track(stage, !!this.stage);
       this.stage = stage;
-    } else if (this.side !== (this.quest.relic && !this.quest.relicBack)) { // the corona found or given back
-      this.side = !this.side;
+    } else if (side !== this.side) {
+      this.side = side;
       this.track(stage, false);
     }
+    this.payout(dt);
     this.npc.update(dt, player, this.offering());
     this.speziale.update(dt, player, this.blessing());
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt);
@@ -420,6 +437,7 @@ export class QuestView {
 
   /** A loaded game: gates already open and the chest already emptied, without playing the openings. */
   settle(): void {
+    this.paidOut = this.quest.done.length; // paid when they were done
     for (const v of this.gates) if (v.gate.open) { v.p = 1; this.pose(v); for (const m of v.solid) { const i = this.blockers.indexOf(m); if (i >= 0) this.blockers.splice(i, 1); } }
     if (this.quest.chestOpen) { this.lidP = LOOT; this.opening(LOOT); }
   }

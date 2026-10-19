@@ -7,7 +7,7 @@
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
 import { CARD, levelOf } from '../player/levels.ts';
-import type { Quest } from '../quest/progress.ts';
+import { QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 
@@ -29,7 +29,9 @@ export interface GameState {
   // Level 2 (all absent in older saves: false): reported (first quest handed in), accepted2 (La dote delle Zitelle taken),
   // arrived (reached the Zitelle), key2 (the Maestra's key), boss2Dead, reported2, blessed2 (Fra' Bortolo's second infusion);
   // relic, relicBack: Fra' Zuane's corona picked up and given back (absent: false).
-  quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number }
+  // found: Fra' Bortolo found as Fra' Zuane asked; done: the quests done (quest/progress.ts QUESTS), whose XP is in build.xp.
+  // Both absent in saves from before the quest rewards: found if he blessed the hero, done rebuilt from the flags.
+  quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number; found?: boolean; done?: string[] }
     & Partial<Record<typeof LEVEL2[number], boolean>>;
   dead: number[]; // indices into Game.mobs
   time: number; // s played
@@ -63,7 +65,7 @@ export function serialize(g: Game): GameState {
     v: VERSION,
     player: { x, y, z, yaw: g.player.facing, hp: g.stats.hp, mana: g.stats.mana, charge: g.kit.charge },
     quest: { key: g.quest.key, gates: g.quest.gates.filter((q) => q.open).map((q) => q.id), bossDead: g.quest.bossDead, accepted: g.quest.accepted, out: g.quest.out, blessed: g.quest.blessed, blessLeft: g.quest.blessLeft,
-      ...Object.fromEntries(LEVEL2.map((k) => [k, g.quest[k]])) },
+      found: g.quest.found, done: [...g.quest.done], ...Object.fromEntries(LEVEL2.map((k) => [k, g.quest[k]])) },
     dead: g.mobs.flatMap((m, i) => (m.state === 'dead' ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
@@ -94,12 +96,24 @@ export function deserialize(g: Game, s: GameState): void {
   if (s.quest.bossDead) g.quest.win();
   for (const k of LEVEL2) g.quest[k] = s.quest[k] ?? false;
   if (s.quest.boss2Dead) { g.quest.boss2Dead = false; g.quest.win2(); }
+  g.quest.found = s.quest.found ?? g.quest.blessed;
+  g.quest.done = s.quest.done ? s.quest.done.filter((id): id is QuestId => id in QUESTS) // one from another build is dropped
+    : ([['chiave', g.quest.key], ['bortolo', g.quest.found], ['reverendissimo', g.quest.reported], ['zitelle', g.quest.reported2], ['relic', g.quest.relicBack]] as const).flatMap(([id, d]) => (d ? [id] : []));
   const dead = s.dead.map((i) => g.mobs[i]).filter((m) => m);
   killAll(dead);
   for (const m of dead) m.t = GONE;
   g.time = s.time;
   if (s.fog) g.fog.decode(s.fog); // a grid from another build's level is dropped: fogged, not garbled
   if (s.bag) g.bag.decode(s.bag);
+}
+
+/**
+ * The quest XP counted into a save's build.xp, which the game takes off to find the worth of its dead. A save from
+ * before the quest rewards counted only Fra' Zuane's two reports and his corona, at their old 150, 300 and 160: its other quests are paid on load.
+ */
+export function questXpIn(s: GameState): number {
+  if (s.quest.done) return s.quest.done.reduce((n, id) => n + (id in QUESTS ? QUESTS[id as QuestId].xp : 0), 0);
+  return (s.quest.reported ? 150 : 0) + (s.quest.reported2 ? 300 : 0) + (s.quest.relicBack ? 160 : 0);
 }
 
 /** Shape check for anything read back from storage: a hand-edited or older save is refused, not half-applied. */
@@ -110,6 +124,7 @@ export function valid(s: unknown): s is GameState {
     && !!o.quest && typeof o.quest.key === 'boolean' && typeof o.quest.bossDead === 'boolean' && Array.isArray(o.quest.gates)
     && ['accepted', 'out', 'blessed', ...LEVEL2].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out' | 'blessed'] as boolean | undefined))
     && (o.quest.blessLeft === undefined || num(o.quest.blessLeft))
+    && [undefined, true, false].includes(o.quest.found) && (o.quest.done === undefined || (Array.isArray(o.quest.done) && o.quest.done.every((x) => typeof x === 'string')))
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))

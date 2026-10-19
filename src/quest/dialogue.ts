@@ -32,6 +32,9 @@ export const OBJECTIVE: Record<Stage, string> = {
   done: 'La dote è resa',
 };
 
+/** The tracker's line for Fra' Bortolo's errand, from Fra' Zuane's first quest until he is found. */
+export const BORTOLO_OBJECTIVE = "Trova Fra' Bortolo nella serra dell'orto";
+
 export interface Talk {
   pages: string[];
   /** The last page offers the quest: Accetta / Rifiuta instead of a goodbye. */
@@ -48,6 +51,7 @@ export const TALK: Record<Stage, Talk> = {
       'Sono Fra\' Zuane, il portinaio. Le chiavi di questa casa erano mie. La notte del Redentore, quando i morti si alzarono, chiusi le grate del chiostro grande sui preti del Reverendissimo.',
       'Corsi al pontile per portare la chiave al Patriarca, ma la laguna non mi volle. Feci in tempo a nasconderla nel baule delle reliquie, sigillato col mio nome. Poi le sue catene mi trascinarono qui, su una soglia che non posso varcare.',
       'Il portone è sbarrato da dentro. Passa dalla calle e dal convento, attraversa l\'orto fino al pontile sulla laguna. Prendi la chiave, apri la grata del chiostro grande, entra in chiesa dal coro.',
+      'Nell\'orto c\'è la serra di Fra\' Bortolo, lo speziale. Se la sua ruta resiste ancora, resiste anche lui. Cercalo: sa del voto cose che io ho dimenticato, e un vivo... un quasi vivo ha bisogno delle sue erbe.',
       'E sotto la cupola, spezza il voto. Ti do il mio nome: il sigillo ti riconoscerà. Fallo, Risorto, e forse anche questo vecchio portinaio potrà andarsene.',
     ],
     offer: true,

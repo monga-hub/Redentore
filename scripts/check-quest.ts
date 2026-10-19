@@ -4,8 +4,8 @@
 // and the tracker's objective following each step. Fra' Bortolo in the serra: reachable in peace, blesses once.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { BLESSING, CHEST, NPC, Quest, RELIC_DROP, REWARD, SPEZIALE, type Stage } from '../src/quest/progress.ts';
-import { OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
+import { BLESSING, CHEST, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
+import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
 
 let failed = 0;
@@ -28,8 +28,9 @@ for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'report', 'offer', 'ro
 }
 if (!TALK.talk.offer || !TALK.report.offer || !TALK.offer.offer || Object.entries(TALK).some(([s, t]) => !['talk', 'report', 'offer'].includes(s) && t.offer)) fail('only the first conversation, the report and the re-offer offer a quest');
 
-// Start: talk to him; the chest is sealed.
+// Start: talk to him; the chest is sealed, and Fra' Bortolo cannot be found for a quest not yet given.
 want('talk');
+if (quest.meet() || quest.found) fail("Fra' Bortolo found before Fra' Zuane asked");
 const talk = quest.prompt(facing);
 if (!talk?.talk || !talk.act) fail("no 'talk' prompt next to Fra' Zuane");
 const sealed = quest.prompt(feet(CHEST.x, CHEST.z + 1.2));
@@ -42,6 +43,9 @@ const open = quest.prompt(feet(CHEST.x, CHEST.z + 1.2));
 if (!open?.act) fail('the chest does not open once the quest is accepted');
 open?.act?.();
 if (!quest.key) fail('opening the chest gave no key');
+if (quest.bonusXp !== questXp('chiave') || quest.done.join() !== 'chiave') fail('the key out of the chest is not a quest done');
+// Fra' Bortolo, sought since Fra' Zuane's first quest: found once, paid once.
+if (!BORTOLO_OBJECTIVE || !quest.meet() || quest.meet() || quest.bonusXp !== questXp('chiave') + questXp('bortolo')) fail("finding Fra' Bortolo does not pay its reward exactly once");
 want('grate');
 const grate = quest.gates.find((g) => g.id === 'grata-nord')!, c = quest.centre(grate);
 const at = quest.prompt(feet(c.x, c.z + 1.2));
@@ -59,7 +63,7 @@ if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once the Re
 
 // Level 2: the report pays once; declining leaves the offer open; accepting drops the chains.
 const xp0 = quest.bonusXp;
-if (xp0 !== 0 || !quest.report() || quest.report() || quest.bonusXp !== REWARD.report.xp) fail('the report to Fra\' Zuane does not pay its reward exactly once');
+if (!quest.report() || quest.report() || quest.bonusXp !== xp0 + questXp('reverendissimo')) fail('the report to Fra\' Zuane does not pay its reward exactly once');
 want('offer');
 const chains = quest.gate('catene');
 if (chains.open || quest.prompt(feet(55, 15))?.act) fail('the chains on the Ponte de la Croce open before the second quest');
@@ -82,8 +86,13 @@ if (quest.gate('portone-zitelle').open) fail("the Zitelle's portone opened befor
 quest.win2();
 if (!quest.gate('portone-zitelle').open) fail("the Governatrice's death did not open the Zitelle's portone");
 want('return');
-if (!quest.report2() || quest.report2() || quest.bonusXp !== REWARD.report.xp + REWARD.return.xp) fail('the second report does not pay its reward exactly once');
+if (!quest.report2() || quest.report2() || quest.bonusXp !== xp0 + questXp('reverendissimo') + questXp('zitelle')) fail('the second report does not pay its reward exactly once');
 want('done');
+if (quest.done.join() !== 'chiave,bortolo,reverendissimo,zitelle') fail(`quests done ${quest.done}`);
+// Every quest is worth most of a level where it lands, and a boss handed in more than one (player/levels.ts need: 20 × level).
+for (const [id, lv] of [['chiave', 5], ['bortolo', 5], ['teste', 7], ['relic', 8], ['reverendissimo', 10], ['zitelle', 14]] as const) {
+  if (QUESTS[id].xp < 0.6 * 20 * lv || QUESTS[id].gold <= 0) fail(`${id} pays ${QUESTS[id].xp} XP, under most of level ${lv}`);
+}
 if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once it is over");
 
 // Fra' Bortolo in the serra: out of every friar's pull, talks at any time, blesses once.
@@ -115,7 +124,7 @@ if (runs < 850 || runs > 970) fail(`the corona falls by the 20th kill in ${runs 
 keyed.relic = true;
 if (keyed.rollRelic(never)) fail('the corona dropped twice');
 const xp1 = keyed.bonusXp;
-if (!keyed.returnRelic() || keyed.returnRelic() || keyed.bonusXp !== xp1 + REWARD.relic.xp) fail('giving the corona back does not pay exactly once');
+if (!keyed.returnRelic() || keyed.returnRelic() || keyed.bonusXp !== xp1 + questXp('relic')) fail('giving the corona back does not pay exactly once');
 for (const p of RELIC_TALK.pages) if (p.length > 260) fail(`a page of the corona is ${p.length} characters, too long for the window on a phone`);
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `

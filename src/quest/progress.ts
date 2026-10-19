@@ -81,8 +81,23 @@ const ZITELLE = 196;
 export const CROCE = { x: 78, z: 15, yaw: -Math.PI / 2 } as const;
 export const ANDITO = { x: 240, z: -35, yaw: Math.PI } as const; // facing the back door
 
-/** What each report to Fra' Zuane is worth: experience on top of the dead's, gold into the bag. */
-export const REWARD = { report: { xp: 150, gold: 80 }, return: { xp: 300, gold: 200 }, relic: { xp: 160, gold: 120 } } as const;
+/**
+ * What every quest is worth when done: experience on top of the dead's, gold into the bag, and the name on the
+ * "Missione completata" banner (quest/view.ts). The XP is sized to the level the hero usually has when it lands
+ * (player/levels.ts need: 20 × level), most of a level for an errand, a whole one or more for a boss handed in,
+ * so every quest levels the hero up. Saved by id (core/save.ts): append, never rename.
+ */
+export const QUESTS = {
+  chiave: { title: 'Il baule del pontile', xp: 80, gold: 30 }, // the key out of the chest, ~level 5
+  bortolo: { title: 'Lo speziale della serra', xp: 70, gold: 30 }, // Fra' Bortolo found, ~level 5
+  reverendissimo: { title: 'La chiave del portinaio', xp: 200, gold: 80 }, // handed in to Fra' Zuane, ~level 10
+  zitelle: { title: 'La dote delle Zitelle', xp: 300, gold: 200 }, // handed in to Fra' Zuane, ~level 14
+  teste: { title: 'Le teste dei frati', xp: 140, gold: 60 }, // Fra' Bortolo's side quest, in the orto, ~level 7
+  relic: { title: 'La corona del portinaio', xp: 160, gold: 120 }, // Fra' Zuane's corona given back, a random drop, ~level 6-10
+} as const;
+export type QuestId = keyof typeof QUESTS;
+/** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
+export const questXp = (id: QuestId) => QUESTS[id].xp;
 
 /**
  * Fra' Zuane's corona, off any of the dead: each kill's chance starts at `base` and rises by `ramp` (about one run in
@@ -114,6 +129,9 @@ export class Quest {
   relic = false; // Fra' Zuane's corona picked up (main.ts), once a run
   relicBack = false; // and given back to him
   private relicKills = 0; // kills rolled for it so far (not saved: a load starts the ramp over)
+  found = false; // Fra' Bortolo found in the serra, as Fra' Zuane asked
+  /** The quests done, in order: their rewards (bonusXp, and the banner and gold quest/view.ts hands out once each). */
+  done: QuestId[] = [];
   readonly gates: Gate[];
   private world: World;
 
@@ -157,14 +175,30 @@ export class Quest {
     return false;
   }
 
+  /** A quest is done: its reward is the hero's, once (false if it already was). */
+  complete(id: QuestId): boolean {
+    if (this.done.includes(id)) return false;
+    this.done.push(id);
+    return true;
+  }
+
   /** Fra' Zuane hears the first quest done (once): its reward is laid on. */
   report(): boolean {
     if (!this.out || this.reported) return false;
-    return (this.reported = true);
+    this.reported = true;
+    return this.complete('reverendissimo');
+  }
+
+  /** Fra' Bortolo is found, once Fra' Zuane has sent the hero looking. */
+  meet(): boolean {
+    if (!this.accepted || this.found) return false;
+    this.found = true;
+    return this.complete('bortolo');
   }
 
   /** La dote delle Zitelle taken: the chains on the Ponte de la Croce fall. */
   accept2(): void {
+    this.report();
     this.reported = this.accepted2 = true;
     for (const g of this.gates) if (g.needs === 'quest2') this.open(g);
   }
@@ -184,12 +218,13 @@ export class Quest {
   /** Fra' Zuane hears the second quest done (once). */
   report2(): boolean {
     if (this.stage !== 'return') return false;
-    return (this.reported2 = true);
+    this.reported2 = true;
+    return this.complete('zitelle');
   }
 
-  /** Experience the reports to Fra' Zuane have earned, on top of the dead's (main.ts adds it). */
+  /** Experience the quests done have earned, on top of the dead's (main.ts adds it). */
   get bonusXp(): number {
-    return (this.reported ? REWARD.report.xp : 0) + (this.reported2 ? REWARD.return.xp : 0) + (this.relicBack ? REWARD.relic.xp : 0);
+    return this.done.reduce((s, id) => s + questXp(id), 0);
   }
 
   /** A death that drops loot: does Fra' Zuane's corona fall with it? (RELIC_DROP; never once found.) */
@@ -201,7 +236,8 @@ export class Quest {
   /** The corona is in his hands again (once). */
   returnRelic(): boolean {
     if (!this.relic || this.relicBack) return false;
-    return (this.relicBack = true);
+    this.relicBack = true;
+    return this.complete('relic');
   }
 
   centre(g: Gate): { x: number; z: number } {
@@ -217,6 +253,7 @@ export class Quest {
 
   takeKey(): void {
     this.chestOpen = this.key = true;
+    this.complete('chiave');
   }
 
   /** The Reverendissimo is dead: the portone opens onto the fondamenta. */

@@ -4,7 +4,7 @@ import { playSfx } from '../audio/engine.ts';
 import type { World } from '../core/physics.ts';
 import { beamTexture, discTexture } from '../fx/diabloFx.ts';
 import type { Mob } from '../ui/target.ts';
-import { Bag, ITEM, RARITY, roll, type Icon, type Rarity, type Tier } from './bag.ts';
+import { Bag, ITEM, QUEST_COLOR, RARITY, roll, type Icon, type Rarity, type Tier } from './bag.ts';
 
 // Loot on the ground, in both camera styles: a dead enemy throws its gold and items out in a
 // small arc; gold glints, items (gear too) stand in a beam of their rarity's colour and every drop wears a
@@ -19,9 +19,13 @@ const REACH = 0.9, MAGNET = 2.4, PULL = 9; // m pickup radius, m gold reach, m/s
 const LABEL = 24; // m: plates further than this are hidden
 const BEAM_H: Record<Rarity, number> = { comune: 0, noncomune: 1.4, raro: 2.2, epico: 3, leggendario: 4.5 };
 const GOLD = 0xffcf4a;
+const QUEST_BEAM = 1.8; // m: a quest item's beam, whatever its rarity
 
-/** Watched enemies, what tier of loot they drop, from which level's tables, and when their deaths drop nothing (a victory takes them all). */
-export interface Dropper { all: readonly Mob[]; tier: Tier; level?: 1 | 2; quiet?: () => boolean }
+/**
+ * Watched enemies, what tier of loot they drop, from which level's tables, and when their deaths drop nothing (a victory takes them all).
+ * `quest`: asked at each death, a quest item to throw out too, if any.
+ */
+export interface Dropper { all: readonly Mob[]; tier: Tier; level?: 1 | 2; quiet?: () => boolean; quest?: () => string | undefined }
 
 interface Loose {
   gold: number; id: string; // gold > 0: a pile, else the item `id`
@@ -95,7 +99,9 @@ function star(): THREE.Texture {
 export class Drops {
   readonly root = new THREE.Group();
   private pool: Loose[] = [];
-  private tracks: { mob: Mob; tier: Tier; level: 1 | 2; quiet?: () => boolean; dead: boolean; t: number }[];
+  private tracks: { mob: Mob; tier: Tier; level: 1 | 2; quiet?: () => boolean; quest?: () => string | undefined; dead: boolean; t: number }[];
+  /** A quest item walked over: true when its quest takes it (main.ts) instead of the bag. */
+  collect?: (id: string) => boolean;
   private layer = document.createElement('div');
   private floats: Float[] = [];
   private time = 0;
@@ -103,6 +109,8 @@ export class Drops {
   private mats: Record<Icon, THREE.MeshStandardMaterial>;
   private beamMats: Record<Rarity, THREE.MeshBasicMaterial>;
   private discMats: Record<Rarity, THREE.MeshBasicMaterial>;
+  private questBeam: THREE.MeshBasicMaterial;
+  private questDisc: THREE.MeshBasicMaterial;
   private pile: THREE.BufferGeometry;
   private goldMat: THREE.Material;
   private p = new THREE.Vector3();
@@ -118,7 +126,7 @@ export class Drops {
     this.bag = bag;
     this.camera = camera;
     this.root.name = 'loot';
-    this.tracks = droppers.flatMap((d) => d.all.map((mob) => ({ mob, tier: d.tier, level: d.level ?? 1, quiet: d.quiet, dead: mob.state === 'dead', t: 0 }))); // the dead of a loaded game drop nothing
+    this.tracks = droppers.flatMap((d) => d.all.map((mob) => ({ mob, tier: d.tier, level: d.level ?? 1, quiet: d.quiet, quest: d.quest, dead: mob.state === 'dead', t: 0 }))); // the dead of a loaded game drop nothing
 
     this.geo = shapes();
     this.mats = Object.fromEntries(Object.entries(TINT).map(([k, c]) => [k, new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: METAL.has(k as Icon) ? 0.8 : 0.1, emissive: c, emissiveIntensity: 0.12 })])) as Record<Icon, THREE.MeshStandardMaterial>;
@@ -129,6 +137,8 @@ export class Drops {
     const glow = (map: THREE.Texture, c: string) => new THREE.MeshBasicMaterial({ map, color: c, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false });
     this.beamMats = Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, glow(beamTex, r.color)])) as Record<Rarity, THREE.MeshBasicMaterial>;
     this.discMats = Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, glow(discTex, r.color)])) as Record<Rarity, THREE.MeshBasicMaterial>;
+    this.questBeam = glow(beamTex, QUEST_COLOR);
+    this.questDisc = glow(discTex, QUEST_COLOR);
     const beamGeo = new THREE.CylinderGeometry(0.07, 0.12, 1, 10, 1, true).translate(0, 0.5, 0);
     const discGeo = new THREE.CircleGeometry(0.45, 20).rotateX(-Math.PI / 2);
     const starMat = new THREE.SpriteMaterial({ map: starTex, color: 0xfff0b0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false });
@@ -168,14 +178,14 @@ export class Drops {
     l.mesh.geometry = item ? this.geo[item.icon] : this.pile;
     l.mesh.material = item ? this.mats[item.icon] : this.goldMat;
     if (item) {
-      l.beam.material = this.beamMats[item.rarity];
-      l.disc.material = this.discMats[item.rarity];
-      l.beam.scale.set(1, BEAM_H[item.rarity] || 0.001, 1);
+      l.beam.material = item.quest ? this.questBeam : this.beamMats[item.rarity];
+      l.disc.material = item.quest ? this.questDisc : this.discMats[item.rarity];
+      l.beam.scale.set(1, beamH(item.id) || 0.001, 1);
     }
     l.mesh.rotation.set(0, Math.random() * Math.PI * 2, 0);
     l.plate.textContent = item ? item.name : `${gold} oro`;
     l.plate.className = item ? 'plate' : 'plate gold';
-    l.plate.style.color = item ? RARITY[item.rarity].color : '';
+    l.plate.style.color = item ? colorOf(item.id) : '';
   }
   /**
    * Per frame, after the enemies moved (and before a victory's: its dead drop nothing, the boss's own loot aside).
@@ -186,11 +196,10 @@ export class Drops {
     for (const k of this.tracks) {
       const dead = k.mob.state === 'dead';
       if (dead && !k.dead && !k.quiet?.()) {
-        const d = roll(k.tier, Math.random, k.level), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body
+        const d = roll((k.mob as { again?: boolean }).again ? 'worker' : k.tier, Math.random, k.level), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body; a risen friar: a worker's purse
         for (const g of d.gold) this.spawn(m.x, m.y, m.z, g, '', far);
         for (const id of d.items) this.spawn(m.x, m.y, m.z, 0, id, far);
-        const x = this.extra?.();
-        if (x) this.spawn(m.x, m.y, m.z, 0, x, far);
+        for (const x of [this.extra?.(), k.quest?.()]) if (x) this.spawn(m.x, m.y, m.z, 0, x, far);
       }
       k.dead = dead;
     }
@@ -206,7 +215,7 @@ export class Drops {
     const item = ITEM.get(l.id), on = l.t >= 0;
     l.mesh.visible = on;
     l.glint.visible = on && !item;
-    l.beam.visible = l.disc.visible = on && !!item && l.t > FLY && BEAM_H[item.rarity] > 0;
+    l.beam.visible = l.disc.visible = on && !!item && l.t > FLY && beamH(item.id) > 0;
     if (!on) return false;
     const k = Math.min(l.t / FLY, 1), m = l.mesh;
     m.position.lerpVectors(l.from, l.to, k);
@@ -225,10 +234,11 @@ export class Drops {
     l.glint.position.set(m.position.x, m.position.y + 0.12, m.position.z);
     l.glint.scale.setScalar(0.18 + Math.max(0, tw) * 0.32);
     if (k < 1 || !level || flat > REACH) { l.full = false; return false; }
-    if (item && !this.bag.add(l.id)) { const first = !l.full; l.full = true; return first; }
+    if (item?.quest && this.collect?.(l.id)) { /* counted by its quest */ }
+    else if (item && !this.bag.add(l.id)) { const first = !l.full; l.full = true; return first; }
     if (!item) this.bag.gold += l.gold;
     playSfx('loot', null, { ui: true, rate: item ? 1.1 : 1.7, gain: item ? 0.6 : 0.4 });
-    this.gain(item ? `+ ${item.name}` : '', l.gold, item ? RARITY[item.rarity].color : '');
+    this.gain(item ? `+ ${item.name}` : '', l.gold, item ? colorOf(item.id) : '');
     this.free(l);
     return false;
   }
@@ -273,3 +283,7 @@ export class Drops {
     return this.pool.filter((l) => l.live).map((l) => ({ x: l.to.x, y: l.to.y, z: l.to.z, gold: l.gold, id: l.id }));
   }
 }
+
+/** A drop's colour and beam: its rarity's, or the quest items' own. */
+const colorOf = (id: string) => { const it = ITEM.get(id)!; return it.quest ? QUEST_COLOR : RARITY[it.rarity].color; };
+const beamH = (id: string) => { const it = ITEM.get(id)!; return it.quest ? QUEST_BEAM : BEAM_H[it.rarity]; };

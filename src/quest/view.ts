@@ -6,9 +6,10 @@ import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Dialogue } from '../ui/dialogue.ts';
 import { ICONS } from '../ui/icons.ts';
-import { BORTOLO_OBJECTIVE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, titleOf } from './dialogue.ts';
+import { BORTOLO_OBJECTIVE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
 import { Npc } from './npc.ts';
-import { BLESSING, CHEST, NPC, QUESTS, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
+import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
+import { QUEST_COLOR } from '../loot/bag.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -30,6 +31,7 @@ const goldFlare: Style = { life: 0.5, size: 2.4, grow: 0.6, color: 0xfff4c8, col
 const rueLeaf: Style = { life: [1, 1.6], size: [0.08, 0.14], color: 0xb8ff9a, color2: 0x2a8a3a, hdr: 3, tex: T.ember, drag: 0.8, grav: -1.2 };
 const rueFlare: Style = { life: 0.6, size: 2.2, grow: 0.8, color: 0xeaffd8, color2: 0x7adf6a, hdr: 3, tex: T.star, fadeIn: 0.05 };
 const RUE = 0x8aff9a; // Fra' Bortolo's glow
+const riteSmoke: Style = { life: [1.4, 2.2], size: [0.4, 0.8], grow: 1.6, color: 0x9aff8a, color2: 0x0a2a10, hdr: 1.5, drag: 1.2, grav: -0.6 };
 const goldGlow: Style = { life: [0.6, 0.9], size: [0.5, 0.8], grow: 1.8, color: GOLD, color2: 0x803000, hdr: 2, drag: 2, grav: -1.5 };
 
 const CSS = `
@@ -64,6 +66,8 @@ body.touch #quest-done { font-size: 24px; }
 #quests span.new { animation: quest-new 1.6s ease-out; }
 @keyframes quest-new { 0% { color: #fff; text-shadow: 0 0 10px #ffd200; } }
 #quests.done span { color: #7dff64; }
+#quests span.heads { color: ${QUEST_COLOR}; }
+#quests span.heads.ready { color: #7dff64; }
 body.touch #quests { top: 0; right: calc(100% + 16px); width: 190px; font-size: 12px; }
 body.diablo #quests b { color: #e9d6b0; }
 
@@ -107,7 +111,7 @@ export class QuestView {
   private doneEl = document.createElement('div');
   private paidOut = 0; // quests in quest.done whose banner and gold have been given
   private bannerT = 0;
-  private side = ''; // the side quests on the tracker: 'b' Fra' Bortolo's errand, 'r' the corona to give back
+  private side = ''; // the side quests on the tracker: 'b' Fra' Bortolo's errand, 'r' the corona to give back, then the heads (`heads`)
   private bossName?: object; // the kind the boss bar is named for
   /** The boss bar is up: the target frame and the boss's own nameplate bar give way to it. */
   bossShown = false;
@@ -118,6 +122,10 @@ export class QuestView {
   /** Fra' Zuane takes his corona back: main.ts swaps it in the bag for his medal and returns the medal's name. */
   relicBack?: () => string;
   private returning = false; // his window is the corona's
+  /** Friars still standing (main.ts): Le teste dei frati wants no more heads than are left to take. */
+  friars: () => number = () => HEADS.need;
+  /** The rite's boon is picked: main.ts lays it on the kit. */
+  boonTaken?: () => void;
   private shown = '';
   private tapped = false;
 
@@ -236,17 +244,63 @@ export class QuestView {
     return ['talk', 'report', 'offer', 'return'].includes(this.quest.stage) || this.quest.relic && !this.quest.relicBack;
   }
 
-  /** Fra' Bortolo has an infusion to give: the first, or on the road to the Zitelle the second. */
+  /** Fra' Bortolo has an infusion to give (the first, or on the road to the Zitelle the second), the heads to ask for or the rite to perform. */
   private blessing(): boolean {
     const q = this.quest;
-    return !q.blessed || (q.accepted2 && !q.blessed2 && !q.boss2Dead);
+    return !q.blessed || (q.accepted2 && !q.blessed2 && !q.boss2Dead) || this.asking() || q.headsReady(this.friars());
+  }
+
+  /** He has Le teste dei frati to give: not yet taken and friars still about. */
+  private asking(): boolean {
+    const q = this.quest;
+    return !q.asked && !q.bossDead && this.friars() > 0;
+  }
+
+  /** What Fra' Bortolo says now, and what an Accetta (or a boon picked) does. */
+  private spezialeTalk(): [Talk, ((choice?: string) => void)?] {
+    const q = this.quest, alive = this.friars();
+    if (q.headsReady(alive)) return [SPEZIALE_RITE, (id) => { if (id && q.rite(id)) this.rite(id); }];
+    if (q.asked && !q.boon && !q.bossDead) return [spezialeWait(q.heads, q.headsNeed(alive))];
+    const t = q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
+    if (!this.asking()) return [t];
+    const ask = () => { q.asked = true; this.news.push(`Missione accettata: ${QUESTS.teste.title}`); };
+    return [q.blessed ? SPEZIALE_HEADS : { ...SPEZIALE_HEADS, pages: [...SPEZIALE_TALK.pages, ...SPEZIALE_HEADS.pages] }, ask]; // the first time, after the lore
+  }
+
+  /** The rite of the rue: the heads go into the earth, a green pall and a gold rush rise round the hero, the boon is theirs (the XP and gold are payout's). */
+  private rite(id: string): void {
+    const at = this.hero, b = BOONS.find((x) => x.id === id)!;
+    playSfx('ward');
+    this.vfx.spawn(rueFlare, SPEZIALE.x, 1.2, SPEZIALE.z);
+    this.vfx.burst(riteSmoke, SPEZIALE.x, 0.3, SPEZIALE.z, 24, 0.8, 0.6, 1);
+    this.vfx.burst(rueLeaf, at.x, at.y + 0.3, at.z, 80, 0.8, 2, 3);
+    this.vfx.burst(goldMote, at.x, at.y + 0.6, at.z, 40, 0.6, 1.4, 2);
+    this.vfx.pulse(at.x, at.y + 1, at.z, RUE, 50);
+    this.vfx.shake(0.2);
+    this.boonTaken?.();
+    this.news.push(`Rito della ruta: ${b.text}, per sempre`);
+  }
+
+  /** A head picked up off a friar (main.ts, from the drops). */
+  head(): void {
+    const q = this.quest;
+    q.heads++;
+    if (q.headsReady(this.friars())) this.news.push("Hai le teste: torna da Fra' Bortolo, nella serra");
+  }
+
+  /** The tracker's Le teste dei frati key while it is on: the count, or ready to hand in. */
+  private heads(): string {
+    const q = this.quest, alive = this.friars();
+    return !q.asked || q.boon ? '' : q.headsReady(alive) ? 'T' : `t${q.heads}/${q.headsNeed(alive)}`;
   }
 
   /** The tracker's lines: the quest's, then Fra' Bortolo's errand while it is open; `fresh` flashes the objective as new. */
   private track(stage: Stage, fresh: boolean): void {
     this.trackEl.classList.toggle('done', stage === 'done');
     const sides = (this.side.includes('b') ? `<b>${QUESTS.bortolo.title}</b><span class="${fresh ? 'new' : ''}">${BORTOLO_OBJECTIVE}</span>` : '')
-      + (this.side.includes('r') ? `<b>${RELIC_TITLE}</b><span>${RELIC_OBJECTIVE}</span>` : '');
+      + (this.side.includes('r') ? `<b>${RELIC_TITLE}</b><span>${RELIC_OBJECTIVE}</span>` : '')
+      + (this.side.includes('T') ? `<b>${QUESTS.teste.title}</b><span class="heads ready">Torna da Fra' Bortolo, nella serra</span>`
+        : this.side.includes('t') ? `<b>${QUESTS.teste.title}</b><span class="heads">Teste di frate ${this.side.slice(this.side.indexOf('t') + 1)}</span>` : '');
     this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>${sides}`;
   }
 
@@ -329,15 +383,14 @@ export class QuestView {
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, relic ? RELIC_TALK : TALK[stage], accept);
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
-        const q = this.quest;
-        const t = q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
-        this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t, undefined, () => this.shop?.());
+        const [t, accept] = this.spezialeTalk();
+        this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t, accept, () => this.shop?.());
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }
     this.tapped = false;
     this.quest.update(player);
-    const q = this.quest, stage = q.stage, side = (q.accepted && !q.found ? 'b' : '') + (q.relic && !q.relicBack ? 'r' : '');
+    const q = this.quest, stage = q.stage, side = (q.accepted && !q.found ? 'b' : '') + (q.relic && !q.relicBack ? 'r' : '') + this.heads();
     if (stage !== this.stage) {
       const was = this.stage, done = was === 'report' || was === 'return'; // complete: its banner and chime are payout's
       if (was === 'talk') notices.push(`Missione accettata: ${QUEST_TITLE}`);

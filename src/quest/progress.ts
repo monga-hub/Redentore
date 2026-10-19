@@ -13,6 +13,7 @@
 // church's back door from the court and kills the Governatrice under the dome; her portone opens on the
 // sagrato, and Fra' Zuane hears it done.
 import type { Box, World } from '../core/physics.ts';
+import type { Tune } from '../player/levels.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 import { ZF } from '../level/zones/zitelle.ts';
 
@@ -87,6 +88,19 @@ export const ANDITO = { x: 240, z: -35, yaw: Math.PI } as const; // facing the b
  * (player/levels.ts need: 20 × level), most of a level for an errand, a whole one or more for a boss handed in,
  * so every quest levels the hero up. Saved by id (core/save.ts): append, never rename.
  */
+/**
+ * Fra' Bortolo's side quest, Le teste dei frati (QUESTS.teste): once he has asked, every friar's death may throw out a
+ * head (`rate`), and always does when the friars left could no longer make up the `need`. Brought back to the serra,
+ * the rue rite buys one lasting boon, picked from BOONS.
+ */
+export const HEADS = { need: 12, rate: 0.5, item: 'testa-frate' } as const;
+/** The rite's boons: laid on the kit after the level-up cards (main.ts levels.apply), for good. */
+export const BOONS = [
+  { id: 'fiala', label: 'Fiala +30%', text: 'la Fiala di linfa tombale ripristina il 30% in più', apply: (t: Tune) => { t.potion *= 1.3; } },
+  { id: 'vigore', label: 'Salute +8%', text: "l'8% di salute massima in più", apply: (t: Tune) => { t.hp *= 1.08; } },
+  { id: 'rapida', label: 'Fiala rapida', text: 'il recupero della Fiala si accorcia del 20%', apply: (t: Tune) => { t.potionCd *= 0.8; } },
+] as const;
+
 export const QUESTS = {
   chiave: { title: 'Il baule del pontile', xp: 80, gold: 30 }, // the key out of the chest, ~level 5
   bortolo: { title: 'Lo speziale della serra', xp: 70, gold: 30 }, // Fra' Bortolo found, ~level 5
@@ -129,6 +143,9 @@ export class Quest {
   relic = false; // Fra' Zuane's corona picked up (main.ts), once a run
   relicBack = false; // and given back to him
   private relicKills = 0; // kills rolled for it so far (not saved: a load starts the ramp over)
+  asked = false; // Le teste dei frati taken from Fra' Bortolo
+  heads = 0; // friars' heads picked up for it
+  boon = ''; // the rite's boon (BOONS id) once the heads are handed in
   found = false; // Fra' Bortolo found in the serra, as Fra' Zuane asked
   /** The quests done, in order: their rewards (bonusXp, and the banner and gold quest/view.ts hands out once each). */
   done: QuestId[] = [];
@@ -231,6 +248,31 @@ export class Quest {
   rollRelic(rnd: () => number = Math.random): boolean {
     if (this.relic) return false;
     return this.key || rnd() < RELIC_DROP.base + RELIC_DROP.ramp * this.relicKills++;
+  }
+
+  /** Heads the rite wants with `alive` friars left: 12, or what is still to be had once the friars run short (the boss's fall takes them all). */
+  headsNeed(alive: number): number {
+    return Math.min(HEADS.need, this.heads + alive);
+  }
+
+  /** Le teste dei frati is on and `need` heads are in hand. */
+  headsReady(alive: number): boolean {
+    return this.asked && !this.boon && this.heads >= this.headsNeed(alive);
+  }
+
+  /** A friar just died, `alive` left and `ground` heads lying unpicked: does a head roll out of its hood? */
+  headDrop(alive: number, ground: number, rnd: () => number = Math.random): boolean {
+    if (!this.asked || this.boon) return false;
+    const short = HEADS.need - this.heads - ground;
+    return short > 0 && (rnd() < HEADS.rate || short > alive); // the last friars always pay
+  }
+
+  /** The rite: the heads are spent on boon `id`, and Le teste dei frati is done (once). */
+  rite(id: string): boolean {
+    if (this.boon || !BOONS.some((b) => b.id === id)) return false;
+    this.boon = id;
+    this.heads = 0;
+    return this.complete('teste');
   }
 
   /** The corona is in his hands again (once). */

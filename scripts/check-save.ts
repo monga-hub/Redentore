@@ -3,7 +3,7 @@
 // dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots, the reload handoff and the autosave survive storage and refuse junk.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { Quest } from '../src/quest/progress.ts';
+import { QUESTS, Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
 import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
@@ -201,4 +201,21 @@ const odd = boot();
 deserialize(odd, { ...ls, build: { ...ls.build, picks: ['hp', 'from_the_future'] } });
 if (odd.levels.picks.join() !== 'hp') fail('unknown card kept');
 if (!valid({ ...s, build: undefined }) || valid({ ...s, build: { xp: 1, lv: 1, picks: [3] } }) || valid({ ...s, build: { xp: '1', lv: 1, picks: [] } })) fail('build field validation');
+// Le teste dei frati: asked, the heads in hand and the boon round-trip; a save from before it loads with it not taken; junk is refused.
+const hq = boot();
+Object.assign(hq.quest, { asked: true, heads: 7 });
+hq.mobs[4].again = true; // a friar risen again keeps its lesser worth
+const hs = JSON.parse(JSON.stringify(serialize(hq))), hb = boot();
+deserialize(hb, hs);
+if (!hb.quest.asked || hb.quest.heads !== 7 || hb.quest.boon) fail(`the heads restored as ${hb.quest.heads}`);
+if (!hb.mobs[4].again || hb.mobs.filter((m) => m.again).length !== 1 || valid({ ...hs, again: ['x'] })) fail('risen friars not restored');
+const done = boot();
+deserialize(done, { ...hs, quest: { ...hs.quest, heads: 0, boon: 'fiala', done: ['teste'] } });
+if (done.quest.boon !== 'fiala' || done.quest.bonusXp !== QUESTS.teste.xp) fail('the rite\'s boon or its XP not restored');
+const before2 = boot();
+deserialize(before2, (({ quest: { asked: _as, heads: _h, boon: _bo, ...q }, ...o }) => ({ ...o, quest: q }))(hs));
+if (before2.quest.asked || before2.quest.heads || before2.quest.boon) fail('a save from before the heads loads with them');
+const odd2 = boot();
+deserialize(odd2, { ...hs, quest: { ...hs.quest, boon: 'from_the_future' } });
+if (odd2.quest.boon || valid({ ...hs, quest: { ...hs.quest, heads: 'x' } }) || valid({ ...hs, quest: { ...hs.quest, asked: 1 } }) || valid({ ...hs, quest: { ...hs.quest, boon: 3 } })) fail('heads field validation');
 console.log('save system ok');

@@ -8,7 +8,7 @@
 // threshold, which he can neither cross nor leave. He has waited four centuries for someone the
 // vow raised and did not keep.
 
-import { SECOND, type Stage } from './progress.ts';
+import { BOONS, SECOND, type Stage } from './progress.ts';
 
 export const QUEST_TITLE = 'La chiave del portinaio';
 export const QUEST2_TITLE = 'La dote delle Zitelle';
@@ -42,6 +42,8 @@ export interface Talk {
   /** The offered quest's name (default the first) and the answer to a Rifiuta (default DECLINE). */
   title?: string;
   decline?: string;
+  /** The last page asks for one of these instead of Accetta / Rifiuta (the rite's boons); the accept handler gets its id. */
+  choices?: readonly { id: string; label: string }[];
 }
 
 export const TALK: Record<Stage, Talk> = {
@@ -136,4 +138,28 @@ export const RELIC_TALK: Talk = {
     'Quattro secoli di Ave Maria contate sulle dita, Risorto. Le dita di un morto non bastano: si perde il conto. Lasciami... lasciami dirne una, adesso, con i grani giusti.',
     '...Ecco. Le mani non tremano più. Tieni la medaglietta: io ho ritrovato la corona, a te il santo serve più che a me. San Francesco ti guardi le spalle, dove io non posso arrivare.',
   ],
+};
+
+// Le teste dei frati (quest/progress.ts HEADS): the rite the Reverendissimo forbade, asked after the lore.
+export const HEADS_TITLE = 'Le teste dei frati';
+/** His ask: after the lore on the first talk, or on its own while it is still open. */
+export const SPEZIALE_HEADS: Talk = {
+  pages: [
+    'Un\'altra cosa, Risorto. La ruta da sola non ridà il nome ai fratelli: serve il rito intero, quello che il Reverendissimo ci proibì. E il rito vuole le teste di chi il nome l\'ha perso.',
+    'Portamene dodici. Non guardarmi così: loro non le usano più, e la grazia non chiede permesso. Le metterò nella terra sotto la ruta, e la terra ti renderà qualcosa che resta.',
+  ],
+  offer: true, title: HEADS_TITLE,
+  decline: 'La ruta sa aspettare, Risorto. Se cambi idea la serra è qui, e i fratelli non vanno da nessuna parte.',
+};
+/** While he waits for them: `n` in hand of `need`. */
+export const spezialeWait = (n: number, need: number): Talk => ({
+  pages: [`${n ? `Ne hai ${n}.` : 'Ancora nessuna?'} Me ne servono ${need}. I fratelli zappano nell\'orto: guarda sotto i cappucci, Risorto, e non fare quella faccia.`],
+});
+/** The heads brought back: the rite, and a boon to pick. */
+export const SPEZIALE_RITE: Talk = {
+  pages: [
+    'Eccole. Le conto due volte, come faceva lui con i corpi... no. Lui contava per tenerle, io per restituirle. Mettile qui, tra la ruta e la salvia, e non respirare.',
+    'Scegli cosa vuoi che la terra ti renda: una fiala più forte, un corpo più saldo o una fiala che torna piena prima. Una volta sola, Risorto: il rito non si ripete.',
+  ],
+  choices: BOONS,
 };

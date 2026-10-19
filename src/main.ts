@@ -19,9 +19,9 @@ import { Friars } from './enemies/friars.ts';
 import { Priests } from './enemies/priests.ts';
 import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
-import { FRIAR, GROUPS } from './enemies/brain.ts';
+import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { ANDITO, CHEST, CROCE, NPC, Quest } from './quest/progress.ts';
+import { ANDITO, BOONS, CHEST, CROCE, HEADS, NPC, Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
 import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
 import { checkVersion } from './ui/version.ts';
@@ -84,8 +84,9 @@ const levels = new Levels(); // XP from the dead, the cards picked; laid on the 
 const levelUp = new LevelUp(); // the two-card window
 const gear = new Equipment(); // what the hero wears: the hemp set and the bone club at first
 let worn = effects(gear.totals);
-levels.apply = () => { // the cards and the gear, laid on the kit and the stats
+levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on the kit and the stats
   Object.assign(tune, tuneOf(levels.picks));
+  BOONS.find((b) => b.id === quest.boon)?.apply(tune);
   worn = effects(gear.totals);
   playerStats.grow(tune.hp, tune.mana, worn.hp, worn.mana);
   playerStats.armor = tune.armor * (1 - worn.cut);
@@ -98,6 +99,7 @@ levels.apply = () => { // the cards and the gear, laid on the kit and the stats
 gear.onChange = () => levels.apply();
 levels.apply(); // the starter set's stats (a load lays its own again)
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
+friars.rising = () => !quest.bossDead; // the vow raises the orto's dead until the Reverendissimo falls with it
 scene.add(friars.root);
 const priests = new Priests(level.world, kit.vfx, playerStats, level.areas); // undead priests casting in the cloisters
 scene.add(priests.root);
@@ -160,6 +162,7 @@ const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(o
 const bag = new Bag(); // gold and items picked up off the dead
 const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
+const worthOf = (i: number) => ((mobs[i] as { again?: boolean }).again ? Math.ceil(worth[i] * RISE.xp) : worth[i]); // a risen friar, a quarter
 const pending = takePending(); // a slot picked in the menu, carried across the reload
 const loaded = pending ?? resume(); // or the run in progress: a tab iOS killed for memory and reloaded, the home-screen app relaunched
 if (loaded) {
@@ -221,8 +224,10 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
   ...L2_KINDS.map(([, kind, height]) => ({ all: ofKind(kind), height })),
 ], kit.vfx, cam.camera, CHEST);
 scene.add(dfx.root);
-const drops = new Drops([ // gold and items out of the dead, walked over into the bag (after a load, so its dead drop nothing)
-  { all: friars.all, tier: 'friar' },
+const standing = () => friars.all.reduce((n, f) => n + (f.state === 'dead' ? 0 : 1), 0); // friars left to give a head
+questView.friars = standing;
+const drops: Drops = new Drops([ // gold and items out of the dead, walked over into the bag (after a load, so its dead drop nothing)
+  { all: friars.all, tier: 'friar', quest: () => (quest.headDrop(standing(), drops.loose.filter((l) => l.id === HEADS.item).length) ? HEADS.item : undefined) }, // Fra' Bortolo's heads
   { all: priests.all.filter((f) => f.kind === PRIEST), tier: 'priest' },
   { all: priests.all.filter((f) => f.kind === SACERDOTE), tier: 'elite' },
   { all: [priests.boss], tier: 'boss' },
@@ -231,6 +236,7 @@ const drops = new Drops([ // gold and items out of the dead, walked over into th
 ].map((d) => ({ ...d, quiet: () => quest.bossDead }) as Dropper).concat(([[GONDOLIERE, 'friar'], [CODEGA, 'priest'], [ZITELLA, 'priest'], [VELO, 'priest'], [GASTALDO, 'elite'], [MAESTRA, 'elite'], [GOVERNATRICE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind(kind), tier, level: 2, quiet: () => quest.boss2Dead }))), level.world, bag, cam.camera);
 scene.add(drops.root);
 drops.extra = () => (!drops.loose.some((l) => l.id === RELIC) && quest.rollRelic() ? RELIC : undefined); // Fra' Zuane's corona, once a run (one on the ground at a time)
+drops.collect = (id) => id === HEADS.item && (questView.head(), true); // Fra' Bortolo's heads are counted, not bagged
 const bagPanel = new BagPanel(bag, gear); // B or the satchel button
 bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
 const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure button: the paper doll
@@ -241,6 +247,7 @@ const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
 questView.shop = () => vendor.open();
 questView.reward = (gold) => { bag.gold += gold; };
 questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
+questView.boonTaken = () => levels.apply();
 questView.blockDoors(level.cameraBlockers); // shut doors stop the camera and the targeting rays
 vendor.level2 = () => quest.accepted2; // level 2's epics on the road to the Zitelle
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
@@ -429,7 +436,10 @@ renderer.setAnimationLoop(() => {
   }
   { // the worth of the newly dead (Sete d'anime heals on each), and the rewards
     let fresh = 0;
-    mobs.forEach((m, i) => { if (m.state === 'dead' && !fell[i]) { fell[i] = true; slain += worth[i]; fresh++; } });
+    mobs.forEach((m, i) => {
+      if (m.state !== 'dead') fell[i] = false; // risen again: its next death counts
+      else if (!fell[i]) { fell[i] = true; slain += worthOf(i); fresh++; }
+    });
     if (fresh && tune.leech) playerStats.heal(playerStats.hpMax * tune.leech * fresh);
     levels.xp = slain + quest.bonusXp;
     if (levels.lv > shownLv) levelUp.flash((shownLv = levels.lv));

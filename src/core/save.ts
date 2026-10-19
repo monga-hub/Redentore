@@ -7,7 +7,7 @@
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
 import { CARD, levelOf } from '../player/levels.ts';
-import { QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
+import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 
@@ -31,9 +31,11 @@ export interface GameState {
   // relic, relicBack: Fra' Zuane's corona picked up and given back (absent: false).
   // found: Fra' Bortolo found as Fra' Zuane asked; done: the quests done (quest/progress.ts QUESTS), whose XP is in build.xp.
   // Both absent in saves from before the quest rewards: found if he blessed the hero, done rebuilt from the flags.
-  quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number; found?: boolean; done?: string[] }
+  // Fra' Bortolo's Le teste dei frati (absent in older saves: not taken): asked, the heads in hand, the rite's boon ('' until then).
+  quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number; found?: boolean; done?: string[]; asked?: boolean; heads?: number; boon?: string }
     & Partial<Record<typeof LEVEL2[number], boolean>>;
   dead: number[]; // indices into Game.mobs
+  again?: number[]; // indices of the friars risen again (enemies/brain.ts rise); absent in older saves: none
   time: number; // s played
   fog?: string; // Discovery.encode(); absent in saves from before the fog of war, which load fully fogged
   // Level-up cards in the order picked, XP and the level it makes (lv is for readers: XP decides). Absent in
@@ -52,7 +54,7 @@ export interface Game {
   /** `apply` lays the picks on the kit and stats (raising hpMax), so a load runs it before restoring hp. */
   levels: { xp: number; picks: string[]; apply(): void };
   quest: Quest;
-  mobs: { state: string; hp: number; t: number }[];
+  mobs: { state: string; hp: number; t: number; again?: boolean }[];
   time: number;
   fog: { encode(): string; decode(s: string): boolean };
   bag: Bag;
@@ -65,8 +67,9 @@ export function serialize(g: Game): GameState {
     v: VERSION,
     player: { x, y, z, yaw: g.player.facing, hp: g.stats.hp, mana: g.stats.mana, charge: g.kit.charge },
     quest: { key: g.quest.key, gates: g.quest.gates.filter((q) => q.open).map((q) => q.id), bossDead: g.quest.bossDead, accepted: g.quest.accepted, out: g.quest.out, blessed: g.quest.blessed, blessLeft: g.quest.blessLeft,
-      found: g.quest.found, done: [...g.quest.done], ...Object.fromEntries(LEVEL2.map((k) => [k, g.quest[k]])) },
+      found: g.quest.found, done: [...g.quest.done], asked: g.quest.asked, heads: g.quest.heads, boon: g.quest.boon, ...Object.fromEntries(LEVEL2.map((k) => [k, g.quest[k]])) },
     dead: g.mobs.flatMap((m, i) => (m.state === 'dead' ? [i] : [])),
+    again: g.mobs.flatMap((m, i) => (m.again ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
     build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks] },
@@ -83,6 +86,7 @@ export function deserialize(g: Game, s: GameState): void {
   g.levels.xp = s.build?.xp ?? 0;
   g.levels.picks = (s.build?.picks ?? []).filter((id) => CARD.has(id)); // a card from another build is dropped
   if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
+  g.quest.boon = BOONS.some((b) => b.id === s.quest.boon) ? s.quest.boon! : ''; // before the clamp too: the rite's boon may raise it
   g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
   g.stats.hp = Math.min(Math.max(p.hp, 1), g.stats.hpMax); // never wake up dead
   g.stats.mana = Math.min(Math.max(p.mana, 0), g.stats.manaMax);
@@ -91,6 +95,8 @@ export function deserialize(g: Game, s: GameState): void {
   g.quest.out = s.quest.out ?? false;
   g.quest.blessed = s.quest.blessed ?? false;
   g.quest.blessLeft = Math.max(0, s.quest.blessLeft ?? 0);
+  g.quest.asked = s.quest.asked ?? false;
+  g.quest.heads = Math.max(0, Math.floor(s.quest.heads ?? 0));
   if (s.quest.key) g.quest.takeKey();
   for (const q of g.quest.gates) if (s.quest.gates.includes(q.id)) g.quest.open(q);
   if (s.quest.bossDead) g.quest.win();
@@ -102,6 +108,7 @@ export function deserialize(g: Game, s: GameState): void {
   const dead = s.dead.map((i) => g.mobs[i]).filter((m) => m);
   killAll(dead);
   for (const m of dead) m.t = GONE;
+  for (const i of s.again ?? []) if (g.mobs[i]) g.mobs[i].again = true;
   g.time = s.time;
   if (s.fog) g.fog.decode(s.fog); // a grid from another build's level is dropped: fogged, not garbled
   if (s.bag) g.bag.decode(s.bag);
@@ -125,7 +132,8 @@ export function valid(s: unknown): s is GameState {
     && ['accepted', 'out', 'blessed', ...LEVEL2].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out' | 'blessed'] as boolean | undefined))
     && (o.quest.blessLeft === undefined || num(o.quest.blessLeft))
     && [undefined, true, false].includes(o.quest.found) && (o.quest.done === undefined || (Array.isArray(o.quest.done) && o.quest.done.every((x) => typeof x === 'string')))
-    && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
+    && [undefined, true, false].includes(o.quest.asked) && (o.quest.heads === undefined || num(o.quest.heads)) && (o.quest.boon === undefined || typeof o.quest.boon === 'string')
+    && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && (o.again === undefined || (Array.isArray(o.again) && o.again.every(Number.isInteger))) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')))
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
     && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')));

@@ -4,8 +4,8 @@
 // and the tracker's objective following each step. Fra' Bortolo in the serra: reachable in peace, blesses once.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { BLESSING, CHEST, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
-import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
+import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
+import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
 
 let failed = 0;
@@ -100,7 +100,7 @@ const bortolo = feet(SPEZIALE.x, SPEZIALE.z - 1.2);
 if (level.world.blocked(bortolo.x, bortolo.z, bortolo.y)) fail("no room to stand by Fra' Bortolo");
 if (quest.prompt(bortolo)?.talk !== 'speziale') fail("no 'talk' prompt next to Fra' Bortolo");
 for (const [x, z] of [...GROUPS, ...MORE].flat()) if (Math.hypot(x - bortolo.x, z - bortolo.z) < FRIAR.aggro + 1) fail(`a friar at (${x}, ${z}) hoes within reach of Fra' Bortolo`);
-for (const t of [SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
+for (const t of [SPEZIALE_HEADS, SPEZIALE_RITE, spezialeWait(11, 12), SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
 if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('blessed before talking to Fra\' Bortolo');
 if (!quest.bless() || quest.castMul !== BLESSING.cast || quest.dmgMul !== BLESSING.dmg) fail('the blessing does not quicken casts and harden blows');
 if (quest.bless()) fail('the blessing was given twice');
@@ -127,8 +127,22 @@ const xp1 = keyed.bonusXp;
 if (!keyed.returnRelic() || keyed.returnRelic() || keyed.bonusXp !== xp1 + questXp('relic')) fail('giving the corona back does not pay exactly once');
 for (const p of RELIC_TALK.pages) if (p.length > 260) fail(`a page of the corona is ${p.length} characters, too long for the window on a phone`);
 
+// Le teste dei frati: no heads before he asks; 12 out of the orto's friars, the last ones always paying; the rite once, for its XP.
+const h = new Quest(buildLevel().world), friars = [...GROUPS, ...MORE].flat().length;
+if (friars < HEADS.need * 2) fail(`only ${friars} friars in the orto for ${HEADS.need} heads`);
+if (h.headDrop(friars - 1, 0, () => 0)) fail('a head dropped before Fra\' Bortolo asked');
+h.asked = true;
+for (let alive = friars - 1; alive >= 0; alive--) if (h.headDrop(alive, 0, () => 0.99)) h.heads++; // the worst luck there is
+if (h.heads !== HEADS.need) fail(`the worst luck brought ${h.heads} heads, not ${HEADS.need}`);
+if (h.headDrop(5, 0, () => 0)) fail('a head dropped past the need');
+const hxp = h.bonusXp;
+if (h.rite('nope') || !h.rite(BOONS[0].id) || h.rite(BOONS[1].id) || h.boon !== BOONS[0].id || h.bonusXp !== hxp + questXp('teste') || h.headsReady(0)) fail('the rite does not grant one boon and its XP exactly once');
+const h2 = new Quest(buildLevel().world);
+h2.asked = true; h2.heads = 3;
+if (h2.headsNeed(friars) !== HEADS.need || h2.headsNeed(0) !== 3 || !h2.headsReady(0)) fail('with the friars gone, the heads in hand do not do');
+
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once`);
+  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);
   process.exit(1);

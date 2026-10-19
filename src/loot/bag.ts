@@ -18,8 +18,10 @@ export const RARITY: Record<Rarity, { name: string; color: string }> = {
 export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | 'skull' | 'nail'
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
-/** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it. */
+/** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it (the friars' heads aren't even bagged: loot/drops.ts collect). */
 export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; quest?: true }
+/** Quest items' colour, on the ground and in the tracker. */
+export const QUEST_COLOR = '#ffd84a';
 
 export const ITEMS: readonly Item[] = [
   { id: 'rosario-bosso', name: 'Rosario di bosso', rarity: 'comune', icon: 'rosary', lore: 'Grani consumati da mille Ave Maria sussurrate nella peste.' },
@@ -43,6 +45,8 @@ export const ITEMS: readonly Item[] = [
   { id: 'filo-oro', name: 'Filo d’oro del velo', rarity: 'leggendario', icon: 'rosary', lore: 'Il primo e l’ultimo punto del velo. Tira, se hai coraggio.', l2: true },
   // Fra' Zuane's keepsake (quest/progress.ts rollRelic): off any of the dead, once a run.
   { id: 'corona-zuane', name: 'Corona del portinaio', rarity: 'leggendario', icon: 'rosary', lore: 'Grani d’ulivo e una medaglietta consumata dal pollice. Fra’ Zuane la perse nell’orto: riportagliela, sulla fondamenta.', quest: true },
+  // Fra' Bortolo's heads (quest/progress.ts HEADS): off the friars while he wants them.
+  { id: 'testa-frate', name: 'Testa di frate', rarity: 'comune', icon: 'skull', lore: 'Per il rito della ruta di Fra’ Bortolo. Sorride ancora, sotto il cappuccio.', quest: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

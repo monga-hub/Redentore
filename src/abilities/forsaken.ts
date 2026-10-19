@@ -1309,7 +1309,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'potion', name: 'Fiala di linfa tombale', icon: 'potion', offGcd: true,
     get cooldown() { return tune.potionCd * tune.cdr; },
-    get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${tune.potion * 100}% della salute e il ${tune.potion * 100}% del mana.`; },
+    get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${Math.round(tune.potion * 100)}% della salute e il ${Math.round(tune.potion * 100)}% del mana.`; },
     fire(k) {
       const s = k.stats, h = s.heal(s.hpMax * tune.potion);
       playSfx('potion', chest(k));

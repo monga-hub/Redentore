@@ -6,7 +6,7 @@ import type { World } from '../core/physics.ts';
 import { D, T, type DecalStyle, type RibbonStyle, type Style, type Vfx } from '../abilities/vfx.ts';
 import type { PlayerStats } from '../player/stats.ts';
 import { playSfx } from '../audio/engine.ts';
-import { FRIAR, hurt, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
+import { FRIAR, hurt, rise, separate, spawnGroups, think, type Friar, type State, type Target } from './brain.ts';
 import { killAll, wipe } from './caster.ts';
 import { still, type Control } from './control.ts';
 
@@ -252,9 +252,13 @@ export class Friars {
     }, (e) => console.error('friar model failed to load', e));
   }
 
+  /** The dead get up again (brain.ts `rise`) while this holds: main.ts, until the Reverendissimo falls. */
+  rising: () => boolean = () => false;
+
   /** AI + animation. `player`: feet position. Melee hits go to the player's stats. */
   update(dt: number, player: Target): void {
     if (!this.views.length) return; // wait for the model: no invisible hoes
+    if (this.rising()) for (const f of this.all) rise(f, player, this.world);
     let dmg = 0;
     for (const f of this.all) dmg += think(f, player, this.world, dt);
     separate(this.all, this.world);

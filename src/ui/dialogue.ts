@@ -24,7 +24,7 @@ const CSS = `
 #talk .title { margin: 0 0 8px; font: italic 13px Georgia, serif; color: #6b4a1f; }
 #talk .title:empty { display: none; }
 #talk p.text { min-height: 4.4em; margin: 0; white-space: pre-wrap; }
-#talk .btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+#talk .btns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 12px; }
 #talk button { min-width: 112px; padding: 9px 16px; cursor: pointer; font: bold 15px Georgia, serif; color: #ffd75e; text-shadow: 0 1px 2px #000;
   border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#9a2216, #520c07 55%, #2e0503) padding-box, var(--gilt) border-box;
   box-shadow: 0 0 0 1px #000, inset 0 1px 0 rgba(255,215,94,.3), 0 2px 5px rgba(0,0,0,.4); touch-action: manipulation; }
@@ -67,7 +67,7 @@ export class Dialogue {
   private typed = 0; // characters shown
   private last = 0; // performance.now() of the last typing step
   private raf = 0;
-  private onAccept?: () => void;
+  private onAccept?: (choice?: string) => void;
   private onShop?: () => void;
   /** Called when the window closes, after the accept handler if the quest was taken. */
   onClose?: () => void;
@@ -99,7 +99,10 @@ export class Dialogue {
       else if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyF') {
         e.preventDefault();
         if (this.typing) this.finish();
-        else this.btns.querySelector<HTMLElement>('button')?.click(); // the first button: Continua, Accetta or Addio
+        else { // the first button: Continua, Accetta or Addio; never a boon, which wants a deliberate click
+          const b = this.btns.querySelector<HTMLElement>('button');
+          if (!b?.dataset.do?.startsWith('pick:')) b?.click();
+        }
       }
     }, true);
     document.body.append(this.el);
@@ -113,8 +116,8 @@ export class Dialogue {
     return this.typed < this.text.length;
   }
 
-  /** Opens on `talk` in `who`'s voice; `accept` runs if the offered quest is taken; `shop` adds Commercia (a vendor) to every page. */
-  show(who: Speaker, talk: Talk, accept?: () => void, shop?: () => void): void {
+  /** Opens on `talk` in `who`'s voice; `accept` runs if the offered quest is taken (with the id of the choice picked); `shop` adds Commercia (a vendor) to every page. */
+  show(who: Speaker, talk: Talk, accept?: (choice?: string) => void, shop?: () => void): void {
     this.el.setAttribute('aria-label', who.name);
     this.whoEl.textContent = who.name;
     this.img.src = who.portrait;
@@ -159,6 +162,7 @@ export class Dialogue {
     const last = this.page >= this.talk.pages.length - 1, key = '<kbd>F</kbd>';
     let html = this.text !== this.talk.pages[this.page] ? `<button data-do="close">Addio${key}</button>` // the decline line
       : !last ? `<button data-do="next">Continua${key}</button>`
+      : this.talk.choices ? this.talk.choices.map((c) => `<button data-do="pick:${c.id}">${c.label}</button>`).join('')
       : this.talk.offer ? `<button data-do="accept">Accetta${key}</button><button class="no" data-do="decline">Rifiuta</button>`
       : `<button data-do="close">Addio${key}</button>`;
     if (this.onShop) html += '<button class="shop" data-do="shop">Commercia</button>';
@@ -175,8 +179,8 @@ export class Dialogue {
       this.close();
       shop?.();
     }
-    else if (what === 'accept') {
-      this.onAccept?.();
+    else if (what === 'accept' || what.startsWith('pick:')) {
+      this.onAccept?.(what.slice(5) || undefined);
       this.close();
     } else this.close();
   }

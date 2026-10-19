@@ -10,7 +10,7 @@ import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
 import { ANDITO, CHOIR_DOOR, CROCE } from '../src/quest/progress.ts';
 import { GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, VELO, spawnLevel2 } from '../src/enemies/zitelle.ts';
-import { FRIAR, GROUPS, MORE, hurt, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
+import { FRIAR, GROUPS, MORE, RISE, hurt, rise, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, spawnApiary, cloisterPlan, fly, gardenPlan, lagoonPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -77,6 +77,14 @@ expect(b, 'dead', 'killed');
 if (hurt(b, 5)) fail('killed twice');
 run(600);
 expect(b, 'dead', 'still dead 10 minutes later (no respawn)');
+// The vow raises it again (main.ts, until the Reverendissimo falls): not under the hero's nose, not before its time; then at home, whole, worth less.
+const c = spawnGroups(world, [[[0, 5, 0]]])[0][0];
+const near = { x: c.home.x + RISE.away - 1, y: 0, z: c.home.z }, far = { x: c.home.x + RISE.away + 1, y: 0, z: c.home.z };
+hurt(c, FRIAR.hp);
+if (rise(c, far, world, () => 1) || (c.t = RISE.after[1] - 0.1, rise(c, far, world))) fail('a friar rose before its time');
+c.t = RISE.after[1];
+if (rise(c, near, world) || !rise(c, far, world) || c.state !== 'hoe' || c.hp !== FRIAR.hp || !c.again || c.x !== c.home.x || c.z !== c.home.z) fail('a dead friar does not rise at home, whole and marked, out of the hero\'s sight');
+if (rise(c, far, world)) fail('a living friar rose');
 console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
 
 // ---------------------------------------------------------------- priests (caster.ts)

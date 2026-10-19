@@ -37,6 +37,8 @@ export interface Friar {
   mates: Friar[]; // the hoeing group, pulled together
   cc: Control; // slows, roots, stuns laid by the hero's spells (control.ts)
   blind?: number; // s chasing without line of sight
+  again?: boolean; // risen again (`rise`): worth less, drops less
+  riseAt?: number; // s into its death it rises again (`rise`)
 }
 
 export interface Target { x: number; y: number; z: number }
@@ -153,9 +155,25 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
       f.hp = FRIAR.hp;
       if (walk(f, f.home.x, f.home.z, FRIAR.walk, 0, world, dt) < 0.05) enter(f, 'hoe');
       return 0;
-    case 'dead': // for good: nobody respawns
+    case 'dead': // until the vow raises it again (`rise`), or for good once the Reverendissimo is dead
       return 0;
   }
+}
+
+/**
+ * The vow raises the orto's dead while the Reverendissimo stands (Friars.rising): a friar gets up at its own spot
+ * `after` s from its fall, once the hero is `away` m off it (out of sight there, and never on top of them). Each one
+ * rises in its own place, so a group never outnumbers its first count; a risen friar is worth `xp` of one and drops
+ * a worker's loot (main.ts, loot/drops.ts), so the orto feeds Fra' Bortolo's heads, not the levels.
+ */
+export const RISE = { after: [60, 120], away: 25, xp: 0.25 } as const;
+export function rise(f: Friar, p: Target, world: World, rnd: () => number = Math.random): boolean {
+  if (f.state !== 'dead') return false;
+  f.riseAt ??= f.t + RISE.after[0] + rnd() * (RISE.after[1] - RISE.after[0]); // a loaded corpse (t past the sink) too: after, from now
+  if (f.t < f.riseAt || Math.hypot(p.x - f.home.x, p.z - f.home.z) < RISE.away) return false;
+  Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: FRIAR.hp, cd: 0, blind: 0, again: true, riseAt: undefined });
+  enter(f, 'hoe');
+  return true;
 }
 
 /** Damage a friar. Returns true if this killed it. Evading and dead friars ignore it. */

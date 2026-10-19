@@ -4,7 +4,7 @@ import type { FogLayer } from './fog.ts';
 import { PX, WATER, type Minimap, type Pin } from './minimap.ts';
 
 // The big map, WoW style: M (or the book button on the minimap) opens the whole complex in a
-// framed overlay, north up (+Z, turned half round like the minimap), under the same fog as the minimap. Discovered places carry their
+// framed overlay, turned like the minimap to the camera's heading at opening, under the same fog as the minimap. Discovered places carry their
 // names, the player shows as an arrow and the objective as a gold diamond. The game pauses while
 // it is open; M, Esc, a click or a tap close it. Its DOM is styled here, like ui/menu.ts.
 
@@ -29,7 +29,7 @@ body.touch #worldmap .foot i { display: none; }
 `;
 
 /** What the map shows of the game when it opens. */
-export interface MapView { x: number; z: number; facing: number; area?: string; goal?: Pin }
+export interface MapView { x: number; z: number; facing: number; view: number; area?: string; goal?: Pin }
 
 export class WorldMap {
   private el = document.createElement('div');
@@ -105,20 +105,23 @@ export class WorldMap {
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
     const c = this.ctx, b = this.bounds;
-    // fit the complex, centred, 1 m = k px
-    const k = Math.min(w / (b.x1 - b.x0), h / (b.z1 - b.z0));
-    const ox = (b.x0 + b.x1) / 2 - w / 2 / k, oz = (b.z0 + b.z1) / 2 - h / 2 / k;
-    const at = (x: number, z: number) => [w - (x - ox) * k, h - (z - oz) * k] as const; // north (+Z) up, east (-X) right
+    // fit the complex turned to the camera's heading (as the minimap), centred, 1 m = k px
+    const cos = Math.cos(v.view), sin = Math.sin(v.view), bw = b.x1 - b.x0, bh = b.z1 - b.z0;
+    const k = Math.min(w / (Math.abs(cos) * bw + Math.abs(sin) * bh), h / (Math.abs(sin) * bw + Math.abs(cos) * bh));
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+    const at = (x: number, z: number) => [w / 2 + ((x - cx) * cos - (z - cz) * sin) * k, h / 2 + ((x - cx) * sin + (z - cz) * cos) * k] as const;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.fillStyle = WATER;
     c.fillRect(0, 0, w, h);
     c.imageSmoothingEnabled = true;
     const m = this.chart;
     c.save();
-    c.translate(w, h);
-    c.rotate(Math.PI);
-    c.drawImage(m.chart, (ox - m.x0) * PX, (oz - m.z0) * PX, w / k * PX, h / k * PX, 0, 0, w, h);
-    this.fog.draw(c, ox, oz, k, w, h);
+    const R = Math.hypot(w, h) / 2 / k + 1; // m: a square this half-size covers the turned window
+    c.translate(w / 2, h / 2);
+    c.rotate(v.view);
+    c.translate(-R * k, -R * k);
+    c.drawImage(m.chart, (cx - R - m.x0) * PX, (cz - R - m.z0) * PX, 2 * R * PX, 2 * R * PX, 0, 0, 2 * R * k, 2 * R * k);
+    this.fog.draw(c, cx - R, cz - R, k, 2 * R * k, 2 * R * k);
     c.restore();
     const shade = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) / 2);
     shade.addColorStop(0, 'rgba(0,0,0,0)');
@@ -167,7 +170,7 @@ export class WorldMap {
     c.beginPath();
     c.arc(0, 0, 14, 0, Math.PI * 2);
     c.fill();
-    c.rotate(Math.PI - v.facing);
+    c.rotate(v.view - v.facing);
     c.beginPath();
     c.moveTo(0, -11);
     c.lineTo(7.5, 8);

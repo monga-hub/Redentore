@@ -21,8 +21,8 @@ const HZ = 30; // redraws per second
 
 /**
  * WoW-style minimap, top right (styled in index.html): a round window on a top-down chart of the
- * complex, north up (the real north: +Z, the canal side, level/plan.ts; so the chart is drawn turned half round),
- * centred on the player with an arrow turning with their facing, the unexplored
+ * complex turned with the camera (what lies ahead on screen is up; the N on the rim follows the real north, +Z,
+ * level/plan.ts), centred on the player with an arrow turning with their facing, the unexplored
  * parts under the fog of war; red dots for living enemies in range and a gold marker for the
  * current objective, pinned to the rim when far. The book button opens the big map (ui/worldMap.ts).
  * The chart is baked once from the level's floor and wall boxes into an offscreen canvas, so a
@@ -32,6 +32,7 @@ export class Minimap {
   private el = document.getElementById('minimap')!;
   private name = this.el.querySelector<HTMLElement>('.name')!;
   private canvas = this.el.querySelector('canvas')!;
+  private north = this.el.querySelector<HTMLElement>('.north')!;
   private ctx = this.canvas.getContext('2d')!;
   /** The baked chart, PX texels per metre; the big map draws it too. */
   readonly chart: HTMLCanvasElement;
@@ -85,8 +86,8 @@ export class Minimap {
     this.wait = 0;
   }
 
-  /** `facing`: player yaw (0 = -Z, south: the arrow points down). `foes`: every mob. `goal`: the objective, if any; `also`: side quests' pins. */
-  update(dt: number, p: { x: number; z: number }, facing: number, label: string | undefined, foes: Pin[], goal?: Pin, also: Pin[] = []): void {
+  /** `facing`: player yaw; `view`: the camera's (both 0 = looking -Z, as in camera/). `foes`: every mob. `goal`: the objective, if any; `also`: side quests' pins. */
+  update(dt: number, p: { x: number; z: number }, facing: number, view: number, label: string | undefined, foes: Pin[], goal?: Pin, also: Pin[] = []): void {
     if ((label ?? '') !== this.label) this.name.textContent = this.label = label ?? '';
     if ((this.wait -= dt) > 0) return;
     this.wait = 1 / HZ;
@@ -106,8 +107,9 @@ export class Minimap {
     // The chart, scaled so 1 m = k px, with the player's spot at the centre.
     c.imageSmoothingEnabled = true;
     c.save();
-    c.translate(size, size);
-    c.rotate(Math.PI); // north (+Z) up, east (-X) right
+    c.translate(r, r);
+    c.rotate(view); // the camera's heading up
+    c.translate(-r, -r);
     c.drawImage(this.chart, (p.x - this.x0) * PX - r / k * PX, (p.z - this.z0) * PX - r / k * PX, size / k * PX, size / k * PX, 0, 0, size, size);
     this.fog.draw(c, p.x - r / k, p.z - r / k, k, size, size);
     c.restore();
@@ -118,7 +120,9 @@ export class Minimap {
     c.fillStyle = shade;
     c.fillRect(0, 0, size, size);
 
-    const at = (q: Pin) => [r - (q.x - p.x) * k, r - (q.z - p.z) * k] as const; // turned half round, like the chart
+    const cos = Math.cos(view), sin = Math.sin(view);
+    const at = (q: Pin) => { const dx = (q.x - p.x) * k, dz = (q.z - p.z) * k; return [r + dx * cos - dz * sin, r + dx * sin + dz * cos] as const; }; // turned like the chart
+    this.north.style.transform = `translate(${-sin * (r + 1)}px, ${cos * (r + 1)}px)`; // +Z on the rim
     c.lineWidth = 1;
     c.strokeStyle = '#000';
     c.fillStyle = '#ff2a1a';
@@ -148,10 +152,10 @@ export class Minimap {
       c.restore();
     }
 
-    // The player: a bright arrow turning with their facing (yaw 0 points down, south).
+    // The player: a bright arrow turning with their facing (up when facing where the camera looks).
     c.save();
     c.translate(r, r);
-    c.rotate(Math.PI - facing);
+    c.rotate(view - facing);
     c.beginPath();
     c.moveTo(0, -8);
     c.lineTo(5.5, 6);

@@ -128,7 +128,7 @@
       @keyframes lowhp { to { filter: brightness(1.7) } }
 
       /* Minimap (src/ui/minimap.ts): round chart in a bronze ring, top right, zone name on a plate
-         above, N on the rim, zoom buttons below right, big-map button below left. The column right of it stays free for the menu
+         above, N on the rim (pointing to the real north as the chart turns), zoom buttons below right, big-map button below left. The column right of it stays free for the menu
          and fullscreen buttons; narrow screens drop it under the player frame. */
       #minimap {
         --m: 150px;
@@ -150,7 +150,7 @@
       #minimap .name:empty { visibility: hidden; }
       #minimap .name { border: 2px solid transparent; background: var(--panel); box-shadow: var(--panel-shadow); }
       #minimap .north {
-        position: absolute; left: 50%; top: -10px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; box-sizing: border-box;
+        position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; z-index: 1; /* minimap.ts moves it round the rim, over the buttons */ border-radius: 50%; box-sizing: border-box;
         border: 2px solid transparent; background: radial-gradient(#3b2a16, #120d09) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000;
         color: #f3e2b0; font: bold 10px/16px Georgia, serif; text-align: center; text-shadow: 0 1px 1px #000;
       }

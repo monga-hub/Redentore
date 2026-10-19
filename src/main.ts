@@ -30,7 +30,7 @@ import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { autosave, deserialize, resume, serialize, takePending, type Game } from './core/save.ts';
-import { isDiablo, onStyle } from './core/style.ts';
+import { isDiablo, onQuality, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
 import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
@@ -255,7 +255,8 @@ const warm = () => {
   kit.prime(); // and a first real draw of each, at nothing
 };
 let warmed = false;
-fx.onDegrade = () => { if (warmed) warm(); };
+fx.onRebuild = () => { if (warmed) warm(); };
+onQuality((q) => fx.setQuality(new URLSearchParams(location.search).get('fx') === 'low' ? 'bassa' : q)); // the menu's "Grafica"; `?fx=low` pins the bottom rung
 /** The Diablo view on or off: camera, controls, cuts, look, HUD. The intro keeps its own look and gets it at the hand-over. */
 function applyStyle(diablo: boolean): void {
   input.orbit = !diablo;

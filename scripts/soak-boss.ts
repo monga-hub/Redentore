@@ -1,11 +1,12 @@
 // Boss soak (`npm run soak`; not in `npm run check`: it needs Chrome and plays for minutes). The real
 // game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), fights the
 // Reverendissimo with every ability on the bar, the church's sacerdoti and priests alive, through all
-// three acts and the berserk, then the slow-frame fallback forced mid-fight, then the kill. It asserts
-// what got the fight's tab killed on iPhones (iOS reloads a tab past its memory budget, GPU buffers
-// included): no page errors or lost context, no programs, geometries or textures piling up as the
-// fight goes on, the GPU buffers of the phone profile within budget, and the fallback giving memory
-// back instead of adding a second set on top. A WebGL hook tallies the buffers (bytes the page asks for).
+// three acts and the berserk, then down the quality ladder one rung at a time mid-fight and back to the
+// top, then the kill. It asserts what got the fight's tab killed on iPhones (iOS reloads a tab past its
+// memory budget, GPU buffers included): no page errors or lost context, no programs, geometries or
+// textures piling up as the fight goes on, the GPU buffers of the phone profile within budget, each rung
+// down giving memory back instead of adding a second set on top, and the climb back holding no more than
+// the start. A WebGL hook tallies the buffers (bytes the page asks for).
 //
 //   npm run soak                       ~2 minutes of fight
 //   SOAK_SECONDS=600 npm run soak      a longer one
@@ -75,7 +76,10 @@ function fight(seconds: number, level: number): void {
   player.respawn(level === 2 ? { x: 240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
   const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
-  let next = 0, degraded = false, raged = false;
+  let next = 0, raged = false;
+  const RUNGS = [[0.45, 1], [0.55, 2], [0.65, 3], [0.8, 0]]; // fraction of the fight, rung
+  fx.auto = false; // the ladder walked by hand: swiftshader's frame rate would walk it on its own
+  fx.setStep(0, 'soak');
   const tick = () => {
     const t = (performance.now() - t0) / 1000;
     if (boss.state === 'dead' && t > seconds) { w.SOAK.done = true; w.SOAK.won = level === 2 ? quest.boss2Dead : quest.bossDead; return; }
@@ -83,8 +87,9 @@ function fight(seconds: number, level: number): void {
     playerStats.hp = playerStats.hpMax; // the fight, not the hero, is under test
     playerStats.mana = playerStats.manaMax;
     if (boss.state !== 'dead') boss.hp = t < seconds ? Math.max(boss.hp, boss.kind.hp * 0.03 + 1) : Math.min(boss.hp, boss.kind.hp * 0.03); // kept up through every act until the end, then brought down (an evade heals him)
-    if (!degraded && t > seconds * 0.6) { degraded = true; w.SOAK.before = samples.at(-1); fx.degrade('soak'); }
+    while (RUNGS.length && t > seconds * RUNGS[0][0]) fx.setStep(RUNGS.shift()![1], 'soak');
     if (!raged && t > seconds * 0.3) { raged = true; boss.fight = Math.max(boss.fight, BERSERK - 5); } // the berserk without four minutes of waiting
+    if (Math.hypot(boss.x - player.pos.x, boss.z - player.pos.z) > 10) player.respawn({ x: boss.x, z: Math.max(boss.z + 4, floor), yaw: 0 }); // a dash through him (Passo d'ombra) left the hero behind the altar: back in front, before he evades
     const dx = boss.x - player.pos.x, dz = boss.z - player.pos.z, d = Math.hypot(dx, dz) || 1;
     player.facing = Math.atan2(-dx, -dz);
     targeting.target = { kind: targeting.kinds.find((k: { all: object[] }) => k.all.includes(boss)), mob: boss };
@@ -92,7 +97,7 @@ function fight(seconds: number, level: number): void {
     for (let i = 0; i < 12; i++) kit.system.tryCast(i);
     if (t >= next) {
       next = t + 1;
-      samples.push({ t, low: degraded, prog: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures, gpu: w.SOAK.gpuMB(), phase: boss.phase, rage: boss.fight >= BERSERK, state: boss.state, lost: w.fx.renderer.getContext().isContextLost() });
+      samples.push({ t, step: fx.step, prog: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures, gpu: w.SOAK.gpuMB(), phase: boss.phase, rage: boss.fight >= BERSERK, state: boss.state, lost: w.fx.renderer.getContext().isContextLost() });
     }
   };
   requestAnimationFrame(tick);
@@ -167,31 +172,39 @@ try {
     while (!(await evaluate('window.zitelle.root.children.length > 0'))) { if (Date.now() - t0 > 240e3) throw new Error("level 2's bodies never loaded"); await sleep(500); }
   }
   while (!(await evaluate('!!window.SOAK.done'))) {
-    if ((await evaluate('performance.now()')) > (SECONDS + 300) * 1000) throw new Error('the boss never fell');
+    if ((await evaluate('performance.now()')) > (SECONDS + 300) * 1000) throw new Error(`the boss never fell: ${await evaluate("SOAK.samples.filter((x, i, a) => x.state !== a[i - 1]?.state || x.step !== a[i - 1]?.step).map((x) => `${x.t.toFixed(0)}s ${x.state} p${x.phase} r${x.step}`).join(', ')")} (hero ${await evaluate('JSON.stringify(player.pos)')})`);
     await sleep(2000);
   }
-  type Sample = { t: number; low: boolean; prog: number; geo: number; tex: number; gpu: number; phase: number; rage: boolean; state: string; lost: boolean };
-  const r: { samples: Sample[]; before: Sample; errors: string[]; won: boolean } = await evaluate('({ samples: SOAK.samples, before: SOAK.before, errors: SOAK.errors, won: SOAK.won })');
+  type Sample = { t: number; step: number; prog: number; geo: number; tex: number; gpu: number; phase: number; rage: boolean; state: string; lost: boolean };
+  const r: { samples: Sample[]; errors: string[]; won: boolean } = await evaluate('({ samples: SOAK.samples, errors: SOAK.errors, won: SOAK.won })');
   const s = r.samples;
 
   for (const e of [...pageErrors, ...r.errors]) fail(`page: ${e.slice(0, 300)}`);
   if (s.some((x) => x.lost)) fail('WebGL context lost');
   if (Math.max(...s.map((x) => x.phase)) < 2 || !s.some((x) => x.rage)) fail('the fight never reached the third act and the berserk');
   if (!r.won) fail('the boss fell but the quest missed it');
-  // Steady state: past the first seconds' first uses, nothing piles up, in either quality.
-  for (const low of [false, true]) {
-    const run = s.filter((x) => x.low === low).slice(low ? 3 : 8);
+  // The fight in runs, one per stay on a rung: the top, rungs 1..3 down, the top again.
+  const runs: Sample[][] = [];
+  for (const x of s) { if (runs.at(-1)?.[0].step !== x.step) runs.push([]); runs.at(-1)!.push(x); }
+  if (runs.map((run) => run[0].step).join() !== '0,1,2,3,0') fail(`the ladder went ${runs.map((run) => run[0].step).join(' -> ')}`);
+  // Steady state: past the first seconds' first uses (or a rung's change), nothing piles up on any rung.
+  runs.forEach((run, i) => {
+    const steady = run.slice(i ? 3 : 8);
     for (const k of ['prog', 'geo', 'tex'] as const) {
-      const lo = Math.min(...run.map((x) => x[k])), hi = Math.max(...run.map((x) => x[k]));
-      if (hi - lo > SLACK[k]) fail(`${k} grew ${lo} -> ${hi} over the ${low ? 'low-quality' : 'high-quality'} fight`);
+      const lo = Math.min(...steady.map((x) => x[k])), hi = Math.max(...steady.map((x) => x[k]));
+      if (hi - lo > SLACK[k]) fail(`${k} grew ${lo} -> ${hi} on rung ${run[0].step}`);
     }
+  });
+  const peak = (run: Sample[] | undefined, k: 'gpu' | 'prog') => Math.max(...(run ?? []).map((x) => x[k]));
+  const top = runs[0], gpu = runs.map((run) => peak(run, 'gpu')), prog = runs.map((run) => peak(run, 'prog'));
+  if (gpu[0] > BUDGET) fail(`the phone profile holds ${gpu[0].toFixed(0)} MB of GPU buffers, over the ${BUDGET} MB budget`);
+  for (let i = 1; i <= 3; i++) {
+    if (gpu[i] >= gpu[i - 1]) fail(`rung ${i} kept the buffers of rung ${i - 1}: ${gpu[i - 1].toFixed(0)} -> ${gpu[i].toFixed(0)} MB`);
+    if (prog[i] > prog[0]) fail(`rung ${i} piled up programs: ${prog[0]} -> ${prog[i]}`);
   }
-  const high = Math.max(...s.filter((x) => !x.low).map((x) => x.gpu)), low = Math.max(...s.filter((x) => x.low).slice(3).map((x) => x.gpu));
-  if (high > BUDGET) fail(`the phone profile holds ${high.toFixed(0)} MB of GPU buffers, over the ${BUDGET} MB budget`);
-  if (low >= r.before.gpu) fail(`the slow-frame fallback kept its buffers: ${r.before.gpu.toFixed(0)} -> ${low.toFixed(0)} MB`);
-  const progLow = Math.max(...s.filter((x) => x.low).map((x) => x.prog));
-  if (progLow > r.before.prog) fail(`the slow-frame fallback piled up programs: ${r.before.prog} -> ${progLow}`);
-  console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU ${high.toFixed(0)} MB, ${low.toFixed(0)} MB after the fallback; programs ${r.before.prog} -> ${progLow}`);
+  if (gpu[4] > gpu[0] * 1.02) fail(`back on the top rung the buffers grew: ${gpu[0].toFixed(0)} -> ${gpu[4].toFixed(0)} MB`);
+  if (prog[4] > prog[0] + SLACK.prog) fail(`back on the top rung the programs grew: ${prog[0]} -> ${prog[4]}`);
+  console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU by rung ${gpu.map((g) => g.toFixed(0)).join(' -> ')} MB; programs ${prog.join(' -> ')}; top rung ${top.length} s`);
 } catch (e) {
   fail(String((e as Error).message));
 } finally {

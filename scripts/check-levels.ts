@@ -119,4 +119,9 @@ big.unlock('new1');
 if (big.slots[2]?.id !== 'new1' || big.layout().includes('a')) fail(`unlock without a slot: ${big.layout()}`);
 big.unlock('a'); // its old slot went to new1: the next free one
 if (big.slots[3]?.id !== 'a' || big.slots[2]?.id !== 'new1') fail(`re-placed: ${big.layout()}`);
+// The starting bar (abilities/forsaken.ts BAR): the kit on slots 0-3, each unlock on the next free slot, in the touch arc's thumb order.
+const kit = ['fall', 'plague', 'mend', 'potion'], later = ['nova', 'veil', 'strike', 'step', 'ward'];
+const run = new AbilitySystem([...kit, ...later].map(ab), [...kit, ...Array<null>(8).fill(null)], { player: { pos: { x: 0, y: 0, z: 0 } } }, START);
+for (const id of later) run.unlock(id);
+if (run.layout().slice(0, 9).join() !== [...kit, ...later].join()) fail(`unlocks out of thumb order: ${run.layout()}`);
 console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 400 runs offered cleanly)`);

@@ -12,8 +12,8 @@ export const PUSHBACKS = 3;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
 const LAYOUT = 'redentore.bar';
-/** Where a newly unlocked ability without a slot of its own goes, best first: the touch fan has slots 0-8. */
-const SPARE = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 8, 0];
+/** Where a newly unlocked ability without a slot of its own goes, best first: the touch fan's slots 1-8 in thumb order, then the keys left, the big button last. */
+const SPARE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0];
 
 /**
  * The player's arrangement if one is stored and sound (12 slots, each empty or a distinct ability of `known`),

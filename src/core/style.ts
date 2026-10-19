@@ -25,3 +25,30 @@ export function onStyle(f: (diablo: boolean) => void): void {
   subs.push(f);
   f(diablo);
 }
+
+// The menu's "Grafica": Auto walks fx/atmosphere.ts's quality ladder on the frame rate, Alta and Bassa
+// pin its top and bottom rung. Persisted and subscribed like the style.
+export type Quality = 'auto' | 'alta' | 'bassa';
+export const QUALITIES: readonly Quality[] = ['auto', 'alta', 'bassa'];
+const QKEY = 'redentore.quality';
+
+let quality: Quality = 'auto';
+try { quality = QUALITIES.find((q) => q === localStorage.getItem(QKEY)) ?? 'auto'; } catch { /* blocked storage: auto */ }
+
+const qsubs: ((q: Quality) => void)[] = [];
+
+export function getQuality(): Quality {
+  return quality;
+}
+
+export function setQuality(q: Quality): void {
+  if (q === quality) return;
+  quality = q;
+  try { localStorage.setItem(QKEY, q); } catch { /* not persisted, still applied */ }
+  for (const f of qsubs) f(q);
+}
+
+export function onQuality(f: (q: Quality) => void): void {
+  qsubs.push(f);
+  f(quality);
+}

@@ -1322,5 +1322,6 @@ export const ABILITIES: Ability<Forsaken>[] = [
 
 for (const a of ABILITIES) a.school = SCHOOL[a.id]; // each school its own global cooldown
 
-/** Slot order on the bar; 0 - = stay free for later items. The wisp, like the other unlocks, takes the first free slot. */
-export const BAR: (string | null)[] = ['fall', 'plague', 'mend', 'strike', 'nova', 'veil', 'step', 'ward', 'potion', null, null, null];
+/** The starting bar: the main attack on the big button, the starting kit on the next slots, which on touch run
+ *  from the bottom-left of the thumb arc up (ui/actionBar.ts RING). Every unlock takes the next free slot. */
+export const BAR: (string | null)[] = ['fall', 'plague', 'mend', 'potion', null, null, null, null, null, null, null, null];

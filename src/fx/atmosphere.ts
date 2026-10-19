@@ -16,8 +16,10 @@ import { PHONE } from '../core/device.ts';
 // factor, eased from the HUD areas, blends fog, ambient, exposure and grading so walking
 // through a door feels like eyes adapting to the dark.
 //
-// Quality: `?fx=low` (or a sustained slow frame rate) drops the moon shadows and the
-// post chain, freeing their buffers; sky, torches, fog and particles stay. Phones start lean
+// Quality: a ladder walked one rung at a time on the smoothed frame rate, down after a few seconds
+// under ~28 fps, back up after longer over ~50 (see QUALITY). Each rung gives back what it stops
+// using; torches, lamps, the hero's light, emissive glow and the moon's shadows stay on every rung,
+// so the night never goes flat. `?fx=low` and the menu's "Grafica" pin a rung. Phones start lean
 // (`PHONE`): iOS kills a tab whose memory, GPU buffers included, outgrows a budget of about a
 // gigabyte, and reloads it, so their buffers are sized down from the start.
 
@@ -64,6 +66,16 @@ const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, h
 const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight
 const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
+/**
+ * Rungs, best first: 0 everything; 1 fewer pixels (the pixel ratio x0.7, at least 1); 2 half the moon's
+ * shadow map; 3 no post chain (bloom, grade), straight to the canvas. Down after `down.after` s under
+ * `down.fps`, up after `up.after` s over `up.fps`; a rung given up again after climbing back to it is
+ * not tried a third time, so the ladder settles instead of see-sawing.
+ */
+const QUALITY = { rungs: 3, down: { fps: 28, after: 4 }, up: { fps: 50, after: 8 }, settle: 3, pixels: 0.7 };
+const SHADOW = PHONE ? 1024 : 2048;
+/** Without the post chain the grade is gone: a lower exposure and a CSS vignette over the canvas (free to composite) keep the dark. */
+const BARE = { exposure: 0.8, vignette: 0.75 };
 
 const NOISE = /* glsl */ `
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -201,7 +213,13 @@ export class Atmosphere {
   indoor = 0;
   private mood: Record<keyof typeof MOOD, readonly [number, number]> = MOOD;
   private readonly hero = new THREE.PointLight(HERO_LIGHT.color, HERO_LIGHT.intensity, HERO_LIGHT.distance, HERO_LIGHT.decay);
-  private low = new URLSearchParams(location.search).get('fx') === 'low';
+  /** The rung of QUALITY the renderer stands on: 0 best, QUALITY.rungs no post chain. */
+  step = 0;
+  /** Walk the ladder on the frame rate; off when the menu or `?fx=low` pins a rung. */
+  auto = true;
+  private best = 0; // the best rung the ladder may still climb back to
+  private climbed = false; // the current rung was reached going up
+  private readonly pixelRatio: number;
   private readonly fog = new THREE.FogExp2(FOG_OUT.getHex(), MOOD.fog[0]);
   private readonly hemi = new THREE.HemisphereLight(0x5a74a0, 0x15130f, MOOD.hemi[0]);
   private readonly moon = new THREE.DirectionalLight(0xa9c2f0, MOON);
@@ -213,8 +231,11 @@ export class Atmosphere {
   private readonly dustMat: THREE.PointsMaterial;
   private readonly composer: EffectComposer;
   private readonly grade = new ShaderPass(GradeShader);
+  private readonly vignette = document.createElement('div');
   private t = 0;
   private slowFor = 0;
+  private fastFor = 0;
+  private settle = 5; // s before the frame rate counts: shader compiles at boot, buffers after a step
   private avgDt = 1 / 60;
 
   private readonly renderer: THREE.WebGLRenderer;
@@ -227,6 +248,7 @@ export class Atmosphere {
     this.scene = scene;
     this.camera = camera;
     this.level = level;
+    this.pixelRatio = renderer.getPixelRatio();
     this.torches = new Torches(level.lights);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.shadowMap.enabled = true;
@@ -242,7 +264,7 @@ export class Atmosphere {
     // Moon: crisp cold key light, shadow box following the player.
     this.moon.castShadow = true;
     const s = this.moon.shadow;
-    s.mapSize.setScalar(PHONE ? 1024 : 2048);
+    s.mapSize.setScalar(SHADOW);
     Object.assign(s.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 10, far: 320 });
     s.bias = -0.0004;
     s.normalBias = 0.04;
@@ -273,7 +295,12 @@ export class Atmosphere {
     this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
     this.setSize(innerWidth, innerHeight);
-    if (this.low) this.degrade('requested with ?fx=low');
+    this.vignette.style.cssText = 'position:fixed;inset:0;pointer-events:none;display:none;background:radial-gradient(ellipse at center, transparent 35%, #000 105%)';
+    renderer.domElement.after(this.vignette); // under the HUD, which comes later
+  }
+
+  private get low(): boolean {
+    return this.step === QUALITY.rungs;
   }
 
   setSize(w: number, h: number): void {
@@ -295,9 +322,10 @@ export class Atmosphere {
     this.moon.intensity = MOON + DIABLO_OPEN.moon * open;
     this.fog.density = lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k);
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
-    this.renderer.toneMappingExposure = lerp(mood.exposure, k) + DIABLO_OPEN.exposure * open;
+    this.renderer.toneMappingExposure = (lerp(mood.exposure, k) + DIABLO_OPEN.exposure * open) * (this.low ? BARE.exposure : 1);
     u.uCool.value = lerp(mood.cool, k);
     u.uVignette.value = lerp(mood.vignette, k) + DIABLO_OPEN.vignette * open;
+    if (this.low) this.vignette.style.opacity = (u.uVignette.value * BARE.vignette).toFixed(2);
     u.uContrast.value = (mood === DIABLO_MOOD ? GRADE.diablo : GRADE.wow).contrast + DIABLO_OPEN.contrast * open;
     this.dustMat.opacity = lerp(mood.dust, k);
     this.hero.position.set(focus.x, focus.y + HERO_LIGHT.height, focus.z);
@@ -324,10 +352,26 @@ export class Atmosphere {
     }
     p.needsUpdate = true;
 
-    // Auto fallback: ~4 s under ~25 fps (after a warm-up for shader compiles).
+    // The quality ladder, on the smoothed frame rate.
     this.avgDt += (dt - this.avgDt) * 0.05;
-    this.slowFor = this.t > 5 && this.avgDt > 0.04 ? this.slowFor + dt : 0;
-    if (!this.low && this.slowFor > 4) this.degrade(`slow frames (${(1 / this.avgDt).toFixed(0)} fps)`);
+    this.settle -= dt;
+    const fps = 1 / this.avgDt, { down, up } = QUALITY;
+    this.slowFor = this.auto && this.settle < 0 && fps < down.fps ? this.slowFor + dt : 0;
+    this.fastFor = this.auto && this.settle < 0 && fps > up.fps ? this.fastFor + dt : 0;
+    if (this.slowFor > down.after && this.step < QUALITY.rungs) {
+      if (this.climbed) this.best = this.step + 1; // it failed here once already
+      this.setStep(this.step + 1, `slow frames (${fps.toFixed(0)} fps)`);
+    } else if (this.fastFor > up.after && this.step > this.best) {
+      this.setStep(this.step - 1, `fast frames (${fps.toFixed(0)} fps)`);
+      this.climbed = true;
+    }
+  }
+
+  /** The menu's "Grafica": Auto walks the ladder from the top, Alta and Bassa pin its ends. */
+  setQuality(q: 'auto' | 'alta' | 'bassa'): void {
+    this.auto = q === 'auto';
+    this.best = 0;
+    if (q !== 'auto') this.setStep(q === 'alta' ? 0 : QUALITY.rungs, `set to ${q}`);
   }
 
   /** "Stile Diablo" on or off: mood and grade, brighter torches, and a warm light that follows the hero (one more light: programs recompile once). */
@@ -343,8 +387,8 @@ export class Atmosphere {
     else this.scene.remove(this.hero);
   }
 
-  /** Called after dropping to low quality (its light state rebuilds every program): main.ts warms them again. */
-  onDegrade?: () => void;
+  /** Called after the post chain goes or comes back (programs are keyed on the target they draw into): main.ts warms them again. */
+  onRebuild?: () => void;
 
   /**
    * Compile every material in the scene now, for both targets it may be drawn into (the HDR
@@ -366,25 +410,36 @@ export class Atmosphere {
   }
 
   /**
-   * Drop to low quality, giving back what high quality held: the post chain's buffers (on a phone the
-   * biggest allocation of the game), the shadow map, and every program built for shadows or the HDR
-   * buffer. Three keeps a material's old programs next to the new ones until the material is disposed,
-   * so without that the fallback, which a heavy fight on a phone triggers, piled a second set of programs
-   * and buffers on top of the first, the peak that got the tab killed.
+   * Stand on rung `n` of QUALITY, giving back what the rungs below it stop using, never holding two sets at
+   * once (iOS kills a tab past its memory budget, the peak that once came from a one-shot fallback piling
+   * a low-quality set on the high one). Fewer pixels and a smaller shadow map resize their buffers in
+   * place, without new programs. Without the post chain its buffers go (on a phone the biggest allocation
+   * of the game), and so does every program built for the HDR buffer: three keeps a material's old
+   * programs next to the new ones until the material is disposed. Coming back, the composer and its
+   * passes, which dispose only their GPU side, allocate again on their next draw.
    */
-  private degrade(why: string): void {
-    this.low = true;
-    this.moon.castShadow = false; // light state change recompiles programs without shadows
-    this.moon.shadow.map?.dispose();
-    this.moon.shadow.map = null;
-    for (const p of this.composer.passes) p.dispose();
-    this.composer.dispose();
-    this.scene.traverse((o) => { // only the GPU side goes: three builds a disposed material again on its next draw
-      const m = (o as THREE.Mesh).material;
-      if (m) for (const x of Array.isArray(m) ? m : [m]) x.dispose();
-    });
-    console.info(`[fx] low quality: ${why}`);
-    this.onDegrade?.();
+  setStep(n: number, why: string): void {
+    n = THREE.MathUtils.clamp(n, 0, QUALITY.rungs);
+    if (n === this.step) return;
+    const post = this.low;
+    this.step = n;
+    this.climbed = false;
+    this.slowFor = this.fastFor = 0;
+    this.settle = QUALITY.settle;
+    this.renderer.setPixelRatio(n >= 1 ? Math.max(1, this.pixelRatio * QUALITY.pixels) : this.pixelRatio);
+    this.setSize(innerWidth, innerHeight);
+    this.moon.shadow.mapSize.setScalar(n >= 2 ? SHADOW / 2 : SHADOW); // three resizes the map on its next shadow pass
+    if (this.low && !post) {
+      for (const p of this.composer.passes) p.dispose();
+      this.composer.dispose();
+      this.scene.traverse((o) => { // only the GPU side goes: three builds a disposed material again on its next draw
+        const m = (o as THREE.Mesh).material;
+        if (m) for (const x of Array.isArray(m) ? m : [m]) x.dispose();
+      });
+    }
+    console.info(`[fx] quality ${n}/${QUALITY.rungs}: ${why}`);
+    this.vignette.style.display = this.low ? '' : 'none';
+    if (this.low !== post) this.onRebuild?.();
   }
 }
 

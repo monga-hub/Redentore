@@ -19,11 +19,13 @@ import { ICONS } from './icons.ts';
 // a hit that sets the cast bar back flashes it red as the fill jumps back.
 
 /** Touch ring placement per bar slot: [angle (180 = left of the corner, 90 = above), radius px, diameter px].
- *  About 20 px of gap between neighbours and between the arcs, so a thumb lands on one button only. */
+ *  About 20 px of gap between neighbours and between the arcs, so a thumb lands on one button only.
+ *  Slots follow the thumb: the inner arc from its bottom-left button up to its top-right one, then the
+ *  outer arc the same way, so keys 2..9 and the bar's fill order (SPARE in abilities/system.ts) match. */
 const RING: Record<number, [number, number, number]> = {
   0: [0, 0, 96], // the big one, in the corner
-  1: [95, 120, 58], 2: [125, 120, 58], 5: [155, 120, 58], 6: [185, 120, 58],
-  3: [92, 196, 54], 4: [114, 196, 54], 7: [136, 196, 54], 8: [158, 196, 54], // + jump at 180 (index.html)
+  1: [185, 120, 58], 2: [155, 120, 58], 3: [125, 120, 58], 4: [95, 120, 58],
+  5: [158, 196, 54], 6: [136, 196, 54], 7: [114, 196, 54], 8: [92, 196, 54], // + jump at 180 (index.html)
 };
 
 interface Slot<C extends Caster> {

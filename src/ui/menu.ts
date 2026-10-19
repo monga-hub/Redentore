@@ -1,6 +1,6 @@
 import attribution from '../../ATTRIBUTION.md?raw';
 import { getAudio, setAudio, type AudioSettings } from '../audio/engine.ts';
-import { isDiablo, setDiablo } from '../core/style.ts';
+import { getQuality, isDiablo, QUALITIES, setDiablo, setQuality } from '../core/style.ts';
 import { clearAutosave, save, setPending, slots, type GameState, type Slot } from '../core/save.ts';
 import { ICONS } from './icons.ts';
 
@@ -91,6 +91,10 @@ export function credits(md: string): string {
 const styleBtn = () => `<button class="btn style" data-do="style" aria-pressed="${isDiablo()}"><span>Stile Diablo<br><small>${isDiablo()
   ? 'Visuale isometrica, clic per muoverti e attaccare' : 'Ora: camera in terza persona (WoW)'}</small></span><i aria-hidden="true"></i></button>`;
 
+/** The "Grafica" button: each tap moves Auto -> Alta -> Bassa and back. */
+const QUALITY_HINT = { auto: 'Si adatta al telefono, scende se rallenta', alta: 'Sempre al massimo: luci, ombre, bagliore', bassa: 'Più fluida: meno pixel, niente bagliore' };
+const qualityBtn = () => `<button class="btn style" data-do="quality"><span>Grafica: ${getQuality()[0].toUpperCase() + getQuality().slice(1)}<br><small>${QUALITY_HINT[getQuality()]}</small></span></button>`;
+
 export const playTime = (s: number) => {
   const m = Math.floor(s / 60);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
@@ -177,7 +181,7 @@ export class Menu {
         <button class="btn" data-go="save">Salva partita</button>
         <button class="btn" data-go="load">Carica partita</button>
         <button class="btn" data-go="audio">Audio</button>
-        ${styleBtn()}<hr>
+        ${styleBtn()}${qualityBtn()}<hr>
         <button class="btn" data-do="new">Nuova partita</button>
         <button class="btn" data-go="credits">Crediti</button>
         <button class="btn" data-do="exit">Esci</button></div>`;
@@ -229,6 +233,11 @@ export class Menu {
       setDiablo(!isDiablo());
       b.outerHTML = styleBtn();
       this.el.querySelector<HTMLElement>('[data-do="style"]')!.focus();
+    }
+    else if (d === 'quality') {
+      setQuality(QUALITIES[(QUALITIES.indexOf(getQuality()) + 1) % QUALITIES.length]);
+      b.outerHTML = qualityBtn();
+      this.el.querySelector<HTMLElement>('[data-do="quality"]')!.focus();
     }
     else if (slot !== undefined) this.slot(+slot);
   }

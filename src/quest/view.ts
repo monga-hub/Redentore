@@ -252,20 +252,15 @@ export class QuestView {
 
   /** While the world is paused for the dialogue (main.ts): only the speaker moves. */
   idle(dt: number, player: THREE.Vector3): void {
-    this.npc.update(dt, player, this.offering());
-    this.speziale.update(dt, player, this.blessing());
-    this.iseppo.update(dt, player, this.quest.side.marker(this.quest.boss2Dead));
+    this.marks(dt, player);
   }
 
-  /** Fra' Zuane has a quest to give or to hear about: his marker is up. */
-  private offering(): boolean {
-    return ['talk', 'report', 'offer', 'return'].includes(this.quest.stage) || this.quest.relic && !this.quest.relicBack;
-  }
-
-  /** Fra' Bortolo has an infusion to give (the first, or on the road to the Zitelle the second), the heads to ask for or the rite to perform. */
-  private blessing(): boolean {
-    const q = this.quest;
-    return !q.blessed || (q.accepted2 && !q.blessed2 && !q.boss2Dead) || this.asking() || q.headsReady(this.friars());
+  /** The three of them, each under his "!" or "?" (Quest.marks). */
+  private marks(dt: number, player: THREE.Vector3): void {
+    const m = this.quest.marks(this.friars());
+    this.npc.update(dt, player, m.zuane);
+    this.speziale.update(dt, player, m.speziale);
+    this.iseppo.update(dt, player, m.iseppo);
   }
 
   /** He has Le teste dei frati to give: not yet taken and friars still about. */
@@ -440,9 +435,7 @@ export class QuestView {
       this.track(stage, false);
     }
     this.payout(dt);
-    this.npc.update(dt, player, this.offering());
-    this.speziale.update(dt, player, this.blessing());
-    this.iseppo.update(dt, player, this.quest.side.marker(this.quest.boss2Dead));
+    this.marks(dt, player);
     const spots = this.quest.side.spots();
     for (const f of this.finds) {
       f.m.visible = spots.some((s) => s.q === f.q);

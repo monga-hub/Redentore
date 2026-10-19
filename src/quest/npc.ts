@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { loadModel, stand } from '../core/models.ts';
+import type { Mark } from './progress.ts';
 
 // Fra' Zuane on the fondamenta (see quest/dialogue.ts for who he is): a Meshy ghost of an old
 // Capuchin porter, rigged with Meshy and animated from its library. He breathes in place, turns
-// to whoever talks to him and talks with his hands, and wears WoW's gold "!" while his quest is
-// on offer. Not a mob: no collider beyond his own small box (quest/progress.ts), no health, and
+// to whoever talks to him and talks with his hands, and wears WoW's gold "!" while a quest is
+// on offer, its gold "?" while one is ready to hand in. Not a mob: no collider beyond his own small box (quest/progress.ts), no health, and
 // nothing in the game targets or hurts him. Fra' Bortolo in the serra is the same ghost glowing
 // green, and Mastro Iseppo in the squero a Meshy boatwright glowing like a lantern: `Npc` takes where it stands, the tint and the body.
 
@@ -13,8 +14,8 @@ const FADE = 0.4; // s between idle and talking
 const TURN = 4; // rad/s toward the player while talking
 const GHOST = 0x8fdcff; // Fra' Zuane's self-glow
 
-/** The gold "!" over a quest giver's head, drawn on a canvas. */
-function marker(): THREE.Sprite {
+/** The gold `ch` ("!" or "?") over a quest giver's head, drawn on a canvas. */
+function marker(ch: string): THREE.Sprite {
   const c = document.createElement('canvas');
   c.width = 64; c.height = 128;
   const g = c.getContext('2d')!;
@@ -23,11 +24,11 @@ function marker(): THREE.Sprite {
   g.textBaseline = 'middle';
   g.lineWidth = 10;
   g.strokeStyle = '#1a0d00';
-  g.strokeText('!', 32, 68);
+  g.strokeText(ch, 32, 68);
   const grad = g.createLinearGradient(0, 16, 0, 120);
   grad.addColorStop(0, '#fff3a0'); grad.addColorStop(0.5, '#ffd200'); grad.addColorStop(1, '#c07a00');
   g.fillStyle = grad;
-  g.fillText('!', 32, 68);
+  g.fillText(ch, 32, 68);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), fog: false, depthWrite: false }));
   s.material.map!.colorSpace = THREE.SRGBColorSpace;
   s.scale.set(0.3, 0.6, 1);
@@ -44,7 +45,7 @@ export class Npc {
   private idle?: THREE.AnimationAction;
   private talks: THREE.AnimationAction[] = [];
   private current?: THREE.AnimationAction;
-  private mark = marker();
+  private marks = { offer: marker('!'), ready: marker('?') };
   private time = 0;
   talking = false;
 
@@ -53,8 +54,7 @@ export class Npc {
     this.at = at;
     this.root.position.set(at.x, 0, at.z);
     this.root.rotation.y = at.yaw;
-    this.mark.position.y = HEIGHT + 0.55;
-    this.root.add(this.mark);
+    for (const m of Object.values(this.marks)) this.root.add(m);
     loadModel(model).then((gltf) => {
       const model = gltf.scene;
       stand(model, HEIGHT);
@@ -80,12 +80,14 @@ export class Npc {
     this.current = a;
   }
 
-  /** `player`: the hero's feet; `offer`: he has something for the hero, the "!" is up. */
-  update(dt: number, player: THREE.Vector3, offer: boolean): void {
+  /** `player`: the hero's feet; `mark`: the "!" or "?" over his head (Quest.marks). */
+  update(dt: number, player: THREE.Vector3, mark: Mark): void {
     const at = this.at;
     this.time += dt;
-    this.mark.visible = offer && !this.talking;
-    this.mark.position.y = HEIGHT + 0.55 + Math.sin(this.time * 2.5) * 0.06;
+    for (const [k, m] of Object.entries(this.marks)) {
+      m.visible = k === mark && !this.talking;
+      m.position.y = HEIGHT + 0.55 + Math.sin(this.time * 2.5) * 0.06;
+    }
     const want = this.talking ? Math.atan2(-(player.x - at.x), -(player.z - at.z)) : at.yaw;
     const d = Math.atan2(Math.sin(want - this.root.rotation.y), Math.cos(want - this.root.rotation.y));
     this.root.rotation.y += Math.sign(d) * Math.min(Math.abs(d), TURN * dt);

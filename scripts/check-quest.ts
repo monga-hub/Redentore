@@ -195,7 +195,7 @@ bag.add('forbici-maestra');
 hand('maestra');
 if (sq.prompt(exvoto)?.act?.() !== "Hai trovato l'ex voto di Mastro Iseppo") fail('the ex voto cannot be picked up in the Redentore');
 hand('exvoto');
-if (side.open().length || side.marker()) fail('he still has something once the chain is done');
+if (side.open().length || side.handInReady() || sq.marks(0).iseppo) fail('he still has something once the chain is done');
 let zk = 0;
 while (!side.loot('zitella', () => 0, false, never) && zk < 1000) zk++;
 if (zk !== Math.ceil((1 - LETTER_DROP.base) / LETTER_DROP.ramp)) fail(`the letter's bad-luck ramp ends after ${zk} kills`);
@@ -213,6 +213,26 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
 
 // The drowned rise again like the orto's friars: late, out of the hero's way, at their spot, worth less.
 const l2 = spawnLevel2(level.world), g0 = l2.all.find((m) => m.kind === GONDOLIERE)!;
+// The markers (Quest.marks): "!" on offer, "?" ready to hand in, "?" over "!", none when idle.
+{
+  const q = new Quest(level.world), m = () => q.marks(1), is = (who: 'zuane' | 'speziale' | 'iseppo', w: string | undefined, why: string) => { if (m()[who] !== w) fail(`${who} shows ${m()[who]}, want ${w}: ${why}`); };
+  is('zuane', 'offer', 'his first quest'); is('speziale', 'offer', 'his blessing'); is('iseppo', 'offer', 'his first quest');
+  q.accepted = q.blessed = true;
+  is('zuane', undefined, 'quest running'); is('speziale', 'ready', 'found, as Fra\' Zuane asked');
+  q.found = true; q.asked = true; q.heads = HEADS.need;
+  is('speziale', 'ready', 'the heads in hand');
+  q.boon = 'vigore';
+  is('speziale', undefined, 'nothing left for him');
+  q.relic = true;
+  is('zuane', 'ready', 'the corona in hand');
+  q.relicBack = q.key = q.bossDead = q.out = true;
+  for (const g of q.gates) q.open(g);
+  is('zuane', 'ready', 'the first quest to report');
+  q.reported = true;
+  is('zuane', 'offer', 'the second quest');
+  const b = new Bag(); q.side.bag = b; q.side.taken.push('lumi'); q.side.kills.lumi = 99;
+  is('iseppo', 'ready', '"?" over "!" with a quest done and another on offer');
+}
 const far = { x: g0.home.x + RISE.away + 5, y: 0, z: g0.home.z }, near = { x: g0.home.x + 5, y: 0, z: g0.home.z };
 g0.x += 3;
 killAll([g0]);

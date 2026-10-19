@@ -211,9 +211,9 @@ export class SideQuests {
     return SIDE.filter((q) => q.want.kind !== 'letter' && !this.taken.includes(q.id) && !this.done.includes(q.id) && (!q.after || this.done.includes(q.after)));
   }
 
-  /** His "!" is up: a quest to give or one to hear about. */
-  marker(over = false): boolean {
-    return this.open().length > 0 || SIDE.some((q) => this.ready(q, over));
+  /** A quest of his is ready to hand in: his "?" is up (Quest.marks). */
+  handInReady(over = false): boolean {
+    return SIDE.some((q) => this.ready(q, over));
   }
 
   /** A quest handed in: its XP, gold and banner (Quest.complete, set by Quest). */

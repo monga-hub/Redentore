@@ -134,6 +134,10 @@ const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
 export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | 'iseppo' }
 
+/** WoW's marker over a quest giver: gold "?" with a quest ready to hand in, gold "!" with one on offer, else none. */
+export type Mark = 'ready' | 'offer' | undefined;
+const mark = (ready: boolean, offer: boolean): Mark => (ready ? 'ready' : offer ? 'offer' : undefined); // "?" wins
+
 export class Quest {
   accepted = false; // Fra' Zuane's quest taken
   key = false;
@@ -217,6 +221,17 @@ export class Quest {
     if (!this.out || this.reported) return false;
     this.reported = true;
     return this.complete('reverendissimo');
+  }
+
+  /** Every quest giver's marker (`alive`: friars left, for Fra' Bortolo's heads); quest/view.ts hangs them over their heads. */
+  marks(alive: number): Record<NonNullable<Prompt['talk']>, Mark> {
+    const s = this.stage, over = this.boss2Dead;
+    return {
+      zuane: mark(s === 'report' || s === 'return' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer'),
+      speziale: mark((this.accepted && !this.found) || this.headsReady(alive),
+        !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (!this.asked && !this.bossDead && alive > 0)),
+      iseppo: mark(this.side.handInReady(over), this.side.open().length > 0),
+    };
   }
 
   /** Fra' Bortolo is found, once Fra' Zuane has sent the hero looking. */

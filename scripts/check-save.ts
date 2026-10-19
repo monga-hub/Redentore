@@ -5,7 +5,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, QUESTS, Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, takePending, type Game } from '../src/core/save.ts';
+import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, startup, takePending, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
@@ -197,6 +197,22 @@ if (resume(store)) fail('junk autosave resumed');
 autosave(s, store);
 clearAutosave(store);
 if (resume(store)) fail('autosave survived a new game');
+// The menu's handoffs across the reload win over the autosave the old page makes on its way out (the reload's
+// visibilitychange): "Nuova partita" boots afresh and stays fresh, a load becomes the run in progress, a cold boot resumes.
+autosave(s, store);
+clearAutosave(store); setPending('new', store); // "Nuova partita"
+autosave(s, store); // the old page, hidden by its reload
+let up = startup(store, store);
+if (up.state || !up.queued || resume(store)) fail('"Nuova partita" resumed the old run');
+if (startup(store, store).state) fail('the old run came back on the next cold boot');
+autosave(s, store);
+setPending(zs, store); // "Carica"
+autosave(s, store);
+up = startup(store, store);
+if (JSON.stringify(up.state) !== JSON.stringify(zs) || JSON.stringify(resume(store)) !== JSON.stringify(zs)) fail('a load left the old run as the one in progress');
+up = startup(store, store); // iOS killed it: the cold boot resumes the loaded run
+if (up.queued || JSON.stringify(up.state) !== JSON.stringify(zs)) fail('cold boot after a load did not resume it');
+clearAutosave(store);
 // Level 2 through the autosave: the second quest's stage, its open doors and its checkpoint come back.
 autosave(zs, store);
 const zr = boot();

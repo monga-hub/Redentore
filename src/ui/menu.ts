@@ -235,7 +235,7 @@ export class Menu {
     else if (d === 'close') this.close();
     else if (d === 'book') { this.close(); this.hooks.book?.(); }
     else if (d === 'back') this.show(this.from);
-    else if (d === 'new') { clearAutosave(); location.reload(); } // a clean boot is a clean start
+    else if (d === 'new') { clearAutosave(); setPending('new'); location.reload(); } // a clean boot is a clean start (save.ts's `startup`)
     else if (d === 'l2') this.hooks.levelTwo?.();
     else if (d === 'exit') this.show('title');
     else if (d === 'style') {

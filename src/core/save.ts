@@ -174,16 +174,28 @@ export function save(i: number, slot: Slot, store: Storage = localStorage): bool
   try { store.setItem(SLOT_KEY(i), JSON.stringify(slot)); return true; } catch { return false; }
 }
 
-/** Queue `s` for the next boot (see `takePending`). */
-export function setPending(s: GameState, store: Storage = sessionStorage): boolean {
+/** Queue `s` for the next boot (see `takePending`), or 'new' for "Nuova partita". */
+export function setPending(s: GameState | 'new', store: Storage = sessionStorage): boolean {
   try { store.setItem(PENDING, JSON.stringify(s)); return true; } catch { return false; }
 }
 
-/** The state queued by the last load, once: it is cleared so a later refresh starts afresh. */
-export function takePending(store: Storage = sessionStorage): GameState | undefined {
+/** The state queued by the last load (or 'new'), once: it is cleared so a later refresh starts afresh. */
+export function takePending(store: Storage = sessionStorage): GameState | 'new' | undefined {
   const s = read(store, PENDING);
   try { store.removeItem(PENDING); } catch { /* blocked storage: nothing was queued either */ }
-  return valid(s) ? s : undefined;
+  return s === 'new' || valid(s) ? s : undefined;
+}
+
+/**
+ * The game a boot starts: what the menu queued across the reload, else the run in progress (undefined: a new game).
+ * The queued one becomes the run in progress, as the page that queued it may have autosaved its own run on the way out
+ * (the reload's `visibilitychange`, main.ts): that run came back on a "Nuova partita", and on a cold boot after a load.
+ */
+export function startup(session: Storage = sessionStorage, local: Storage = localStorage): { state?: GameState; queued: boolean } {
+  const p = takePending(session);
+  if (p === 'new') clearAutosave(local);
+  else if (p) autosave(p, local);
+  return p ? { state: p === 'new' ? undefined : p, queued: true } : { state: resume(local), queued: false };
 }
 
 /** Keep `s` as the run in progress (main.ts, out of combat only, so a resume never lands mid-fight). False when storage is full or blocked. */

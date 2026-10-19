@@ -33,7 +33,7 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { autosave, deserialize, questXpIn, resume, serialize, setPending, takePending, type Game } from './core/save.ts';
+import { autosave, deserialize, questXpIn, serialize, setPending, startup, type Game } from './core/save.ts';
 import { BAR, install, migration, prepared } from './core/prepared.ts';
 import { isDiablo, onQuality, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
@@ -180,8 +180,7 @@ const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each 
 const worthOf = (i: number) => ((mobs[i] as { again?: boolean }).again ? Math.ceil(worth[i] * RISE.xp) : worth[i]); // a risen friar, a quarter
 const levelTwo = prepared(serialize(game), mobs.length - zitelle.all.length, level.areas); // the hero ready for level 2, off this fresh boot (level 1's mobs come first)
 if (swap) install(levelTwo); // resumed just below
-const pending = takePending(); // a slot picked in the menu, carried across the reload
-const loaded = pending ?? resume(); // or the run in progress: a tab iOS killed for memory and reloaded, the home-screen app relaunched
+const { state: loaded, queued: pending } = startup(); // a slot picked in the menu, carried across the reload, or the run in progress: a tab iOS killed for memory and reloaded, the home-screen app relaunched
 if (loaded) {
   deserialize(game, loaded);
   cam.yaw = player.facing;

@@ -1,4 +1,4 @@
-// The hero's fall, Diablo style: the world drains to grey under a dark vignette and "Sei morto" fades in,
+// The hero's fall, Diablo style: the world drains to grey under a dark vignette and "You are dead" fades in,
 // gilded like the victory banner. main.ts shows it on the death and hides it on the wake-up, where the grey
 // fades back out. Plain DOM over the canvas: a CSS filter on the canvas, no extra render pass.
 
@@ -22,7 +22,7 @@ export class DeathScreen {
     const style = document.createElement('style');
     style.textContent = CSS;
     this.el.id = 'death';
-    this.el.innerHTML = '<b>Sei morto</b>';
+    this.el.innerHTML = '<b>You are dead</b>';
     document.head.append(style);
     document.body.append(this.el);
     canvas.classList.add('fade');

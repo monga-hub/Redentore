@@ -110,6 +110,8 @@ export class Drops {
   private readonly world: World;
   private readonly bag: Bag;
   private readonly camera: THREE.Camera;
+  /** Asked at each death that drops: an extra item id to throw out too (Fra' Zuane's corona, main.ts). */
+  extra?: () => string | undefined;
 
   constructor(droppers: Dropper[], world: World, bag: Bag, camera: THREE.Camera) {
     this.world = world;
@@ -187,6 +189,8 @@ export class Drops {
         const d = roll(k.tier, Math.random, k.level), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body
         for (const g of d.gold) this.spawn(m.x, m.y, m.z, g, '', far);
         for (const id of d.items) this.spawn(m.x, m.y, m.z, 0, id, far);
+        const x = this.extra?.();
+        if (x) this.spawn(m.x, m.y, m.z, 0, x, far);
       }
       k.dead = dead;
     }

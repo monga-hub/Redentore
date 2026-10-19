@@ -136,12 +136,13 @@ export class BagPanel {
     this.kind('b', {
       tip: (what, tap) => {
         const s = this.bag.items[Number(what)], it = ITEM.get(s.id)!;
-        const verb = this.selling ? `vendi per ${(sellPrice(it) * s.n).toLocaleString('it-IT')} oro` : it.slot ? 'indossa' : '';
+        const verb = it.quest ? '' : this.selling ? `vendi per ${(sellPrice(it) * s.n).toLocaleString('it-IT')} oro` : it.slot ? 'indossa' : '';
         return itemTip(it, { n: s.n, worn: it.slot ? ITEM.get(this.gear.worn[it.slot] ?? '') : null, hint: verb && `${tap ? 'Tocca di nuovo' : 'Clic'}: ${verb}` });
       },
       use: (what) => {
         const i = Number(what), it = ITEM.get(this.bag.items[i]?.id ?? '');
         if (!it) return;
+        if (it.quest) return this.say('Fra’ Zuane la aspetta, sulla fondamenta.');
         if (this.selling) return this.selling(i);
         if (!it.slot) return this.say('Questo non si indossa: Fra’ Bortolo potrebbe comprarlo.');
         this.say(this.gear.wear(this.bag, i));

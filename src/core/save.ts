@@ -12,8 +12,8 @@ import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 
 const VERSION = 1;
-/** The second quest's flags on Quest, saved as they are. */
-const LEVEL2 = ['reported', 'accepted2', 'arrived', 'key2', 'boss2Dead', 'reported2', 'blessed2'] as const;
+/** Flags on Quest saved as they are: the second quest's, and Fra' Zuane's corona found and given back. */
+const LEVEL2 = ['reported', 'accepted2', 'arrived', 'key2', 'boss2Dead', 'reported2', 'blessed2', 'relic', 'relicBack'] as const;
 const SLOT_KEY = (i: number) => `redentore.save.${i}`;
 const PENDING = 'redentore.pending'; // sessionStorage: the state to apply on the next boot
 const AUTO = 'redentore.auto'; // localStorage: the run in progress, resumed by a boot with nothing pending
@@ -27,7 +27,8 @@ export interface GameState {
   // the boss; absent in saves from before him, which load with the quest already taken. blessed/blessLeft:
   // Fra' Bortolo's blessing taken and the s of it left; absent in saves from before him: not taken.
   // Level 2 (all absent in older saves: false): reported (first quest handed in), accepted2 (La dote delle Zitelle taken),
-  // arrived (reached the Zitelle), key2 (the Maestra's key), boss2Dead, reported2, blessed2 (Fra' Bortolo's second infusion).
+  // arrived (reached the Zitelle), key2 (the Maestra's key), boss2Dead, reported2, blessed2 (Fra' Bortolo's second infusion);
+  // relic, relicBack: Fra' Zuane's corona picked up and given back (absent: false).
   quest: { key: boolean; gates: string[]; bossDead: boolean; accepted?: boolean; out?: boolean; blessed?: boolean; blessLeft?: number }
     & Partial<Record<typeof LEVEL2[number], boolean>>;
   dead: number[]; // indices into Game.mobs

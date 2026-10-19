@@ -2,7 +2,7 @@
 // boss always yields the nail and showers gold, gear drops get better by tier; the bag stacks by id
 // (gear one per slot), refuses what does not fit and round-trips. Gear: the stat math, wearing from
 // the bag (swapping), taking off, selling at a quarter, buying epics, crits, and the save of what is worn.
-import { Bag, ITEM, ITEMS, RARITY, TABLES, roll, type Tier } from '../src/loot/bag.ts';
+import { Bag, ITEM, ITEMS, RARITY, RELIC, RELIC_PRIZE, TABLES, roll, type Tier } from '../src/loot/bag.ts';
 import { ARMOR_K, CRIT_BASE, Equipment, GEAR, SHOP, STARTER, shop, buy, buyPrice, crit, effects, sell, sellPrice, totals, worth } from '../src/loot/gear.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -81,6 +81,12 @@ if (!sold || sold.n !== 3 || bag2.gold !== 10 + 3 * sellPrice(ITEM.get('falange'
 if (buy(bag2, ITEM.get('pastorale')!) !== 'Non hai abbastanza oro.' || bag2.count('pastorale')) fail('bought without the gold');
 bag2.gold = 1000;
 if (buy(bag2, ITEM.get('pastorale')!) || bag2.gold !== 1000 - 624 || !bag2.count('pastorale')) fail('buy');
+// Fra' Zuane's corona: no table rolls it, Fra' Bortolo won't buy it; nor does any table roll his medal, which is worn on the neck.
+for (const t of Object.keys(TABLES) as Tier[]) for (const lv of [1, 2] as const) for (let i = 0; i < 2000; i++) if (roll(t, Math.random, lv).items.some((id) => id === RELIC || id === RELIC_PRIZE)) fail(`${t} rolled the corona or the medal`);
+const rb = new Bag();
+rb.add(RELIC);
+if (sell(rb, 0, (id) => ITEM.get(id)) || !rb.count(RELIC)) fail('sold the corona');
+if (ITEM.get(RELIC_PRIZE)?.slot !== 'amuleto' || !buyPrice(ITEM.get(RELIC_PRIZE)!)) fail('the medal is not a priced neck piece');
 const g2 = new Equipment();
 g2.decode(JSON.parse(JSON.stringify({ ...gear.encode(), anello: 'saio-voto', amuleto: 'from_the_future' })));
 if (JSON.stringify(g2.encode()) !== JSON.stringify(gear.encode())) fail('gear round-trip keeps junk or loses pieces');

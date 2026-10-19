@@ -18,8 +18,8 @@ export const RARITY: Record<Rarity, { name: string; color: string }> = {
 export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | 'skull' | 'nail'
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
-/** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. */
-export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true }
+/** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it. */
+export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; quest?: true }
 
 export const ITEMS: readonly Item[] = [
   { id: 'rosario-bosso', name: 'Rosario di bosso', rarity: 'comune', icon: 'rosary', lore: 'Grani consumati da mille Ave Maria sussurrate nella peste.' },
@@ -41,6 +41,8 @@ export const ITEMS: readonly Item[] = [
   { id: 'merletto', name: 'Ritaglio di punto in aria', rarity: 'raro', icon: 'relic', lore: 'Un palmo di merletto bianco. Ogni nodo è stretto attorno a un nome.', l2: true },
   { id: 'dote', name: 'Borsa della dote', rarity: 'epico', icon: 'relic', lore: 'Monete di cent’anni diversi, e nessuna sposa.', l2: true },
   { id: 'filo-oro', name: 'Filo d’oro del velo', rarity: 'leggendario', icon: 'rosary', lore: 'Il primo e l’ultimo punto del velo. Tira, se hai coraggio.', l2: true },
+  // Fra' Zuane's keepsake (quest/progress.ts rollRelic): off any of the dead, once a run.
+  { id: 'corona-zuane', name: 'Corona del portinaio', rarity: 'leggendario', icon: 'rosary', lore: 'Grani d’ulivo e una medaglietta consumata dal pollice. Fra’ Zuane la perse nell’orto: riportagliela, sulla fondamenta.', quest: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));
@@ -61,6 +63,8 @@ export const TABLES: Record<Tier, Table> = {
 };
 export const BOSS_PRIZE = 'chiodo'; // the Reverendissimo's fall always yields the nail
 export const BOSS2_PRIZE = 'filo-oro'; // the Governatrice's, the golden thread
+export const RELIC = 'corona-zuane'; // Fra' Zuane's lost rosary
+export const RELIC_PRIZE = 'medaglia-portinaio'; // what he gives for it (loot/gear.ts)
 /** Level 2's dead are richer: gold × this. */
 const GOLD2 = 1.6;
 
@@ -74,7 +78,7 @@ export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 =
   const items: string[] = tier === 'boss' ? [prize] : [];
   for (let i = 0; i < t.items; i++) {
     if (rnd() >= t.chance) continue;
-    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && (mine(x) || (level === 2 && !x.l2 && r === 'comune')));
+    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && (mine(x) || (level === 2 && !x.l2 && r === 'comune')));
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   const g = t.gear;

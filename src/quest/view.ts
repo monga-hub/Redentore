@@ -6,7 +6,7 @@ import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Dialogue } from '../ui/dialogue.ts';
 import { ICONS } from '../ui/icons.ts';
-import { OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, titleOf } from './dialogue.ts';
+import { OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, titleOf } from './dialogue.ts';
 import { Npc } from './npc.ts';
 import { BLESSING, CHEST, NPC, REWARD, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
 
@@ -103,6 +103,10 @@ export class QuestView {
   shop?: () => void;
   /** A quest handed in: main.ts puts its gold in the bag. */
   reward?: (gold: number) => void;
+  /** Fra' Zuane takes his corona back: main.ts swaps it in the bag for his medal and returns the medal's name. */
+  relicBack?: () => string;
+  private returning = false; // his window is the corona's
+  private side = false; // the corona's line is on the tracker
   private shown = '';
   private tapped = false;
 
@@ -150,7 +154,9 @@ export class QuestView {
     document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.buffEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
-      if (this.npc.talking) this.paid(); // a report heard, even if the next quest is turned down
+      if (this.returning) this.thanked(); // his corona back
+      else if (this.npc.talking) this.paid(); // a report heard, even if the next quest is turned down
+      this.returning = false;
       this.npc.talking = false;
       if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
@@ -163,6 +169,15 @@ export class QuestView {
     if (!r) return;
     this.reward?.(r.gold);
     this.news.push(`Ricompensa: ${r.xp} esperienza, ${r.gold} oro`);
+  }
+
+  /** Fra' Zuane has his corona back: the medal, the gold and the XP (derived from the flags, main.ts), once. */
+  private thanked(): void {
+    if (!this.quest.returnRelic()) return;
+    const r = REWARD.relic, medal = this.relicBack?.();
+    this.reward?.(r.gold);
+    playSfx('quest', null, { rate: 0.84, gain: 1.3 });
+    this.news.push(`Missione compiuta: ${RELIC_TITLE}`, `Ricompensa: ${r.xp} esperienza, ${r.gold} oro${medal ? `, ${medal}` : ''}`);
   }
 
   /** Fra' Bortolo's blessing lands on the hero: a rush of rue and gold round them, a chime, a notice. */
@@ -201,7 +216,7 @@ export class QuestView {
 
   /** Fra' Zuane has a quest to give or to hear about: his marker is up. */
   private offering(): boolean {
-    return ['talk', 'report', 'offer', 'return'].includes(this.quest.stage);
+    return ['talk', 'report', 'offer', 'return'].includes(this.quest.stage) || this.quest.relic && !this.quest.relicBack;
   }
 
   /** Fra' Bortolo has an infusion to give: the first, or on the road to the Zitelle the second. */
@@ -213,7 +228,8 @@ export class QuestView {
   /** The tracker's lines; `fresh` flashes the objective as new. */
   private track(stage: Stage, fresh: boolean): void {
     this.trackEl.classList.toggle('done', stage === 'done');
-    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>`;
+    this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>`
+      + (this.side ? `<b>${RELIC_TITLE}</b><span>${RELIC_OBJECTIVE}</span>` : '');
   }
 
   private gate(g: Gate, iron: THREE.Material): GateView {
@@ -290,9 +306,9 @@ export class QuestView {
       if (n) notices.push(n);
       if (pr.talk === 'zuane') {
         this.npc.talking = true;
-        const stage = this.quest.stage;
-        const accept = stage === 'talk' ? () => { this.quest.accepted = true; } : stage === 'report' || stage === 'offer' ? () => { this.paid(); this.quest.accept2(); } : undefined;
-        this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, TALK[stage], accept);
+        const stage = this.quest.stage, relic = this.returning = this.quest.relic && !this.quest.relicBack; // the corona first: the quest's talk waits for the next one
+        const accept = relic ? undefined : stage === 'talk' ? () => { this.quest.accepted = true; } : stage === 'report' || stage === 'offer' ? () => { this.paid(); this.quest.accept2(); } : undefined;
+        this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, relic ? RELIC_TALK : TALK[stage], accept);
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
         const q = this.quest;
@@ -312,8 +328,12 @@ export class QuestView {
       else if (stage === 'route') notices.push(`Missione accettata: ${QUEST2_TITLE}`);
       else if (was && !done) notices.push(OBJECTIVE[stage]);
       if (was) playSfx('quest', null, done ? { rate: 0.84, gain: 1.3 } : {}); // complete: lower and fuller
+      this.side = this.quest.relic && !this.quest.relicBack;
       this.track(stage, !!this.stage);
       this.stage = stage;
+    } else if (this.side !== (this.quest.relic && !this.quest.relicBack)) { // the corona found or given back
+      this.side = !this.side;
+      this.track(stage, false);
     }
     this.npc.update(dt, player, this.offering());
     this.speziale.update(dt, player, this.blessing());

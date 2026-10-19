@@ -131,6 +131,12 @@ const l1 = boot();
 deserialize(l1, (({ quest: { reported: _r, accepted2: _a2, arrived: _ar, key2: _k, boss2Dead: _b, reported2: _r2, blessed2: _b2, ...q }, ...o }) => ({ ...o, quest: { ...q, gates: ['grata-nord', 'coro', 'portone'] } }))(zs));
 if (l1.quest.stage !== 'report' || l1.quest.gate('catene').open) fail(`a finished level-1 save loads at ${l1.quest.stage}`);
 if (valid({ ...zs, quest: { ...zs.quest, key2: 1 } })) fail('level 2 flag validation');
+// Fra' Zuane's corona: found and given back survive a save; a save from before it loads with it still lost.
+const rz = boot();
+deserialize(rz, { ...zs, quest: { ...zs.quest, relic: true, relicBack: true } });
+const rs = JSON.parse(JSON.stringify(serialize(rz)));
+if (!rz.quest.relic || !rz.quest.relicBack || !rs.quest.relic || !rs.quest.relicBack) fail('the corona\'s flags do not survive a save');
+if (old.quest.relic || old.quest.relicBack) fail('a save from before the corona loads with it found');
 // A fog grid from before the level grew east keeps its cells where they were.
 const narrow = (() => { const f = new Discovery(buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle')); f.reveal(SPAWN.x, SPAWN.z); return f; })();
 const wide = fogOf(boot());

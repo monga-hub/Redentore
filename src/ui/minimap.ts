@@ -84,8 +84,8 @@ export class Minimap {
     this.wait = 0;
   }
 
-  /** `facing`: player yaw (0 = north, -Z). `foes`: every mob. `goal`: the objective, if any. */
-  update(dt: number, p: { x: number; z: number }, facing: number, label: string | undefined, foes: Pin[], goal?: Pin): void {
+  /** `facing`: player yaw (0 = north, -Z). `foes`: every mob. `goal`: the objective, if any; `also`: side quests' pins. */
+  update(dt: number, p: { x: number; z: number }, facing: number, label: string | undefined, foes: Pin[], goal?: Pin, also: Pin[] = []): void {
     if ((label ?? '') !== this.label) this.name.textContent = this.label = label ?? '';
     if ((this.wait -= dt) > 0) return;
     this.wait = 1 / HZ;
@@ -128,8 +128,8 @@ export class Minimap {
     }
     c.restore();
 
-    if (goal) { // gold diamond; beyond the window it clings to the rim, pointing the way
-      let [x, y] = at(goal);
+    for (const g of goal ? [goal, ...also] : also) { // gold diamond; beyond the window it clings to the rim, pointing the way
+      let [x, y] = at(g);
       const d = Math.hypot(x - r, y - r), max = r - 6;
       if (d > max) { x = r + (x - r) / d * max; y = r + (y - r) / d * max; }
       c.save();

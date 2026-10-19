@@ -119,3 +119,17 @@ export const SPEZIALE_ZITELLE: Talk = {
   ],
 };
 export const SPEZIALE_ZITELLE_AGAIN: Talk = { pages: ['Non ho altra ruta, Risorto. Va\' alle Zitelle. Se senti cantare sottovoce tra i tavoli del merletto, non fermarti ad ascoltare.'] };
+
+// Fra' Zuane's corona: the Capuchin rosary he wore at the cord, olive-wood beads and a worn medal of
+// San Francesco, his mother's gift at his vestition. It snapped off as he ran for the pontile and the
+// beads went into the orto's furrows; one of the dead brings it up (loot/bag.ts RELIC).
+export const RELIC_TITLE = 'La corona del portinaio';
+export const RELIC_OBJECTIVE = "Riporta la corona a Fra' Zuane, sulla fondamenta";
+export const RELIC_TALK: Talk = {
+  pages: [
+    'Quella... quella è la mia corona. Il legno d\'ulivo, la medaglietta di San Francesco consumata dal pollice. Dove l\'hai trovata, Risorto? No, non dirmelo. Lo so: nell\'orto, tra i fratelli.',
+    'Me la diede mia madre il giorno della vestizione, a Treviso. «Così non ti perdi», disse. La notte del Redentore il cordone si strappò mentre correvo al pontile, e i grani finirono nei solchi.',
+    'Quattro secoli di Ave Maria contate sulle dita, Risorto. Le dita di un morto non bastano: si perde il conto. Lasciami... lasciami dirne una, adesso, con i grani giusti.',
+    '...Ecco. Le mani non tremano più. Tieni la medaglietta: io ho ritrovato la corona, a te il santo serve più che a me. San Francesco ti guardi le spalle, dove io non posso arrivare.',
+  ],
+};

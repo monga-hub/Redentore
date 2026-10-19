@@ -38,10 +38,10 @@ export const HP_PER = 10, MANA_PER = 10, REGEN_PER = 0.1; // per point of Vigore
 export const ARMOR_K = 700; // armor / (armor + K) of every blow is turned aside
 export const CRIT_BASE = 5, CRIT_MUL = 1.5; // % chance with no gear, × a critical blow deals
 
-const BUDGET: Partial<Record<Rarity, number>> = { comune: 4, noncomune: 9, raro: 15, epico: 24 };
+const BUDGET: Partial<Record<Rarity, number>> = { comune: 4, noncomune: 9, raro: 15, epico: 24, leggendario: 30 };
 const ARMOR: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 14, raro: 20, epico: 28 };
-const ILVL: Partial<Record<Rarity, number>> = { comune: 5, noncomune: 10, raro: 15, epico: 20 };
-const BUY: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 40, raro: 120, epico: 480 };
+const ILVL: Partial<Record<Rarity, number>> = { comune: 5, noncomune: 10, raro: 15, epico: 20, leggendario: 22 };
+const BUY: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 40, raro: 120, epico: 480, leggendario: 1200 };
 /** Level 2's pieces (the Giudecca and the Zitelle): a bigger budget and more armor at each quality, a higher item level, dearer. */
 const L2 = { budget: 1.4, armor: 1.3, ilvl: 12, buy: 1.6 };
 const JUNK: Record<Rarity, number> = { comune: 3, noncomune: 8, raro: 20, epico: 50, leggendario: 150 }; // flavour items' sell price
@@ -104,6 +104,8 @@ const DEFS: [string, string, Slot, Rarity, string, string?][] = [
   ['pastorale', 'Pastorale del Reverendissimo', 'arma', 'epico', 'potenza critico celerita', 'Il riccio d’argento è graffiato: contava anche le fosse.'],
   ['ruta-oro', 'Ruta d’oro di Fra’ Bortolo', 'amuleto', 'epico', 'spirito intelletto potenza', 'Un rametto d’erba della grazia, chiuso nell’oro.'],
   ['anello-1576', 'Anello del voto del 1576', 'anello', 'epico', 'critico potenza vigore', 'Dentro la fascia: «Liberaci, e ti alzeremo un tempio».'],
+  // Fra' Zuane's thanks for his corona (quest/view.ts): no table rolls a legendary piece.
+  ['medaglia-portinaio', 'Medaglia del portinaio', 'amuleto', 'leggendario', 'vigore spirito critico', 'San Francesco, consumato da quattro secoli di Ave Maria. «Ti guardi le spalle, dove io non arrivo.»'],
 ];
 
 // Level 2: off the dead of the fondamenta and the Pia Casa (loot/bag.ts roll at level 2).
@@ -235,7 +237,7 @@ export class Equipment {
 /** Sell the whole stack in bag slot `i` to Fra' Bortolo; what went and for how much, or undefined. */
 export function sell(bag: Bag, i: number, item: (id: string) => Item | undefined): { id: string; n: number; gold: number } | undefined {
   const s = bag.items[i], it = s && item(s.id);
-  if (!it) return undefined;
+  if (!it || it.quest) return undefined;
   bag.items.splice(i, 1);
   const gold = sellPrice(it) * s.n;
   bag.gold += gold;

@@ -82,7 +82,14 @@ export const CROCE = { x: 78, z: 15, yaw: -Math.PI / 2 } as const;
 export const ANDITO = { x: 240, z: -35, yaw: Math.PI } as const; // facing the back door
 
 /** What each report to Fra' Zuane is worth: experience on top of the dead's, gold into the bag. */
-export const REWARD = { report: { xp: 150, gold: 80 }, return: { xp: 300, gold: 200 } } as const;
+export const REWARD = { report: { xp: 150, gold: 80 }, return: { xp: 300, gold: 200 }, relic: { xp: 160, gold: 120 } } as const;
+
+/**
+ * Fra' Zuane's corona, off any of the dead: each kill's chance starts at `base` and rises by `ramp` (about one run in
+ * two has it by the 11th kill, nine in ten by the 20th), and once the key is in hand the next kill is sure, so it
+ * always falls before the Reverendissimo does (his own death drops it at the latest).
+ */
+export const RELIC_DROP = { base: 0.02, ramp: 0.01 } as const;
 
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
@@ -104,6 +111,9 @@ export class Quest {
   key2 = false; // the key of the church, off the Maestra del merletto
   boss2Dead = false; // the Governatrice
   reported2 = false; // the second quest handed in
+  relic = false; // Fra' Zuane's corona picked up (main.ts), once a run
+  relicBack = false; // and given back to him
+  private relicKills = 0; // kills rolled for it so far (not saved: a load starts the ramp over)
   readonly gates: Gate[];
   private world: World;
 
@@ -179,7 +189,19 @@ export class Quest {
 
   /** Experience the reports to Fra' Zuane have earned, on top of the dead's (main.ts adds it). */
   get bonusXp(): number {
-    return (this.reported ? REWARD.report.xp : 0) + (this.reported2 ? REWARD.return.xp : 0);
+    return (this.reported ? REWARD.report.xp : 0) + (this.reported2 ? REWARD.return.xp : 0) + (this.relicBack ? REWARD.relic.xp : 0);
+  }
+
+  /** A death that drops loot: does Fra' Zuane's corona fall with it? (RELIC_DROP; never once found.) */
+  rollRelic(rnd: () => number = Math.random): boolean {
+    if (this.relic) return false;
+    return this.key || rnd() < RELIC_DROP.base + RELIC_DROP.ramp * this.relicKills++;
+  }
+
+  /** The corona is in his hands again (once). */
+  returnRelic(): boolean {
+    if (!this.relic || this.relicBack) return false;
+    return (this.relicBack = true);
   }
 
   centre(g: Gate): { x: number; z: number } {

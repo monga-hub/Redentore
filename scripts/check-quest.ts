@@ -4,8 +4,8 @@
 // and the tracker's objective following each step. Fra' Bortolo in the serra: reachable in peace, blesses once.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { BLESSING, CHEST, NPC, Quest, REWARD, SPEZIALE, type Stage } from '../src/quest/progress.ts';
-import { OBJECTIVE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
+import { BLESSING, CHEST, NPC, Quest, RELIC_DROP, REWARD, SPEZIALE, type Stage } from '../src/quest/progress.ts';
+import { OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
 
 let failed = 0;
@@ -98,7 +98,28 @@ if (quest.bless()) fail('the blessing was given twice');
 quest.blessLeft = 0;
 if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('the blessing outlived its time');
 
-console.log(`quest ok: talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once`);
+// Fra' Zuane's corona: rarer than nothing at first, more likely with each kill, sure with the key in hand; never once found.
+const unlucky = new Quest(buildLevel().world), never = () => 0.999999;
+let kills = 0;
+while (!unlucky.rollRelic(never) && kills < 1000) kills++;
+if (kills !== Math.ceil((1 - RELIC_DROP.base) / RELIC_DROP.ramp)) fail(`the corona's bad-luck ramp ends after ${kills} kills`);
+const keyed = new Quest(buildLevel().world);
+keyed.takeKey();
+if (!keyed.rollRelic(never)) fail('the corona is not sure once the key is in hand');
+let runs = 0;
+for (let r = 0, s = 7; r < 1000; r++) { // seeded: how many runs have it by the 20th kill
+  const q = new Quest(level.world), rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 20; k++) if (q.rollRelic(rnd)) { runs++; break; }
+}
+if (runs < 850 || runs > 970) fail(`the corona falls by the 20th kill in ${runs / 10}% of runs`);
+keyed.relic = true;
+if (keyed.rollRelic(never)) fail('the corona dropped twice');
+const xp1 = keyed.bonusXp;
+if (!keyed.returnRelic() || keyed.returnRelic() || keyed.bonusXp !== xp1 + REWARD.relic.xp) fail('giving the corona back does not pay exactly once');
+for (const p of RELIC_TALK.pages) if (p.length > 260) fail(`a page of the corona is ${p.length} characters, too long for the window on a phone`);
+
+console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
+  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);
   process.exit(1);

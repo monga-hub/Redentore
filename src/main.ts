@@ -23,6 +23,7 @@ import { FRIAR, GROUPS } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
 import { ANDITO, CHEST, CROCE, NPC, Quest } from './quest/progress.ts';
 import { QuestView } from './quest/view.ts';
+import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
 import { checkVersion } from './ui/version.ts';
 import { Minimap } from './ui/minimap.ts';
 import { Menu } from './ui/menu.ts';
@@ -38,7 +39,7 @@ import { DiabloFx } from './fx/diabloFx.ts';
 import { GothicDressing } from './level/gothic.ts';
 import { audioReady, initAudio, tap, voices } from './audio/engine.ts';
 import { Director } from './audio/director.ts';
-import { Bag } from './loot/bag.ts';
+import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
 import { Equipment, crit, effects } from './loot/gear.ts';
@@ -229,6 +230,7 @@ const drops = new Drops([ // gold and items out of the dead, walked over into th
   { all: bees.all.filter((f) => f.kind === APETTA), tier: 'worker' },
 ].map((d) => ({ ...d, quiet: () => quest.bossDead }) as Dropper).concat(([[GONDOLIERE, 'friar'], [CODEGA, 'priest'], [ZITELLA, 'priest'], [VELO, 'priest'], [GASTALDO, 'elite'], [MAESTRA, 'elite'], [GOVERNATRICE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind(kind), tier, level: 2, quiet: () => quest.boss2Dead }))), level.world, bag, cam.camera);
 scene.add(drops.root);
+drops.extra = () => (!drops.loose.some((l) => l.id === RELIC) && quest.rollRelic() ? RELIC : undefined); // Fra' Zuane's corona, once a run (one on the ground at a time)
 const bagPanel = new BagPanel(bag, gear); // B or the satchel button
 bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
 const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure button: the paper doll
@@ -238,6 +240,7 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
 const vendor = new VendorPanel(bagPanel, bag, gear); // Fra' Bortolo's Commercia
 questView.shop = () => vendor.open();
 questView.reward = (gold) => { bag.gold += gold; };
+questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
 questView.blockDoors(level.cameraBlockers); // shut doors stop the camera and the targeting rays
 vendor.level2 = () => quest.accepted2; // level 2's epics on the road to the Zitelle
 const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
@@ -393,6 +396,10 @@ renderer.setAnimationLoop(() => {
   dfx.update(dt, quest.accepted && !quest.key);
   for (const text of drops.update(dt, player.pos)) kit.system.notices.push({ kind: 'error', text }); // before the victory: the boss drops, those he takes with him don't
   bagPanel.update();
+  if (!quest.relic && bag.count(RELIC)) { // Fra' Zuane's corona picked up: the side quest starts
+    quest.relic = true;
+    kit.system.notices.push({ kind: 'info', text: `Missione: ${RELIC_TITLE}. ${RELIC_OBJECTIVE}` });
+  }
   const boss = quest.bossDead ? zitelle.boss : priests.boss, rage = boss.fight >= boss.kind.phases!.berserk; // the boss's acts and berserk, called out as they come
   for (const text of questView.update(dt, player.pos, pressed, boss)) kit.system.notices.push({ kind: 'info', text });
   if (boss !== lastBoss) { lastBoss = boss; bossAct = boss.phase; bossRage = rage; } // the Reverendissimo's acts are not the Governatrice's
@@ -441,7 +448,7 @@ renderer.setAnimationLoop(() => {
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);
   fog.update(dt);
-  minimap.update(dt, player.pos, player.facing, area, foes, goal());
+  minimap.update(dt, player.pos, player.facing, area, foes, goal(), quest.relic && !quest.relicBack ? [NPC] : []); // and Fra' Zuane while his corona is in the bag
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
   audio.update(dt, cam.camera, undefined, false, pressed); // before the bar drains this frame's notices

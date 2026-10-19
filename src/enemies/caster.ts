@@ -96,14 +96,14 @@ export const SACERDOTE: CasterKind = {
 
 /**
  * Il Reverendissimo: the boss under the dome. Huge and slow, hits hard, a nova to run out of and,
- * as it weakens, branded floor and rage (`phases`). Tuned with scripts/balance.ts: a level 8-9 build
+ * as it weakens, branded floor and rage (`phases`). Tuned with scripts/balance.ts: a level 10-11 build (the quest route with its rewards)
  * that dodges, in the gear the route drops, brings it down in about 3 minutes (in the starter set it
  * mostly can't, with epics bought a little sooner); one that eats the novas and the marks dies, and so
  * does the starting kit, which can't beat the berserk.
  */
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
-  hp: 11000,
+  hp: 12000, // 11000 before the quests paid XP: the hero now walks in a level or two higher
   xp: 0, // his fall ends the run
   aggro: 15, leash: 60, blind: 15,
   range: 22, keep: 0,

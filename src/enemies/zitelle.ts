@@ -57,7 +57,7 @@ export const MAESTRA: CasterKind = {
 };
 export const GOVERNATRICE: CasterKind = {
   ...PRIEST,
-  hp: 13000, xp: 0, // her fall ends the second quest
+  hp: 14000, xp: 0, // her fall ends the second quest; 13000 before the quests paid XP
   aggro: 14, leash: 60, blind: 15,
   range: 22, keep: 0, speed: 2.9, walk: 6, cast: 2.2, cooldown: 4, bolt: 11, life: 5, damage: 125,
   radius: 1, margin: 1.6,

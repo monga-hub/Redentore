@@ -1,8 +1,9 @@
 // Experience levels and the choose-a-card upgrades, Vampire Survivors style but on a finite budget:
 // nobody respawns, so XP is the worth of the mobs lying dead (main.ts derives it every frame) and the
 // curve is tuned to it. Full clear before the boss: 1145 XP, level 11; the quest route with the apiary
-// ~870 (scripts/balance.ts), level 9: the boss is tuned for 8-9. Level 2 (the Zitelle) brings the route to ~1730
-// by the Governatrice, level 13, and the quests' rewards (quest/progress.ts QUESTS) add up to 970.
+// ~870 (scripts/balance.ts) and ~1020 with the key's and Fra' Bortolo's quest XP, level 10: the boss is tuned for 10-11.
+// Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
+// pays 950 XP in all, so a run with the side quests done too ends at the cap.
 // Each level offers two cards. Even levels up to 10 offer two new abilities (the specials from level 6; the second
 // card leans to a school already owned, so fire, frost or lightning can make a build);
 // the others a modifier of an owned ability (or a fusion) against a stat passive. The run starts with
@@ -10,7 +11,7 @@
 // of `Tune`, replayed from the picks (`tuneOf`), so a save only needs the pick list.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
-export const MAX_LEVEL = 15; // level 2 cleared and handed in ends at 14
+export const MAX_LEVEL = 16; // level 2 cleared and handed in, with every side quest, ends at 16
 /** XP from level `lv` to `lv + 1`. */
 export const need = (lv: number) => 20 * lv;
 

@@ -2,7 +2,11 @@
 // game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), fights the
 // Reverendissimo with every ability on the bar, the church's sacerdoti and priests alive, through all
 // three acts and the berserk, then down the quality ladder one rung at a time mid-fight (the ultra-light ones too) and back to the
-// top, then the kill. It asserts what got the fight's tab killed on iPhones (iOS reloads a tab past its
+// top, then the kill. On the top rung (before the ladder and after it) the hero changes clothes twice a second (whole sets,
+// mixed ones, nothing on): every piece and weapon built and freed again (player/outfit.ts), and undressed for each sample, so
+// only leftovers would count; every outfit is worn once before the fight, so their first draws don't count as growth. After
+// the kill, the character sheet opened and closed sixty times, the hero changing between, its figure (ui/figure.ts) drawn each
+// time: nothing it leaves behind on the GPU, no program past the first uses, and its canvas given back. It asserts what got the fight's tab killed on iPhones (iOS reloads a tab past its
 // memory budget, GPU buffers included): no page errors or lost context, no programs, geometries or
 // textures piling up as the fight goes on, the GPU buffers of the phone profile within budget, each rung
 // down giving memory back instead of adding a second set on top, and the climb back holding no more than
@@ -60,9 +64,33 @@ function track(): void {
   addEventListener('webglcontextlost', () => w.SOAK.errors.push('WebGL context lost'), true);
 }
 
+/** What the hero changes into, in turn: nothing, the hemp, mixed sets, whole sets of every look, odd pieces. */
+const WARDROBE = [
+  {},
+  { testa: 'canapa-testa', spalle: 'canapa-spalle', torso: 'canapa-torso', mani: 'canapa-mani', gambe: 'canapa-gambe', piedi: 'canapa-piedi', arma: 'clava-osso' },
+  { testa: 'becchino-testa', spalle: 'scuola-spalle', torso: 'gonfaloniere-torso', mani: 'sterratore-mani', gambe: 'arsenale-gambe', piedi: 'portinaio-piedi', arma: 'ferrata-arma' },
+  { testa: 'penitente-testa', spalle: 'cappellano-spalle', torso: 'piviale-torso', mani: 'cerusico-mani', gambe: 'sacrestano-gambe', piedi: 'calzari-piedi', arma: 'turibolo-arma' },
+  { testa: 'mitria', spalle: 'mantella-peste', torso: 'saio-voto', mani: 'guanti-palladio', gambe: 'cosciali-lazzaretto', piedi: 'zoccoli-redentore', arma: 'pastorale' },
+  { testa: 'paglietta', spalle: 'gastaldo-spalle', torso: 'righe-torso', mani: 'puntoaria-mani', gambe: 'squerariol-gambe', piedi: 'squero-piedi', arma: 'remo-spezzato' },
+  { testa: 'zendale', spalle: 'codega-spalle', torso: 'velada', mani: 'merlettaia-mani', gambe: 'zitelle-gambe', piedi: 'traghetto-piedi', arma: 'fuso-ferrato' },
+  { testa: 'velo-governatrice', spalle: 'collare-puntoaria', torso: 'busto-broccato', mani: 'guanti-maestra', gambe: 'cosciali-gastaldo', piedi: 'zoccoli-voga', arma: 'scettro-governatrice' },
+  { testa: 'mitria', torso: 'busto-broccato', piedi: 'squero-piedi', arma: 'campanaro-arma' },
+];
+
+/**
+ * In the page before the fight: every outfit worn long enough for its weapon to load and be drawn, and the sheet opened in
+ * each, so their programs' first uses (bodies, pieces and props, under the world's lights and the sheet's) all come now.
+ */
+async function rehearse(wardrobe: object[]): Promise<void> {
+  const { gear, sheet } = window as any, wait = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+  for (const o of wardrobe) { gear.decode(o); await wait(1500); sheet.toggle(); await wait(400); sheet.toggle(); }
+  gear.decode({});
+}
+
 /** In the page once it has loaded: the church set for the boss, every ability on the bar, a bot that fights him. */
-function fight(seconds: number, level: number): void {
-  const w = window as any, { quest, priests, zitelle, player, playerStats, levels, kit, targeting, fx } = w;
+function fight(seconds: number, level: number, WARDROBE: object[]): void {
+  const w = window as any, { quest, priests, zitelle, player, playerStats, levels, kit, targeting, fx, gear } = w;
+  let dressed = 0;
   const boss = level === 2 ? zitelle.boss : priests.boss, BERSERK = boss.kind.phases.berserk;
   quest.accepted = true;
   quest.takeKey();
@@ -76,7 +104,7 @@ function fight(seconds: number, level: number): void {
   player.respawn(level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
   const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
-  let next = 0, raged = false;
+  let next = 0, raged = false, change = 0;
   const RUNGS = [[0.4, 1], [0.48, 2], [0.56, 3], [0.64, 4], [0.72, 5], [0.82, 0]]; // fraction of the fight, rung
   fx.auto = false; // the ladder walked by hand: swiftshader's frame rate would walk it on its own
   fx.setStep(0, 'soak');
@@ -95,12 +123,35 @@ function fight(seconds: number, level: number): void {
     targeting.target = { kind: targeting.kinds.find((k: { all: object[] }) => k.all.includes(boss)), mob: boss };
     if ((boss.state === 'nova' || boss.marks.length) && player.pos.z - (dz / d) * 0.25 < floor) { player.pos.x -= (dx / d) * 0.25; player.pos.z -= (dz / d) * 0.25; } // dodge: out of the nova, off the brands
     for (let i = 0; i < 12; i++) kit.system.tryCast(i);
+    if (t >= change && fx.step === 0) { change = t + 0.5; gear.decode(WARDROBE[dressed++ % WARDROBE.length]); w.SOAK.dressed = dressed; } // down the ladder he keeps what he has on: a rung's programs are its own
     if (t >= next) {
       next = t + 1;
+      gear.decode(WARDROBE[0]); // sampled undressed: what a change left behind still counts, what is worn doesn't
       samples.push({ t, step: fx.step, prog: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures, gpu: w.SOAK.gpuMB(), phase: boss.phase, rage: boss.fight >= BERSERK, state: boss.state, lost: w.fx.renderer.getContext().isContextLost() });
     }
   };
   requestAnimationFrame(tick);
+}
+
+/** In the page after the fight: the sheet opened and shut again and again, the hero dressed differently each time. */
+async function sheetCycles(): Promise<object> {
+  const w = window as any, { sheet, gear, fx } = w, info = fx.renderer.info;
+  const frames = (n: number) => new Promise((ok) => { const f = () => (n-- > 0 ? requestAnimationFrame(f) : ok(0)); f(); });
+  const SETS = [
+    { testa: 'mitria', spalle: 'mantella-peste', torso: 'saio-voto', mani: 'guanti-palladio', gambe: 'cosciali-lazzaretto', piedi: 'zoccoli-redentore', arma: 'pastorale' },
+    { testa: 'becchino-testa', spalle: 'scuola-spalle', torso: 'gonfaloniere-torso', mani: 'sterratore-mani', gambe: 'arsenale-gambe', piedi: 'portinaio-piedi', arma: 'campanaro-arma' },
+    { testa: 'velo-governatrice', spalle: 'collare-puntoaria', torso: 'busto-broccato', mani: 'guanti-maestra', gambe: 'cosciali-gastaldo', piedi: 'zoccoli-voga', arma: 'turibolo-arma' },
+  ];
+  const wait = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+  const cycle = async (i: number, hold = 0) => { sheet.toggle(); await frames(4); gear.decode(SETS[i % SETS.length]); await frames(4); await wait(hold); sheet.toggle(); gear.decode({}); await frames(3); };
+  const tally = () => ({ gpu: w.SOAK.gpuMB(), prog: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures });
+  await wait(8000); // the kill's loot falls and lies (its own first draws), then all is still
+  for (let i = 0; i < SETS.length; i++) await cycle(i, 1500); // first uses since the climb back relit every material: each set, its weapon loaded
+  const before = tally();
+  for (let i = 0; i < 30; i++) await cycle(i);
+  const mid = tally();
+  for (let i = 30; i < 60; i++) await cycle(i);
+  return { before, mid, after: tally(), canvas: sheet.stage.width * sheet.stage.height, open: sheet.shown };
 }
 
 // --- the game, served
@@ -167,7 +218,8 @@ try {
   if (!(await evaluate("matchMedia('(pointer: coarse)').matches"))) fail('the emulated phone is not taken for a phone');
   for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro
   await sleep(3000);
-  await evaluate(`(${fight})(${SECONDS}, ${LEVEL})`);
+  await evaluate(`(${rehearse})(${JSON.stringify(WARDROBE)})`);
+  await evaluate(`(${fight})(${SECONDS}, ${LEVEL}, ${JSON.stringify(WARDROBE)})`);
   if (LEVEL === 2) { // level 2's bodies load with its quest
     while (!(await evaluate('window.zitelle.root.children.length > 0'))) { if (Date.now() - t0 > 240e3) throw new Error("level 2's bodies never loaded"); await sleep(500); }
   }
@@ -176,7 +228,7 @@ try {
     await sleep(2000);
   }
   type Sample = { t: number; step: number; prog: number; geo: number; tex: number; gpu: number; phase: number; rage: boolean; state: string; lost: boolean };
-  const r: { samples: Sample[]; errors: string[]; won: boolean } = await evaluate('({ samples: SOAK.samples, errors: SOAK.errors, won: SOAK.won })');
+  const r: { samples: Sample[]; errors: string[]; won: boolean; dressed: number } = await evaluate('({ samples: SOAK.samples, errors: SOAK.errors, won: SOAK.won, dressed: SOAK.dressed })');
   const s = r.samples;
 
   for (const e of [...pageErrors, ...r.errors]) fail(`page: ${e.slice(0, 300)}`);
@@ -195,6 +247,11 @@ try {
       if (hi - lo > SLACK[k]) fail(`${k} grew ${lo} -> ${hi} on rung ${run[0].step}`);
     }
   });
+  type Tally = { gpu: number; prog: number; geo: number; tex: number };
+  const sh: { before: Tally; mid: Tally; after: Tally; canvas: number; open: boolean } = await evaluate(`(${sheetCycles})()`);
+  if (sh.open || sh.canvas) fail(`the sheet left open or its figure's canvas kept: ${JSON.stringify(sh)}`);
+  // Buffers and textures back where they were; programs only for first uses (a prop drawn under the sheet's lights the first time), none in the last thirty.
+  if (sh.after.gpu > sh.before.gpu + 0.5 || sh.after.geo > sh.before.geo || sh.after.tex > sh.before.tex || sh.after.prog > sh.mid.prog || sh.after.prog > sh.before.prog + SLACK.prog) fail(`60 openings of the sheet left something behind: ${JSON.stringify(sh)}`);
   const peak = (run: Sample[] | undefined, k: 'gpu' | 'prog') => Math.max(...(run ?? []).map((x) => x[k]));
   const top = runs[0], gpu = runs.map((run) => peak(run, 'gpu')), prog = runs.map((run) => peak(run, 'prog'));
   if (gpu[0] > BUDGET) fail(`the phone profile holds ${gpu[0].toFixed(0)} MB of GPU buffers, over the ${BUDGET} MB budget`);
@@ -204,7 +261,7 @@ try {
   }
   if (gpu[6] > gpu[0] * 1.02) fail(`back on the top rung the buffers grew: ${gpu[0].toFixed(0)} -> ${gpu[6].toFixed(0)} MB`);
   if (prog[6] > prog[0] + SLACK.prog) fail(`back on the top rung the programs grew: ${prog[0]} -> ${prog[6]}`);
-  console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU by rung ${gpu.map((g) => g.toFixed(0)).join(' -> ')} MB; programs ${prog.join(' -> ')}; top rung ${top.length} s`);
+  console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; ${r.dressed} changes of clothes; the sheet opened 63 times (GPU ${sh.before.gpu.toFixed(1)} -> ${sh.after.gpu.toFixed(1)} MB, programs ${sh.before.prog} -> ${sh.mid.prog} -> ${sh.after.prog}, geometries ${sh.before.geo} -> ${sh.after.geo}); GPU by rung ${gpu.map((g) => g.toFixed(0)).join(' -> ')} MB; programs ${prog.join(' -> ')}; top rung ${top.length} s`);
 } catch (e) {
   fail(String((e as Error).message));
 } finally {

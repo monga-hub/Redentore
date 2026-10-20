@@ -48,6 +48,8 @@ import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
 import { Equipment, SHOP2, crit, effects, shop } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
+import { Figure } from './ui/figure.ts';
+import { relight } from './player/outfit.ts';
 import { VendorPanel } from './ui/vendor.ts';
 import { DeathScreen } from './ui/death.ts';
 
@@ -103,8 +105,8 @@ levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on t
   kit.system.chargeAfter = tune.furyStart;
   kit.system.unlock(...tune.owned); // all owned before any is placed: the bar keeps its slots across a reload
 };
-gear.onChange = () => levels.apply();
-levels.apply(); // the starter set's stats (a load lays its own again)
+gear.onChange = () => { levels.apply(); player.model.wear(gear.worn); }; // the stats, and the hero dressed in it
+gear.onChange(); // the starter set (a load lays its own again)
 const friars = new Friars(level.world, kit.vfx, playerStats); // undead friars hoeing the orto
 friars.rising = () => !quest.bossDead; // the vow raises the orto's dead until the Reverendissimo falls with it
 scene.add(friars.root);
@@ -267,6 +269,8 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
   lv: levels.lv, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
   dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
+const figure = new Figure(renderer, scene, player.mesh, sheet.stage); // the sheet's hero, as dressed, while it is open
+sheet.el.addEventListener('hidden', () => figure.free());
 const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commercia, Mastro Iseppo's; their tomes teach a school
   owned: () => tune.owned,
   learn: (ids) => {
@@ -302,7 +306,7 @@ const warm = () => {
   kit.prime(); // and a first real draw of each, at nothing
 };
 let warmed = false;
-fx.onRebuild = () => { if (warmed) warm(); };
+fx.onRebuild = () => { relight(); if (warmed) warm(); }; // the pieces not worn now too (player/outfit.ts)
 const bodiesIn = () => !!(friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length); // everyone's bodies in
 fx.loaded = bodiesIn; // the boot test times the scene, not the loading
 onQuality((q) => fx.setQuality(new URLSearchParams(location.search).get('fx') === 'low' ? 'bassa' : q)); // the menu's "Grafica"; `?fx=low` pins the bottom rung
@@ -410,6 +414,7 @@ renderer.setAnimationLoop(() => {
   if (menu.paused || worldMap.open || bagPanel.open || book.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
+    if (sheet.shown) { player.model.animate(dt, 0, true); figure.draw(); } // he idles on the sheet (and in the world behind it)
     input.consume();
     input.endFrame();
     audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open, pressed); // the dialogue window ducks the music itself

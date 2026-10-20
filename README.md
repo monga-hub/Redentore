@@ -81,6 +81,19 @@ fino alla chiesa delle Zitelle.
   davvero: Vigore (+10 salute), Intelletto (+10 mana), Spirito (rigenerazione), Potenza (+% danni),
   Critico (probabilità di un colpo al 150%) e Celerità (lanci e tempo di recupero globale più rapidi);
   l'armatura toglie A / (A + 700) dei danni. Il confronto con il pezzo indossato è nel tooltip.
+  Quello che si indossa si vede sul Risorto (`src/player/outfit.ts`), come i set di WoW e Diablo: ogni famiglia di pezzi
+  è un set con la sua sagoma e i suoi colori, e un set intero si legge come un solo personaggio. Livello 1: il becchino
+  della peste (verde, maschera a becco, cuoio e ferro arrugginito), il chierico (verde, per chi lancia: cappello
+  saturno, mozzetta e stola cremisi, cotta di pizzo), l'Arsenale (blu: morione crestato col pennacchio, acciaio e
+  ottone), Murano (blu, per chi lancia: corona di fiamme di vetro, piviale verde-azzurro e oro), il secondo voto (viola:
+  mitria con la croce accesa, spallacci neri e oro con teschi dagli occhi viola, mantello). Livello 2: il gondoliere
+  annegato (verde: paglietta, maglia a righe, fascia cremisi, la lanterna della codega), la Pia Casa (blu: tricorno,
+  ferro catramato e pizzo), la Governatrice (viola: corona e velo, aureola, collare di pizzo, broccato d'oro e perle).
+  Il set di canapa è il corpo del Risorto com'è. Elmi, spallacci, corazze, bracciali, cosciali e schinieri sono
+  costruiti sulle ossa e fusi in un solo disegno per materiale; sotto, il corpo si tinge per zone (cappuccio, saio,
+  guanti, brache, stivali) e i suoi spallacci d'osso rientrano sotto i nuovi. Le armi sono gli oggetti di scena dei
+  nemici (pastorale, remo, rocca, scettro...) o costruite (la mazza a campana, il turibolo di Murano). Nella scheda del personaggio
+  c'è l'eroe stesso, a figura intera e vestito com'è, che respira; trascinandolo si gira.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile
@@ -94,7 +107,7 @@ npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
 npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle due carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2; `TOMES=plague,holy` parte coi tomi di quelle scuole letti (vedi scripts/balance.ts)
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
-npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, CHROME=... per il binario)
+npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, CHROME=... per il binario)
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -129,7 +142,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un pezzo (secondo tocco su touch) per indossarlo: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
-| C | scheda del personaggio: manichino stile WoW con i nove posti e i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
+| C | scheda del personaggio: manichino stile WoW con i nove posti attorno all'eroe a figura intera, vestito com'è (trascinalo per girarlo), e accanto i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
@@ -337,6 +350,11 @@ src/
                              giravolte della clava, guardia dopo il combattimento, passo e corsa a
                              falcata misurata (niente piedi che scivolano), combo a 3 colpi, una
                              mossa per incantesimo, reazioni ai colpi, morte; aura per Velo e Patto
+  player/outfit.ts           l'equipaggiamento sull'eroe: otto set (pezzi sulle ossa, fusi per
+                             materiale nello spazio della pelle), tinte per zona e spallacci d'osso
+                             rientrati nello shader del corpo, l'arma in pugno
+  ui/figure.ts               l'eroe nella scheda: lui stesso, disegnato dal renderer del gioco
+                             in un angolo del canvas e copiato nella scheda, solo mentre è aperta
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione
   camera/intro.ts            piano sequenza d'apertura (spline Catmull-Rom sulle chiavi, saltabile)
   camera/diabloCamera.ts     Stile Diablo: camera isometrica fissa; CameraBlend per i cambi di stile

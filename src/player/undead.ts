@@ -1,10 +1,13 @@
 import * as THREE from 'three';
-import { UPPER, arm, loadModel, over, stand } from '../core/models.ts';
+import { UPPER, loadModel, over, stand } from '../core/models.ts';
 import { PLAYER } from '../core/physics.ts';
+import type { GearState } from '../loot/gear.ts';
+import { Outfit } from './outfit.ts';
 
 // The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
-// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB, a Meshy bone club in the
-// right fist. Loaded async; `root` stays empty until the GLBs arrive.
+// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB, dressed in what it wears (player/outfit.ts:
+// the pieces, the dyes, the weapon in the right fist, the bone club to start). Loaded async; `root` stays empty until
+// the GLB arrives.
 //
 // Locomotion: a hunched, heavy-breathing idle that now and then twirls the club, a crouched guard
 // for a few seconds after any fight, a walk and a charging run whose stride is matched to the
@@ -14,7 +17,6 @@ import { PLAYER } from '../core/physics.ts';
 // underneath. A death clip takes the whole body. A fresnel shell (the aura) glows over the body
 // for Velo spettrale and Patto della tomba, and flashes red on a hit.
 
-const CLUB = { length: 0.95, grip: 0.12, tilt: 1 }; // m long, held near the butt, leaning toward the fingers
 const LOCO = { idle: 'Idle_Breathe', combat: 'Idle_Combat', fidget: 'Idle', walk: 'Walking', run: 'Run_Charge', air: 'Jump_Run' } as const;
 type State = keyof typeof LOCO;
 // m/s each clip covers at rate 1: a planted foot's speed under the hips (measured on the clips;
@@ -157,13 +159,18 @@ export class UndeadModel {
   private club?: THREE.Object3D;
   private tip?: THREE.Object3D;
   private leftHand?: THREE.Object3D;
+  private outfit?: Outfit;
+  private worn: GearState = {};
 
   constructor() {
-    Promise.all([loadModel('reietto.glb'), loadModel('clava.glb')]).then(([gltf, club]) => {
+    loadModel('reietto.glb').then((gltf) => {
       const model = gltf.scene;
       stand(model, PLAYER.height);
-      this.tip = arm(model, club.scene, CLUB.length, CLUB.grip, CLUB.tilt);
-      this.club = this.tip.parent!;
+      let body: THREE.SkinnedMesh | undefined;
+      model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
+      const outfit = (this.outfit = new Outfit(model, body!));
+      outfit.onWeapon = (top) => { this.tip = top; this.club = top?.parent ?? undefined; };
+      outfit.wear(this.worn);
       this.leftHand = model.getObjectByName('LeftHand');
       const mixer = (this.mixer = new THREE.AnimationMixer(model));
       const clip = (name: string) => THREE.AnimationClip.findByName(gltf.animations, name);
@@ -202,6 +209,12 @@ export class UndeadModel {
       }
       this.root.add(model);
     }, (e) => console.error('player model failed to load', e));
+  }
+
+  /** Dress the hero in `worn` (now, or once the body has loaded). */
+  wear(worn: GearState): void {
+    this.worn = { ...worn };
+    this.outfit?.wear(this.worn);
   }
 
   /** Play a move over whatever the legs are doing, its blow landing `after` s from now. */
@@ -282,6 +295,7 @@ export class UndeadModel {
 
   animate(dt: number, speed: number, grounded: boolean): void {
     if (!this.mixer) return;
+    this.outfit?.update(dt);
     const showAura = this.aura.update(dt) || this.priming-- > 0;
     for (const s of this.shells) s.visible = showAura;
     if (this.dead) {

@@ -1,9 +1,11 @@
 // Loot check (`npm run check`): every tier's drops fall in its gold range and name real items, the
 // boss always yields the nail and showers gold, gear drops get better by tier; the bag stacks by id
 // (gear one per slot), refuses what does not fit and round-trips. Gear: the stat math, wearing from
-// the bag (swapping), taking off, selling at a quarter, buying epics, crits, and the save of what is worn.
+// the bag (swapping), taking off, selling at a quarter, buying epics, crits, and the save of what is worn; and that every
+// piece shows on the hero (player/outfit.ts).
 import { Bag, ITEM, ITEMS, RARITY, RELIC, RELIC_PRIZE, TABLES, roll, type Tier } from '../src/loot/bag.ts';
 import { ARMOR_K, CRIT_BASE, Equipment, GEAR, SHOP, STARTER, shop, buy, buyPrice, crit, effects, sell, sellPrice, totals, worth } from '../src/loot/gear.ts';
+import { WEAPONS, lookOf } from '../src/player/outfit.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 let seed = 1;
@@ -90,5 +92,8 @@ if (ITEM.get(RELIC_PRIZE)?.slot !== 'amuleto' || !buyPrice(ITEM.get(RELIC_PRIZE)
 const g2 = new Equipment();
 g2.decode(JSON.parse(JSON.stringify({ ...gear.encode(), anello: 'saio-voto', amuleto: 'from_the_future' })));
 if (JSON.stringify(g2.encode()) !== JSON.stringify(gear.encode())) fail('gear round-trip keeps junk or loses pieces');
+
+// What is worn shows: a model in the fist for every weapon, a look for every visible piece past the hemp (neck and ring don't show).
+for (const g of GEAR) if (g.slot === 'arma' ? !WEAPONS[g.id] : g.slot !== 'amuleto' && g.slot !== 'anello' && g.rarity !== 'comune' && !lookOf(g.id)) fail(`${g.id} does not show on the hero`);
 
 console.log(`loot ok: gear worth by tier ${Object.entries(gearRank).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(', ')}; gold per kill ${Object.entries(mean).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}`);

@@ -7,7 +7,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Level } from '../level/index.ts';
 import { Z } from '../level/plan.ts';
 import { Torches, DOT } from './torches.ts';
-import { PHONE, WEAK } from '../core/device.ts';
+import { PHONE, weakness } from '../core/device.ts';
 
 // Lighting and mood on top of the dressed level: a full-moon night over the lagoon.
 // A cold moon is the only shadow-casting light; a starry sky dome with drifting clouds
@@ -17,12 +17,13 @@ import { PHONE, WEAK } from '../core/device.ts';
 // through a door feels like eyes adapting to the dark.
 //
 // Quality: a ladder walked one rung at a time on the smoothed frame rate, down after a few seconds
-// under ~28 fps, back up after longer over ~50 (see QUALITY). Each rung gives back what it stops
+// under ~28 fps, back up after longer over ~50 (see QUALITY), after a boot test has put it on the rung
+// this device calls for (see BENCH). Each rung gives back what it stops
 // using; torches, lamps, the hero's light and emissive glow stay on every rung, so the night never
 // goes flat, and the moon's shadows on all but the two "ultra-light" ones at the bottom, for weak
 // Android phones. `?fx=low` and the menu's "Grafica" pin a rung. Phones start lean (`PHONE`): iOS
 // kills a tab whose memory, GPU buffers included, outgrows a budget of about a gigabyte, and reloads
-// it, so their buffers are sized down from the start; a weak phone (`WEAK`) starts without the post chain.
+// it, so their buffers are sized down from the start; a weak phone (`weakness`) starts the test lighter.
 
 /** 0 = open air, 1 = closed interior; covered cloister walks sit in between. */
 function indoorness(zone: string | undefined, label: string | undefined): number {
@@ -77,6 +78,19 @@ const LAGOON_FOG = 0.02; // extra density at the riva
  * of see-sawing.
  */
 const QUALITY = { rungs: 5, post: 3, lite: 4, down: { fps: 28, after: 4 }, up: { fps: 50, after: 8 }, settle: 3, pixels: 0.7, tiny: 0.75, lights: 3, sparks: 0.5 };
+/**
+ * The boot test: the real scene (the intro's flight, or the game) timed from `from` to `to` s after the models are in
+ * (`loaded`), past the shader compiles of their first frames, on the rung the GPU's name and the memory point to.
+ * Under the ladder's down mark (never otherwise: a phone the ladder would leave alone keeps its look), the median frame,
+ * scaled by what each rung roughly `cost`s against the top one, picks the best rung expected to hold `fps` (between the
+ * ladder's down and up marks, so it stays put), at once rather than a rung every few seconds. The
+ * rung is remembered for this build (`KEY`) and moved with the ladder, so the next boot starts there without a test; a
+ * new build, or "Grafica: Auto" picked again, tests anew. It only ever lightens: the ladder climbs if there is room.
+ * ponytail: `cost` is a guess from a software GPU (rung 1 ~0.7, rung 5 ~0.2 of the top's frame); retune on real phones.
+ */
+const BENCH = { from: 1.5, to: 4, frames: 10, fps: 40, cost: [1, 0.75, 0.7, 0.55, 0.35, 0.22] };
+const KEY = 'redentore.fx';
+declare const __BUILD__: { sha: string; time: number };
 const SHADOW = PHONE ? 1024 : 2048;
 /** Without the post chain the grade is gone: a lower exposure and a CSS vignette over the canvas (free to composite) keep the dark. */
 const BARE = { exposure: 0.8, vignette: 0.75 };
@@ -244,8 +258,12 @@ export class Atmosphere {
   private t = 0;
   private slowFor = 0;
   private fastFor = 0;
-  private settle = 5; // s before the frame rate counts: shader compiles at boot, buffers after a step
+  private settle = 0; // s before the frame rate counts: shader compiles and model loads at boot, buffers after a step
   private avgDt = 1 / 60;
+  private readonly hint: number; // the rung the boot test starts on
+  private readonly gpu: string;
+  private bench?: { at: number; frames: number[] }; // the boot test under way: its first frame (ms), the frames timed
+  private last = 0; // ms, the last update
 
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
@@ -306,7 +324,30 @@ export class Atmosphere {
     this.setSize(innerWidth, innerHeight);
     this.vignette.style.cssText = 'position:fixed;inset:0;pointer-events:none;display:none;background:radial-gradient(ellipse at center, transparent 35%, #000 105%)';
     renderer.domElement.after(this.vignette); // under the HUD, which comes later
-    if (WEAK) this.setStep(QUALITY.post, 'weak phone'); // the ladder climbs back if it keeps up
+    const weak = weakness(renderer.getContext());
+    this.gpu = weak.gpu;
+    this.hint = weak.level ? QUALITY.post + weak.level - 1 : 0;
+    const kept = recall();
+    if (kept === undefined) this.test();
+    else this.setStep(kept, 'kept from the last boot');
+    this.settle = 5;
+  }
+
+  /** Start the boot test (BENCH) on the rung the hints point to. */
+  private test(): void {
+    this.setStep(this.hint, this.hint ? `weak phone (${this.gpu || 'GPU unnamed'})` : 'boot test');
+    this.bench = { at: -1, frames: [] };
+  }
+
+  /** The boot test's verdict: this rung if it holds the ladder's mark, else the best expected to hold BENCH.fps. */
+  private judge(frames: number[]): void {
+    this.bench = undefined;
+    const ms = frames.sort((a, b) => a - b)[frames.length >> 1], { cost } = BENCH;
+    let n = this.step;
+    if (1000 / ms < QUALITY.down.fps) while (n < QUALITY.rungs && (ms * cost[n]) / cost[this.step] > 1000 / BENCH.fps) n++;
+    console.info(`[fx] boot test: ${(1000 / ms).toFixed(0)} fps on rung ${this.step} (${this.gpu || 'GPU unnamed'}), rung ${n} called for`);
+    this.setStep(n, 'boot test');
+    remember(n);
   }
 
   /** No post chain: straight to the canvas. */
@@ -373,26 +414,41 @@ export class Atmosphere {
     }
     p.needsUpdate = this.dust.visible;
 
-    // The quality ladder, on the smoothed frame rate.
+    // The boot test, on real time (dt is capped), then the quality ladder, on the smoothed frame rate.
+    const now = performance.now(), b = this.bench;
+    if (b && this.auto) {
+      if (b.at < 0) { if (this.loaded()) b.at = now; }
+      else if (now - b.at > BENCH.to * 1000) {
+        if (b.frames.length >= BENCH.frames) this.judge(b.frames);
+        else this.bench = { at: -1, frames: [] }; // held up (the menu, a hidden tab): again
+      } else if (now - b.at > BENCH.from * 1000) b.frames.push(now - this.last);
+    }
+    this.last = now;
     this.avgDt += (dt - this.avgDt) * 0.05;
     this.settle -= dt;
-    const fps = 1 / this.avgDt, { down, up } = QUALITY;
-    this.slowFor = this.auto && this.settle < 0 && fps < down.fps ? this.slowFor + dt : 0;
-    this.fastFor = this.auto && this.settle < 0 && fps > up.fps ? this.fastFor + dt : 0;
+    const fps = 1 / this.avgDt, { down, up } = QUALITY, walk = this.auto && !this.bench && this.settle < 0;
+    this.slowFor = walk && fps < down.fps ? this.slowFor + dt : 0;
+    this.fastFor = walk && fps > up.fps ? this.fastFor + dt : 0;
     if (this.slowFor > down.after && this.step < QUALITY.rungs) {
       if (this.climbed) this.best = this.step + 1; // it failed here once already
       this.setStep(this.step + 1, `slow frames (${fps.toFixed(0)} fps)`);
+      remember(this.step);
     } else if (this.fastFor > up.after && this.step > this.best) {
       this.setStep(this.step - 1, `fast frames (${fps.toFixed(0)} fps)`);
       this.climbed = true;
+      remember(this.step);
     }
   }
 
-  /** The menu's "Grafica": Auto walks the ladder from the top, Alta and Bassa pin its ends. */
+  /** The menu's "Grafica": Auto walks the ladder (picked again, from a pinned rung, it tests the device anew), Alta and Bassa pin its ends. */
   setQuality(q: 'auto' | 'alta' | 'bassa'): void {
+    const pinned = !this.auto;
     this.auto = q === 'auto';
     this.best = 0;
-    if (q !== 'auto') this.setStep(q === 'alta' ? 0 : QUALITY.rungs, `set to ${q}`);
+    if (q !== 'auto') {
+      this.bench = undefined;
+      this.setStep(q === 'alta' ? 0 : QUALITY.rungs, `set to ${q}`);
+    } else if (pinned) this.test();
   }
 
   /** "Stile Diablo" on or off: mood and grade, brighter torches, and a warm light that follows the hero (one more light: programs recompile once). */
@@ -407,6 +463,9 @@ export class Atmosphere {
     if (diablo) this.scene.add(this.hero);
     else this.scene.remove(this.hero);
   }
+
+  /** Whether the models are in: the boot test waits for it (frames spent loading them would time the loading, not the scene). */
+  loaded = () => true;
 
   /** Called after the post chain or the ultra-light rungs come or go (programs are keyed on the target they draw into, the lights and the shadows): main.ts warms them again. */
   onRebuild?: () => void;
@@ -478,6 +537,18 @@ export class Atmosphere {
     this.vignette.style.display = this.low ? '' : 'none';
     if (this.low !== post || this.lite !== lite) this.onRebuild?.();
   }
+}
+
+/** The rung kept for this build, if any (KEY: "<build time> <rung>"). */
+function recall(): number | undefined {
+  try {
+    const [build, step] = (localStorage.getItem(KEY) ?? '').split(' '), n = Number(step);
+    return build === String(__BUILD__.time) && Number.isInteger(n) && n >= 0 && n <= QUALITY.rungs ? n : undefined;
+  } catch { return undefined; } // blocked storage: test every boot
+}
+
+function remember(step: number): void {
+  try { localStorage.setItem(KEY, `${__BUILD__.time} ${step}`); } catch { /* not kept: the next boot tests again */ }
 }
 
 /** Wrap v into [-size/2, size/2). */

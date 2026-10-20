@@ -303,6 +303,8 @@ const warm = () => {
 };
 let warmed = false;
 fx.onRebuild = () => { if (warmed) warm(); };
+const bodiesIn = () => !!(friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length); // everyone's bodies in
+fx.loaded = bodiesIn; // the boot test times the scene, not the loading
 onQuality((q) => fx.setQuality(new URLSearchParams(location.search).get('fx') === 'low' ? 'bassa' : q)); // the menu's "Grafica"; `?fx=low` pins the bottom rung
 /** The Diablo view on or off: camera, controls, cuts, look, HUD. The intro keeps its own look and gets it at the hand-over. */
 function applyStyle(diablo: boolean): void {
@@ -437,7 +439,7 @@ renderer.setAnimationLoop(() => {
       blend.start(cam.camera);
     }
   }
-  if (!warmed && friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length) { warmed = true; warm(); } // everyone loaded
+  if (!warmed && bodiesIn()) { warmed = true; warm(); }
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();
     else menu.toggle();

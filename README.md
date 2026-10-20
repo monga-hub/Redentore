@@ -316,7 +316,13 @@ src/
                              touch) pixel ratio 1,5, niente MSAA sul canvas, MSAA 2x nel
                              post, ombre 1024 e texture dei modelli dimezzate: iOS ricarica
                              la scheda oltre ~1 GB di memoria, GPU compresa; un Android con
-                             ≤ 4 GB (`deviceMemory`) parte già senza post
+                             ≤ 4 GB (`deviceMemory`) o una GPU debole nota (nome WebGL:
+                             Mali, Adreno, PowerVR vecchi) parte già senza post o
+                             ultra-leggero. Al primo avvio una prova di 4 s sulla scena
+                             vera (l'intro o il gioco, a modelli caricati) sceglie subito
+                             il gradino giusto;
+                             il gradino resta salvato sul dispositivo per questa build e
+                             segue la scala, "Grafica: Auto" rifà la prova
   fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
                              PointLight assegnate alle torce più vicine al player; candele,
                              lampadari e bagliori colorati delle vetrate da `level.lights`

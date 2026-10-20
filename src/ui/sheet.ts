@@ -13,7 +13,7 @@ import { itemTip } from './tooltip.ts';
 // Hover (tap) a slot for its tooltip; click the shown one to take it off into the bag.
 
 const CSS = `
-#bag .sheet .doll { display: grid; grid-template-columns: var(--s) calc(var(--s) * 3.2) var(--s) auto; grid-template-rows: repeat(5, var(--s)); gap: 4px 8px; }
+#bag .sheet .doll { display: grid; grid-template-columns: var(--s) calc(var(--s) * 3.8) var(--s) auto; grid-template-rows: repeat(5, var(--s)); gap: 4px 8px; }
 #bag .sheet .col { display: flex; flex-direction: column; gap: 4px; grid-row: 1 / 5; }
 #bag .sheet .col.r { grid-column: 3; }
 #bag .sheet .cell:not([style]) .ico { opacity: .3; filter: grayscale(1); } /* an empty slot shows what goes there, faded */
@@ -28,9 +28,9 @@ const CSS = `
 #bag .sheet dt { color: #c9b48a; } #bag .sheet dd { margin: 0; text-align: right; color: #f3ecd8; white-space: nowrap; }
 #bag .sheet dd.up { color: #3fd84a; }
 /* Beside the bag the sheet is wider than six cells now: the cells shrink a little sooner. */
-#bag.duo:has(.sheet.on) { --s: min(46px, calc((100vw - 170px) / 14), calc((100dvh - 110px) / 5.6)); }
+#bag.duo:has(.sheet.on) { --s: min(46px, calc((100vw - 170px) / 14.6), calc((100dvh - 110px) / 5.6)); }
 @media (max-width: 480px) { /* a phone held upright: the numbers under the doll */
-  #bag .sheet .doll { grid-template-columns: var(--s) calc(var(--s) * 3.2) var(--s); grid-template-rows: repeat(5, var(--s)) auto; }
+  #bag .sheet .doll { grid-template-columns: var(--s) calc(var(--s) * 3.8) var(--s); grid-template-rows: repeat(5, var(--s)) auto; }
   #bag .sheet .stats { grid-column: 1 / 4; grid-row: 6; padding: 6px 0 0; border: 0; }
 }
 `;

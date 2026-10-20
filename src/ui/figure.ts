@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
 // The character sheet's figure, WoW style: the hero himself, full length and as dressed now, idling in the middle of the
-// paper doll; a drag turns him round. No second copy of him: the game's renderer draws the hero (his meshes, his gear,
+// paper doll, facing the viewer (his chest, whatever way the idle turns him) and framed from his feet to his headgear;
+// a drag turns him round. No second copy of him: the game's renderer draws the hero (his meshes, his gear,
 // his materials) with two lights of its own, a layer apart, into a corner of its own canvas just before the frame's own
 // draw paints over it, and the corner is copied into the sheet's canvas. Only while the sheet is open; closed, the
 // sheet's canvas gives its pixels back.
@@ -19,8 +20,11 @@ export class Figure {
   private readonly hero: THREE.Object3D;
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
-  /** The viewer's turn round the hero (dragged), from three-quarters on his left. */
-  private yaw = 0.45;
+  /** The viewer's turn round the hero (dragged), from straight in front of him. */
+  private yaw = 0;
+  /** Where his chest faces (eased: the idle sways). */
+  private facing?: number;
+  private bones?: { l: THREE.Object3D; r: THREE.Object3D; head: THREE.Object3D };
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, hero: THREE.Object3D, canvas: HTMLCanvasElement) {
     this.renderer = renderer;
@@ -50,14 +54,22 @@ export class Figure {
     if (!w || !h || w > gl.width || h > gl.height) return;
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
     this.hero.traverse((o) => o.layers.enable(LAYER)); // pieces come and go: every time
+    const b = (this.bones ??= ((l, r, head) => (l && r && head ? { l, r, head } : undefined))(this.hero.getObjectByName('LeftArm'), this.hero.getObjectByName('RightArm'), this.hero.getObjectByName('Head')));
     const at = this.hero.getWorldPosition(new THREE.Vector3()), ahead = this.hero.getWorldDirection(new THREE.Vector3()).negate().setY(0).normalize(); // he faces -Z
+    let top = 1.95;
+    if (b) { // his chest's way: from the line of his shoulders (his left is -X at rest), and the top of his head with a hat or a mitre on
+      const across = b.l.getWorldPosition(new THREE.Vector3()).sub(b.r.getWorldPosition(new THREE.Vector3())), f = Math.atan2(across.z, -across.x);
+      this.facing = this.facing === undefined ? f : this.facing + Math.atan2(Math.sin(f - this.facing), Math.cos(f - this.facing)) * 0.1;
+      ahead.set(-Math.sin(this.facing), 0, -Math.cos(this.facing));
+      top = b.head.getWorldPosition(new THREE.Vector3()).y - at.y + 0.42;
+    }
     ahead.applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
-    const side = new THREE.Vector3(ahead.z, 0, -ahead.x);
+    const side = new THREE.Vector3(ahead.z, 0, -ahead.x), half = (top + 0.06) / 2, mid = top - half;
     this.cam.aspect = w / h;
-    this.cam.fov = 2 * THREE.MathUtils.radToDeg(Math.atan(1.06 / 4.6)); // 2.12 m tall at 4.6 m: a mitre or a staff and the feet
+    this.cam.fov = 2 * THREE.MathUtils.radToDeg(Math.atan(half / 4.6)); // his height and his headgear's, 4.6 m away
     this.cam.updateProjectionMatrix();
-    this.cam.position.copy(at).addScaledVector(ahead, 4.6).setY(at.y + 1.25);
-    this.cam.lookAt(at.x, at.y + 1.02, at.z);
+    this.cam.position.copy(at).addScaledVector(ahead, 4.6).setY(at.y + mid + 0.2);
+    this.cam.lookAt(at.x, at.y + mid, at.z);
     this.key.position.copy(at).addScaledVector(ahead, 3).addScaledVector(side, 2.2).setY(at.y + 3.4);
     this.fill.position.copy(at).addScaledVector(ahead, -2).addScaledVector(side, -2.5).setY(at.y + 1.6);
     for (const l of [this.key, this.fill]) { l.target.position.copy(at).setY(at.y + 1); l.target.updateMatrixWorld(); }
@@ -83,9 +95,10 @@ export class Figure {
     r.setRenderTarget(target);
   }
 
-  /** The sheet closed: its canvas's pixels go back; the next open starts from three-quarters again. */
+  /** The sheet closed: its canvas's pixels go back; the next open starts from the front again. */
   free(): void {
     this.canvas.width = this.canvas.height = 0;
-    this.yaw = 0.45;
+    this.yaw = 0;
+    this.facing = undefined;
   }
 }

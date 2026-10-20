@@ -8,20 +8,19 @@ import { PHONE } from './device.ts';
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
-/** A GLB under public/models/ (Vite's base); on a phone its textures at half size. */
-export async function loadModel(file: string): Promise<GLTF> {
+/** A GLB under public/models/ (Vite's base); on a phone its textures wider than `phone` px at half size. */
+export async function loadModel(file: string, phone = 512): Promise<GLTF> {
   const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/${file}`);
-  if (PHONE) await halve(gltf.scene);
+  if (PHONE) await halve(gltf.scene, phone);
   return gltf;
 }
 
-const MAX_PHONE = 512;
 /**
- * Every texture of `root` wider than `MAX_PHONE` px scaled down by half, the decoded original freed:
+ * Every texture of `root` wider than `max` px scaled down by half, the decoded original freed:
  * a quarter of the memory, on the GPU and off it. The Meshy bodies' 1024 px maps came to ~64 MB of
  * the GPU budget a phone has, for detail its screen can't show at a character's size.
  */
-async function halve(root: THREE.Object3D): Promise<void> {
+async function halve(root: THREE.Object3D, max: number): Promise<void> {
   const maps = new Set<THREE.Texture>();
   root.traverse((o) => {
     const m = (o as THREE.Mesh).material;
@@ -29,7 +28,7 @@ async function halve(root: THREE.Object3D): Promise<void> {
   });
   await Promise.all([...maps].map(async (t) => {
     const img = t.image as ImageBitmap | HTMLImageElement | undefined;
-    if (!img || img.width <= MAX_PHONE) return;
+    if (!img || img.width <= max) return;
     try {
       t.image = await createImageBitmap(img, { resizeWidth: img.width / 2, resizeHeight: img.height / 2, resizeQuality: 'high' });
       if (img instanceof ImageBitmap) img.close();

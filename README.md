@@ -83,17 +83,20 @@ fino alla chiesa delle Zitelle.
   l'armatura toglie A / (A + 700) dei danni. Il confronto con il pezzo indossato è nel tooltip.
   Quello che si indossa si vede sul Risorto (`src/player/outfit.ts`), come i set di WoW e Diablo: ogni famiglia di pezzi
   è un set con la sua sagoma e i suoi colori, e un set intero si legge come un solo personaggio. Livello 1: il becchino
-  della peste (verde, maschera a becco, cuoio e ferro arrugginito), il chierico (verde, per chi lancia: cappello
-  saturno, mozzetta e stola cremisi, cotta di pizzo), l'Arsenale (blu: morione crestato col pennacchio, acciaio e
-  ottone), Murano (blu, per chi lancia: corona di fiamme di vetro, piviale verde-azzurro e oro), il secondo voto (viola:
-  mitria con la croce accesa, spallacci neri e oro con teschi dagli occhi viola, mantello). Livello 2: il gondoliere
-  annegato (verde: paglietta, maglia a righe, fascia cremisi, la lanterna della codega), la Pia Casa (blu: tricorno,
-  ferro catramato e pizzo), la Governatrice (viola: corona e velo, aureola, collare di pizzo, broccato d'oro e perle).
-  Il set di canapa è il corpo del Risorto com'è. Elmi, spallacci, corazze, bracciali, cosciali e schinieri sono
-  costruiti sulle ossa e fusi in un solo disegno per materiale; sotto, il corpo si tinge per zone (cappuccio, saio,
-  guanti, brache, stivali) e i suoi spallacci d'osso rientrano sotto i nuovi. Le armi sono gli oggetti di scena dei
-  nemici (pastorale, remo, rocca, scettro...) o costruite (la mazza a campana, il turibolo di Murano). Nella scheda del personaggio
-  c'è l'eroe stesso, a figura intera e vestito com'è, che respira; trascinandolo si gira.
+  della peste (verde: cuoio cerato, ferro arrugginito, fiale di vetro, cappello e maschera a becco), il chierico (verde, per
+  chi lancia: talare nera, cotta di pizzo, mozzetta cremisi, saturno), l'Arsenale (blu: acciaio e ottone, fascia cremisi,
+  morione crestato col pennacchio), Murano (blu, per chi lancia: broccato verde-azzurro e oro, vetri d'ambra e cobalto
+  accesi, corona di fiamme di vetro), il secondo voto (viola: acciaio annerito e filigrana d'oro, velluto viola, teschi,
+  spallacci col teschio dagli occhi viola, mitria con la croce accesa). Livello 2: il gondoliere annegato (verde: maglia a
+  righe, fascia cremisi, alghe e cirripedi, paglietta), la Pia Casa (blu: ferro catramato, pizzo bianco, argento, tricorno),
+  la Governatrice (viola: broccato d'oro, pizzo, perle, cristalli ciano accesi, corona col velo). Il set di canapa è il
+  corpo del Risorto com'è. Ogni set è il corpo stesso dipinto di nuovo (una ritexture Meshy del Risorto sui suoi UV, da un
+  concept dipinto di lui in quel set: colore, rilievo, ruvidezza e metallo), e il corpo si dipinge a zone (cappuccio,
+  spalle, petto, braccia, mani, fianchi, gambe, piedi) dal set del posto che le copre, così stoffa e armatura si piegano
+  col corpo; sopra, scolpiti con Meshy e fissati alle ossa, l'elmo o il cappello sul cappuccio e gli spallacci (i suoi
+  spallacci d'osso rientrano sotto i nuovi). Le armi sono gli oggetti di scena dei nemici (pastorale, remo, rocca, scettro...)
+  o modelli Meshy loro (la mazza a campana, il turibolo di Murano). Si carica solo quello che si indossa e si libera quello che si
+  toglie. Nella scheda del personaggio c'è l'eroe stesso, a figura intera, di fronte e vestito com'è, che respira; trascinandolo si gira.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 
 Stato attuale: **slice verticale in greybox** — l'intero complesso è camminabile

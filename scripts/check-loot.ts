@@ -2,10 +2,11 @@
 // boss always yields the nail and showers gold, gear drops get better by tier; the bag stacks by id
 // (gear one per slot), refuses what does not fit and round-trips. Gear: the stat math, wearing from
 // the bag (swapping), taking off, selling at a quarter, buying epics, crits, and the save of what is worn; and that every
-// piece shows on the hero (player/outfit.ts).
+// piece shows on the hero (player/outfit.ts), its files there.
 import { Bag, ITEM, ITEMS, RARITY, RELIC, RELIC_PRIZE, TABLES, roll, type Tier } from '../src/loot/bag.ts';
 import { ARMOR_K, CRIT_BASE, Equipment, GEAR, SHOP, STARTER, shop, buy, buyPrice, crit, effects, sell, sellPrice, totals, worth } from '../src/loot/gear.ts';
-import { WEAPONS, lookOf } from '../src/player/outfit.ts';
+import { existsSync } from 'node:fs';
+import { DIR, LOOKS, PIECES, WEAPONS, lookOf } from '../src/player/outfit.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 let seed = 1;
@@ -95,5 +96,12 @@ if (JSON.stringify(g2.encode()) !== JSON.stringify(gear.encode())) fail('gear ro
 
 // What is worn shows: a model in the fist for every weapon, a look for every visible piece past the hemp (neck and ring don't show).
 for (const g of GEAR) if (g.slot === 'arma' ? !WEAPONS[g.id] : g.slot !== 'amuleto' && g.slot !== 'anello' && g.rarity !== 'comune' && !lookOf(g.id)) fail(`${g.id} does not show on the hero`);
+// Every look: the body painted anew (three maps), a helm and a pair of pauldrons; every weapon's model.
+const model = (f: string) => existsSync(new URL(`../public/models/${f}`, import.meta.url));
+for (const l of LOOKS) {
+  for (const k of ['base', 'normal', 'orm']) if (!model(`${DIR}${l}-${k}.webp`)) fail(`${l} has no ${k} map`);
+  for (const s of ['testa', 'spalle'] as const) if (!PIECES[`${l}-${s}`] || !model(`${DIR}${l}-${s}.glb`)) fail(`${l} has no ${s} piece`);
+}
+for (const [id, w] of Object.entries(WEAPONS)) if (!model(w.file)) fail(`${id}: no ${w.file}`);
 
 console.log(`loot ok: gear worth by tier ${Object.entries(gearRank).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(', ')}; gold per kill ${Object.entries(mean).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(', ')}`);

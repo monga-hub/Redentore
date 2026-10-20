@@ -49,7 +49,6 @@ import { BagPanel } from './ui/bag.ts';
 import { Equipment, SHOP2, crit, effects, shop } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
-import { relight } from './player/outfit.ts';
 import { VendorPanel } from './ui/vendor.ts';
 import { DeathScreen } from './ui/death.ts';
 
@@ -306,7 +305,7 @@ const warm = () => {
   kit.prime(); // and a first real draw of each, at nothing
 };
 let warmed = false;
-fx.onRebuild = () => { relight(); if (warmed) warm(); }; // the pieces not worn now too (player/outfit.ts)
+fx.onRebuild = () => { if (warmed) warm(); };
 const bodiesIn = () => !!(friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length); // everyone's bodies in
 fx.loaded = bodiesIn; // the boot test times the scene, not the loading
 onQuality((q) => fx.setQuality(new URLSearchParams(location.search).get('fx') === 'low' ? 'bassa' : q)); // the menu's "Grafica"; `?fx=low` pins the bottom rung

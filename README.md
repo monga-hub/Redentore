@@ -306,11 +306,17 @@ src/
                              ombre, hemisphere, nebbia (più fitta verso la laguna), foschia
                              sull'acqua, pulviscolo, post (bloom, grading notturno, ACES);
                              interni/esterni sfumati per area.
-                             `?fx=low` (o fps bassi sostenuti) spegne ombre e post e ne
+                             Scala di qualità (fps bassi sostenuti la scendono un gradino
+                             alla volta): meno pixel, ombre a metà, niente post, poi i due
+                             gradini "ultra-leggeri" per telefoni Android deboli (niente
+                             ombre, 3 luci delle torce, cielo senza nuvole, niente foschia
+                             e pulviscolo, metà particelle, infine pixel ratio 0,75);
+                             `?fx=low` e "Grafica: Bassa" fissano l'ultimo. Ogni gradino ne
                              libera i buffer. Su telefono (`core/device.ts`, puntatore
                              touch) pixel ratio 1,5, niente MSAA sul canvas, MSAA 2x nel
                              post, ombre 1024 e texture dei modelli dimezzate: iOS ricarica
-                             la scheda oltre ~1 GB di memoria, GPU compresa
+                             la scheda oltre ~1 GB di memoria, GPU compresa; un Android con
+                             ≤ 4 GB (`deviceMemory`) parte già senza post
   fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
                              PointLight assegnate alle torce più vicine al player; candele,
                              lampadari e bagliori colorati delle vetrate da `level.lights`

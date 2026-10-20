@@ -260,7 +260,10 @@ export class LevelBuilder {
       const m = new THREE.Mesh(mergeGeometries(d.geos)!, material(d.role));
       m.userData.role = d.role;
       d.zone.add(m);
-      if (d.cam) this.cameraBlockers.push(m);
+      // The camera's and the targeting's rays test each part on its own bounds, not the merged mesh's, which can span a
+      // whole convent with the hero inside it: the same hits for a fraction of the triangles (the follow camera's ray
+      // tested 11 568 of them every frame in the church). Positions only: nothing else of them is kept.
+      if (d.cam) for (const g of d.geos) this.cameraBlockers.push(new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', g.getAttribute('position')).setIndex(g.getIndex()), m.material));
     }
     this.decorBatches.clear();
   }

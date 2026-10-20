@@ -530,6 +530,7 @@ renderer.setAnimationLoop(() => {
   minimap.update(dt, player.pos, player.facing, diablo ? dcam.yaw : cam.yaw, area, foes, goal(), sidePins()); // and the side quests'
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
+  kit.vfx.density = fx.sparks;
   audio.update(dt, cam.camera, undefined, false, pressed); // before the bar drains this frame's notices
   fx.render();
   bar.render(dt, pressed);

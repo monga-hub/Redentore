@@ -825,8 +825,12 @@ export class Vfx {
     this.root.add(this.floorDark.mesh, this.floorGlow.mesh, this.smoke.mesh, this.glow.mesh, this.ribbons.mesh, this.spikes.mesh, this.column, this.light);
   }
 
+  /** Share of the particles spawned that are kept (the quality ladder's ultra-light rungs thin them out, main.ts). */
+  density = 1;
+
   /** One particle of style `s` at (x,y,z) moving at (vx,vy,vz). */
   spawn(s: Style, x: number, y: number, z: number, vx = 0, vy = 0, vz = 0): void {
+    if (this.density < 1 && Math.random() > this.density) return;
     (s.dark ? this.smoke : this.glow).spawn(s, x, y, z, vx, vy, vz);
   }
 

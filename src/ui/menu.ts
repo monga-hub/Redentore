@@ -92,7 +92,7 @@ const styleBtn = () => `<button class="btn style" data-do="style" aria-pressed="
   ? 'Visuale isometrica, clic per muoverti e attaccare' : 'Ora: camera in terza persona (WoW)'}</small></span><i aria-hidden="true"></i></button>`;
 
 /** The "Grafica" button: each tap moves Auto -> Alta -> Bassa and back. */
-const QUALITY_HINT = { auto: 'Si adatta al telefono, scende se rallenta', alta: 'Sempre al massimo: luci, ombre, bagliore', bassa: 'Più fluida: meno pixel, niente bagliore' };
+const QUALITY_HINT = { auto: 'Si adatta al telefono, scende se rallenta', alta: 'Sempre al massimo: luci, ombre, bagliore', bassa: 'Per telefoni deboli: niente ombre né bagliore, meno luci e pixel' };
 const qualityBtn = () => `<button class="btn style" data-do="quality"><span>Grafica: ${getQuality()[0].toUpperCase() + getQuality().slice(1)}<br><small>${QUALITY_HINT[getQuality()]}</small></span></button>`;
 
 export const playTime = (s: number) => {

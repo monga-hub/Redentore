@@ -7,7 +7,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import type { Level } from '../level/index.ts';
 import { Z } from '../level/plan.ts';
 import { Torches, DOT } from './torches.ts';
-import { PHONE } from '../core/device.ts';
+import { PHONE, WEAK } from '../core/device.ts';
 
 // Lighting and mood on top of the dressed level: a full-moon night over the lagoon.
 // A cold moon is the only shadow-casting light; a starry sky dome with drifting clouds
@@ -18,10 +18,11 @@ import { PHONE } from '../core/device.ts';
 //
 // Quality: a ladder walked one rung at a time on the smoothed frame rate, down after a few seconds
 // under ~28 fps, back up after longer over ~50 (see QUALITY). Each rung gives back what it stops
-// using; torches, lamps, the hero's light, emissive glow and the moon's shadows stay on every rung,
-// so the night never goes flat. `?fx=low` and the menu's "Grafica" pin a rung. Phones start lean
-// (`PHONE`): iOS kills a tab whose memory, GPU buffers included, outgrows a budget of about a
-// gigabyte, and reloads it, so their buffers are sized down from the start.
+// using; torches, lamps, the hero's light and emissive glow stay on every rung, so the night never
+// goes flat, and the moon's shadows on all but the two "ultra-light" ones at the bottom, for weak
+// Android phones. `?fx=low` and the menu's "Grafica" pin a rung. Phones start lean (`PHONE`): iOS
+// kills a tab whose memory, GPU buffers included, outgrows a budget of about a gigabyte, and reloads
+// it, so their buffers are sized down from the start; a weak phone (`WEAK`) starts without the post chain.
 
 /** 0 = open air, 1 = closed interior; covered cloister walks sit in between. */
 function indoorness(zone: string | undefined, label: string | undefined): number {
@@ -68,11 +69,14 @@ const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
 /**
  * Rungs, best first: 0 everything; 1 fewer pixels (the pixel ratio x0.7, at least 1); 2 half the moon's
- * shadow map; 3 no post chain (bloom, grade), straight to the canvas. Down after `down.after` s under
- * `down.fps`, up after `up.after` s over `up.fps`; a rung given up again after climbing back to it is
- * not tried a third time, so the ladder settles instead of see-sawing.
+ * shadow map; 3 (`post`) no post chain (bloom, grade), straight to the canvas; 4 (`lite`) ultra-light: no
+ * moon shadows (the shadow pass drew as much again as the view), `lights` of the torch pool, a sky without
+ * clouds, no mist or motes, `sparks` of the spell particles; 5 the pixel ratio down to `tiny`, under the
+ * screen's own pixels. Down after `down.after` s under `down.fps`, up after `up.after` s over `up.fps`; a
+ * rung given up again after climbing back to it is not tried a third time, so the ladder settles instead
+ * of see-sawing.
  */
-const QUALITY = { rungs: 3, down: { fps: 28, after: 4 }, up: { fps: 50, after: 8 }, settle: 3, pixels: 0.7 };
+const QUALITY = { rungs: 5, post: 3, lite: 4, down: { fps: 28, after: 4 }, up: { fps: 50, after: 8 }, settle: 3, pixels: 0.7, tiny: 0.75, lights: 3, sparks: 0.5 };
 const SHADOW = PHONE ? 1024 : 2048;
 /** Without the post chain the grade is gone: a lower exposure and a CSS vignette over the canvas (free to composite) keep the dark. */
 const BARE = { exposure: 0.8, vignette: 0.75 };
@@ -115,6 +119,7 @@ const skyMaterial = () => new THREE.ShaderMaterial({
       vec3 d = normalize(vDir);
       float h = d.y;
       vec3 c = mix(uHorizon, uZenith, pow(smoothstep(-0.02, 0.65, h), 0.55));
+      #ifndef LITE
 
       // Stars: one candidate per cell of a direction grid, faded towards the hazy horizon.
       vec3 sp = d * 220.0, cell = floor(sp);
@@ -142,6 +147,10 @@ const skyMaterial = () => new THREE.ShaderMaterial({
 
       c = mix(c + moon + haloCol, cloud, cover * 0.88);
       c += haloCol * cover * 0.6; // halo scatters through thin cloud
+      #else // ultra-light: the gradient and a plain moon disc with its halo, no fbm
+      float ang = acos(clamp(dot(d, uMoonDir), -1.0, 1.0));
+      c += vec3(1.0, 0.98, 0.92) * 2.0 * smoothstep(0.042, 0.039, ang) + vec3(0.55, 0.68, 0.9) * (exp(-ang * 9.0) * 0.16 + exp(-ang * 35.0) * 0.35);
+      #endif
       gl_FragColor = vec4(c, 1.0);
     }`,
 });
@@ -213,7 +222,7 @@ export class Atmosphere {
   indoor = 0;
   private mood: Record<keyof typeof MOOD, readonly [number, number]> = MOOD;
   private readonly hero = new THREE.PointLight(HERO_LIGHT.color, HERO_LIGHT.intensity, HERO_LIGHT.distance, HERO_LIGHT.decay);
-  /** The rung of QUALITY the renderer stands on: 0 best, QUALITY.rungs no post chain. */
+  /** The rung of QUALITY the renderer stands on: 0 best, QUALITY.rungs the lightest. */
   step = 0;
   /** Walk the ladder on the frame rate; off when the menu or `?fx=low` pins a rung. */
   auto = true;
@@ -297,10 +306,22 @@ export class Atmosphere {
     this.setSize(innerWidth, innerHeight);
     this.vignette.style.cssText = 'position:fixed;inset:0;pointer-events:none;display:none;background:radial-gradient(ellipse at center, transparent 35%, #000 105%)';
     renderer.domElement.after(this.vignette); // under the HUD, which comes later
+    if (WEAK) this.setStep(QUALITY.post, 'weak phone'); // the ladder climbs back if it keeps up
   }
 
+  /** No post chain: straight to the canvas. */
   private get low(): boolean {
-    return this.step === QUALITY.rungs;
+    return this.step >= QUALITY.post;
+  }
+
+  /** Ultra-light (main.ts thins the spell particles to `sparks`). */
+  get lite(): boolean {
+    return this.step >= QUALITY.lite;
+  }
+
+  /** Share of the spell particles drawn on this rung. */
+  get sparks(): number {
+    return this.lite ? QUALITY.sparks : 1;
   }
 
   setSize(w: number, h: number): void {
@@ -319,7 +340,7 @@ export class Atmosphere {
     const mood = this.mood, u = this.grade.uniforms;
     const open = mood === DIABLO_MOOD ? 1 - Math.min(k / 0.45, 1) : 0;
     this.hemi.intensity = lerp(mood.hemi, k) + DIABLO_OPEN.hemi * open;
-    this.moon.intensity = MOON + DIABLO_OPEN.moon * open;
+    this.moon.intensity = (MOON + DIABLO_OPEN.moon * open) * (this.lite ? 1 - k : 1); // without shadows no roof stops it: indoors it goes
     this.fog.density = lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k);
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
     this.renderer.toneMappingExposure = (lerp(mood.exposure, k) + DIABLO_OPEN.exposure * open) * (this.low ? BARE.exposure : 1);
@@ -345,12 +366,12 @@ export class Atmosphere {
 
     // Drift the motes and wrap them into the box around the player.
     const p = this.dust.geometry.attributes.position as THREE.BufferAttribute, arr = p.array as Float32Array;
-    for (let i = 0; i < arr.length; i += 3) {
+    for (let i = 0; this.dust.visible && i < arr.length; i += 3) {
       arr[i] = wrap(arr[i] + Math.sin(this.t * 0.3 + i) * 0.05 * dt - focus.x, 30) + focus.x;
       arr[i + 1] = wrap(arr[i + 1] + 0.04 * dt - focus.y - 3, 10) + focus.y + 3;
       arr[i + 2] = wrap(arr[i + 2] + Math.cos(this.t * 0.27 + i) * 0.05 * dt - focus.z, 30) + focus.z;
     }
-    p.needsUpdate = true;
+    p.needsUpdate = this.dust.visible;
 
     // The quality ladder, on the smoothed frame rate.
     this.avgDt += (dt - this.avgDt) * 0.05;
@@ -387,7 +408,7 @@ export class Atmosphere {
     else this.scene.remove(this.hero);
   }
 
-  /** Called after the post chain goes or comes back (programs are keyed on the target they draw into): main.ts warms them again. */
+  /** Called after the post chain or the ultra-light rungs come or go (programs are keyed on the target they draw into, the lights and the shadows): main.ts warms them again. */
   onRebuild?: () => void;
 
   /**
@@ -416,22 +437,38 @@ export class Atmosphere {
    * place, without new programs. Without the post chain its buffers go (on a phone the biggest allocation
    * of the game), and so does every program built for the HDR buffer: three keeps a material's old
    * programs next to the new ones until the material is disposed. Coming back, the composer and its
-   * passes, which dispose only their GPU side, allocate again on their next draw.
+   * passes, which dispose only their GPU side, allocate again on their next draw. The ultra-light rungs
+   * change every lit program (fewer lights, no shadow), so going in or out of them disposes the materials
+   * too; the shadow map goes with the shadows, and is freed at once when it changes size.
    */
   setStep(n: number, why: string): void {
     n = THREE.MathUtils.clamp(n, 0, QUALITY.rungs);
     if (n === this.step) return;
-    const post = this.low;
+    const post = this.low, lite = this.lite;
     this.step = n;
     this.climbed = false;
     this.slowFor = this.fastFor = 0;
     this.settle = QUALITY.settle;
-    this.renderer.setPixelRatio(n >= 1 ? Math.max(1, this.pixelRatio * QUALITY.pixels) : this.pixelRatio);
+    this.renderer.setPixelRatio(n >= 5 ? Math.min(QUALITY.tiny, this.pixelRatio) : n >= 1 ? Math.max(1, this.pixelRatio * QUALITY.pixels) : this.pixelRatio);
     this.setSize(innerWidth, innerHeight);
-    this.moon.shadow.mapSize.setScalar(n >= 2 ? SHADOW / 2 : SHADOW); // three resizes the map on its next shadow pass
+    const shadow = this.moon.shadow, size = n >= 2 ? SHADOW / 2 : SHADOW;
+    if (shadow.mapSize.x !== size || this.lite !== lite) {
+      shadow.dispose(); // now, rather than on the next shadow pass
+      shadow.map = null; // three allocates it again on that pass, at the new size
+      shadow.mapSize.setScalar(size);
+    }
     if (this.low && !post) {
       for (const p of this.composer.passes) p.dispose();
       this.composer.dispose();
+    }
+    if (this.lite !== lite) {
+      this.moon.castShadow = !this.lite;
+      this.torches.setPool(this.lite ? QUALITY.lights : Torches.POOL);
+      if (this.lite) this.sky.material.defines.LITE = '';
+      else delete this.sky.material.defines.LITE;
+      this.mist.visible = this.dust.visible = !this.lite;
+    }
+    if ((this.low && !post) || this.lite !== lite) {
       this.scene.traverse((o) => { // only the GPU side goes: three builds a disposed material again on its next draw
         const m = (o as THREE.Mesh).material;
         if (m) for (const x of Array.isArray(m) ? m : [m]) x.dispose();
@@ -439,7 +476,7 @@ export class Atmosphere {
     }
     console.info(`[fx] quality ${n}/${QUALITY.rungs}: ${why}`);
     this.vignette.style.display = this.low ? '' : 'none';
-    if (this.low !== post) this.onRebuild?.();
+    if (this.low !== post || this.lite !== lite) this.onRebuild?.();
   }
 }
 

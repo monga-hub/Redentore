@@ -103,6 +103,7 @@ export class Torches {
    * stacked cones and a light just over the wide Meshy bowl would blow out to a white disc. */
   brazierFlame = 1;
   brazierLift = 0.5;
+  static readonly POOL = POOL;
   /** Brazier flame bases, and the iron that holds them (swapped for a Meshy brazier in the Diablo view). */
   readonly braziers: { x: number; y: number; z: number }[];
   readonly brazierIron: THREE.InstancedMesh[];
@@ -110,6 +111,7 @@ export class Torches {
   private readonly flames: number[]; // emitters drawing a flame
   private readonly lit: number[]; // emitters competing for the light pool
   private readonly lights: THREE.PointLight[] = [];
+  private pool = POOL;
   private readonly outer: THREE.InstancedMesh;
   private readonly core: THREE.InstancedMesh;
   private readonly order: number[];
@@ -195,6 +197,13 @@ export class Torches {
     this.root.add(sparks);
   }
 
+  /** Light only `n` of the POOL lights (the quality ladder's ultra-light rungs): the rest are hidden, so they leave
+   * the shader's light count at once and the programs change (fx/atmosphere.ts disposes and warms them). */
+  setPool(n: number): void {
+    this.pool = n;
+    this.lights.forEach((l, k) => (l.visible = k < n));
+  }
+
   update(t: number, dt: number, focus: THREE.Vector3): void {
     const { em, m, q, sc, v } = this;
     q.identity();
@@ -209,13 +218,13 @@ export class Torches {
     for (const i of this.lit) this.dist[i] = Math.hypot(em[i].x - focus.x, em[i].y - focus.y, em[i].z - focus.z);
     this.outer.instanceMatrix.needsUpdate = this.core.instanceMatrix.needsUpdate = true;
 
-    // Light pool: nearest POOL torches. Each fades out as it nears the distance of the
+    // Light pool: nearest `pool` torches. Each fades out as it nears the distance of the
     // first torch left without a light, so hand-overs never pop.
     this.order.sort((a, b) => this.dist[a] - this.dist[b]);
-    const cut = this.order.length > POOL ? this.dist[this.order[POOL]] : Infinity;
+    const n = this.pool, cut = this.order.length > n ? this.dist[this.order[n]] : Infinity;
     for (let k = 0; k < POOL; k++) {
       const l = this.lights[k], i = this.order[k];
-      if (i === undefined) { l.intensity = 0; continue; }
+      if (i === undefined || k >= n) { l.intensity = 0; continue; }
       const e = em[i], w = Math.min(1, Math.max(0, (cut - this.dist[i]) / 4));
       l.position.set(e.x + e.nx * 0.6, e.y + (e.kind === 'brazier' ? this.brazierLift : e.kind === 'torch' ? 0.3 : 0), e.z + e.nz * 0.6);
       l.color.setHex(e.color);

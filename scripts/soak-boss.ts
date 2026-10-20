@@ -1,7 +1,7 @@
 // Boss soak (`npm run soak`; not in `npm run check`: it needs Chrome and plays for minutes). The real
 // game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), fights the
 // Reverendissimo with every ability on the bar, the church's sacerdoti and priests alive, through all
-// three acts and the berserk, then down the quality ladder one rung at a time mid-fight and back to the
+// three acts and the berserk, then down the quality ladder one rung at a time mid-fight (the ultra-light ones too) and back to the
 // top, then the kill. It asserts what got the fight's tab killed on iPhones (iOS reloads a tab past its
 // memory budget, GPU buffers included): no page errors or lost context, no programs, geometries or
 // textures piling up as the fight goes on, the GPU buffers of the phone profile within budget, each rung
@@ -77,7 +77,7 @@ function fight(seconds: number, level: number): void {
   const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
   let next = 0, raged = false;
-  const RUNGS = [[0.45, 1], [0.55, 2], [0.65, 3], [0.8, 0]]; // fraction of the fight, rung
+  const RUNGS = [[0.4, 1], [0.48, 2], [0.56, 3], [0.64, 4], [0.72, 5], [0.82, 0]]; // fraction of the fight, rung
   fx.auto = false; // the ladder walked by hand: swiftshader's frame rate would walk it on its own
   fx.setStep(0, 'soak');
   const tick = () => {
@@ -183,10 +183,10 @@ try {
   if (s.some((x) => x.lost)) fail('WebGL context lost');
   if (Math.max(...s.map((x) => x.phase)) < 2 || !s.some((x) => x.rage)) fail('the fight never reached the third act and the berserk');
   if (!r.won) fail('the boss fell but the quest missed it');
-  // The fight in runs, one per stay on a rung: the top, rungs 1..3 down, the top again.
+  // The fight in runs, one per stay on a rung: the top, rungs 1..5 down, the top again.
   const runs: Sample[][] = [];
   for (const x of s) { if (runs.at(-1)?.[0].step !== x.step) runs.push([]); runs.at(-1)!.push(x); }
-  if (runs.map((run) => run[0].step).join() !== '0,1,2,3,0') fail(`the ladder went ${runs.map((run) => run[0].step).join(' -> ')}`);
+  if (runs.map((run) => run[0].step).join() !== '0,1,2,3,4,5,0') fail(`the ladder went ${runs.map((run) => run[0].step).join(' -> ')}`);
   // Steady state: past the first seconds' first uses (or a rung's change), nothing piles up on any rung.
   runs.forEach((run, i) => {
     const steady = run.slice(i ? 3 : 8);
@@ -198,12 +198,12 @@ try {
   const peak = (run: Sample[] | undefined, k: 'gpu' | 'prog') => Math.max(...(run ?? []).map((x) => x[k]));
   const top = runs[0], gpu = runs.map((run) => peak(run, 'gpu')), prog = runs.map((run) => peak(run, 'prog'));
   if (gpu[0] > BUDGET) fail(`the phone profile holds ${gpu[0].toFixed(0)} MB of GPU buffers, over the ${BUDGET} MB budget`);
-  for (let i = 1; i <= 3; i++) {
-    if (gpu[i] >= gpu[i - 1]) fail(`rung ${i} kept the buffers of rung ${i - 1}: ${gpu[i - 1].toFixed(0)} -> ${gpu[i].toFixed(0)} MB`);
+  for (let i = 1; i <= 5; i++) {
+    if (i === 5 ? gpu[i] > gpu[i - 1] : gpu[i] >= gpu[i - 1]) fail(`rung ${i} kept the buffers of rung ${i - 1}: ${gpu[i - 1].toFixed(0)} -> ${gpu[i].toFixed(0)} MB`); // rung 5 shrinks only the canvas, which the hook doesn't see
     if (prog[i] > prog[0]) fail(`rung ${i} piled up programs: ${prog[0]} -> ${prog[i]}`);
   }
-  if (gpu[4] > gpu[0] * 1.02) fail(`back on the top rung the buffers grew: ${gpu[0].toFixed(0)} -> ${gpu[4].toFixed(0)} MB`);
-  if (prog[4] > prog[0] + SLACK.prog) fail(`back on the top rung the programs grew: ${prog[0]} -> ${prog[4]}`);
+  if (gpu[6] > gpu[0] * 1.02) fail(`back on the top rung the buffers grew: ${gpu[0].toFixed(0)} -> ${gpu[6].toFixed(0)} MB`);
+  if (prog[6] > prog[0] + SLACK.prog) fail(`back on the top rung the programs grew: ${prog[0]} -> ${prog[6]}`);
   console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; GPU by rung ${gpu.map((g) => g.toFixed(0)).join(' -> ')} MB; programs ${prog.join(' -> ')}; top rung ${top.length} s`);
 } catch (e) {
   fail(String((e as Error).message));

@@ -356,6 +356,23 @@ export class QuestView {
     this.trackEl.innerHTML = `<b>${titleOf(stage)}</b><span class="${fresh ? 'new' : ''}">${OBJECTIVE[stage]}</span>${sides}${this.lines}`;
   }
 
+  /** The quests running, as the tracker lists them, for the world map's quest log (main.ts adds where each points). */
+  log(): { id: 'main' | 'bortolo' | 'relic' | 'teste' | SideQuest['id']; title: string; line: string; ready: boolean }[] {
+    const q = this.quest, s = q.stage, alive = this.friars(), out: ReturnType<QuestView['log']> = [];
+    if (s !== 'done') out.push({ id: 'main', title: titleOf(s), line: OBJECTIVE[s], ready: s === 'report' || s === 'return' });
+    if (q.accepted && !q.found) out.push({ id: 'bortolo', title: QUESTS.bortolo.title, line: BORTOLO_OBJECTIVE, ready: false });
+    if (q.relic && !q.relicBack) out.push({ id: 'relic', title: RELIC_TITLE, line: RELIC_OBJECTIVE, ready: true });
+    if (q.asked && !q.boon) {
+      const ok = q.headsReady(alive);
+      out.push({ id: 'teste', title: QUESTS.teste.title, line: ok ? "Torna da Fra' Bortolo, nella serra" : `Teste di frate ${q.heads}/${q.headsNeed(alive)}`, ready: ok });
+    }
+    for (const id of q.side.taken) {
+      const sq = SIDE_BY.get(id)!, ok = q.side.ready(sq, q.boss2Dead);
+      out.push({ id, title: QUESTS[id].title, line: ok ? `Torna da ${ISEPPO.name}, nello squero` : sq.line(q.side.progress(sq)), ready: ok });
+    }
+    return out;
+  }
+
   /** Mastro Iseppo's quests running, for the tracker: their counts, green once ready to hand in. */
   private sideLines(): string {
     const q = this.quest, s = q.side;

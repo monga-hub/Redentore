@@ -23,7 +23,7 @@ import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
 import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { ANDITO, BOONS, CHEST, CROCE, HEADS, NPC, QUESTS, Quest } from './quest/progress.ts';
+import { ANDITO, BOONS, CHEST, CROCE, HEADS, NPC, QUESTS, Quest, SECOND, SPEZIALE } from './quest/progress.ts';
 import { ISEPPO, SIDE, type Foe } from './quest/squero.ts';
 import { QuestView } from './quest/view.ts';
 import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
@@ -350,25 +350,30 @@ const goal = () => {
  * the elite a head or the shears are wanted off (or the token at its body), the nearest of the kind a collect or kill quest wants.
  */
 const sidePins = () => {
-  const pins: { x: number; z: number }[] = quest.relic && !quest.relicBack ? [NPC] : [], s = quest.side;
-  for (const q of SIDE) {
-    if (!s.active(q.id)) continue;
-    const w = q.want;
-    if (s.ready(q, quest.boss2Dead)) pins.push(ISEPPO);
-    else if (w.kind === 'find') pins.push(w.at);
-    else if (w.kind === 'token') pins.push(drops.loose.find((l) => l.id === w.item) ?? (w.from === 'gastaldo' ? l2.gastaldo : l2.maestra));
-    else if (w.kind === 'collect' || w.kind === 'kill') {
-      const near = zitelle.all.filter((m) => FOE.get(m.kind) === w.from && m.state !== 'dead').sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
-      if (near) pins.push(near);
-    }
-  }
+  const pins: { x: number; z: number }[] = quest.relic && !quest.relicBack ? [NPC] : [];
+  for (const q of SIDE) if (quest.side.active(q.id)) { const at = sidePin(q); if (at) pins.push(at); }
   return pins;
 };
+const sidePin = (q: (typeof SIDE)[number]): { x: number; z: number } | undefined => {
+  const w = q.want;
+  if (quest.side.ready(q, quest.boss2Dead)) return ISEPPO;
+  if (w.kind === 'find') return w.at;
+  if (w.kind === 'token') return drops.loose.find((l) => l.id === w.item) ?? (w.from === 'gastaldo' ? l2.gastaldo : l2.maestra);
+  if (w.kind === 'collect' || w.kind === 'kill') {
+    return zitelle.all.filter((m) => FOE.get(m.kind) === w.from && m.state !== 'dead').sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
+  }
+  return ISEPPO; // the letter: hand it in
+};
+/** The world map's quest log: the tracker's quests, each with the spot it points at (the objective, else its giver). */
+const questLog = () => questView.log().map((e) => ({
+  ...e,
+  at: e.id === 'main' ? goal() : e.id === 'relic' ? NPC : e.id === 'bortolo' || e.id === 'teste' ? SPEZIALE : sidePin(SIDE.find((q) => q.id === e.id)!),
+}));
 function openMap(): void {
   if (menu.paused) return;
   kit.system.cancel();
   input.consume();
-  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), npcs: questView.pins() });
+  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), npcs: questView.pins(), quests: questLog(), level2: SECOND.includes(quest.stage) && quest.stage !== 'offer' });
 }
 const pressed = (code: string) => input.pressed(code);
 /**

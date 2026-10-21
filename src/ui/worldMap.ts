@@ -7,6 +7,8 @@ import { PX, WATER, glyph, under, type Minimap, type Pin } from './minimap.ts';
 // framed overlay, turned like the minimap to the camera's heading at opening, under the same fog as the minimap. Discovered places carry their
 // names, the player shows as an arrow and the objective as a gold diamond. The game pauses while
 // it is open; M, Esc, a click or a tap close it. Its DOM is styled here, like ui/menu.ts.
+// WoW's quest log flanks it: the level's discovered places on the left, the quests running on the right (gold once
+// ready to hand in); tapping one tints its place or rings the spot the quest points at. Both columns fold away.
 
 const CSS = `
 #worldmap { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center;
@@ -20,7 +22,26 @@ const CSS = `
   border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3420, #140e08) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0,0,0,.6); }
 #worldmap .x { position: absolute; right: 6px; top: 6px; z-index: 1; width: 30px; height: 30px; padding: 0; cursor: pointer; font: bold 18px/1 system-ui, sans-serif;
   color: #f3e2b0; background: linear-gradient(#7a1a10, #3a0805); border: 1px solid #c9a45c; border-radius: 4px; }
-#worldmap canvas { flex: 1; min-height: 0; width: 100%; border: 1px solid #000; border-radius: 3px;
+#worldmap .body { flex: 1; min-height: 0; display: flex; gap: 8px; }
+#worldmap .col { flex: none; width: 190px; overflow-y: auto; overscroll-behavior: contain; cursor: default;
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(rgba(30,22,14,.92), rgba(10,7,4,.95)) padding-box, var(--gilt) border-box; }
+#worldmap .col:not([open]) { width: auto; }
+#worldmap .col:last-child { margin-top: 16px; } /* clear of the close button */
+#worldmap .col summary { position: sticky; top: 0; z-index: 1; background: #1c140c; list-style: none; padding: 4px 8px; cursor: pointer; font: bold 13px/18px Georgia, serif; color: #ffd75e; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+#worldmap .col summary::-webkit-details-marker { display: none; }
+#worldmap .col[open] summary { border-bottom: 1px solid #5e4422; }
+#worldmap .col:not([open]) summary { writing-mode: vertical-rl; padding: 8px 2px; }
+#worldmap .col ul { margin: 0; padding: 2px 0; list-style: none; }
+#worldmap .col li { padding: 3px 8px; cursor: pointer; font: 12px/15px Georgia, serif; color: #e9d6b0; border-left: 3px solid transparent; }
+#worldmap .col li:hover { background: rgba(255,215,94,.08); }
+#worldmap .col li.sel { background: rgba(255,215,94,.16); border-left-color: #ffd75e; }
+#worldmap .col li.here { color: #fff2c0; }
+#worldmap .col li b { display: block; color: #ffd200; font-size: 13px; font-weight: bold; }
+#worldmap .col li small { display: block; font-size: 11px; color: #c9b48a; }
+#worldmap .col li.ready small { color: #ffd75e; }
+#worldmap .col li.none { cursor: default; color: #8a7a5c; font-style: italic; }
+@media (max-width: 900px), (max-height: 500px) { #worldmap .col { width: 140px; } #worldmap .col li b { font-size: 12px; } }
+#worldmap canvas { flex: 1; min-height: 0; min-width: 0; width: 100%; border: 1px solid #000; border-radius: 3px;
   box-shadow: 0 0 0 1px #4a3a26, inset 0 0 20px #000; }
 #worldmap .foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px; font: 12px/16px system-ui, sans-serif; color: #c9b48a; }
 #worldmap .foot b { color: #ffd75e; font-weight: normal; }
@@ -29,7 +50,15 @@ body.touch #worldmap .foot i { display: none; }
 `;
 
 /** What the map shows of the game when it opens. */
-export interface MapView { x: number; z: number; facing: number; view: number; area?: string; goal?: Pin; npcs?: Pin[] }
+export interface MapView {
+  x: number; z: number; facing: number; view: number; area?: string; goal?: Pin; npcs?: Pin[];
+  /** The quest log: the quests running and the spot each points at (objective, else giver). */
+  quests?: { title: string; line: string; ready: boolean; at?: { x: number; z: number } }[];
+  /** The second level's places (the Giudecca and the Zitelle) are the ones listed. */
+  level2?: boolean;
+}
+
+const LEVEL2 = new Set(['giudecca', 'zitelle']); // zones past the Ponte de la Croce
 
 export class WorldMap {
   private el = document.createElement('div');
@@ -44,6 +73,9 @@ export class WorldMap {
   private fog: FogLayer;
   private chart: Minimap;
   private areas: readonly Area[];
+  private places: HTMLElement;
+  private log: HTMLElement;
+  private sel?: { area: string } | { quest: number }; // what the log has highlighted on the map
 
   constructor(d: Discovery, fog: FogLayer, chart: Minimap, areas: readonly Area[]) {
     this.d = d;
@@ -65,13 +97,29 @@ export class WorldMap {
     this.el.setAttribute('aria-modal', 'true');
     this.el.setAttribute('aria-label', 'Mappa');
     this.el.innerHTML = `<div class="panel"><h2>Giudecca · Redentore e Zitelle</h2>
-      <button class="x" aria-label="Chiudi mappa">✕</button><canvas></canvas>
+      <button class="x" aria-label="Chiudi mappa">✕</button><div class="body">
+      <details class="col" open><summary>Luoghi</summary><ul class="places"></ul></details><canvas></canvas>
+      <details class="col" open><summary>Missioni</summary><ul class="log"></ul></details></div>
       <div class="foot"><span class="place"></span><span class="found"></span><span><i>M · Esc · </i>tocca per chiudere</span></div></div>`;
     this.canvas = this.el.querySelector('canvas')!;
     this.ctx = this.canvas.getContext('2d')!;
     this.place = this.el.querySelector('.place')!;
     this.found = this.el.querySelector('.found')!;
+    this.places = this.el.querySelector('.places')!;
+    this.log = this.el.querySelector('.log')!;
     this.el.addEventListener('click', () => this.close());
+    for (const col of this.el.querySelectorAll('.col')) {
+      col.addEventListener('click', (e) => { // a tap in the log picks (or drops) a highlight; the map stays open
+        e.stopPropagation();
+        const li = (e.target as HTMLElement).closest<HTMLElement>('li[data-k]');
+        if (!li) return;
+        const k = li.dataset.k!, pick = k.startsWith('q') ? { quest: +k.slice(1) } : { area: k.slice(1) };
+        this.sel = this.key() === k ? undefined : pick;
+        this.list();
+        this.draw();
+      });
+      col.addEventListener('toggle', () => this.draw()); // the canvas widens or narrows
+    }
     addEventListener('keydown', (e) => { // capture: while the map is up, game keys stay out of it
       if (!this.v) return;
       e.stopPropagation();
@@ -88,7 +136,9 @@ export class WorldMap {
   show(v: MapView): void {
     if (document.pointerLockElement) document.exitPointerLock();
     this.v = v;
+    this.sel = undefined;
     this.el.classList.add('show');
+    this.list();
     this.el.querySelector<HTMLElement>('.x')!.focus({ preventScroll: true });
     this.draw();
   }
@@ -151,6 +201,7 @@ export class WorldMap {
       c.fillText(a.label, x, y);
     }
 
+    this.highlight(at, k);
     for (const n of v.npcs ?? []) glyph(c, ...at(n.x, n.z), n.state, 20);
     if (v.goal && !under(v.goal, v.npcs ?? [])) { // gold diamond, as on the minimap
       const [x, y] = at(v.goal.x, v.goal.z);
@@ -187,6 +238,71 @@ export class WorldMap {
 
     this.place.replaceChildren(...(v.area ? ['Sei in: ', Object.assign(document.createElement('b'), { textContent: v.area })] : []));
     this.found.textContent = `Luoghi scoperti: ${known.size}/${this.names}`;
+  }
+
+  private key(): string | undefined {
+    const s = this.sel;
+    return !s ? undefined : 'quest' in s ? `q${s.quest}` : `a${s.area}`;
+  }
+
+  /** Fills the two columns: the level's discovered places, then the quests running. */
+  private list(): void {
+    const v = this.v;
+    if (!v) return;
+    const key = this.key(), li = (k: string, cls: string, ...kids: (string | Node)[]) => {
+      const e = document.createElement('li');
+      e.dataset.k = k;
+      e.className = cls + (k === key ? ' sel' : '');
+      e.append(...kids);
+      return e;
+    };
+    const tag = (t: 'b' | 'small', text: string) => Object.assign(document.createElement(t), { textContent: text });
+    const none = (text: string) => Object.assign(document.createElement('li'), { className: 'none', textContent: text });
+    const names = [...new Set(this.areas.filter((a) => LEVEL2.has(a.zone) === !!v.level2 && this.d.discovered(a)).map((a) => a.label))]
+      .sort((a, b) => a.localeCompare(b, 'it'));
+    this.places.replaceChildren(...(names.length ? names.map((n) => li(`a${n}`, n === v.area ? 'here' : '', n)) : [none('Nessun luogo scoperto')]));
+    const qs = v.quests ?? [];
+    this.log.replaceChildren(...(qs.length ? qs.map((q, i) => li(`q${i}`, q.ready ? 'ready' : '', tag('b', q.title), tag('small', q.line))) : [none('Nessuna missione')]));
+  }
+
+  /** The log's pick on the map: a place's rectangles tinted gold, or a gilded ring round the quest's spot. */
+  private highlight(at: (x: number, z: number) => readonly [number, number], k: number): void {
+    const s = this.sel, c = this.ctx;
+    if (!s) return;
+    c.save();
+    if ('area' in s) {
+      c.fillStyle = 'rgba(255,215,94,.22)';
+      c.strokeStyle = '#ffd75e';
+      c.lineWidth = 2;
+      c.shadowColor = '#ffd200';
+      c.shadowBlur = 10;
+      for (const a of this.areas) {
+        if (a.label !== s.area) continue;
+        c.beginPath();
+        for (const [x, z] of [[a.x0, a.z0], [a.x1, a.z0], [a.x1, a.z1], [a.x0, a.z1]] as const) c.lineTo(...at(x, z));
+        c.closePath();
+        c.fill();
+        c.stroke();
+      }
+    } else {
+      const p = this.v?.quests?.[s.quest]?.at;
+      if (p) {
+        const [x, y] = at(p.x, p.z), r = Math.max(22, 10 * k); // ~10 m round the spot, never too small to see
+        const g = c.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(255,215,94,.45)');
+        g.addColorStop(1, 'rgba(255,215,94,0)');
+        c.fillStyle = g;
+        c.beginPath();
+        c.arc(x, y, r, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#ffd75e';
+        c.lineWidth = 2;
+        c.shadowColor = '#ffd200';
+        c.shadowBlur = 8;
+        c.stroke();
+      }
+    }
+    c.restore();
   }
 }
 

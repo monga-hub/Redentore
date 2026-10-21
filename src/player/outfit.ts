@@ -73,18 +73,21 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
   'broccato-spalle': { size: 0.28, at: [0.03, 0.05, 0] },
 };
 
-// --- weapons: Meshy props (the enemies' and two of the hero's own), held as the club is (core/models.ts `arm`): m long, grip, tilt
-interface Weapon { file: string; length: number; grip: number; tilt: number }
+// --- weapons: Meshy props (the enemies' and two of the hero's own), held as the club is (core/models.ts `arm`): m long, grip
+// (low on the long ones: less shaft below the fist to run into him), tilt
+/** `upright`: 0..1, how far a staff keeps its head up whatever the fist does (the blows twist the fist as for a sword). */
+interface Weapon { file: string; length: number; grip: number; tilt: number; upright?: number }
+const STAFF = 0.85;
 export const WEAPONS: Record<string, Weapon> = {
   'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, tilt: 1 },
   'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, tilt: 1 },
-  'pellegrino-arma': { file: 'bastone.glb', length: 1.5, grip: 0.36, tilt: -0.95 },
-  'ferrata-arma': { file: 'mazza.glb', length: 1.05, grip: 0.14, tilt: 1 },
+  'pellegrino-arma': { file: 'bastone.glb', length: 1.5, grip: 0.22, tilt: -0.95, upright: STAFF },
+  'ferrata-arma': { file: 'mazza.glb', length: 1.05, grip: 0.1, tilt: 1 },
   'turibolo-arma': { file: 'turibolo.glb', length: 0.85, grip: 0.12, tilt: 0.9 },
-  pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.34, tilt: -0.95 },
-  'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.3, tilt: 0.85 },
-  'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, tilt: -0.9 },
-  'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, tilt: -0.9 },
+  pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.22, tilt: -0.95, upright: STAFF },
+  'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.2, tilt: 0.85 },
+  'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, tilt: -0.9, upright: STAFF },
+  'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.22, tilt: -0.9, upright: STAFF },
 };
 
 /** Free what `o` owns: its geometries, materials and textures. */
@@ -147,6 +150,16 @@ class Fit {
 
   bone(name: string): number {
     return this.names.indexOf(name);
+  }
+
+  /** A rest-pose world point in bone `i`'s own coordinates: it then moves with the bone. */
+  local(i: number, world: THREE.Vector3): THREE.Vector3 {
+    return world.clone().applyMatrix4(this.rest[i].clone().invert());
+  }
+
+  /** Where `name`'s joint is at rest, world. */
+  joint(name: string): THREE.Vector3 {
+    return new THREE.Vector3().setFromMatrixPosition(this.rest[this.bone(name)]);
   }
 
   /** The rest-pose world frame of a socket on `bone`: the model's axes at its joint. */
@@ -310,6 +323,155 @@ class Paint {
   }
 }
 
+// --- the weapon kept out of him
+
+/** A part of him the weapon stays out of: a capsule from `a` to `b` in `bone`'s own coordinates (a sphere if they meet), `r` m round. */
+interface Solid { bone: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; r: number }
+/**
+ * His body as capsules, joint to joint, each as round as most of the skin led by `skin` (spikes and rags past it). Not
+ * the right forearm and hand, which hold the weapon; the left fist small, so a two-handed blow still grips beside it.
+ */
+const PARTS: { from: string; to: string; skin: string[] }[] = [
+  { from: 'Hips', to: 'Spine01', skin: ['Hips', 'Spine02'] },
+  { from: 'Spine01', to: 'neck', skin: ['Spine01', 'Spine'] },
+  { from: 'neck', to: 'head_end', skin: ['neck', 'Head', 'headfront', 'head_end'] },
+  ...(['Left', 'Right'] as const).flatMap((s) => [
+    { from: `${s}Shoulder`, to: `${s}Arm`, skin: [`${s}Shoulder`] },
+    { from: `${s}Arm`, to: `${s}ForeArm`, skin: [`${s}Arm`] },
+    { from: `${s}UpLeg`, to: `${s}Leg`, skin: [`${s}UpLeg`] },
+    { from: `${s}Leg`, to: `${s}Foot`, skin: [`${s}Leg`] },
+    { from: `${s}Foot`, to: `${s}ToeBase`, skin: [`${s}Foot`, `${s}ToeBase`] },
+  ]),
+  { from: 'LeftForeArm', to: 'LeftHand', skin: ['LeftForeArm'] },
+  { from: 'LeftHand', to: 'LeftHand', skin: [] },
+];
+const SKIN_Q = 0.7; // of the skin's distances from a part's axis: its radius
+const FIST = 0.045; // m round the left fist, the least a part is
+const MARGIN = 0.01; // m more, for the rags and plates past the skin's bulk
+const NEAR = 0.1; // m from the grip: the fist's own business
+const ITERATIONS = 24; // turns a frame at most, deepest point first
+const STEP = 0.15; // rad a turn at most: small steps find the least turn instead of overshooting it
+const SWING = 12; // rad/s the guard's own turn may change at most
+
+/** The closest point to `p` on the segment `a`-`b`. */
+function closest(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+  const x = b.x - a.x, y = b.y - a.y, z = b.z - a.z, l = x * x + y * y + z * z;
+  const t = l ? Math.max(0, Math.min(1, ((p.x - a.x) * x + (p.y - a.y) * y + (p.z - a.z) * z) / l)) : 0;
+  return out.set(a.x + x * t, a.y + y * t, a.z + z * t);
+}
+
+/**
+ * Keeps the held weapon out of the hero's body and what he wears: every frame, after the animation, the weapon is turned
+ * about the grip, deepest point first, until none of its surface is inside a part of him (capsules on his bones) or a worn piece (spheres);
+ * the turn eases back to the plain hold when the way is clear. Every clip and every weapon, the sheet's figure too: the
+ * blows were made for a short sword, and a long staff or a crozier would cut through him.
+ */
+class Guard {
+  private readonly body: Solid[] = [];
+  readonly pieces = new Map<Worn, Solid[]>();
+  private held?: THREE.Object3D;
+  private readonly base = new THREE.Quaternion();
+  private readonly lean = new THREE.Quaternion();
+  private pts: THREE.Vector3[] = [];
+  private readonly turn = new THREE.Quaternion();
+  private readonly best = new THREE.Quaternion();
+  private readonly want = new THREE.Quaternion();
+  private readonly p = new THREE.Vector3();
+  private readonly c = new THREE.Vector3();
+  private upright = 0;
+  private readonly root: THREE.Object3D;
+  private readonly fit: Fit;
+
+  constructor(root: THREE.Object3D, f: Fit) {
+    this.root = root;
+    this.fit = f;
+    for (const p of PARTS) {
+      const i = f.bone(p.from), a = f.joint(p.from), b = f.joint(p.to), ids = new Set(p.skin.map((n) => f.bone(n))), c = new THREE.Vector3(), v = new THREE.Vector3(), d: number[] = [];
+      for (let k = 0; k < f.dom.length; k++) if (ids.has(f.dom[k])) d.push(v.fromArray(f.pos, k * 3).distanceTo(closest(v, a, b, c)));
+      d.sort((x, y) => x - y);
+      const r = d.length ? d[Math.floor(SKIN_Q * d.length)] : FIST;
+      this.body.push({ bone: f.bones[i], a: f.local(i, a), b: f.local(i, b), r: Math.min(0.24, Math.max(FIST, r)) + MARGIN });
+    }
+  }
+
+  /** A worn piece's bulk on bone `bone`: a sphere round `centre` (rest world), `r` m. */
+  solid(bone: string, centre: THREE.Vector3, r: number): Solid {
+    const i = this.fit.bone(bone), c = this.fit.local(i, centre);
+    return { bone: this.fit.bones[i], a: c, b: c, r };
+  }
+
+  /** The weapon now in the fist (its `held` group, as core/models.ts `arm` put it), or none; `upright` as its Weapon says. */
+  hold(held?: THREE.Object3D, upright = 0): void {
+    this.held = held;
+    this.upright = upright;
+    this.turn.identity();
+    this.pts = [];
+    if (!held) return;
+    this.base.copy(held.quaternion);
+    held.updateMatrixWorld(true);
+    const inv = held.matrixWorld.clone().invert(), v = new THREE.Vector3(), all: THREE.Vector3[] = [];
+    held.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const p = m.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) all.push(v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv).clone());
+    });
+    const step = Math.max(1, Math.floor(all.length / 96)); // its surface, ~96 points
+    for (let i = 0; i < all.length; i += step) if (all[i].length() > NEAR) this.pts.push(all[i]);
+  }
+
+  /** After the animation's update: the weapon turned out of him. */
+  update(dt: number): void {
+    const h = this.held;
+    if (!h?.parent) return;
+    this.root.updateMatrixWorld(true);
+    const hand = h.parent.getWorldQuaternion(new THREE.Quaternion()), unhand = hand.clone().invert(), base = this.lean.copy(this.base);
+    if (this.upright) { // a staff's head kept up: the fist's way bent toward the sky
+      const way = UP.clone().applyQuaternion(base).applyQuaternion(hand), to = way.clone().lerp(UP, this.upright).normalize();
+      base.premultiply(new THREE.Quaternion().setFromUnitVectors(way, to).premultiply(unhand).multiply(hand));
+    }
+    const solids = [...this.body, ...[...this.pieces.values()].flat()].map((s) => ({ a: s.a.clone().applyMatrix4(s.bone.matrixWorld), b: s.b.clone().applyMatrix4(s.bone.matrixWorld), r: s.r }));
+    const grip = h.getWorldPosition(new THREE.Vector3()), deep = new THREE.Vector3(), out = new THREE.Vector3(), r = new THREE.Vector3(), axis = new THREE.Vector3(), q = new THREE.Quaternion();
+    const want = this.want.identity(), set = (t: THREE.Quaternion) => { h.quaternion.multiplyQuaternions(t, base); h.updateMatrixWorld(true); };
+    // the least turn out of him for this pose, from the plain hold, deepest point first; wedged where it can't clear both
+    // sides, the turn that left it least deep
+    set(want);
+    let least = Infinity;
+    const best = this.best.identity();
+    for (let it = 0; it < ITERATIONS; it++) {
+      const pen = this.deepest(h, solids, deep, out);
+      if (pen < least) { least = pen; best.copy(want); }
+      if (!pen) break;
+      r.subVectors(deep, grip);
+      axis.crossVectors(r, out);
+      if (axis.lengthSq() < 1e-8) axis.crossVectors(r, THREE.Object3D.DEFAULT_UP); // straight at him: any way round
+      const lever = Math.max(0.03, axis.length()); // m the point moves out per radian
+      want.premultiply(q.setFromAxisAngle(axis.normalize(), Math.min(STEP, (pen + 0.005) / lever)).premultiply(unhand).multiply(hand)); // the world turn, in the hand's frame
+      set(want);
+    }
+    if (this.deepest(h, solids, deep, out) > least) want.copy(best);
+    // there no faster than a swing: what it can't clear wobbles less than it pops
+    const step = this.turn.angleTo(want), most = SWING * dt;
+    this.turn.copy(step > most ? this.turn.slerp(want, most / step) : want);
+    set(this.turn);
+  }
+
+  /** How deep the weapon's deepest point is inside a part of him (0: clear), that point and which way is out. */
+  private deepest(h: THREE.Object3D, solids: { a: THREE.Vector3; b: THREE.Vector3; r: number }[], deep: THREE.Vector3, out: THREE.Vector3): number {
+    let pen = 0.002;
+    const p = this.p, c = this.c;
+    for (const pt of this.pts) {
+      p.copy(pt).applyMatrix4(h.matrixWorld);
+      for (const s of solids) {
+        const d = p.distanceTo(closest(p, s.a, s.b, c));
+        if (s.r - d > pen) { pen = s.r - d; deep.copy(p); out.subVectors(p, c).divideScalar(d || 1); }
+      }
+    }
+    return pen > 0.002 ? pen : 0;
+  }
+}
+const UP = new THREE.Vector3(0, 1, 0);
+
 // --- the shaders: the body's own bone pauldrons pulled in under new ones; on everything he wears, glow where a map's red
 // channel says, and a soft shoulder on the lit colour
 
@@ -388,6 +550,7 @@ export class Outfit {
   private readonly root: THREE.Group;
   private readonly body: THREE.SkinnedMesh;
   private readonly paint: Paint;
+  private readonly guard: Guard;
   /** Shared with the body's shader (and the pieces': uGlow). */
   readonly uniforms = { uPad: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
   private worn: GearState = {};
@@ -403,6 +566,7 @@ export class Outfit {
     this.fit = new Fit(root, body);
     this.socket = sockets(this.fit);
     this.paint = new Paint(body, this.mark());
+    this.guard = new Guard(root, this.fit);
     const m = body.material as THREE.MeshStandardMaterial;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, this.uniforms);
@@ -461,7 +625,7 @@ export class Outfit {
   /** The piece of what `slot` wears now, in place of the one there: loaded, then baked onto its bones. */
   private piece(slot: Worn): void {
     const old = this.pieces.get(slot);
-    if (old) { dispose(old); this.pieces.delete(slot); }
+    if (old) { dispose(old); this.pieces.delete(slot); this.guard.pieces.delete(slot); }
     if (slot === 'spalle') this.uniforms.uPad.value = 0;
     const id = this.worn[slot], look = id && lookOf(id), p = look && PIECES[`${look}-${slot}`];
     if (!p) return;
@@ -493,6 +657,13 @@ export class Outfit {
     const b = g.boundingBox!, size = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), k = p.size / Math.max(size.x, size.y, size.z);
     g.translate(-c.x, -(slot === 'testa' ? b.min.y : c.y), -c.z).scale(k, k, k).translate(...p.at);
     const s = this.socket[slot], f = this.fit, flip = new THREE.Matrix4().makeScale(-1, 1, 1), sides: [string, boolean][] = slot === 'testa' ? [['Head', false]] : [['LeftShoulder', false], ['RightShoulder', true]];
+    g.computeBoundingSphere();
+    const bulk = g.boundingSphere!;
+    this.guard.pieces.set(slot, sides.map(([bone, mirror]) => { // its bulk, for the weapon to keep out of
+      const c = bulk.center.clone().add(s);
+      if (mirror) c.x = -c.x;
+      return this.guard.solid(bone, c.applyMatrix4(f.frame(bone)), bulk.radius);
+    }));
     const baked = sides.map(([bone, mirror]) => {
       const i = f.bone(bone), to = new THREE.Matrix4().copy(f.skin[i]).invert().multiply(f.frame(bone));
       if (mirror) to.multiply(flip);
@@ -521,7 +692,7 @@ export class Outfit {
   }
 
   private arm(id?: string): void {
-    if (this.weapon) { dispose(this.weapon); this.weapon = undefined; this.onWeapon(); }
+    if (this.weapon) { dispose(this.weapon); this.weapon = undefined; this.guard.hold(); this.onWeapon(); }
     const w = id ? WEAPONS[id] : undefined;
     if (!w) return;
     loadModel(w.file).then((gltf) => {
@@ -532,10 +703,18 @@ export class Outfit {
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (m?.isMeshStandardMaterial) dress(m, this.uniforms.uGlow, !!m.metalnessMap); // his own PBR props painted like his pieces
       });
-      const top = arm(this.root, prop, w.length, w.grip, w.tilt);
+      const top = arm(this.root, prop, w.length, w.grip, w.tilt), f = this.fit, wrist = f.joint('RightHand');
+      // in the palm past the wrist as at rest, whatever pose he was in when he took it up
+      top.parent!.position.copy(f.local(f.bone('RightHand'), wrist.clone().addScaledVector(wrist.clone().sub(f.joint('RightForeArm')).normalize(), 0.08 * w.length)));
       this.weapon = top.parent!;
+      this.guard.hold(this.weapon, w.upright);
       this.onWeapon(top);
     }, (e) => console.error('weapon failed to load', e));
+  }
+
+  /** After the animation's update: the weapon kept out of him. */
+  clear(dt: number): void {
+    this.guard.update(dt);
   }
 
   /** The glowing glass, gems and runes breathe. */

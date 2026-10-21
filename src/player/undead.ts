@@ -300,6 +300,7 @@ export class UndeadModel {
     for (const s of this.shells) s.visible = showAura;
     if (this.dead) {
       this.mixer.update(dt);
+      this.outfit?.clear(dt);
       return;
     }
     this.combatT = Math.max(0, this.combatT - dt);
@@ -357,5 +358,6 @@ export class UndeadModel {
       }
     }
     this.mixer.update(dt);
+    this.outfit?.clear(dt); // the weapon kept out of him, whatever the clip did
   }
 }

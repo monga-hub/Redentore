@@ -95,7 +95,7 @@ fino alla chiesa delle Zitelle.
   spalle, petto, braccia, mani, fianchi, gambe, piedi) dal set del posto che le copre, così stoffa e armatura si piegano
   col corpo; sopra, scolpiti con Meshy e fissati alle ossa, l'elmo o il cappello sul cappuccio e gli spallacci (i suoi
   spallacci d'osso rientrano sotto i nuovi). Le armi sono gli oggetti di scena dei nemici (pastorale, remo, rocca, scettro...)
-  o modelli Meshy loro (la mazza a campana, il turibolo di Murano). Si carica solo quello che si indossa e si libera quello che si
+  o modelli Meshy loro (la mazza a campana, il turibolo di Murano); un'arma non attraversa il corpo: a ogni fotogramma si gira attorno al pugno quanto basta per uscire dal corpo (capsule sulle ossa) e dai pezzi indossati, e bastoni, pastorale, scettro e rocca restano dritti con la testa in su. Si carica solo quello che si indossa e si libera quello che si
   toglie. Nella scheda del personaggio c'è l'eroe stesso, a figura intera, di fronte e vestito com'è, che respira; trascinandolo si gira.
 - Estetica ispirata a WoW; nessun asset o logo Blizzard.
 

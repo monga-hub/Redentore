@@ -288,7 +288,7 @@ export class SideQuests {
   }
 
   /** Its items out of the bag, the reward in; false (nothing changed) when the bag has no room for the reward. */
-  private handIn(q: SideQuest): boolean {
+  handIn(q: SideQuest): boolean {
     const bag = this.bag, w = q.want;
     if (!bag) return false;
     const item = w.kind === 'kill' ? undefined : w.item, n = item ? Math.min(this.have(item), w.kind === 'collect' ? w.n : 1) : 0;

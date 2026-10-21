@@ -4,13 +4,13 @@ import type { Priest } from '../enemies/caster.ts';
 import { T, type Style, type Vfx } from '../abilities/vfx.ts';
 import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
-import { Dialogue } from '../ui/dialogue.ts';
+import { Dialogue, type Entry } from '../ui/dialogue.ts';
 import { ICONS } from '../ui/icons.ts';
-import { BORTOLO_OBJECTIVE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
+import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
 import { Npc } from './npc.ts';
-import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SPEZIALE, type Gate, type Quest, type Stage } from './progress.ts';
-import { ITEM, QUEST_COLOR } from '../loot/bag.ts';
-import { ISEPPO, SIDE, SIDE_BY, type SideQuest } from './squero.ts';
+import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
+import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
+import { ISEPPO, ISEPPO_DECLINE, ISEPPO_DONE, ISEPPO_FULL, SIDE, SIDE_BY, type SideQuest } from './squero.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -20,6 +20,8 @@ import { ISEPPO, SIDE, SIDE_BY, type SideQuest } from './squero.ts';
 // tap target on phones), the boss's health bar and the victory banner. Its few DOM pieces are
 // styled here so they stay out of the HUD's way.
 
+const join = (t: Talk) => t.pages.join('\n\n'); // a quest's text, whole, in the list window
+const pay = (id: QuestId, item?: string) => ({ xp: QUESTS[id].xp, gold: QUESTS[id].gold, item });
 const OPEN_TIME = 1.6; // s for a gate to open
 const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls
 const GOLD = 0xffd36a;
@@ -129,7 +131,6 @@ export class QuestView {
   reward?: (gold: number) => void;
   /** Fra' Zuane takes his corona back: main.ts swaps it in the bag for his medal and returns the medal's name. */
   relicBack?: () => string;
-  private returning = false; // his window is the corona's
   /** Friars still standing (main.ts): Le teste dei frati wants no more heads than are left to take. */
   friars: () => number = () => HEADS.need;
   /** The rite's boon is picked: main.ts lays it on the kit. */
@@ -190,11 +191,7 @@ export class QuestView {
     document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl, this.buffEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
-      if (this.returning) this.thanked(); // his corona back
-      else if (this.npc.talking) this.quest.report() || this.quest.report2(); // a report heard, even if the next quest is turned down
-      this.returning = false;
       this.npc.talking = false;
-      if (this.speziale.talking) this.quest.meet(); // found, as Fra' Zuane asked
       if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
       this.iseppo.talking = false;
@@ -275,15 +272,51 @@ export class QuestView {
     return !q.asked && !q.bossDead && this.friars() > 0;
   }
 
-  /** What Fra' Bortolo says now, and what an Accetta (or a boon picked) does. */
-  private spezialeTalk(): [Talk, ((choice?: string) => void)?] {
+  /** Fra' Zuane's list: the corona to give back, and his quest as it stands. */
+  private zuaneEntries(): Entry[] {
+    const q = this.quest, s = q.stage, out: Entry[] = [];
+    if (q.relic && !q.relicBack) out.push({ title: RELIC_TITLE, state: 'ready', text: join(RELIC_TALK), reward: pay('relic', ITEM.get(RELIC_PRIZE)?.name), act: () => this.thanked() });
+    if (s === 'talk') out.push({ title: QUEST_TITLE, state: 'offer', text: join(TALK.talk), objective: OBJECTIVE.key, reward: pay('reverendissimo'), decline: DECLINE, act: () => { q.accepted = true; } });
+    else if (s === 'report') out.push({ title: QUEST_TITLE, state: 'ready', text: TALK.report.pages[0], reward: pay('reverendissimo'), act: () => { q.report(); } });
+    else if (s === 'offer') out.push({ title: QUEST2_TITLE, state: 'offer', text: TALK.report.pages.slice(1).join('\n\n'), objective: OBJECTIVE.route, reward: pay('zitelle'), decline: TALK.offer.decline, act: () => q.accept2() }); // the lore of the Zitelle that came with the report
+    else if (s === 'return') out.push({ title: QUEST2_TITLE, state: 'ready', text: join(TALK.return), reward: pay('zitelle'), act: () => { q.report2(); } });
+    else if (s === 'done') out.push({ title: 'Parla', state: 'talk', text: join(TALK.done) });
+    else out.push({ title: titleOf(s), state: 'busy', text: join(TALK[s]), objective: OBJECTIVE[s], reward: pay(SECOND.includes(s) ? 'zitelle' : 'reverendissimo') });
+    return out;
+  }
+
+  /** Fra' Bortolo's list: his talk (the errand handed in on it), and Le teste dei frati. */
+  private spezialeEntries(): Entry[] {
     const q = this.quest, alive = this.friars();
-    if (q.headsReady(alive)) return [SPEZIALE_RITE, (id) => { if (id && q.rite(id)) this.rite(id); }];
-    if (q.asked && !q.boon && !q.bossDead) return [spezialeWait(q.heads, q.headsNeed(alive))];
     const t = q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
-    if (!this.asking()) return [t];
-    const ask = () => { q.asked = true; this.news.push(`Missione accettata: ${QUESTS.teste.title}`); };
-    return [q.blessed ? SPEZIALE_HEADS : { ...SPEZIALE_HEADS, pages: [...SPEZIALE_TALK.pages, ...SPEZIALE_HEADS.pages] }, ask]; // the first time, after the lore
+    const out: Entry[] = [q.accepted && !q.found
+      ? { title: QUESTS.bortolo.title, state: 'ready', text: join(t), reward: pay('bortolo'), act: () => { q.meet(); } } // found, as Fra' Zuane asked
+      : { title: 'Parla', state: 'talk', text: join(t) }];
+    const heads = { title: HEADS_TITLE, objective: `Teste di frate ${q.heads}/${q.headsNeed(alive)}`, reward: pay('teste') };
+    if (q.headsReady(alive)) out.push({ ...heads, state: 'ready', text: join(SPEZIALE_RITE), choices: SPEZIALE_RITE.choices, act: (id) => { if (id && q.rite(id)) this.rite(id); } });
+    else if (q.asked && !q.boon && !q.bossDead) out.push({ ...heads, state: 'busy', text: join(spezialeWait(q.heads, q.headsNeed(alive))) });
+    else if (this.asking()) out.push({ ...heads, state: 'offer', text: join(SPEZIALE_HEADS), objective: `Porta ${HEADS.need} teste di frate a Fra' Bortolo`, decline: SPEZIALE_HEADS.decline,
+      act: () => { q.asked = true; this.news.push(`Missione accettata: ${QUESTS.teste.title}`); } });
+    return out;
+  }
+
+  /** Mastro Iseppo's list: what is ready to hand in, then on offer, then running. */
+  private iseppoEntries(): Entry[] {
+    const s = this.quest.side, over = this.quest.boss2Dead, open = s.open(), rank = { ready: 0, offer: 1, busy: 2, talk: 3 };
+    return SIDE.flatMap((sq): Entry[] => {
+      const base = { title: QUESTS[sq.id].title, objective: sq.line(s.progress(sq)), reward: pay(sq.id, ITEM.get(sq.reward)?.name) };
+      if (s.ready(sq, over)) return [{ ...base, state: 'ready', text: sq.done.join('\n\n'), act: () => { // paid at once: its items out, the epic in (the XP, gold and banner are payout's)
+        if (!s.handIn(sq)) return ISEPPO_FULL;
+        this.news.push(`Ricompensa: ${ITEM.get(sq.reward)!.name}`);
+      } }];
+      if (s.active(sq.id)) return [{ ...base, state: 'busy', text: sq.busy }];
+      if (open.includes(sq)) return [{ ...base, state: 'offer', text: sq.offer.join('\n\n'), decline: ISEPPO_DECLINE, act: () => {
+        if (!s.taken.includes(sq.id)) s.taken.push(sq.id);
+        playSfx('quest');
+        this.news.push(`Missione accettata: ${base.title}`);
+      } }];
+      return [];
+    }).sort((a, b) => rank[a.state] - rank[b.state]);
   }
 
   /** The rite of the rue: the heads go into the earth, a green pall and a gold rush rise round the hero, the boon is theirs (the XP and gold are payout's). */
@@ -406,19 +439,14 @@ export class QuestView {
       if (n) notices.push(n);
       if (pr.talk === 'zuane') {
         this.npc.talking = true;
-        const stage = this.quest.stage, relic = this.returning = this.quest.relic && !this.quest.relicBack; // the corona first: the quest's talk waits for the next one
-        const accept = relic ? undefined : stage === 'talk' ? () => { this.quest.accepted = true; } : stage === 'report' || stage === 'offer' ? () => { this.quest.report(); this.quest.accept2(); } : undefined;
-        this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, relic ? RELIC_TALK : TALK[stage], accept);
+        this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, GREET.zuane, () => this.zuaneEntries());
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
-        const [t, accept] = this.spezialeTalk();
-        this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, t, accept, () => this.shop?.());
-      } else if (pr.talk === 'iseppo') { // a quest handed in is paid as his window opens (its XP, gold and banner are payout's), the epic with a notice
+        this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, GREET.speziale, () => this.spezialeEntries(), () => this.shop?.());
+      } else if (pr.talk === 'iseppo') {
         this.iseppo.talking = true;
-        const t = this.quest.side.talk(this.quest.boss2Dead), offered = t.talk.title;
-        if (t.paid) notices.push(`Ricompensa: ${ITEM.get(t.paid.reward)!.name}`);
-        const accept = t.accept && (() => { t.accept!(); playSfx('quest'); this.news.push(`Missione accettata: ${offered}`); });
-        this.talk.show({ name: ISEPPO.name, portrait: `${import.meta.env.BASE_URL}models/iseppo.webp` }, t.talk, accept, () => this.shop2?.());
+        const s = this.quest.side, all = s.done.length === SIDE.length;
+        this.talk.show({ name: ISEPPO.name, portrait: `${import.meta.env.BASE_URL}models/iseppo.webp` }, all ? ISEPPO_DONE : GREET.iseppo, () => this.iseppoEntries(), () => this.shop2?.());
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }

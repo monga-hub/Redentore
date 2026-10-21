@@ -163,3 +163,10 @@ export const SPEZIALE_RITE: Talk = {
   ],
   choices: BOONS,
 };
+
+/** Each quest-giver's greeting over his list of quests (ui/dialogue.ts). */
+export const GREET = {
+  zuane: 'Risorto. Il portinaio è ancora qui, sulla sua soglia. Cosa cerchi?',
+  speziale: 'Piano con la ruta, Risorto. Cosa ti porta nella serra?',
+  iseppo: 'Mastro Iseppo, proto dello squero. Parla, Risorto: il legno ascolta.',
+} as const;

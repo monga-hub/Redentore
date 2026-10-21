@@ -216,7 +216,7 @@ const l2 = spawnLevel2(level.world), g0 = l2.all.find((m) => m.kind === GONDOLIE
 // The markers (Quest.marks): "!" on offer, "?" ready to hand in, "?" over "!", none when idle.
 {
   const q = new Quest(level.world), m = () => q.marks(1), is = (who: 'zuane' | 'speziale' | 'iseppo', w: string | undefined, why: string) => { if (m()[who] !== w) fail(`${who} shows ${m()[who]}, want ${w}: ${why}`); };
-  is('zuane', 'offer', 'his first quest'); is('speziale', 'offer', 'his blessing'); is('iseppo', 'offer', 'his first quest');
+  is('zuane', 'offer', 'his first quest'); is('speziale', 'offer', 'his blessing'); is('iseppo', undefined, 'level 2 still shut');
   q.accepted = q.blessed = true;
   is('zuane', undefined, 'quest running'); is('speziale', 'ready', 'found, as Fra\' Zuane asked');
   q.found = true; q.asked = true; q.heads = HEADS.need;
@@ -230,6 +230,8 @@ const l2 = spawnLevel2(level.world), g0 = l2.all.find((m) => m.kind === GONDOLIE
   is('zuane', 'ready', 'the first quest to report');
   q.reported = true;
   is('zuane', 'offer', 'the second quest');
+  q.accepted2 = true;
+  is('iseppo', 'offer', 'his first quest, the chains down');
   const b = new Bag(); q.side.bag = b; q.side.taken.push('lumi'); q.side.kills.lumi = 99;
   is('iseppo', 'ready', '"?" over "!" with a quest done and another on offer');
 }

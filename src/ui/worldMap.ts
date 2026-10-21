@@ -9,6 +9,7 @@ import { PX, WATER, glyph, under, type Minimap, type Pin } from './minimap.ts';
 // it is open; M, Esc, a click or a tap close it. Its DOM is styled here, like ui/menu.ts.
 // WoW's quest log flanks it: the level's discovered places on the left, the quests running on the right (gold once
 // ready to hand in); tapping one tints its place or rings the spot the quest points at. Both columns fold away.
+// Two fingers (or the wheel) zoom it round the pinch, one finger (or the mouse) drags it; it opens on the whole level.
 
 const CSS = `
 #worldmap { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center;
@@ -41,7 +42,7 @@ const CSS = `
 #worldmap .col li.ready small { color: #ffd75e; }
 #worldmap .col li.none { cursor: default; color: #8a7a5c; font-style: italic; }
 @media (max-width: 900px), (max-height: 500px) { #worldmap .col { width: 140px; } #worldmap .col li b { font-size: 12px; } }
-#worldmap canvas { flex: 1; min-height: 0; min-width: 0; width: 100%; border: 1px solid #000; border-radius: 3px;
+#worldmap canvas { touch-action: none; flex: 1; min-height: 0; min-width: 0; width: 100%; border: 1px solid #000; border-radius: 3px;
   box-shadow: 0 0 0 1px #4a3a26, inset 0 0 20px #000; }
 #worldmap .foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px; font: 12px/16px system-ui, sans-serif; color: #c9b48a; }
 #worldmap .foot b { color: #ffd75e; font-weight: normal; }
@@ -76,6 +77,11 @@ export class WorldMap {
   private places: HTMLElement;
   private log: HTMLElement;
   private sel?: { area: string } | { quest: number }; // what the log has highlighted on the map
+  private zoom = 1; // 1: the whole level fits
+  private c = { x: 0, z: 0 }; // m: the spot at the canvas's centre
+  private k = 1; // px per m, as last drawn
+  private touches = new Map<number, { x: number; y: number }>();
+  private moved = 0; // px dragged since the press: past a few, the release is no tap
 
   constructor(d: Discovery, fog: FogLayer, chart: Minimap, areas: readonly Area[]) {
     this.d = d;
@@ -115,6 +121,8 @@ export class WorldMap {
         if (!li) return;
         const k = li.dataset.k!, pick = k.startsWith('q') ? { quest: +k.slice(1) } : { area: k.slice(1) };
         this.sel = this.key() === k ? undefined : pick;
+        const p = this.spot();
+        if (p && this.zoom > 1) this.c = this.clamp(p); // zoomed in: bring the pick into view
         this.list();
         this.draw();
       });
@@ -126,6 +134,32 @@ export class WorldMap {
       if ((e.code === 'KeyM' || e.code === 'Escape') && !e.repeat) this.close();
     }, true);
     addEventListener('resize', () => this.draw());
+    const cv = this.canvas;
+    cv.addEventListener('pointerdown', (e) => {
+      cv.setPointerCapture(e.pointerId);
+      if (!this.touches.size) this.moved = 0;
+      this.touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    });
+    cv.addEventListener('pointermove', (e) => {
+      const t = this.touches.get(e.pointerId);
+      if (!t) return;
+      const [a, b] = [...this.touches.values()], p = { x: e.offsetX, y: e.offsetY };
+      if (b) { // pinch: the zoom follows the fingers' spread round their midpoint, which pans as they move
+        const o = a === t ? b : a, d0 = Math.hypot(t.x - o.x, t.y - o.y), d1 = Math.hypot(p.x - o.x, p.y - o.y);
+        this.pan((p.x - t.x) / 2, (p.y - t.y) / 2);
+        if (d0 > 0) this.zoomAt(d1 / d0, (p.x + o.x) / 2, (p.y + o.y) / 2);
+      } else this.pan(p.x - t.x, p.y - t.y);
+      this.moved += Math.hypot(p.x - t.x, p.y - t.y);
+      this.touches.set(e.pointerId, p);
+      this.draw();
+    });
+    for (const ev of ['pointerup', 'pointercancel'] as const) cv.addEventListener(ev, (e) => this.touches.delete(e.pointerId));
+    cv.addEventListener('click', (e) => { if (this.moved > 8) e.stopPropagation(); }); // a drag or pinch is no tap to close
+    cv.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.zoomAt(Math.exp(-e.deltaY / 300), e.offsetX, e.offsetY);
+      this.draw();
+    }, { passive: false });
     document.body.append(this.el);
   }
 
@@ -137,6 +171,8 @@ export class WorldMap {
     if (document.pointerLockElement) document.exitPointerLock();
     this.v = v;
     this.sel = undefined;
+    this.zoom = 1;
+    this.c = { x: (this.bounds.x0 + this.bounds.x1) / 2, z: (this.bounds.z0 + this.bounds.z1) / 2 };
     this.el.classList.add('show');
     this.list();
     this.el.querySelector<HTMLElement>('.x')!.focus({ preventScroll: true });
@@ -157,8 +193,8 @@ export class WorldMap {
     const c = this.ctx, b = this.bounds;
     // fit the complex turned to the camera's heading (as the minimap), centred, 1 m = k px
     const cos = Math.cos(v.view), sin = Math.sin(v.view), bw = b.x1 - b.x0, bh = b.z1 - b.z0;
-    const k = Math.min(w / (Math.abs(cos) * bw + Math.abs(sin) * bh), h / (Math.abs(sin) * bw + Math.abs(cos) * bh));
-    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+    const k = (this.k = this.zoom * Math.min(w / (Math.abs(cos) * bw + Math.abs(sin) * bh), h / (Math.abs(sin) * bw + Math.abs(cos) * bh)));
+    const cx = this.c.x, cz = this.c.z;
     const at = (x: number, z: number) => [w / 2 + ((x - cx) * cos - (z - cz) * sin) * k, h / 2 + ((x - cx) * sin + (z - cz) * cos) * k] as const;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.fillStyle = WATER;
@@ -238,6 +274,36 @@ export class WorldMap {
 
     this.place.replaceChildren(...(v.area ? ['Sei in: ', Object.assign(document.createElement('b'), { textContent: v.area })] : []));
     this.found.textContent = `Luoghi scoperti: ${known.size}/${this.names}`;
+  }
+
+  /** Drags the map by (dx, dy) px on screen, held over the level. */
+  private pan(dx: number, dy: number): void {
+    const r = this.v?.view ?? 0, cos = Math.cos(r), sin = Math.sin(r);
+    this.c = this.clamp({ x: this.c.x - (dx * cos + dy * sin) / this.k, z: this.c.z - (-dx * sin + dy * cos) / this.k });
+  }
+
+  /** Zooms by f round the canvas point (x, y), which keeps the spot under it; 1 (the whole level) to 8. */
+  private zoomAt(f: number, x: number, y: number): void {
+    const z = Math.min(8, Math.max(1, this.zoom * f)), dx = x - this.canvas.clientWidth / 2, dy = y - this.canvas.clientHeight / 2;
+    if (z === this.zoom) return;
+    this.pan(-dx, -dy); // the anchor to the centre, zoom, then back
+    this.k *= z / this.zoom;
+    this.zoom = z;
+    this.pan(dx, dy);
+  }
+
+  private clamp(p: { x: number; z: number }): { x: number; z: number } {
+    const b = this.bounds;
+    return { x: Math.min(b.x1, Math.max(b.x0, p.x)), z: Math.min(b.z1, Math.max(b.z0, p.z)) };
+  }
+
+  /** Where the log's pick is: its place's middle, or the quest's spot. */
+  private spot(): { x: number; z: number } | undefined {
+    const s = this.sel;
+    if (!s) return;
+    if ('quest' in s) return this.v?.quests?.[s.quest]?.at;
+    const a = this.areas.find((a) => a.label === s.area);
+    return a && { x: (a.x0 + a.x1) / 2, z: (a.z0 + a.z1) / 2 };
   }
 
   private key(): string | undefined {

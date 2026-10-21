@@ -230,7 +230,7 @@ export class Quest {
       zuane: mark(s === 'report' || s === 'return' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer'),
       speziale: mark((this.accepted && !this.found) || this.headsReady(alive),
         !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (!this.asked && !this.bossDead && alive > 0)),
-      iseppo: mark(this.side.handInReady(over), this.side.open().length > 0),
+      iseppo: this.accepted2 ? mark(this.side.handInReady(over), this.side.open().length > 0) : undefined, // out of sight until the chains fall: level 2 opens
     };
   }
 

@@ -368,7 +368,7 @@ function openMap(): void {
   if (menu.paused) return;
   kit.system.cancel();
   input.consume();
-  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal() });
+  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), npcs: questView.pins() });
 }
 const pressed = (code: string) => input.pressed(code);
 /**
@@ -533,7 +533,7 @@ renderer.setAnimationLoop(() => {
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);
   fog.update(dt);
-  minimap.update(dt, player.pos, player.facing, diablo ? dcam.yaw : cam.yaw, area, foes, goal(), sidePins()); // and the side quests'
+  minimap.update(dt, player.pos, player.facing, diablo ? dcam.yaw : cam.yaw, area, foes, goal(), sidePins(), questView.pins()); // and the side quests'
   hud.setStats(playerStats);
   fx.update(dt, player.pos);
   kit.vfx.density = fx.sparks;

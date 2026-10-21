@@ -263,6 +263,12 @@ export class QuestView {
     this.iseppo.update(dt, player, m.iseppo);
   }
 
+  /** The quest givers with a "!" or "?" up, for the maps: `state` is the Mark. */
+  pins(): { x: number; z: number; state: string }[] {
+    const m = this.quest.marks(this.friars());
+    return ([[NPC, m.zuane], [SPEZIALE, m.speziale], [ISEPPO, m.iseppo]] as const).flatMap(([at, k]) => (k ? [{ x: at.x, z: at.z, state: k }] : []));
+  }
+
   /** He has Le teste dei frati to give: not yet taken and friars still about. */
   private asking(): boolean {
     const q = this.quest;

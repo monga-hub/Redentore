@@ -13,6 +13,22 @@ const PAINT: Partial<Record<string, string>> = {
   plaster: '#9a5e46', brick: '#87503b', mass: '#7a6a50', water: '#1c3442',
 };
 export const WATER = '#16303e'; // everything the level does not cover: the lagoon and the canal
+/** A quest giver's "!" (offer, yellow) or gold "?" (ready) at (x, y), upright, in the overhead marks' colours (quest/npc.ts). */
+export function glyph(c: CanvasRenderingContext2D, x: number, y: number, mark: string | undefined, px: number): void {
+  c.save();
+  c.font = `bold ${px}px Georgia, serif`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineWidth = 3;
+  c.strokeStyle = '#000';
+  c.fillStyle = mark === 'ready' ? '#ffb300' : '#ffe24a';
+  const ch = mark === 'ready' ? '?' : '!';
+  c.strokeText(ch, x, y);
+  c.fillText(ch, x, y);
+  c.restore();
+}
+/** A pin standing on a marked quest giver: the glyph takes its place. */
+export const under = (q: Pin, npcs: Pin[]) => npcs.some((n) => Math.hypot(n.x - q.x, n.z - q.z) < 1);
 export const PX = 4; // baked map texels per metre
 const OVERHEAD = 3.6; // m: a slab starting this high is a ceiling or an upper floor, not on the map
 const WALL = 1.6; // m: a box this tall reads as a wall (bright, outlined)
@@ -87,7 +103,7 @@ export class Minimap {
   }
 
   /** `facing`: player yaw; `view`: the camera's (both 0 = looking -Z, as in camera/). `foes`: every mob. `goal`: the objective, if any; `also`: side quests' pins. */
-  update(dt: number, p: { x: number; z: number }, facing: number, view: number, label: string | undefined, foes: Pin[], goal?: Pin, also: Pin[] = []): void {
+  update(dt: number, p: { x: number; z: number }, facing: number, view: number, label: string | undefined, foes: Pin[], goal?: Pin, also: Pin[] = [], npcs: Pin[] = []): void {
     if ((label ?? '') !== this.label) this.name.textContent = this.label = label ?? '';
     if ((this.wait -= dt) > 0) return;
     this.wait = 1 / HZ;
@@ -137,10 +153,11 @@ export class Minimap {
     }
     c.restore();
 
-    for (const g of goal ? [goal, ...also] : also) { // gold diamond; beyond the window it clings to the rim, pointing the way
+    for (const g of [...(goal ? [goal, ...also] : also).filter((q) => !under(q, npcs)), ...npcs]) { // gold diamond, or a quest giver's "!"/"?"; beyond the window it clings to the rim, pointing the way
       let [x, y] = at(g);
       const d = Math.hypot(x - r, y - r), max = r - 6;
       if (d > max) { x = r + (x - r) / d * max; y = r + (y - r) / d * max; }
+      if (npcs.includes(g)) { glyph(c, x, y, g.state, 15); continue; }
       c.save();
       c.translate(x, y);
       c.rotate(Math.PI / 4);

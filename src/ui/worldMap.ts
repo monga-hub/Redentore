@@ -1,7 +1,7 @@
 import type { Discovery } from '../core/discovery.ts';
 import type { Area } from '../level/builder.ts';
 import type { FogLayer } from './fog.ts';
-import { PX, WATER, type Minimap, type Pin } from './minimap.ts';
+import { PX, WATER, glyph, under, type Minimap, type Pin } from './minimap.ts';
 
 // The big map, WoW style: M (or the book button on the minimap) opens the whole complex in a
 // framed overlay, turned like the minimap to the camera's heading at opening, under the same fog as the minimap. Discovered places carry their
@@ -29,7 +29,7 @@ body.touch #worldmap .foot i { display: none; }
 `;
 
 /** What the map shows of the game when it opens. */
-export interface MapView { x: number; z: number; facing: number; view: number; area?: string; goal?: Pin }
+export interface MapView { x: number; z: number; facing: number; view: number; area?: string; goal?: Pin; npcs?: Pin[] }
 
 export class WorldMap {
   private el = document.createElement('div');
@@ -151,7 +151,8 @@ export class WorldMap {
       c.fillText(a.label, x, y);
     }
 
-    if (v.goal) { // gold diamond, as on the minimap
+    for (const n of v.npcs ?? []) glyph(c, ...at(n.x, n.z), n.state, 20);
+    if (v.goal && !under(v.goal, v.npcs ?? [])) { // gold diamond, as on the minimap
       const [x, y] = at(v.goal.x, v.goal.z);
       c.save();
       c.translate(x, y);

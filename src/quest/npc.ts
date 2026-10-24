@@ -31,7 +31,13 @@ function marker(ch: string): THREE.Sprite {
   g.fillText(ch, 32, 68);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), fog: false, depthWrite: false }));
   s.material.map!.colorSpace = THREE.SRGBColorSpace;
-  s.scale.set(0.3, 0.6, 1);
+  // WoW-sized; nearer than 6 m it shrinks with the distance so a close camera keeps it at the same screen size (one frame late)
+  const at = new THREE.Vector3();
+  s.scale.set(0.6, 1.2, 1);
+  s.onBeforeRender = (_r, _s, cam) => {
+    const k = Math.min(1, cam.position.distanceTo(s.getWorldPosition(at)) / 6);
+    s.scale.set(0.6 * k, 1.2 * k, 1);
+  };
   return s;
 }
 
@@ -86,7 +92,7 @@ export class Npc {
     this.time += dt;
     for (const [k, m] of Object.entries(this.marks)) {
       m.visible = k === mark && !this.talking;
-      m.position.y = HEIGHT + 0.55 + Math.sin(this.time * 2.5) * 0.06;
+      m.position.y = HEIGHT + 0.85 + Math.sin(this.time * 2.5) * 0.06;
     }
     const want = this.talking ? Math.atan2(-(player.x - at.x), -(player.z - at.z)) : at.yaw;
     const d = Math.atan2(Math.sin(want - this.root.rotation.y), Math.cos(want - this.root.rotation.y));

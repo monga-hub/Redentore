@@ -5,7 +5,6 @@ import { T, type Style, type Vfx } from '../abilities/vfx.ts';
 import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Dialogue, type Entry } from '../ui/dialogue.ts';
-import { ICONS } from '../ui/icons.ts';
 import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
@@ -16,7 +15,7 @@ import { ISEPPO, ISEPPO_DECLINE, ISEPPO_DONE, ISEPPO_FULL, SIDE, SIDE_BY, type S
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
 // open on a burst of gold, the key rising out of it; a gold glint over it while the quest wants
 // it), Fra' Zuane and his dialogue window, Fra' Bortolo in the serra, his blessing and his shop (a green
-// rush of rue round the hero and a buff icon with its countdown under the player frame), the quest tracker, the "F" interaction prompt (also a
+// rush of rue round the hero; its icon is with the hero's buffs, ui/plates.ts), the quest tracker, the "F" interaction prompt (also a
 // tap target on phones), the boss's health bar and the victory banner. Its few DOM pieces are
 // styled here so they stay out of the HUD's way.
 
@@ -76,12 +75,6 @@ body.touch #quests { top: 0; right: calc(100% + 16px); width: 190px; font-size: 
   max-height: 42dvh; overflow: hidden; -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent); } /* several side quests: the list fades out above the buttons */
 body.diablo #quests b { color: #e9d6b0; }
 
-#buffs { position: fixed; left: calc(16px + env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); display: flex; gap: 6px; pointer-events: none; z-index: 4; }
-#buffs .buff { position: relative; width: 32px; text-align: center; font: bold 11px/14px system-ui, sans-serif; color: #f3e6c4; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; }
-#buffs .buff .ico { width: 32px; height: 32px; box-sizing: border-box; border: 1px solid #000; border-radius: 3px;
-  box-shadow: 0 0 0 1px rgba(217,173,82,.8), inset 2px 2px 0 rgba(255,240,200,.18), 0 0 10px rgba(138,255,154,.55); }
-#buffs .buff.end .ico { animation: buff-end .5s ease-in-out infinite alternate; }
-@keyframes buff-end { to { opacity: .35; } }
 @keyframes victory { 0% { opacity: 0; } 8% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 `;
 
@@ -106,8 +99,6 @@ export class QuestView {
   private lines = ''; // Mastro Iseppo's tracker lines as drawn
   private talk = new Dialogue();
   private news: string[] = []; // notices raised outside update (the blessing, given as his window closes)
-  private buffEl = document.createElement('div');
-  private buffLeft = '';
   private hero = new THREE.Vector3(); // the hero's feet at the last update
   private trackEl = document.createElement('div');
   private stage?: Stage;
@@ -186,9 +177,8 @@ export class QuestView {
     this.victoryEl.id = 'victory';
     this.victoryEl.innerHTML = 'Il Reverendissimo è caduto<small>Le porte della chiesa si aprono sulla fondamenta</small>';
     this.trackEl.id = 'quests';
-    this.buffEl.id = 'buffs';
     this.doneEl.id = 'quest-done';
-    document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl, this.buffEl);
+    document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
       this.npc.talking = false;
@@ -229,17 +219,6 @@ export class QuestView {
     this.vfx.burst(goldMote, at.x, at.y + 0.6, at.z, 20, 0.5, 1, 1.5);
     this.vfx.pulse(at.x, at.y + 1, at.z, RUE, 30);
     this.news.push(`${BLESSING.name}: lanci ${Math.round((1 - BLESSING.cast) * 100)}% più rapidi e +${Math.round((BLESSING.dmg - 1) * 100)}% ai danni per ${BLESSING.time / 60} minuti`);
-  }
-
-  /** The blessing's icon under the player frame, with the time it has left. */
-  private buff(): void {
-    const s = Math.ceil(this.quest.blessLeft), text = s > 0 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '';
-    if (text === this.buffLeft) return;
-    if (!this.buffLeft) this.buffEl.innerHTML = `<div class="buff" title="${BLESSING.name}: lanci più rapidi, danni più alti">${ICONS.ruta}<span></span></div>`;
-    this.buffLeft = text;
-    if (!text) { this.buffEl.innerHTML = ''; return; }
-    this.buffEl.querySelector('span')!.textContent = text;
-    this.buffEl.firstElementChild!.classList.toggle('end', s <= 10);
   }
 
   /** A speaker's window is up: the game holds still behind it, but he keeps talking. */
@@ -493,8 +472,7 @@ export class QuestView {
       f.m.rotation.y = this.glint.rotation.y;
       f.m.position.y = f.q.want.kind === 'find' ? f.q.want.at.y + 0.45 + Math.sin(performance.now() * 0.003) * 0.08 : 0;
     }
-    this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt);
-    this.buff();
+    this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt); // its icon is with the hero's buffs (ui/plates.ts)
     const now = this.quest.prompt(player);
     const html = now ? (now.act ? `<kbd>F</kbd>${now.text}` : now.text) : '';
     if (html !== this.shown) {

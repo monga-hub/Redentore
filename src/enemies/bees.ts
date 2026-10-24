@@ -5,7 +5,7 @@ import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type V
 import type { PlayerStats } from '../player/stats.ts';
 import { separate, type Target } from './brain.ts';
 import { APE, hurt, killAll, spawnApiary, think, wipe, type CasterState, type Priest } from './caster.ts';
-import { barMat, flash, ownMaterials } from './friars.ts';
+import { flash, ownMaterials } from './friars.ts';
 import { still } from './control.ts';
 
 // L'ape gigante and her workers at the apiary: a giant hornet generated with Meshy AI (see
@@ -24,7 +24,7 @@ const HOVER = { queen: 1.25, worker: 1.1 }; // m from the floor to the middle of
 const FLAP = { hz: 13, amp: 0.55 }; // wing beats per second, radians either way
 const SINK = { after: 6, time: 2.5, depth: 1.2 };
 const FAR = 40; // m: a hovering bee farther than this skips its bob and wingbeat
-const BAR_W = 0.07, BIG = 25;
+const BIG = 25;
 
 const VENOM = 0x9cff3a, AMBER = 0xffb21c, MURK = 0x1d2a08;
 const venomMote: Style = { life: [0.4, 0.7], size: [0.05, 0.1], color: 0xd8ff8a, color2: VENOM, hdr: 2.5, tex: T.spark, drag: 2 };
@@ -72,7 +72,7 @@ function beat(m: THREE.MeshStandardMaterial, flap: { value: number }): void {
   m.customProgramCacheKey = () => 'ape-wings';
 }
 
-/** One bee: the mesh in a body that hovers, leans, dives and falls, and its nameplate bar. */
+/** One bee: the mesh in a body that hovers, leans, dives and falls (its nameplate is ui/plates.ts's). */
 class View {
   readonly root = new THREE.Group();
   private body = new THREE.Group(); // hover, sway, attack moves
@@ -85,8 +85,6 @@ class View {
   private state?: CasterState;
   private fall = { y: 0, v: 0, roll: 0 }; // death drop
   private trail = -1;
-  private bar = new THREE.Group();
-  private fill: THREE.Sprite;
   private tip = new THREE.Object3D();
   private mesh: THREE.Mesh;
   private v = new THREE.Vector3();
@@ -108,15 +106,6 @@ class View {
     this.body.position.y = hover;
     this.body.add(m);
     this.root.add(this.body);
-
-    const bg = new THREE.Sprite(barMat(0x140c08));
-    bg.scale.set(0.075, 0.011, 1);
-    this.fill = new THREE.Sprite(barMat(0xc8241c));
-    this.fill.scale.set(BAR_W, 0.006, 1);
-    this.fill.renderOrder = 1;
-    this.bar.add(bg, this.fill);
-    this.bar.position.y = this.height + 0.35;
-    this.root.add(this.bar);
   }
 
   /** Struck for `n`: the red flash and a jolt away from the blow. */
@@ -212,11 +201,6 @@ class View {
 
     if (this.flashK > 0) this.flashK = Math.max(0, this.flashK - dt * 4);
     flash(this.mats, this.flashK, f.cc);
-    const r = f.hp / K.hp;
-    this.bar.visible = f.state !== 'dead' && (f.state !== 'pray' || r < 1);
-    this.bar.position.y = y + 0.65 * (this.queen ? SIZES.queen : SIZES.worker) + 0.35;
-    this.fill.scale.x = BAR_W * Math.max(r, 1e-3);
-    this.fill.center.x = 0.5 / Math.max(r, 1e-3);
   }
 }
 

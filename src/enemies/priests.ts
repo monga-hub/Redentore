@@ -8,7 +8,7 @@ import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, rise, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest } from './caster.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA } from './zitelle.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
-import { barMat, flash, ownMaterials } from './friars.ts';
+import { flash, ownMaterials } from './friars.ts';
 import { still } from './control.ts';
 
 // The casters, one body per kind, each generated, rigged and animated with Meshy AI (see
@@ -23,7 +23,6 @@ import { still } from './control.ts';
 // shadow flame; the boss's marks as crimson brands that fill the same way and erupt.
 
 const FADE = 0.2;
-const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 };
 const FAR = 40; // m: praying priests farther than this skip their animation (they barely move)
 const BIG = 25; // damage that makes a heavy flinch
@@ -157,7 +156,7 @@ interface Template {
   glow: THREE.SpriteMaterial; // the crystal's charging glow, shared by the kind
 }
 
-/** One priest's model, animation and nameplate bar. */
+/** One priest's model and animation (its nameplate is ui/plates.ts's). */
 class View {
   readonly root = new THREE.Group();
   private mixer: THREE.AnimationMixer;
@@ -169,8 +168,6 @@ class View {
   private mats: THREE.MeshStandardMaterial[];
   private flash = 0;
   private tip: THREE.Object3D;
-  private bar = new THREE.Group();
-  private fill: THREE.Sprite;
   private sparks = 0;
   private look: Look;
   private held: THREE.Object3D; // the staff, gripped in the fist
@@ -209,15 +206,6 @@ class View {
     this.glow.visible = false;
     this.glow.renderOrder = 3;
     this.tip.add(this.glow);
-
-    const bg = new THREE.Sprite(barMat(0x140c08));
-    bg.scale.set(0.075, 0.011, 1);
-    this.fill = new THREE.Sprite(barMat(0xc8241c));
-    this.fill.scale.set(BAR_W, 0.006, 1);
-    this.fill.renderOrder = 1;
-    this.bar.add(bg, this.fill);
-    this.bar.position.y = t.look.height + 0.35;
-    this.root.add(this.bar);
   }
 
   /** Struck for `n`: the red flash, and a flinch while it is only closing in or standing. */
@@ -295,11 +283,6 @@ class View {
     this.root.rotation.y = f.yaw;
     this.upright += ((f.state === 'swing' || f.state === 'dead' ? 0 : 1) - this.upright) * Math.min(1, dt / 0.15);
     this.stand(f.yaw);
-
-    const r = f.hp / f.kind.hp;
-    this.bar.visible = f.kind !== REVERENDISSIMO && f.kind !== GOVERNATRICE && f.state !== 'dead' && (f.state !== 'pray' || r < 1); // a boss's bar is the big one up top (quest/view.ts)
-    this.fill.scale.x = BAR_W * Math.max(r, 1e-3);
-    this.fill.center.x = 0.5 / Math.max(r, 1e-3);
   }
 
   /** Hold the staff upright in the fist (`upright` of the way from the fist's own grip), facing `yaw`. */

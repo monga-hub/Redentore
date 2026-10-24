@@ -28,7 +28,6 @@ const IMPACT = 1.6; // s into the hoeing clip where the blade bites
 const RUN = 5.5 * HEIGHT / 1.8; // m/s the run covers at rate 1 (a planted foot's speed, on a 1.8 m body): a slowed run chases, evades
 const CLIPS: Record<State, string> = { hoe: 'Hoe', chase: 'Running', swing: 'Attack', evade: 'Running', dead: 'Dead' }; // swing, dead: see SWINGS, DEATHS
 const FADE = 0.2;
-const BAR_W = 0.07;
 const SINK = { after: 6, time: 2.5, depth: 1.4 }; // corpse sinks into the soil, then hides
 const FAR = 40; // m: hoeing friars farther than this skip their animation, like the priests (priests.ts)
 
@@ -46,7 +45,7 @@ interface Template {
   clips: THREE.AnimationClip[];
 }
 
-/** One friar's model, animation and nameplate bar. */
+/** One friar's model and animation (its nameplate is ui/plates.ts's). */
 class View {
   readonly root = new THREE.Group();
   private mixer: THREE.AnimationMixer;
@@ -56,8 +55,6 @@ class View {
   private mats: THREE.MeshStandardMaterial[] = [];
   private flash = 0;
   private blade!: THREE.Object3D;
-  private bar = new THREE.Group();
-  private fill: THREE.Sprite;
   private lastClip = 0;
   private overlay: Overlay;
   private shadows: Shadows;
@@ -82,15 +79,6 @@ class View {
     }
     this.swings = Math.floor(Math.random() * SWINGS.length);
     this.overlay = new Overlay(this.mixer, t.clips, Object.values(FLINCH).map((f) => f.clip));
-
-    const bg = new THREE.Sprite(barMat(0x140c08));
-    bg.scale.set(0.075, 0.011, 1); // fraction of the view height: nameplate-sized at any distance
-    this.fill = new THREE.Sprite(barMat(0xc8241c));
-    this.fill.scale.set(BAR_W, 0.006, 1);
-    this.fill.renderOrder = 1;
-    this.bar.add(bg, this.fill);
-    this.bar.position.y = HEIGHT + 0.35;
-    this.root.add(this.bar);
   }
 
   /** Struck for `n`: the red flash, and a flinch unless it is mid-swing. */
@@ -147,11 +135,6 @@ class View {
     this.root.visible = sink < 1;
     this.root.position.set(f.x, f.y - sink * SINK.depth, f.z);
     this.root.rotation.y = f.yaw;
-
-    const r = f.hp / FRIAR.hp;
-    this.bar.visible = f.state !== 'dead' && (f.state !== 'hoe' || r < 1);
-    this.fill.scale.x = BAR_W * Math.max(r, 1e-3);
-    this.fill.center.x = 0.5 / Math.max(r, 1e-3); // keep the bar's left edge put as it drains
   }
 
   private enter(s: State, from?: State): void {
@@ -196,10 +179,6 @@ export function flash(mats: THREE.MeshStandardMaterial[], k: number, cc?: Contro
   if (cc?.root) { r += 0.12; g += 0.34; b += 0.6; } else if (cc?.slow) { r += 0.04; g += 0.12; b += 0.26; }
   if (cc?.burn) { const f = 0.7 + 0.3 * Math.sin(performance.now() * 0.023); r += 0.5 * f; g += 0.17 * f; b += 0.02 * f; }
   for (const m of mats) { const e = m.userData.glow as number, h = m.userData.ghost as number[] | undefined; m.emissive.setRGB((h?.[0] ?? e) + r, (h?.[1] ?? e) + g, (h?.[2] ?? e) + b); } // a ghost keeps its cold glow
-}
-
-export function barMat(color: number): THREE.SpriteMaterial {
-  return new THREE.SpriteMaterial({ color, fog: false, toneMapped: false, sizeAttenuation: false });
 }
 
 /** Stand the friar up and give it its hoe; every friar is a clone of this. */

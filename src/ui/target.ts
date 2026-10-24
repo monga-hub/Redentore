@@ -8,8 +8,9 @@ export interface Mob { x: number; y: number; z: number; hp: number; state: strin
 /**
  * One kind of enemy: display name, full health, model height and the live brains. `ownBar`: true
  * while a bar of its own shows its name and health (the boss bar), so the target frame stays hidden.
+ * `lv` and `rank` are only shown (ui/plates.ts): no level means a boss's skull.
  */
-export interface Kind { name: string; max: number; height: number; all: readonly Mob[]; ready: () => boolean; ownBar?: () => boolean }
+export interface Kind { name: string; max: number; height: number; all: readonly Mob[]; ready: () => boolean; ownBar?: () => boolean; lv?: number; rank?: 'elite' }
 
 const TAP_PX = 8; // pointer travel below this is a tap, not a camera drag
 const TAP_MS = 350;

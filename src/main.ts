@@ -16,14 +16,16 @@ import { ActionBar } from './ui/actionBar.ts';
 import { AbilityBook } from './ui/book.ts';
 import { saveBar } from './abilities/system.ts';
 import { PlayerStats } from './player/stats.ts';
-import { Targeting } from './ui/target.ts';
+import { Targeting, type Kind } from './ui/target.ts';
+import { HeroAuras, Plates } from './ui/plates.ts';
+import { heroAuras } from './ui/auras.ts';
 import { Friars } from './enemies/friars.ts';
 import { Priests } from './enemies/priests.ts';
 import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
 import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { ANDITO, BOONS, CHEST, CROCE, HEADS, NPC, QUESTS, Quest, SECOND, SPEZIALE } from './quest/progress.ts';
+import { ANDITO, BLESSING, BOONS, CHEST, CROCE, HEADS, NPC, QUESTS, Quest, SECOND, SPEZIALE } from './quest/progress.ts';
 import { ISEPPO, SIDE, type Foe } from './quest/squero.ts';
 import { QuestView } from './quest/view.ts';
 import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
@@ -118,19 +120,20 @@ const zitelle = new Priests(level.world, kit.vfx, playerStats, level.areas, l2, 
 zitelle.rising = (f) => !quest.boss2Dead && (f.kind === GONDOLIERE || f.kind === CODEGA); // the drowned and the codeghe rise again for Mastro Iseppo's quests, until the Governatrice falls
 scene.add(zitelle.root);
 /** Level 2's kinds: name, kind, height. */
-const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85], ['Codega', CODEGA, 1.8], ['Zitella', ZITELLA, 1.65], ['Zitella del velo', VELO, 1.65], ['Il Gastaldo dei gondolieri', GASTALDO, 2.5], ['La Maestra del merletto', MAESTRA, 2.3], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
+const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85, 11], ['Codega', CODEGA, 1.8, 11], ['Zitella', ZITELLA, 1.65, 12], ['Zitella del velo', VELO, 1.65, 12], ['Il Gastaldo dei gondolieri', GASTALDO, 2.5, 13, 'elite'], ['La Maestra del merletto', MAESTRA, 2.3, 14, 'elite'], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
 /** Level 2's kinds Mastro Iseppo's quests count and loot. */
 const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra']]);
 const ofKind = (k: typeof L2_KINDS[number][1]) => zitelle.all.filter((f) => f.kind === k);
-const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, [ // click/tap an enemy, Tab for the nearest
-  { name: 'Frate non-morto', max: FRIAR.hp, height: 1.75, all: friars.all, ready: () => friars.root.children.length > 0 },
-  { name: 'Prete non-morto', max: PRIEST.hp, height: 1.85, all: priests.all.filter((f) => f.kind === PRIEST), ready: () => priests.root.children.length > 0 },
-  { name: 'Sacerdote non-morto', max: SACERDOTE.hp, height: 2.5, all: priests.all.filter((f) => f.kind === SACERDOTE), ready: () => priests.root.children.length > 0 },
+const kinds: Kind[] = [ // the levels are only shown, on the nameplates
+  { name: 'Frate non-morto', max: FRIAR.hp, height: 1.75, all: friars.all, ready: () => friars.root.children.length > 0, lv: 3 },
+  { name: 'Prete non-morto', max: PRIEST.hp, height: 1.85, all: priests.all.filter((f) => f.kind === PRIEST), ready: () => priests.root.children.length > 0, lv: 4 },
+  { name: 'Sacerdote non-morto', max: SACERDOTE.hp, height: 2.5, all: priests.all.filter((f) => f.kind === SACERDOTE), ready: () => priests.root.children.length > 0, lv: 7, rank: 'elite' },
   { name: 'Il Reverendissimo', max: REVERENDISSIMO.hp, height: 4.6, all: [priests.boss], ready: () => priests.root.children.length > 0, ownBar: () => questView.bossShown },
-  { name: 'Ape gigante', max: APE.hp, height: Bees.HEIGHT.queen, all: [bees.queen], ready: () => bees.root.children.length > 0 },
-  { name: 'Ape operaia', max: APETTA.hp, height: Bees.HEIGHT.worker, all: bees.all.filter((f) => f.kind === APETTA), ready: () => bees.root.children.length > 0 },
-  ...L2_KINDS.map(([name, kind, height]) => ({ name, max: kind.hp, height, all: ofKind(kind), ready: () => zitelle.root.children.length > 0, ...(kind === GOVERNATRICE ? { ownBar: () => questView.bossShown } : {}) })),
-]);
+  { name: 'Ape gigante', max: APE.hp, height: Bees.HEIGHT.queen, all: [bees.queen], ready: () => bees.root.children.length > 0, lv: 8, rank: 'elite' },
+  { name: 'Ape operaia', max: APETTA.hp, height: Bees.HEIGHT.worker, all: bees.all.filter((f) => f.kind === APETTA), ready: () => bees.root.children.length > 0, lv: 5 },
+  ...L2_KINDS.map(([name, kind, height, lv, rank]) => ({ name, max: kind.hp, height, all: ofKind(kind), ready: () => zitelle.root.children.length > 0, lv, rank, ...(kind === GOVERNATRICE ? { ownBar: () => questView.bossShown } : {}) })),
+];
+const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, kinds); // click/tap an enemy, Tab for the nearest
 const FALLEN = 3.6; // s the hero lies dead before waking
 const SLOW = 0.3, SLOW_FOR = 1.4; // the world's speed as the hero falls, easing back to 1 over SLOW_FOR s
 let dying = 0;
@@ -158,6 +161,18 @@ function wake(): void {
   const where = at === SPAWN ? 'sulla fondamenta' : at === CROCE ? 'oltre il Ponte de la Croce' : at === ANDITO ? "nell'andito delle Zitelle" : 'alla porta del coro';
   kit.system.notices.push({ kind: 'error', text: `Sei caduto. Ti risvegli ${where}.` });
 }
+const plates = new Plates(kinds, cam.camera, kit.magic, () => targeting.target?.mob); // WoW nameplates: the hero's debuffs, health, level, casts
+const heroBuffs = new HeroAuras(); // under the player frame
+const BUBBLE = ABILITIES.find((a) => a.id === 'bubble')!;
+const buffs = () => {
+  const p = player.pos, m = kit.magic, bubbleCd = kit.system.cooldown(BUBBLE);
+  return heroAuras({
+    bless: { name: BLESSING.name, left: quest.blessLeft },
+    veil: playerStats.veil, immune: playerStats.immune, aureola: bubbleCd > 0 && BUBBLE.cooldown - bubbleCd <= 5.05, // cast in its 5 s: the immunity is Aureola's, not Patto della tomba's
+    sparks: m.sparks, sparkT: m.sparkT, wisp: kit.wisp,
+    hallow: m.hallows.reduce((t, z) => (Math.hypot(p.x - z.x, p.z - z.z) < z.r && Math.abs(p.y - z.y) < 1.5 ? Math.max(t, z.t) : t), 0),
+  });
+};
 kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all];
@@ -533,6 +548,8 @@ renderer.setAnimationLoop(() => {
   kit.vfx.applyShake(cam.camera, dt); // big hits shake the lens; trails face it
   occlusion.update(dt, player.pos, cam.camera);
   targeting.update(dt, player.pos);
+  plates.update(dt, player.pos, lv.lv);
+  heroBuffs.update(dt, buffs);
   stream(player.pos.x);
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;
   hud.setArea(area);

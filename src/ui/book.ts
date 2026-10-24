@@ -116,7 +116,7 @@ body.touch #book .keys { display: none; }
 `;
 
 const SCHOOLS: [School, string][] = [['bone', 'Ossa'], ['plague', 'Peste'], ['shadow', 'Ombra'], ['fire', 'Fuoco'], ['frost', 'Gelo'], ['storm', 'Fulmine'], ['holy', 'Sacro']];
-const SCHOOL_NAME = new Map(SCHOOLS);
+export const SCHOOL_NAME = new Map(SCHOOLS);
 const BOOK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C9.5 4.8 6.5 4.6 3 5.2v13c3.5-.6 6.5-.4 9 1.3 2.5-1.7 5.5-1.9 9-1.3v-13c-3.5-.6-6.5-.4-9 1.3zM12 6.5v13M5.5 8.6c1.8-.2 3.4 0 4.6.6M5.5 11.4c1.8-.2 3.4 0 4.6.6M13.9 9.2c1.2-.6 2.8-.8 4.6-.6M13.9 12c1.2-.6 2.8-.8 4.6-.6"/></svg>';
 const DRAG = 6; // px a mouse press travels before it becomes a drag
 

@@ -139,7 +139,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, Caduta d'ossa, fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Si parte con Nube di peste (2) e Preghiera di suffragio (3); le altre arrivano coi livelli |
+| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, Caduta d'ossa, fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Stiletto di ghiaccio (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
 | R | la fiala di linfa tombale (la pozione), su un tasto suo fuori dagli otto |
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
@@ -158,9 +158,21 @@ lo schermo intero (solo dove il browser lo permette) sta sotto il riquadro del p
 In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,
 anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
+## Eroi
+
+Una partita nuova si apre sulla scelta dell'eroe (`src/ui/select.ts`, `src/player/heroes.ts`), dorata come le altre finestre:
+il Risorto (Ossa, secondaria Ombra), il morto senza nome della Giudecca, e Bortolo (Gelo, secondaria Fulmine), il gondoliere
+annegato l'inverno in cui gelò la laguna, col remo gelato. Ogni carta ha il concept dipinto, nome, titolo, le icone delle due
+scuole e una riga di chi era; ←/→ e Invio anche da tastiera. La scuola va col personaggio: il Risorto parte con le Ossa,
+Bortolo col Gelo (Dardo di brina e Stiletto di ghiaccio); le carte dei livelli e i tomi poi sono gli stessi per tutti e due.
+La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e si
+carica solo il corpo dell'eroe scelto. Bortolo è un corpo Meshy sullo stesso scheletro del Risorto, con le sue 27 clip
+riapplicate osso per osso; dei set porta solo elmi, cappelli e spallacci (misurati su di lui: la paglietta gli si
+ripiega sotto l'elmo), non le ridipinture del corpo, e le armi le stringe col suo pugno.
+
 ## Abilità
 
-Si parte con Caduta d'ossa (la clava, combo a tre colpi), Nube di peste, Preghiera di suffragio (la cura) e la fiala; ai livelli pari fino al 10
+Si parte con Caduta d'ossa (la clava, combo a tre colpi), Preghiera di suffragio (la cura) e la fiala, Bortolo anche con Dardo di brina e Stiletto di ghiaccio; ai livelli pari fino al 10
 arrivano due carte di nuove abilità, dopo il 10 una nuova abilità contro un potenziamento; agli altri
 potenziamenti, passivi e fusioni (`src/player/levels.ts`: 33 abilità da sbloccare, cinque per scuola contando quelle iniziali e lasciando a parte l'attacco primario; 75 carte di potenziamento di cui 8 fusioni). Ogni carta
 esce a caso tra tutte quelle non ancora prese, qualunque cosa si sia scelto prima: nessuna scuola si chiude. Non c'è un livello massimo
@@ -169,8 +181,8 @@ abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del p
 
 **Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), insegna subito
 tutte le abilità della scuola che non si conoscono ancora, che vanno nel Libro delle abilità pronte da equipaggiare. Costa 200 oro per
-abilità e 350 per una speciale, solo per quelle che insegna davvero (Ossa completo 1300, Ombra 1150, Fuoco, Gelo e Fulmine 1000, Peste e
-Sacro 800: Nube di peste e Preghiera di suffragio si hanno dall'inizio); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
+abilità e 350 per una speciale, solo per quelle che insegna davvero (Ossa completo 1300, Ombra 1150, Peste, Fuoco, Gelo e Fulmine 1000,
+Sacro 800: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 600, Dardo di brina e Stiletto di ghiaccio li ha già); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
 non escono più come carte, i loro potenziamenti sì. Nel salvataggio (`build.learned`; i vecchi si caricano senza).
 
 **Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come

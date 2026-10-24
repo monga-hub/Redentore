@@ -56,6 +56,7 @@ const DEFS: [string, string, Slot, Rarity, string, string?][] = [
   ['canapa-gambe', 'Brache di canapa', 'gambe', 'comune', 'vigore intelletto'],
   ['canapa-piedi', 'Sandali di canapa', 'piedi', 'comune', 'vigore intelletto'],
   ['clava-osso', 'Clava d’osso', 'arma', 'comune', 'potenza'],
+  ['remo-gelato', 'Remo gelato', 'arma', 'comune', 'potenza', 'Non si è più scongelato, e nemmeno chi lo voga.'], // Bortolo's (player/heroes.ts)
 
   ['becchino-testa', 'Cappuccio del becchino', 'testa', 'noncomune', 'vigore potenza'],
   ['penitente-testa', 'Zucchetto del penitente', 'testa', 'noncomune', 'intelletto spirito'],
@@ -162,7 +163,9 @@ export const shop = (level2: boolean) => SHOP.filter((g) => level2 || !g.l2);
 /** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
 export const SHOP2 = SHOP.filter((g) => g.l2);
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club. */
-export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune').map((g) => [g.slot, g.id]));
+export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune' && g.id !== 'remo-gelato').map((g) => [g.slot, g.id]));
+/** A new game's set: the hemp and the hero's own weapon (player/heroes.ts). */
+export const starter = (weapon: string): GearState => ({ ...STARTER, arma: weapon });
 
 /** Gold Fra' Bortolo asks for it. */
 export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w * (it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);

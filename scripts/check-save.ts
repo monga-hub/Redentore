@@ -5,10 +5,11 @@ import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, QUESTS, Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, startup, takePending, type Game } from '../src/core/save.ts';
+import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, startup, takePending, upcoming, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
+import type { Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
 import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
 import { eligible, levelOf as lvOf } from '../src/player/levels.ts';
@@ -16,9 +17,10 @@ import { BAR, PICKS, install, migration, prepared } from '../src/core/prepared.t
 
 const fail = (why: string) => { throw new Error(why); };
 
-function boot(): Game {
+function boot(hero: Hero = 'risorto'): Game {
   const level = buildLevel(), stats = new PlayerStats(), gear = new Equipment();
   const g: Game = {
+    hero,
     player: { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: SPAWN.yaw },
     stats,
     kit: { charge: 0 },
@@ -202,17 +204,20 @@ if (resume(store)) fail('autosave survived a new game');
 autosave(s, store);
 clearAutosave(store); setPending('new', store); // "Nuova partita"
 autosave(s, store); // the old page, hidden by its reload
+if (upcoming(store, store) !== 'new' || upcoming(store, store) !== 'new') fail('the boot did not see the new game coming (or the peek took it)');
 let up = startup(store, store);
 if (up.state || !up.queued || resume(store)) fail('"Nuova partita" resumed the old run');
 if (startup(store, store).state) fail('the old run came back on the next cold boot');
 autosave(s, store);
 setPending(zs, store); // "Carica"
 autosave(s, store);
+if (JSON.stringify(upcoming(store, store)) !== JSON.stringify(zs)) fail('the boot did not see the load coming');
 up = startup(store, store);
 if (JSON.stringify(up.state) !== JSON.stringify(zs) || JSON.stringify(resume(store)) !== JSON.stringify(zs)) fail('a load left the old run as the one in progress');
 up = startup(store, store); // iOS killed it: the cold boot resumes the loaded run
-if (up.queued || JSON.stringify(up.state) !== JSON.stringify(zs)) fail('cold boot after a load did not resume it');
+if (up.queued || JSON.stringify(up.state) !== JSON.stringify(zs) || JSON.stringify(upcoming(store, store)) !== JSON.stringify(zs)) fail('cold boot after a load did not resume it');
 clearAutosave(store);
+if (upcoming(store, store) !== undefined) fail('a first launch saw a game coming');
 // Level 2 through the autosave: the second quest's stage, its open doors and its checkpoint come back.
 autosave(zs, store);
 const zr = boot();
@@ -254,6 +259,19 @@ const tOdd = boot();
 deserialize(tOdd, { ...ts, build: { ...ts.build, learned: ['pyre', 'hp', 'from_the_future'] } });
 if (tOdd.levels.learned.join() !== 'pyre') fail(`tomes' junk kept: ${tOdd.levels.learned}`);
 if (!valid(ls) || !valid({ ...ls, build: { ...ls.build, learned: undefined } }) || valid({ ...ts, build: { ...ts.build, learned: [3] } }) || valid({ ...ts, build: { ...ts.build, learned: 'pyre' } })) fail('learned field validation');
+// The hero chosen round-trips with his kit; a save from before the choice is the Risorto's, given back the Nube di peste
+// he started with then; another build's hero is the Risorto; junk is refused.
+const hg = boot('bortolo');
+hg.levels.learned = ['frost', 'lance'];
+const hgs = JSON.parse(JSON.stringify(serialize(hg))), hgb = boot();
+deserialize(hgb, hgs);
+if (hgb.hero !== 'bortolo' || hgb.levels.learned.join() !== 'frost,lance' || tuneOf(hgb.levels.picks, hgb.levels.learned).owned.includes('plague')) fail(`hero after load: ${hgb.hero} ${hgb.levels.learned}`);
+const hgOld = boot('bortolo');
+deserialize(hgOld, (({ hero: _h, ...o }) => o)(hgs));
+if (hgOld.hero !== 'risorto' || !tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague')) fail('a save from before the choice is not the Risorto with his plague');
+const hgOdd = boot();
+deserialize(hgOdd, { ...hgs, hero: 'zanetto' });
+if (hgOdd.hero !== 'risorto' || hgOdd.levels.learned.includes('plague') || valid({ ...hgs, hero: 3 }) || !valid((({ hero: _h, ...o }) => o)(hgs))) fail('hero field validation');
 // Le teste dei frati: asked, the heads in hand and the boon round-trip; a save from before it loads with it not taken; junk is refused.
 const hq = boot();
 Object.assign(hq.quest, { asked: true, heads: 7 });
@@ -273,14 +291,15 @@ deserialize(odd2, { ...hs, quest: { ...hs.quest, boon: 'from_the_future' } });
 if (odd2.quest.boon || valid({ ...hs, quest: { ...hs.quest, heads: 'x' } }) || valid({ ...hs, quest: { ...hs.quest, asked: 1 } }) || valid({ ...hs, quest: { ...hs.quest, boon: 3 } })) fail('heads field validation');
 // The hero ready for level 2: loads at Fra' Zuane's offer, level 12 with every card as `offer` would deal it, level 1's
 // purple on every slot, at full health; the migration swaps every old save for it once, and never again.
-const pg = boot(), ps = JSON.parse(JSON.stringify(prepared(serialize(pg), pg.mobs.length, buildLevel().areas)));
+const pg = boot('bortolo'); // whoever was chosen on this boot, the prepared hero is the Risorto
+const ps = JSON.parse(JSON.stringify(prepared(serialize(pg), pg.mobs.length, buildLevel().areas)));
 if (!valid(ps)) fail('the prepared save is refused');
 const pb = boot();
 deserialize(pb, ps);
-if (pb.quest.stage !== 'offer' || !pb.quest.found || pb.quest.boon !== 'vigore' || !pb.quest.relicBack || pb.quest.bonusXp !== questXpIn(ps)) fail(`prepared save at ${pb.quest.stage}`);
+if (pb.hero !== 'risorto' || !pb.levels.learned.includes('plague') || pb.quest.stage !== 'offer' || !pb.quest.found || pb.quest.boon !== 'vigore' || !pb.quest.relicBack || pb.quest.bonusXp !== questXpIn(ps)) fail(`prepared save at ${pb.quest.stage}`);
 if (lvOf(pb.levels.xp).lv !== 12 || pb.levels.picks.join() !== PICKS.join() || pb.levels.picks.length !== 11) fail(`prepared level ${lvOf(pb.levels.xp).lv}, picks ${pb.levels.picks}`);
 PICKS.forEach((id, i) => {
-  const c = eligible(PICKS.slice(0, i)).find((k) => k.id === id), lv = i + 2;
+  const c = eligible(PICKS.slice(0, i), ['plague']).find((k) => k.id === id), lv = i + 2;
   if (!c || (c.kind === 'ability') !== (lv % 2 === 0 && lv <= 10)) fail(`card ${id} could not be dealt at level ${lv}`);
 });
 if (GEAR_SLOTS.some((sl) => GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.rarity !== 'epico' || GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.l2)) fail(`prepared gear ${JSON.stringify(pb.gear.worn)}`);

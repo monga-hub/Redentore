@@ -3,9 +3,11 @@ import { UPPER, loadModel, over, stand } from '../core/models.ts';
 import { PLAYER } from '../core/physics.ts';
 import type { GearState } from '../loot/gear.ts';
 import { Outfit } from './outfit.ts';
+import { HEROES, type Hero } from './heroes.ts';
 
 // The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
-// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB, dressed in what it wears (player/outfit.ts:
+// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB (the other heroes, player/heroes.ts, on the same rig
+// with the Risorto's clips retargeted onto it, so every move below is the same on each), dressed in what it wears (player/outfit.ts:
 // the pieces, the dyes, the weapon in the right fist, the bone club to start). Loaded async; `root` stays empty until
 // the GLB arrives.
 //
@@ -69,6 +71,8 @@ const AURA_VERT = /* glsl */ `
   #include <common>
   #include <skinning_pars_vertex>
   uniform float uPush;
+  attribute vec3 aHat;
+  uniform float uHat;
   varying vec3 vN;
   varying vec3 vV;
   varying float vY;
@@ -77,6 +81,7 @@ const AURA_VERT = /* glsl */ `
     #include <skinbase_vertex>
     #include <skinnormal_vertex>
     #include <begin_vertex>
+    transformed += aHat * uHat; // his own hat folded away under a helm, as on him (player/outfit.ts)
     #include <skinning_vertex>
     vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
     vN = normalize(normalMatrix * objectNormal);
@@ -102,7 +107,7 @@ const AURA_FRAG = /* glsl */ `
 export class Aura {
   readonly material = new THREE.ShaderMaterial({
     vertexShader: AURA_VERT, fragmentShader: AURA_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uColor: { value: new THREE.Color() }, uK: { value: 0 }, uTime: { value: 0 }, uPush: { value: 0.025 } },
+    uniforms: { uColor: { value: new THREE.Color() }, uK: { value: 0 }, uTime: { value: 0 }, uPush: { value: 0.025 }, uHat: { value: 0 } },
   });
   private want = 0;
   private color = new THREE.Color();
@@ -162,13 +167,14 @@ export class UndeadModel {
   private outfit?: Outfit;
   private worn: GearState = {};
 
-  constructor() {
-    loadModel('reietto.glb').then((gltf) => {
+  constructor(hero: Hero) {
+    loadModel(HEROES[hero].file).then((gltf) => {
       const model = gltf.scene;
       stand(model, PLAYER.height);
       let body: THREE.SkinnedMesh | undefined;
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
-      const outfit = (this.outfit = new Outfit(model, body!));
+      const outfit = (this.outfit = new Outfit(model, body!, hero));
+      this.aura.material.uniforms.uHat = outfit.uniforms.uHat;
       outfit.onWeapon = (top) => { this.tip = top; this.club = top?.parent ?? undefined; };
       outfit.wear(this.worn);
       this.leftHand = model.getObjectByName('LeftHand');

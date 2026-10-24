@@ -7,8 +7,8 @@
 // Each level offers two cards, drawn evenly from everything not yet learnt or maxed, whatever was picked before.
 // Even levels up to 10 offer two new abilities (the specials from level 6), past 10 a new ability against an upgrade;
 // the others a modifier of an owned ability (or a fusion) against a stat passive. With the finite cards all taken, small
-// repeatable ones (and the heal) keep coming. The run starts with Caduta d'ossa, Nube di peste and Preghiera di suffragio
-// (the heal), the potion stays as an item. The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
+// repeatable ones (and the heal) keep coming. Every run starts with Caduta d'ossa and Preghiera di suffragio (the heal), the
+// potion stays as an item; the hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
 // upgrade changes is a field of `Tune`, replayed from the picks and the tomes' abilities (`tuneOf`), so a save only needs both lists.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
@@ -68,7 +68,7 @@ export interface Tune {
   fxVenomCloud: boolean; fxHolyFire: boolean; // fusions: poison in the plague cloud, the judgment set alight
 }
 
-export const START = ['fall', 'plague', 'mend', 'potion'];
+export const START = ['fall', 'mend', 'potion'];
 export const SPECIALS = ['strike', 'nova', 'ward'];
 const BASE: Tune = {
   owned: START,
@@ -134,7 +134,7 @@ const special = (_c: (id: string) => number, owns: (a: string) => boolean) => SP
 const FROST = ['frost', 'font', 'lance', 'blizzard', 'orb'], STORM = ['chain', 'toll', 'shield', 'rod', 'squall'], FIRE = ['pyre', 'wisp', 'pillar', 'cero', 'furnace'];
 const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text: string): Card => ({ id, kind: 'ability', name, icon: id, text, max: 1, of: id, tier, school });
 /** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
-export const SCHOOL: Record<string, School> = { fall: 'bone', plague: 'plague', mend: 'holy' };
+export const SCHOOL: Record<string, School> = { fall: 'bone', mend: 'holy' };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
   ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
 const passive = (id: string, name: string, text: string, max: number, apply: (t: Tune) => void, needs?: Card['needs']): Card =>
@@ -158,6 +158,7 @@ export const CARDS: Card[] = [
   ability('grace', 'Colpo di grazia', 'A', 'bone', `Un fendente a due mani davanti a te: ${BASE.graceDmg} danni, fino al triplo sui nemici già feriti. 20 mana, recupero ${BASE.graceCd} s.`),
   ability('charge', 'Carica del dannato', 'A', 'shadow', `Ti scagli sul nemico (4-20 m): ${BASE.chargeDmg} danni e stordito ${it(BASE.chargeStun)} s. Riempie la furia. Recupero ${BASE.chargeCd} s.`),
   // five a school: poison (Diablo's Witch Doctor and Necromancer, WoW's poisons), WoW's warlock drain, mage, shaman and paladin
+  ability('plague', 'Nube di peste', 'A', 'plague', `Una nube pestilenziale sul bersaglio, larga ${it(BASE.plagueR)} m: ristagna ${BASE.plagueLife} s e corrode chi ci resta dentro (${BASE.plagueDps} danni al secondo). 25 mana, recupero ${BASE.plagueCd} s.`),
   ability('spit', 'Sputo di bile', 'A', 'plague', `Istantaneo: un grumo di bile velenosa da ${BASE.spitDmg} danni e una dose di veleno (${BASE.venomDps} danni al secondo per dose per 8 s, fino a ${BASE.venomMax} dosi). 18 mana.`),
   ability('untore', "Unguento dell'untore", 'A', 'plague', `Ungi il bersaglio: ${BASE.untoreDmg} danni e il suo veleno (almeno 2 dosi) passa a ogni nemico entro ${BASE.untoreR} m. 30 mana, recupero 10 s.`),
   ability('miasma', 'Fiato della fossa', 'A', 'plague', `Un anello di miasma esplode da te: ${BASE.miasmaDmg} danni e ${BASE.miasmaStacks} dosi di veleno a chi è entro ${BASE.miasmaR} m. 45 mana, recupero ${BASE.miasmaCd} s.`),
@@ -333,7 +334,7 @@ export function offer(picks: readonly string[], rnd: () => number = Math.random,
 const FILLERS = CARDS.filter((c) => c.kind === 'filler');
 
 /** A merchant's tome: every ability of a school, for gold (ui/vendor.ts). The cost is per ability it would still teach:
- * four or five a school, the starting Nube di peste and Preghiera di suffragio aside. */
+ * four or five a school (Preghiera di suffragio, everyone's, aside), less what the hero's kit already gave. */
 export interface Tome { school: School; name: string; icon: string }
 export const TOMES: Tome[] = [
   { school: 'bone', name: 'Tomo delle Ossa', icon: 'strike' },
@@ -345,7 +346,7 @@ export const TOMES: Tome[] = [
   { school: 'holy', name: 'Tomo del Sacro', icon: 'judge' },
 ];
 /** Gold a tome asks for each ability it teaches: a special costs more. */
-export const TOME_PRICE = { A: 200, B: 350 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: Peste or Sacro (800) by then, the five-ability ones (1000-1300) a level-2 goal
+export const TOME_PRICE = { A: 200, B: 350 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: Sacro (800) by then, the five-ability ones (1000-1300) a level-2 goal
 /** What `tome` would teach someone owning `owned`, and its price; a tome with nothing left to teach is not sold. */
 export function tomeOf(tome: Tome, owned: readonly string[]): { teaches: Card[]; price: number } {
   const teaches = CARDS.filter((c) => c.kind === 'ability' && c.school === tome.school && !owned.includes(c.id));

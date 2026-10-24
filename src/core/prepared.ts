@@ -1,7 +1,7 @@
 // A hero ready for level 2, built in: what a player usually has when Fra' Zuane offers La dote delle Zitelle.
 // The Reverendissimo is handed in, Fra' Bortolo found and his heads' rite done, the corona given back (its medal in the
 // bag), level 12 (~1025 XP to the boss with the key's and Bortolo's quests, then the hand-in, the heads and the corona:
-// 1525), every slot in level 1's purple, a frost and bone kit on the bar. Standing by Fra' Zuane on the fondamenta.
+// 1525), every slot in level 1's purple, a frost and bone kit on the bar. The Risorto, with the Nube di peste he used to start with. Standing by Fra' Zuane on the fondamenta.
 // The menu offers it as "Nuova partita: dal livello 2"; `migration` and `install` put it once in place of every old save.
 // Plain data over a fresh game's serialize: no three.js, so `npm run check` drives it in Node.
 import { levelOf } from '../player/levels.ts';
@@ -31,6 +31,7 @@ export function prepared(fresh: GameState, fallen: number, areas: readonly { zon
   }
   return {
     ...fresh,
+    hero: 'risorto',
     player: { x: 1.5, y: 0, z: 15, yaw: Math.atan2(3 - 1.5, 12.5 - 15), hp: 1e6, mana: 1e6, charge: 0 }, // full, facing Fra' Zuane
     quest: {
       ...fresh.quest, key: true, gates: ['grata-nord', 'grata-ovest', 'coro', 'portone'], bossDead: true, accepted: true, out: true,
@@ -41,7 +42,7 @@ export function prepared(fresh: GameState, fallen: number, areas: readonly { zon
     again: [],
     time: 2 * 3600,
     fog: fog.encode(),
-    build: { xp: XP, lv: levelOf(XP).lv, picks: [...PICKS] },
+    build: { xp: XP, lv: levelOf(XP).lv, picks: [...PICKS], learned: ['plague'] },
     bag: { gold: 650, items: [[RELIC_PRIZE, 1]] },
     gear: { ...GEAR },
     side: { taken: [], done: [], kills: {} },

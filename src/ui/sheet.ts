@@ -36,7 +36,7 @@ const CSS = `
 `;
 
 /** The numbers beside the figure (main.ts reads them off the stats, the cards and the gear). */
-export interface Summary { lv: number; hp: number; mana: number; armor: number; cut: number; dmg: number; crit: number; haste: number; regen: number }
+export interface Summary { name: string; lv: number; hp: number; mana: number; armor: number; cut: number; dmg: number; crit: number; haste: number; regen: number }
 
 export class SheetPanel {
   readonly el = document.createElement('div');
@@ -89,7 +89,7 @@ export class SheetPanel {
     this.el.innerHTML = `<h2>Personaggio</h2><button class="x" aria-label="Chiudi scheda">✕</button>
       <div class="doll">${col(['testa', 'amuleto', 'spalle', 'torso'])}<div class="stage" title="Trascina per girarlo"></div>${col(['mani', 'gambe', 'piedi', 'anello'], 'r')}
         <div class="wpn">${this.cell('arma')}</div>
-        <div class="stats"><div class="lv">Il Risorto · livello ${n.lv}</div>
+        <div class="stats"><div class="lv">${n.name} · livello ${n.lv}</div>
           <dl><dt>Salute</dt><dd>${it(n.hp)}</dd><dt>Mana</dt><dd>${it(n.mana)}</dd>
           <dt>Armatura</dt><dd title="Danni subiti in meno">${it(n.armor)} (−${pct(n.cut)})</dd>
           <dt>Danni</dt><dd class="${n.dmg > 1 ? 'up' : ''}">+${pct(n.dmg - 1)}</dd><dt>Critico</dt><dd>${Math.round(n.crit)}% (×1,5)</dd>

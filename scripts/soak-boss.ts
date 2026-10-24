@@ -15,6 +15,7 @@
 //   npm run soak                       ~2 minutes of fight
 //   SOAK_SECONDS=600 npm run soak      a longer one
 //   SOAK_LEVEL=2 npm run soak           the Governatrice under the Zitelle's dome instead (level 2's bodies, lace and fuso)
+//   SOAK_HERO=bortolo npm run soak      Bortolo picked on the new game's screen instead of the Risorto (player/heroes.ts)
 //   CHROME=/path/to/chrome npm run soak
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -24,6 +25,7 @@ import { createServer } from 'vite';
 
 const SECONDS = Number(process.env.SOAK_SECONDS ?? 120);
 const LEVEL = Number(process.env.SOAK_LEVEL ?? 1);
+const HERO = process.env.SOAK_HERO ?? 'risorto';
 const BUDGET = 200; // MB of GPU buffers the phone profile may hold (it held ~380 before the phone tier)
 const SLACK = { prog: 4, geo: 12, tex: 4 }; // first uses that may still come late (a loot beam, a death's effects)
 const CHROME = process.env.CHROME ?? (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
@@ -161,7 +163,7 @@ const url = server.resolvedUrls!.local[0];
 
 // --- Chrome, over the DevTools protocol
 const profile = mkdtempSync(join(tmpdir(), 'soak-'));
-const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required', '--mute-audio', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
 const wsUrl = await new Promise<string>((ok, no) => {
   let err = '';
   chrome.stderr.on('data', (d) => { err += d; const m = err.match(/DevTools listening on (ws:\S+)/); if (m) ok(m[1]); });
@@ -213,8 +215,11 @@ try {
   const t0 = Date.now();
   while (!(await evaluate('!!(window.priests?.root.children.length && window.friars?.root.children.length && window.bees?.root.children.length && window.player?.model.root.children.length)').catch(() => false))) {
     if (Date.now() - t0 > 180e3) throw new Error('the game never finished loading');
+    await evaluate(`document.querySelector('#select .card[data-id=${HERO}]')?.click(), document.querySelector('#select button')?.click()`).catch(() => {}); // a new game: the hero's screen
     await sleep(500);
   }
+  const bodies: string[] = await evaluate("performance.getEntriesByType('resource').map((e) => e.name.split('/').pop()).filter((n) => n === 'reietto.glb' || n === 'bortolo.glb')");
+  if (bodies.join() !== (HERO === 'bortolo' ? 'bortolo.glb' : 'reietto.glb')) fail(`bodies loaded for ${HERO}: ${bodies.join(', ') || 'none'}`);
   if (!(await evaluate("matchMedia('(pointer: coarse)').matches"))) fail('the emulated phone is not taken for a phone');
   for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro
   await sleep(3000);

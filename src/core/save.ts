@@ -1,4 +1,4 @@
-// Saved games: the state worth keeping as plain JSON (player, quest flags, who is dead, play
+// Saved games: the state worth keeping as plain JSON (the hero chosen, player, quest flags, who is dead, play
 // time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), three localStorage slots, the handoff that carries a loaded game across a reload,
 // and the autosave: the run in progress, kept whenever no fight is on, that a cold boot resumes. iOS reloads a tab
 // it kills for memory (and a home-screen app relaunches from the start), which used to throw the whole run away.
@@ -11,6 +11,7 @@ import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
 import type { SideState } from '../quest/squero.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
+import { heroOf, type Hero } from '../player/heroes.ts';
 
 const VERSION = 1;
 /** Flags on Quest saved as they are: the second quest's, and Fra' Zuane's corona found and given back. */
@@ -25,6 +26,7 @@ const OLD_EAST = 60;
 
 export interface GameState {
   v: number;
+  hero?: string; // player/heroes.ts; absent in saves from before the choice: the Risorto, who then started with Nube di peste
   player: { x: number; y: number; z: number; yaw: number; hp: number; mana: number; charge: number };
   // gates: ids of the open ones. accepted/out: Fra' Zuane's quest taken, back out on the fondamenta after
   // the boss; absent in saves from before him, which load with the quest already taken. blessed/blessLeft:
@@ -53,6 +55,7 @@ export interface GameState {
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
 export interface Game {
+  hero: Hero;
   player: { pos: { x: number; y: number; z: number }; facing: number };
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
   kit: { charge: number };
@@ -70,6 +73,7 @@ export function serialize(g: Game): GameState {
   const { x, y, z } = g.player.pos;
   return {
     v: VERSION,
+    hero: g.hero,
     player: { x, y, z, yaw: g.player.facing, hp: g.stats.hp, mana: g.stats.mana, charge: g.kit.charge },
     quest: { key: g.quest.key, gates: g.quest.gates.filter((q) => q.open).map((q) => q.id), bossDead: g.quest.bossDead, accepted: g.quest.accepted, out: g.quest.out, blessed: g.quest.blessed, blessLeft: g.quest.blessLeft,
       found: g.quest.found, done: [...g.quest.done], asked: g.quest.asked, heads: g.quest.heads, boon: g.quest.boon, ...Object.fromEntries(LEVEL2.map((k) => [k, g.quest[k]])) },
@@ -91,7 +95,9 @@ export function deserialize(g: Game, s: GameState): void {
   g.player.facing = p.yaw;
   g.levels.xp = s.build?.xp ?? 0;
   g.levels.picks = (s.build?.picks ?? []).filter((id) => CARD.has(id)); // a card from another build is dropped
+  g.hero = heroOf(s.hero);
   g.levels.learned = (s.build?.learned ?? []).filter((id) => CARD.get(id)?.kind === 'ability');
+  if (s.hero === undefined && !g.levels.learned.includes('plague')) g.levels.learned.push('plague'); // the Risorto's old start
   if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
   g.quest.boon = BOONS.some((b) => b.id === s.quest.boon) ? s.quest.boon! : ''; // before the clamp too: the rite's boon may raise it
   g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
@@ -140,7 +146,7 @@ export function questXpIn(s: GameState): number {
 export function valid(s: unknown): s is GameState {
   const o = s as GameState;
   const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
-  return !!o && o.v === VERSION && !!o.player && ['x', 'y', 'z', 'yaw', 'hp', 'mana', 'charge'].every((k) => num(o.player[k as keyof GameState['player']]))
+  return !!o && o.v === VERSION && (o.hero === undefined || typeof o.hero === 'string') && !!o.player && ['x', 'y', 'z', 'yaw', 'hp', 'mana', 'charge'].every((k) => num(o.player[k as keyof GameState['player']]))
     && !!o.quest && typeof o.quest.key === 'boolean' && typeof o.quest.bossDead === 'boolean' && Array.isArray(o.quest.gates)
     && ['accepted', 'out', 'blessed', ...LEVEL2].every((k) => [undefined, true, false].includes(o.quest[k as 'accepted' | 'out' | 'blessed'] as boolean | undefined))
     && (o.quest.blessLeft === undefined || num(o.quest.blessLeft))
@@ -196,6 +202,12 @@ export function startup(session: Storage = sessionStorage, local: Storage = loca
   if (p === 'new') clearAutosave(local);
   else if (p) autosave(p, local);
   return p ? { state: p === 'new' ? undefined : p, queued: true } : { state: resume(local), queued: false };
+}
+
+/** What the next boot will start, untouched (the queued game, else the run in progress; 'new' or undefined: a new game), for the hero to load before it. */
+export function upcoming(session: Storage = sessionStorage, local: Storage = localStorage): GameState | 'new' | undefined {
+  const p = read(session, PENDING);
+  return p === 'new' || valid(p) ? p : resume(local);
 }
 
 /** Keep `s` as the run in progress (main.ts, out of combat only, so a resume never lands mid-fight). False when storage is full or blocked. */

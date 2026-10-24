@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { arm, loadModel, shaft } from '../core/models.ts';
 import { GEAR, type GearState, type Slot } from '../loot/gear.ts';
+import type { Hero } from './heroes.ts';
 
 // What the hero wears, on the hero (WoW's paper doll): every visible slot shows its piece, and a full set reads as one
 // look, like WoW's tier sets and Diablo's class sets in the Redentore's Venetian gothic. Eight looks, one per item family:
@@ -19,7 +20,8 @@ import { GEAR, type GearState, type Slot } from '../loot/gear.ts';
 // slots over them wear: one set of three textures, repainted in place, so cloth and armour bend with the body. On top, as
 // sculpted Meshy pieces baked onto the bones, the helm or hat on the hood and a pauldron on each shoulder (the body's own
 // bone pauldrons pulled in under them); in the fist the weapon, a Meshy prop. Only what is worn is loaded; what is taken
-// off is freed.
+// off is freed. The other heroes (player/heroes.ts) keep their own painted body under every set (the looks are painted on
+// the Risorto's UVs) and wear its helms and pauldrons, fitted to them (`BODIES`), and their own fist.
 
 type Look = 'becchino' | 'chierico' | 'arsenale' | 'murano' | 'voto' | 'gondola' | 'merletto' | 'broccato';
 /** Body regions, painted by the slot that covers them. */
@@ -80,7 +82,7 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
  * the fist this far up the shaft, the elbow bent so the fist holds it straight up. In a blow or a spell the fist slides
  * back down to `grip` and swings it as the clip swings the fist. `flip`: upside down in its file (its head at the bottom).
  */
-interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean }
+interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean }
 export const WEAPONS: Record<string, Weapon> = {
   'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, lean: 0.35 },
   'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 },
@@ -89,6 +91,7 @@ export const WEAPONS: Record<string, Weapon> = {
   'turibolo-arma': { file: 'turibolo.glb', length: 0.85, grip: 0.12, lean: 0.35 },
   pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
   'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true }, // by the handle, the blade the head
+  'remo-gelato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true, ice: true }, // Bortolo's, iced over
   'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
   'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
 };
@@ -100,10 +103,39 @@ export const WEAPONS: Record<string, Weapon> = {
 const FIST = new THREE.Vector3(0, 14, -5.5);
 /**
  * The claws closed on it, the hand's own vertices bent in the shader while he holds a weapon (`aFist`): past the knuckle
- * line (`KNUCKLE`, RightHand's coordinates, cm) and off the thumb's side (x > `THUMB`), turned about it toward the palm,
- * up to `CURL` rad at the tips (`TIPS` cm up the hand).
+ * line (`knuckle`, RightHand's coordinates, cm) and off the thumb's side (x > `thumb`), turned about it toward the palm,
+ * up to `curl` rad at the tips (`tips` cm up the hand).
  */
-const KNUCKLE = new THREE.Vector3(0, 9, -1), TIPS = 22, CURL = 1.0, THUMB = -5.5;
+interface Hand { fist: THREE.Vector3; knuckle: THREE.Vector3; tips: number; curl: number; thumb: number }
+/**
+ * Each hero's body: his hand, the pieces as they sit on him (`PIECES` for the Risorto, whom they were made on), and `paint`:
+ * whether the sets repaint him (only the Risorto: the looks are painted on his UVs).
+ */
+interface Body { hand: Hand; pieces: Partial<Record<`${Look}-${Worn}`, Piece>>; paint: boolean }
+/**
+ * The helms on Bortolo, fitted on his bald crown (his boater folded into it, `fold`): measured on him, the crowns resting on
+ * his head, the closed ones (Meshy's pieces are solid) sunk until their brims sit on his brow, the beaked mask over his face.
+ */
+const HELMS: Body['pieces'] = {
+  'becchino-testa': { size: 0.5, at: [-0.004, -0.168, 0.03] },
+  'chierico-testa': { size: 0.56, at: [-0.004, 0.014, -0.03] },
+  'arsenale-testa': { size: 0.42, at: [-0.004, -0.022, -0.03] },
+  'murano-testa': { size: 0.27, at: [-0.004, -0.038, -0.03] },
+  'voto-testa': { size: 0.36, at: [-0.004, -0.096, -0.075] },
+  'gondola-testa': { size: 0.46, at: [-0.004, -0.104, -0.03] },
+  'merletto-testa': { size: 0.46, at: [-0.004, -0.019, -0.03] },
+  'broccato-testa': { size: 0.3, at: [-0.004, -0.117, -0.05] },
+};
+const DOME = 0.08, NAPE = 0.13; // m his bald crown rises over the band where his hat sat, and the back of his head falls under it
+const BODIES: Record<Hero, Body> = {
+  risorto: { hand: { fist: FIST, knuckle: new THREE.Vector3(0, 9, -1), tips: 22, curl: 1.0, thumb: -5.5 }, pieces: PIECES, paint: true },
+  // a bigger hand, open, the fingers straight: the shaft nearer the knuckles, closed further; his boater folds away under
+  // a helm (`HELMS`)
+  bortolo: {
+    hand: { fist: new THREE.Vector3(0, 12, -4.5), knuckle: new THREE.Vector3(0, 8, -1), tips: 23, curl: 1.7, thumb: -5.5 },
+    pieces: { ...PIECES, ...HELMS }, paint: false,
+  },
+};
 
 /** Free what `o` owns: its geometries, materials and textures. */
 function dispose(o: THREE.Object3D): void {
@@ -192,18 +224,24 @@ class Fit {
     return new THREE.Vector3().setFromMatrixPosition(this.rest[this.bone(bone)]).applyMatrix4(this.frame(on).invert());
   }
 
-  /** The rest-pose vertices led by `bone`, in its frame. */
-  points(bone: string): THREE.Vector3[] {
+  /** The rest-pose vertices led by `bone`, in its frame (not those `skip` marks). */
+  points(bone: string, skip?: Uint8Array): THREE.Vector3[] {
     const inv = this.frame(bone).invert(), id = this.bone(bone), out: THREE.Vector3[] = [];
-    for (let i = 0; i < this.dom.length; i++) if (this.dom[i] === id) out.push(new THREE.Vector3().fromArray(this.pos, i * 3).applyMatrix4(inv));
+    for (let i = 0; i < this.dom.length; i++) if (this.dom[i] === id && !skip?.[i]) out.push(new THREE.Vector3().fromArray(this.pos, i * 3).applyMatrix4(inv));
     return out;
   }
 }
 
-/** Where the pieces go: the hood's crown (the middle of its top, head frame) and the left shoulder ball (collarbone frame). */
-function sockets(f: Fit): Record<Worn, THREE.Vector3> {
-  const hood = f.points('Head'), top = Math.max(...hood.map((p) => p.y)), peak = hood.filter((p) => p.y > top - 0.05);
+/** Where the pieces go: the hood's crown (the middle of its top, head frame; under his own hat, `hat`) and the left shoulder ball (collarbone frame). */
+function sockets(f: Fit, hat?: Uint8Array): Record<Worn, THREE.Vector3> {
+  const hood = f.points('Head', hat), top = Math.max(...hood.map((p) => p.y)), peak = hood.filter((p) => p.y > top - 0.05);
   return { testa: peak.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(Math.max(1, peak.length)), spalle: f.at('LeftArm', 'LeftShoulder') };
+}
+
+/** His own hat, if his body has one (Bortolo's boater, its band and icicles: the GLB's `_HAT` vertex mask, picked by colour when it was made), folded away under a helm. */
+function hatOf(body: THREE.SkinnedMesh): Uint8Array | undefined {
+  const a = body.geometry.attributes._hat;
+  return a && Uint8Array.from({ length: a.count }, (_, i) => (a.getX(i) > 0.5 ? 1 : 0));
 }
 
 // --- the body's maps, painted per region
@@ -568,13 +606,18 @@ const UP = new THREE.Vector3(0, 1, 0);
 const VERT_HEAD = /* glsl */ `
 attribute float aPad;
 attribute vec3 aFist;
+attribute vec3 aHat;
+attribute vec3 aHatN;
 uniform float uPad;
 uniform float uFist;
+uniform float uHat;
 uniform vec3 uPadL;
-uniform vec3 uPadR;`;
+uniform vec3 uPadR;
+varying float vHat;`;
 const VERT_BODY = /* glsl */ `#include <begin_vertex>
 transformed = mix(transformed, aPad > 0.0 ? uPadL : uPadR, abs(aPad) * uPad);
-transformed += aFist * uFist;`;
+transformed += aFist * uFist + aHat * uHat;
+vHat = dot(aHat, aHat) > 0.0 ? uHat : 0.0;`;
 const FRAG_HEAD = /* glsl */ `
 uniform float uGlow;`;
 // Runes, gems, glass: the glow/roughness/metal map's red channel lights its colour up (Outfit.update makes it breathe).
@@ -597,6 +640,7 @@ function lit(sh: THREE.WebGLProgramParametersWithUniforms, glow: { value: number
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>${FRAG_HEAD}`).replace('#include <emissivemap_fragment>', FRAG_GLOW).replace('#include <opaque_fragment>', FRAG_SHOULDER);
 }
 const GLOW = 1.3;
+const ICE: [number, number, number] = [1.6, 2.1, 2.6], ICE_GLOW = 0x1c4a66; // a frozen weapon's tint (over its own colours) and its cold self-glow
 /**
  * × the maps' metalness: the night has no environment to mirror, and full metal shows only the lights' highlights (black
  * steel reads as a hole); half keeps the paint, as WoW's painted armour does.
@@ -642,29 +686,38 @@ export class Outfit {
   private readonly socket: Record<Worn, THREE.Vector3>;
   private readonly root: THREE.Group;
   private readonly body: THREE.SkinnedMesh;
-  private readonly paint: Paint;
+  private readonly paint?: Paint;
   private readonly guard: Guard;
+  private readonly own: Body;
   /** Shared with the body's shader (and the pieces': uGlow). */
-  readonly uniforms = { uPad: { value: 0 }, uFist: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
+  readonly uniforms = { uPad: { value: 0 }, uFist: { value: 0 }, uHat: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
   private worn: GearState = {};
   private pieces = new Map<Worn, THREE.SkinnedMesh>();
   private weapon?: THREE.Object3D;
   private t = 0;
   onWeapon: (top?: THREE.Object3D) => void = () => {};
 
-  /** `root`: the stood body's scene (core/models.ts `stand`). */
-  constructor(root: THREE.Group, body: THREE.SkinnedMesh) {
+  /** `root`: the stood body's scene (core/models.ts `stand`), `hero`'s. */
+  constructor(root: THREE.Group, body: THREE.SkinnedMesh, hero: Hero) {
     this.root = root;
     this.body = body;
+    this.own = BODIES[hero];
     this.fit = new Fit(root, body);
-    this.socket = sockets(this.fit);
-    this.paint = new Paint(body, this.mark());
+    const hat = hatOf(body);
+    this.socket = sockets(this.fit, hat);
+    this.fold(hat);
+    const region = this.mark(), m = body.material as THREE.MeshStandardMaterial;
+    if (this.own.paint) this.paint = new Paint(body, region);
+    else m.metalness = METAL; // his own maps, made like the painted ones
     this.guard = new Guard(root, this.fit);
-    const m = body.material as THREE.MeshStandardMaterial;
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, this.uniforms);
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>${VERT_HEAD}`).replace('#include <begin_vertex>', VERT_BODY);
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>${VERT_HEAD}`).replace('#include <begin_vertex>', VERT_BODY)
+        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nif (dot(aHat, aHat) > 0.0) objectNormal = normalize(mix(objectNormal, aHatN, uHat));');
       lit(sh, this.uniforms.uGlow);
+      // his own hat, folded into his bald crown under a helm, his skin's blue (an open crown shows it)
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vHat;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.29, 0.38), vHat);');
     };
     m.customProgramCacheKey = () => 'hero-dressed';
   }
@@ -697,6 +750,7 @@ export class Outfit {
     g.setAttribute('aPad', new THREE.BufferAttribute(pad, 1));
     const into = (b: number) => f.skin[b].clone().invert(); // the world into the body's own coordinates
     const fist = new Float32Array(n * 3), H = f.bone('RightHand'), toBody = new THREE.Matrix3().setFromMatrix4(into(H)), x = new THREE.Vector3(1, 0, 0);
+    const { knuckle: KNUCKLE, tips: TIPS, curl: CURL, thumb: THUMB } = this.own.hand;
     for (let i = 0; i < n; i++) {
       let w = 0;
       for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === H) w += sw.getComponent(i, k);
@@ -713,6 +767,38 @@ export class Outfit {
     return region;
   }
 
+  /**
+   * Where each vertex of his own hat goes when a helm folds it away (`aHat`): onto a bald crown, the dome over the top of his
+   * head where the hat leaves it (the mesh has no skull under the hat, nor behind it): as wide and deep as his head there,
+   * `DOME` m high over its middle, and down the back of his head (`aHatN`: its normals).
+   */
+  private fold(hat?: Uint8Array): void {
+    const f = this.fit, n = f.dom.length, out = new Float32Array(n * 3), normal = new Float32Array(n * 3), head = f.bone('Head');
+    if (hat) {
+      const frame = f.frame('Head'), into = frame.clone().invert(), turn = new THREE.Matrix3().setFromMatrix4(frame); // the head's frame: the model's axes, +Z ahead
+      const at = (i: number) => new THREE.Vector3().fromArray(f.pos, i * 3).applyMatrix4(into);
+      let top = -Infinity;
+      for (let i = 0; i < n; i++) if (f.dom[i] === head && !hat[i]) top = Math.max(top, at(i).y);
+      const band = new THREE.Box3();
+      for (let i = 0; i < n; i++) if (f.dom[i] === head && !hat[i] && at(i).y > top - 0.03) band.expandByPoint(at(i));
+      // his brow is the front of the dome, the band's width its width, an egg's depth behind (the back of his head is the hat's too)
+      const rx = (band.max.x - band.min.x) / 2 * 0.97, r = new THREE.Vector3(rx, DOME, rx * 1.2), c = new THREE.Vector3((band.max.x + band.min.x) / 2, top - 0.03, band.max.z - r.z);
+      const toBody = new THREE.Matrix3().setFromMatrix4(f.skin[head].clone().invert()).multiply(turn), d = new THREE.Vector3(), q = new THREE.Vector3();
+      for (let i = 0; i < n; i++) {
+        if (!hat[i]) continue;
+        const p = at(i);
+        const ry = p.y < c.y ? NAPE : DOME; // under the band, down the back of his head to the nape
+        d.copy(p).sub(c).divide(r.setY(ry));
+        d.y = Math.max(d.z < 0 ? -0.9 : 0, d.y); // the brim and what hangs off it onto the band, behind down to the nape
+        d.normalize();
+        q.copy(d).divide(r).applyMatrix3(toBody).normalize().toArray(normal, i * 3); // the ellipsoid's normal there
+        d.multiply(r).add(c).sub(p).applyMatrix3(toBody).toArray(out, i * 3);
+      }
+    }
+    this.body.geometry.setAttribute('aHat', new THREE.BufferAttribute(out, 3));
+    this.body.geometry.setAttribute('aHatN', new THREE.BufferAttribute(normal, 3));
+  }
+
   wear(worn: GearState): void {
     if (!('arma' in this.worn) || worn.arma !== this.worn.arma) this.arm((this.worn.arma = worn.arma));
     let changed = false;
@@ -724,7 +810,7 @@ export class Outfit {
       changed = true;
       if ((slot === 'testa' || slot === 'spalle') && (!this.pieces.has(slot) || was !== (id && lookOf(id)))) this.piece(slot);
     }
-    if (changed) this.paint.paint(REGION_SLOT.map((s) => { const id = this.worn[s]; return id ? lookOf(id) : undefined; }));
+    if (changed) this.paint?.paint(REGION_SLOT.map((s) => { const id = this.worn[s]; return id ? lookOf(id) : undefined; }));
   }
 
   /** The piece of what `slot` wears now, in place of the one there: loaded, then baked onto its bones. */
@@ -732,7 +818,8 @@ export class Outfit {
     const old = this.pieces.get(slot);
     if (old) { dispose(old); this.pieces.delete(slot); this.guard.pieces.delete(slot); }
     if (slot === 'spalle') this.uniforms.uPad.value = 0;
-    const id = this.worn[slot], look = id && lookOf(id), p = look && PIECES[`${look}-${slot}`];
+    else this.uniforms.uHat.value = 0;
+    const id = this.worn[slot], look = id && lookOf(id), p = look && this.own.pieces[`${look}-${slot}`];
     if (!p) return;
     loadModel(`${DIR}${look}-${slot}.glb`, 256).then((gltf) => {
       const now = this.worn[slot];
@@ -740,6 +827,7 @@ export class Outfit {
       const m = this.bake(slot, p, gltf.scene);
       this.pieces.set(slot, m);
       if (slot === 'spalle') this.uniforms.uPad.value = 1;
+      else this.uniforms.uHat.value = 1; // his own hat folded away under it
     }, (e) => console.error('outfit piece failed to load', e));
   }
 
@@ -807,12 +895,13 @@ export class Outfit {
         o.userData.xray = true; // no x-ray twin either
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (m?.isMeshStandardMaterial) dress(m, this.uniforms.uGlow, !!m.metalnessMap); // his own PBR props painted like his pieces
+        if (w.ice && m?.isMeshStandardMaterial) { m.color.setRGB(...ICE); m.emissive.set(ICE_GLOW); m.roughness = 0.3; } // frozen over: the wood frosted pale
       });
       if (w.flip) prop.rotation.z = Math.PI;
       const walk = w.staff === undefined ? undefined : [shaft(prop, w.staff), shaft(prop, w.grip)], top = arm(this.root, prop, w.length, w.grip), held = top.parent!;
       // in the fist: the shaft across the palm, its head out of the thumb side leaned toward the fingertips
       const way = new THREE.Vector3(-Math.cos(w.lean), Math.sin(w.lean), 0), out = new THREE.Vector3(0, 0, -1);
-      held.position.copy(FIST);
+      held.position.copy(this.own.hand.fist);
       held.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(way.clone().cross(out), way, out));
       if (walk) { // the fist slid up to the staff's grip: the prop down by as much, on the shaft there
         const k = prop.scale.x, d = walk[1].sub(walk[0]).multiplyScalar(k);

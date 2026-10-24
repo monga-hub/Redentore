@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PLAYER, type World } from '../core/physics.ts';
 import type { Input } from '../core/input.ts';
 import { UndeadModel } from './undead.ts';
+import type { Hero } from './heroes.ts';
 
 const RUN = 6, WALK = 2.5, GRAVITY = 22, JUMP = 7, TURN = 12;
 
@@ -9,7 +10,7 @@ const RUN = 6, WALK = 2.5, GRAVITY = 22, JUMP = 7, TURN = 12;
 export class PlayerController {
   readonly mesh = new THREE.Group();
   /** The body: its moves, aura and hands (abilities drive it). */
-  readonly model = new UndeadModel();
+  readonly model: UndeadModel;
   /** Dead and falling: keys, stick and steering are ignored (gravity still applies). */
   frozen = false;
   /** Carried by a leap or a charge (abilities/grimoire.ts moves the feet): no keys, no gravity. */
@@ -24,7 +25,8 @@ export class PlayerController {
   readonly world: World;
   private spawn: { x: number; z: number; yaw: number };
 
-  constructor(world: World, spawn: { x: number; z: number; yaw: number }) {
+  constructor(world: World, spawn: { x: number; z: number; yaw: number }, hero: Hero) {
+    this.model = new UndeadModel(hero);
     this.world = world;
     this.spawn = spawn;
     this.mesh.add(this.model.root);

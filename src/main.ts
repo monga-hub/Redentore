@@ -9,7 +9,7 @@ import { Hud } from './ui/hud.ts';
 import { TouchControls } from './ui/touch.ts';
 import { Atmosphere } from './fx/atmosphere.ts';
 import { PHONE } from './core/device.ts';
-import { ABILITIES, Forsaken, tune } from './abilities/forsaken.ts';
+import { ABILITIES, Forsaken, barOf, tune } from './abilities/forsaken.ts';
 import { CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
@@ -35,7 +35,7 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { autosave, deserialize, questXpIn, serialize, setPending, startup, type Game } from './core/save.ts';
+import { autosave, deserialize, questXpIn, serialize, setPending, startup, upcoming, type Game } from './core/save.ts';
 import { BAR, install, migration, prepared } from './core/prepared.ts';
 import { isDiablo, onQuality, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
@@ -48,15 +48,22 @@ import { Director } from './audio/director.ts';
 import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
-import { Equipment, SHOP2, crit, effects, shop } from './loot/gear.ts';
+import { Equipment, SHOP2, crit, effects, shop, starter } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
 import { VendorPanel } from './ui/vendor.ts';
 import { DeathScreen } from './ui/death.ts';
+import { HEROES, heroOf } from './player/heroes.ts';
+import { chooseHero } from './ui/select.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
 initAudio(); // before the intro, whose first press unlocks the sound
+const swap = migration(); // once: the old saves make way for the hero ready for level 2 (core/prepared.ts)
+const ahead = swap ? undefined : upcoming(); // the game this boot starts, whose hero's body loads
+const fresh = !swap && (!ahead || ahead === 'new'); // a new game: its hero chosen first (ui/select.ts)
+const hero = fresh ? await chooseHero() : heroOf(swap || ahead === 'new' ? undefined : ahead?.hero);
+if (fresh) saveBar({ bar: barOf(HEROES[hero].kit), off: [] }); // his kit on the bar, before the kit reads it
 // Phones: a 1.5 pixel ratio (a third of DPR 3's pixels on an iPhone) and no MSAA on the canvas, which the post chain draws one quad into.
 const renderer = new THREE.WebGLRenderer({ antialias: !PHONE });
 renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.5 : 2));
@@ -75,24 +82,25 @@ const quest = new Quest(level.world); // church shut, key in the chest on the po
 
 const input = new Input(renderer.domElement);
 new TouchControls(renderer.domElement, input);
-const player = new PlayerController(level.world, SPAWN);
+const player = new PlayerController(level.world, SPAWN, hero);
 scene.add(player.mesh);
 const cam = new ThirdPersonCamera(innerWidth / innerHeight, SPAWN.yaw, level.cameraBlockers);
 const dcam = new DiabloCamera(cam.camera); // "Stile Diablo": same lens object, high fixed view
 const blend = new CameraBlend(); // eases style switches and the intro's hand-over
-const hud = new Hud();
+const hud = new Hud(HEROES[hero].portrait, HEROES[hero].name);
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
-const swap = migration(); // once: the old saves make way for the hero ready for level 2 (core/prepared.ts)
-if (swap) saveBar(BAR); // its bar, before the kit reads it
+if (swap) saveBar(BAR); // the prepared hero's bar, before the kit reads it
 const kit = new Forsaken(player, playerStats); // abilities on 1..0 - =
 scene.add(kit.vfx.root);
 const questView = new QuestView(quest, kit.vfx); // gates, chest, Fra' Zuane and his dialogue, tracker
 scene.add(questView.root);
 const bar = new ActionBar(kit.system);
 const levels = new Levels(); // XP from the dead, the cards picked; laid on the kit by `apply`
+levels.learned = [...HEROES[hero].kit]; // his school's start (a load lays its own)
 const levelUp = new LevelUp(); // the two-card window
-const gear = new Equipment(); // what the hero wears: the hemp set and the bone club at first
+const gear = new Equipment(); // what the hero wears: the hemp set and his own weapon at first
+gear.worn = starter(HEROES[hero].weapon);
 let worn = effects(gear.totals);
 levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on the kit and the stats
   Object.assign(tune, tuneOf(levels.picks, levels.learned));
@@ -191,7 +199,7 @@ const old = GROUPS.flat().length;
 const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all, ...zitelle.all]; // level 2's last
 const bag = new Bag(); // gold and items picked up off the dead
 quest.side.bag = bag; // Mastro Iseppo's quest items go in and out of it
-const game: Game = { player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
+const game: Game = { hero, player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const worthOf = (i: number) => ((mobs[i] as { again?: boolean }).again ? Math.ceil(worth[i] * RISE.xp) : worth[i]); // a risen friar, a quarter
 const levelTwo = prepared(serialize(game), mobs.length - zitelle.all.length, level.areas); // the hero ready for level 2, off this fresh boot (level 1's mobs come first)
@@ -280,7 +288,7 @@ drops.collect = (id) => id === HEADS.item && (questView.head(), true); // Fra' B
 const bagPanel = new BagPanel(bag, gear); // B or the satchel button
 bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
 const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure button: the paper doll
-  lv: levels.lv, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
+  name: HEROES[hero].name, lv: levels.lv, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
   dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
 const figure = new Figure(renderer, scene, player.mesh, sheet.stage); // the sheet's hero, as dressed, while it is open

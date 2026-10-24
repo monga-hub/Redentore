@@ -15,8 +15,10 @@ export class Hud {
   private lastHp = -1;
   private charged = false;
 
-  constructor() {
-    document.querySelector('#unit .portrait')!.innerHTML = `<img alt="" src="${import.meta.env.BASE_URL}models/reietto.webp">`;
+  /** `portrait`: the hero's, under public/models/; `name` on his frame. */
+  constructor(portrait: string, name: string) {
+    document.querySelector('#unit .name')!.textContent = name;
+    document.querySelector('#unit .portrait')!.innerHTML = `<img alt="" src="${import.meta.env.BASE_URL}models/${portrait}">`;
     this.xp.el.addEventListener('animationend', (e) => { if (e.animationName === 'xpburst') this.xp.el.classList.remove('up'); }); // drops the frame back under the level-up veil
   }
 

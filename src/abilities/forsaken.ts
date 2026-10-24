@@ -1776,4 +1776,6 @@ for (const a of ABILITIES) a.school = SCHOOL[a.id]; // each school its own globa
 /** The starting bar: the primary attack fixed on the big button (slot 0), the potion fixed on its own (slot 9), the starting
  *  kit on the next slots, which on touch run from the bottom-left of the thumb arc up (ui/actionBar.ts RING). Every unlock
  *  takes the next free slot; the ability book (ui/book.ts) rearranges slots 1-8. */
-export const BAR: (string | null)[] = ['fall', 'plague', 'mend', null, null, null, null, null, null, 'potion'];
+export const BAR: (string | null)[] = ['fall', 'mend', null, null, null, null, null, null, null, 'potion'];
+/** A new game's bar: the hero's own kit (player/heroes.ts) ahead of the heal. */
+export const barOf = (kit: readonly string[]): (string | null)[] => ['fall', ...kit, 'mend', ...Array<null>(7 - kit.length).fill(null), 'potion'];

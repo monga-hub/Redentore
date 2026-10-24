@@ -24,7 +24,8 @@ const GOLD = 0xffc85a, GHOST = 0x9fc4ff, GRAVE = 0x58ff9a, BONE = 0xefe6d2, DUST
 
 /** Damage, ranges, times and cooldowns the level-up cards change: the picks so far (main.ts lays them on). */
 export const tune: Tune = tuneOf([]);
-const PLAGUE_RADIUS = 2.2, PLAGUE_RANGE = 20, PLAGUE_REACH = 6; // m: cloud size (looks; the live one is tune.plagueR), reach for a foe, throw with none
+export const PLAGUE_RANGE = 20; // m: reach for a foe
+const PLAGUE_RADIUS = 2.2, PLAGUE_REACH = 6; // m: cloud size (looks; the live one is tune.plagueR), throw with none
 const PLAGUE_POOLS = 6; // clouds at once; past that the oldest gives way
 const FUSION_CLOUD = 4; // s a cloud sown by a fusion lasts
 const WISP_MOVING = 0.6, WISP_REACH = 10, WISP_ORBIT = 0.7; // m/s: the wisp only scorches while it drifts; m: it goes for foes this near, circling them this close

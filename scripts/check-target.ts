@@ -1,7 +1,7 @@
 // Target picking check (`npm run check`): a click on a mob's body selects it, the closer of two
 // overlapping mobs wins, empty ground, dead mobs and mobs behind the camera select nothing.
 import * as THREE from 'three';
-import { pick, type Kind, type Mob } from '../src/ui/target.ts';
+import { pick, resolve, type Kind, type Mob } from '../src/ui/target.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 const W = 800, H = 600;
@@ -21,4 +21,12 @@ if (pick([kind], camera, ...at(near, 0.9), W, H)?.mob !== near) fail('overlap: t
 if (pick([kind], camera, ...at(dead), W, H)) fail('dead mob picked');
 if (pick([kind], camera, 20, 20, W, H)) fail('empty corner picked something');
 if (pick([{ ...kind, ready: () => false }], camera, ...at(near), W, H)) fail('mob without a model picked');
+
+// A targeted cast with no living target takes the nearest foe to the hero within the cast's reach.
+const hero = { x: 0, z: 0 };
+if (resolve(undefined, [kind], hero, 30)?.mob !== near) fail('no target: the nearest foe should be taken');
+if (resolve(undefined, [kind], hero, 4)) fail('no foe in reach: nothing should be taken');
+if (resolve({ kind, mob: dead }, [kind], hero, 30)?.mob !== near) fail('dead target: the nearest living foe should be taken');
+if (resolve({ kind, mob: far }, [kind], hero, 4)?.mob !== far) fail('a living target should be kept');
+if (resolve(undefined, [kind], hero, 30, (m) => m !== near)?.mob !== behind) fail('a foe out of sight should be skipped');
 console.log('target picking ok');

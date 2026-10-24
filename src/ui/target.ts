@@ -44,6 +44,29 @@ export function pick(kinds: readonly Kind[], camera: THREE.Camera, x: number, y:
   return best;
 }
 
+type Pick = { kind: Kind; mob: Mob };
+const live = (m: Mob) => m.state !== 'dead' && m.state !== 'evade';
+
+/** The nearest living enemy to `p` (feet) closer than `range` m that `seen` allows, other than `skip`. */
+export function nearest(kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen: (m: Mob, k: Kind) => boolean = () => true, skip?: Mob): Pick | undefined {
+  let best: Pick | undefined, bestD = range;
+  for (const kind of kinds) {
+    if (!kind.ready()) continue;
+    for (const mob of kind.all) {
+      const d = Math.hypot(mob.x - p.x, mob.z - p.z);
+      if (!live(mob) || mob === skip || d >= bestD || !seen(mob, kind)) continue;
+      bestD = d;
+      best = { kind, mob };
+    }
+  }
+  return best;
+}
+
+/** The target a cast goes to: the current one while it lives (even out of range: the spell says so), else the nearest within `range`. */
+export function resolve(current: Pick | undefined, kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen?: (m: Mob, k: Kind) => boolean): Pick | undefined {
+  return current && live(current.mob) ? current : nearest(kinds, p, range, seen);
+}
+
 /**
  * Target selection, WoW style: click or tap an enemy to target it, click empty ground to clear,
  * Tab for the nearest one. A red ring marks the target's feet and the frame next to the player's
@@ -99,17 +122,12 @@ export class Targeting {
 
   /** Tab: the nearest living enemy in range and in sight, skipping the current target so repeated presses alternate. */
   nearest(): void {
-    let best: { kind: Kind; mob: Mob } | undefined, bestD = TAB_RANGE;
-    for (const kind of this.kinds) {
-      if (!kind.ready()) continue;
-      for (const mob of kind.all) {
-        const d = Math.hypot(mob.x - this.player.x, mob.z - this.player.z);
-        if (mob.state === 'dead' || mob === this.target?.mob || d >= bestD || !this.seen(mob, kind)) continue;
-        bestD = d;
-        best = { kind, mob };
-      }
-    }
-    if (best) this.target = best;
+    this.target = nearest(this.kinds, this.player, TAB_RANGE, (m, k) => this.seen(m, k), this.target?.mob) ?? this.target;
+  }
+
+  /** A targeted cast with no living target picks the nearest enemy in sight within `range` m, as if tapped. */
+  ensure(range: number): void {
+    this.target = resolve(this.target, this.kinds, this.player, range, (m, k) => this.seen(m, k));
   }
 
   /** The living, visible enemy under screen point (x, y), if any. */

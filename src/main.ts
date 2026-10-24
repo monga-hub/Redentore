@@ -9,7 +9,8 @@ import { Hud } from './ui/hud.ts';
 import { TouchControls } from './ui/touch.ts';
 import { Atmosphere } from './fx/atmosphere.ts';
 import { PHONE } from './core/device.ts';
-import { ABILITIES, Forsaken, barOf, tune } from './abilities/forsaken.ts';
+import { ABILITIES, Forsaken, PLAGUE_RANGE, barOf, tune } from './abilities/forsaken.ts';
+import { CHARGE, GRACE, LEAP, RANGE } from './abilities/grimoire.ts';
 import { CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
@@ -189,7 +190,9 @@ const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, 
 const MAIN = ABILITIES.find((a) => a.id === 'fall')!; // Caduta d'ossa, the swing a click-attack repeats, wherever it sits on the bar
 dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(kit.system.slots.indexOf(MAIN));
 const AIMED = new Set(['fall', 'step', 'plague', 'strike', 'pyre', 'frost', 'lance', 'chain', 'toll', 'leap', 'grace', 'charge', 'spit', 'untore', 'fever', 'drain', 'pillar', 'cero', 'furnace', 'blizzard', 'orb', 'judge', 'hammer']); // casts that go where the hero faces
-kit.system.aim = (a) => { if (AIMED.has(a.id)) dctl.aim(); };
+// No living target: the nearest foe in sight within the cast's reach becomes the target, as if tapped (iPhone taps rarely land on a mob).
+const REACH: Record<string, () => number> = { fall: () => tune.fallRange, grace: () => GRACE.range, step: () => 8, leap: () => LEAP.range, charge: () => CHARGE.max, plague: () => PLAGUE_RANGE, drain: () => 25 }; // the rest: RANGE
+kit.system.aim = (a) => { if (AIMED.has(a.id)) { targeting.ensure(REACH[a.id]?.() ?? RANGE); dctl.aim(); } };
 const occlusion = new Occlusion([level.root, fx.torches.root], level, [ // walls drop, roofs and props in the way fade out, Diablo view
   [player.mesh, 0xffc46b], [friars.root, 0xff3b2e], [priests.root, 0xff3b2e], [bees.root, 0xff3b2e], [zitelle.root, 0xff3b2e], // x-ray silhouettes behind what still hides them
 ]);

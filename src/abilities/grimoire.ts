@@ -44,10 +44,10 @@ const HOP = 8; // m a saetta jumps
 const HOP_FALL = 0.75; // each jump keeps this much of the damage
 const STORM = 1.5; // Miasma elettrico on the clouded
 const TOLL_DELAY = 0.6; // s from the call to the bolt
-const LEAP = { range: 12, time: 0.55, stop: 1.2, stun: 1, over: 1.3 }; // over: m of wall, hive or bench a leap clears
-const CHARGE = { min: 4, max: 20, speed: 24, stop: 1.3 };
+export const LEAP = { range: 12, time: 0.55, stop: 1.2, stun: 1, over: 1.3 }; // over: m of wall, hive or bench a leap clears
+export const CHARGE = { min: 4, max: 20, speed: 24, stop: 1.3 };
 const WHIRL_R = 3, WHIRL_CHILL = 0.6, WHIRL_FROZEN = 2;
-const GRACE = { range: 3, arc: Math.cos(1.1) };
+export const GRACE = { range: 3, arc: Math.cos(1.1) };
 const VENOM_T = 8; // s a dose of poison lasts (a new dose refreshes them all)
 const UNTORE_MIN = 2; // doses Unguento dell'untore passes on at least
 const FEVER_T = 12;

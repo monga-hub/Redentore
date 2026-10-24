@@ -300,7 +300,7 @@ export class UndeadModel {
     for (const s of this.shells) s.visible = showAura;
     if (this.dead) {
       this.mixer.update(dt);
-      this.outfit?.clear(dt);
+      this.outfit?.clear(dt, 0);
       return;
     }
     this.combatT = Math.max(0, this.combatT - dt);
@@ -326,12 +326,14 @@ export class UndeadModel {
     if (next === 'run') this.actions.run.timeScale = speed / PACE.run;
     this.still += ((standing ? 1 : 0) - this.still) * Math.min(1, dt / FADE);
 
+    let busy = 0; // how much of the upper body a move or a held pose has: a staff comes down from upright for it (not for the charge, a sprint)
     // Held poses, under any move; the whirl and the charge take the legs too.
     for (const h of Object.keys(HOLDS) as Hold[]) {
       const ch = this.layers.get(HOLDS[h]);
       const k = Math.max(0, Math.min(1, (this.holdK.get(h) ?? 0) + (this.holdOn.has(h) ? dt / 0.15 : -dt / 0.25)));
       this.holdK.set(h, k);
       if (!ch) continue;
+      if (h !== 'rush') busy = Math.max(busy, k);
       if (k > 0 && !ch.upper.isRunning()) { ch.upper.reset().play(); ch.lower.reset().play(); }
       if (k === 0 && ch.upper.isRunning()) { ch.upper.stop(); ch.lower.stop(); }
       if (h === 'rush') ch.upper.timeScale = ch.lower.timeScale = Math.max(1, speed / 8); // a head-down sprint
@@ -353,11 +355,12 @@ export class UndeadModel {
         this.playing = undefined;
       } else {
         const k = Math.max(0, Math.min(1, t / s.move.in, (s.end - t) / s.move.out)); // fade in, hold, fade out
+        busy = Math.max(busy, k);
         s.layer.upper.setEffectiveWeight(over(k));
         s.layer.lower.setEffectiveWeight(over(k * (s.move.whole ? 1 : this.still)));
       }
     }
     this.mixer.update(dt);
-    this.outfit?.clear(dt); // the weapon kept out of him, whatever the clip did
+    this.outfit?.clear(dt, 1 - busy); // the weapon kept out of him, whatever the clip did
   }
 }

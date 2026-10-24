@@ -59,6 +59,23 @@ export function stand(scene: THREE.Group, height: number): void {
 }
 
 /**
+ * The middle of `prop`'s shaft `at` of the way up (its file's units; y is that height): the box round its surface there,
+ * not round the whole prop (a crook, a mace's flange or a club's bend is off to one side of what the fist holds).
+ */
+export function shaft(prop: THREE.Object3D, at: number): THREE.Vector3 {
+  prop.updateMatrixWorld(true);
+  const all = new THREE.Box3().setFromObject(prop), y = all.min.y + at * (all.max.y - all.min.y), band = (all.max.y - all.min.y) * 0.02;
+  const box = new THREE.Box3(), v = new THREE.Vector3();
+  prop.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const p = m.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) if (Math.abs(v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).y - y) < band) box.expandByPoint(v);
+  });
+  return box.isEmpty() ? all.getCenter(v).setY(y) : box.getCenter(v).setY(y);
+}
+
+/**
  * Put `prop` (a Meshy prop, upright in its file) in the stood body's right fist, `length` m long
  * and held `grip` of the way up, its length along the hand bone's +Z: across the fist, so it
  * stands up in the idle and prayer poses and points ahead in a cast. Returns its top end, where
@@ -66,10 +83,10 @@ export function stand(scene: THREE.Group, height: number): void {
  * `tilt` (radians) leans it from across the fist toward the fingers, as a one-handed weapon hangs.
  */
 export function arm(scene: THREE.Group, prop: THREE.Group, length: number, grip: number, tilt = 0): THREE.Object3D {
-  const box = new THREE.Box3().setFromObject(prop), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+  const box = new THREE.Box3().setFromObject(prop), size = box.getSize(new THREE.Vector3()), c = shaft(prop, grip);
   const k = length / size.y;
   prop.scale.setScalar(k);
-  prop.position.set(-c.x * k, -(box.min.y + grip * size.y) * k, -c.z * k); // the grip at the origin
+  prop.position.set(-c.x * k, -(box.min.y + grip * size.y) * k, -c.z * k); // the grip at the origin, on the shaft
   prop.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
   const held = new THREE.Group(), top = new THREE.Object3D();
   held.name = 'held';

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { arm, loadModel } from '../core/models.ts';
+import { arm, loadModel, shaft } from '../core/models.ts';
 import { GEAR, type GearState, type Slot } from '../loot/gear.ts';
 
 // What the hero wears, on the hero (WoW's paper doll): every visible slot shows its piece, and a full set reads as one
@@ -73,22 +73,37 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
   'broccato-spalle': { size: 0.28, at: [0.03, 0.05, 0] },
 };
 
-// --- weapons: Meshy props (the enemies' and two of the hero's own), held as the club is (core/models.ts `arm`): m long, grip
-// (low on the long ones: less shaft below the fist to run into him), tilt
-/** `upright`: 0..1, how far a staff keeps its head up whatever the fist does (the blows twist the fist as for a sword). */
-interface Weapon { file: string; length: number; grip: number; tilt: number; upright?: number }
-const STAFF = 0.85;
+// --- weapons: Meshy props (the enemies' and two of the hero's own) in his right fist (`FIST`): m long, gripped `grip` of
+// the way up in a fight, the head out of the fist's thumb side leaned `lean` (rad) toward his fingertips
+/**
+ * `staff`: a staff, crozier, sceptre or distaff, held upright as a walking staff while he stands, walks, runs or jumps:
+ * the fist this far up the shaft, the elbow bent so the fist holds it straight up. In a blow or a spell the fist slides
+ * back down to `grip` and swings it as the clip swings the fist. `flip`: upside down in its file (its head at the bottom).
+ */
+interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean }
 export const WEAPONS: Record<string, Weapon> = {
-  'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, tilt: 1 },
-  'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, tilt: 1 },
-  'pellegrino-arma': { file: 'bastone.glb', length: 1.5, grip: 0.22, tilt: -0.95, upright: STAFF },
-  'ferrata-arma': { file: 'mazza.glb', length: 1.05, grip: 0.1, tilt: 1 },
-  'turibolo-arma': { file: 'turibolo.glb', length: 0.85, grip: 0.12, tilt: 0.9 },
-  pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.22, tilt: -0.95, upright: STAFF },
-  'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.2, tilt: 0.85 },
-  'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, tilt: -0.9, upright: STAFF },
-  'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.22, tilt: -0.9, upright: STAFF },
+  'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, lean: 0.35 },
+  'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 },
+  'pellegrino-arma': { file: 'bastone.glb', length: 1.5, grip: 0.3, lean: 0.2, staff: 0.6 },
+  'ferrata-arma': { file: 'mazza.glb', length: 1.05, grip: 0.12, lean: 0.35 },
+  'turibolo-arma': { file: 'turibolo.glb', length: 0.85, grip: 0.12, lean: 0.35 },
+  pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
+  'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true }, // by the handle, the blade the head
+  'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
+  'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
 };
+/**
+ * The fist, in RightHand's own coordinates (cm): the channel his curled claws make in front of the palm (-Z), across it,
+ * the thumb side -X. A shaft through it along X sits in the claws whatever the clip does with the wrist (his rig has no
+ * finger bones: the hand is one piece, its claws already half closed).
+ */
+const FIST = new THREE.Vector3(0, 14, -5.5);
+/**
+ * The claws closed on it, the hand's own vertices bent in the shader while he holds a weapon (`aFist`): past the knuckle
+ * line (`KNUCKLE`, RightHand's coordinates, cm) and off the thumb's side (x > `THUMB`), turned about it toward the palm,
+ * up to `CURL` rad at the tips (`TIPS` cm up the hand).
+ */
+const KNUCKLE = new THREE.Vector3(0, 9, -1), TIPS = 22, CURL = 1.0, THUMB = -5.5;
 
 /** Free what `o` owns: its geometries, materials and textures. */
 function dispose(o: THREE.Object3D): void {
@@ -150,6 +165,11 @@ class Fit {
 
   bone(name: string): number {
     return this.names.indexOf(name);
+  }
+
+  /** A point in bone `i`'s own coordinates, at rest, in the world. */
+  world(i: number, local: THREE.Vector3): THREE.Vector3 {
+    return local.clone().applyMatrix4(this.rest[i]);
   }
 
   /** A rest-pose world point in bone `i`'s own coordinates: it then moves with the bone. */
@@ -346,12 +366,23 @@ const PARTS: { from: string; to: string; skin: string[] }[] = [
   { from: 'LeftHand', to: 'LeftHand', skin: [] },
 ];
 const SKIN_Q = 0.7; // of the skin's distances from a part's axis: its radius
-const FIST = 0.045; // m round the left fist, the least a part is
+const FIST_R = 0.045; // m round the left fist, the least a part is
 const MARGIN = 0.01; // m more, for the rags and plates past the skin's bulk
 const NEAR = 0.1; // m from the grip: the fist's own business
 const ITERATIONS = 24; // turns a frame at most, deepest point first
 const STEP = 0.15; // rad a turn at most: small steps find the least turn instead of overshooting it
 const SWING = 12; // rad/s the guard's own turn may change at most
+const EASE = 0.15; // s for a staff to stand up or come down
+const PLANT = 0.08; // rad a standing staff's foot is out to his side (its head in), clear of his leg
+const LIFT = 0.6, WRIST = 0.9; // of the way a staff's head is from the sky, the wrist bends it up, and rad at most
+const HANG = 0.7; // rad below level a club's or a mace's head hangs ahead of him at ease
+const FOREARM = [0.5, 0.45]; // the forearm holding a standing staff: rad below level, and how far out to his side (of ahead)
+
+/** The turn that takes `a` to `to` exactly and `b` (not along `a`) as near as it can to `near`. */
+function toward(a: THREE.Vector3, b: THREE.Vector3, to: THREE.Vector3, near: THREE.Vector3): THREE.Quaternion {
+  const frame = (x: THREE.Vector3, y: THREE.Vector3) => { const i = x.clone().normalize(), k = new THREE.Vector3().crossVectors(i, y).normalize(); return new THREE.Matrix4().makeBasis(i, new THREE.Vector3().crossVectors(k, i), k); };
+  return new THREE.Quaternion().setFromRotationMatrix(frame(to, near).multiply(frame(a, b).transpose()));
+}
 
 /** The closest point to `p` on the segment `a`-`b`. */
 function closest(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
@@ -361,36 +392,52 @@ function closest(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, out: THRE
 }
 
 /**
- * Keeps the held weapon out of the hero's body and what he wears: every frame, after the animation, the weapon is turned
- * about the grip, deepest point first, until none of its surface is inside a part of him (capsules on his bones) or a worn piece (spheres);
- * the turn eases back to the plain hold when the way is clear. Every clip and every weapon, the sheet's figure too: the
- * blows were made for a short sword, and a long staff or a crozier would cut through him.
+ * The weapon in his fist, as the clip moves it: every frame, after the animation, while he is at ease a staff stood up
+ * as a walking staff (the elbow bent, the fist slid up the shaft) or a club's head let hang ahead, then the wrist turned, deepest point first, until none
+ * of the weapon is inside a part of him (capsules on his bones) or a worn piece (spheres); the turn eases back to the
+ * plain hold when the way is clear. The weapon never moves in the fist: the hand turns with it. Every clip and every
+ * weapon, the sheet's figure too: the blows were made for a short sword, and a long staff or a crozier would cut through him.
  */
 class Guard {
   private readonly body: Solid[] = [];
   readonly pieces = new Map<Worn, Solid[]>();
   private held?: THREE.Object3D;
-  private readonly base = new THREE.Quaternion();
-  private readonly lean = new THREE.Quaternion();
+  private prop?: THREE.Object3D;
+  private top?: THREE.Object3D;
+  /** The prop and its top in the fist at the fight's grip and at the staff's (held's own coordinates). */
+  private readonly fight = [new THREE.Vector3(), new THREE.Vector3()];
+  private readonly walk = [new THREE.Vector3(), new THREE.Vector3()];
+  private staff = false;
+  private ease = 0; // 0..1: how far the staff is stood up
   private pts: THREE.Vector3[] = [];
   private readonly turn = new THREE.Quaternion();
   private readonly best = new THREE.Quaternion();
   private readonly want = new THREE.Quaternion();
   private readonly p = new THREE.Vector3();
   private readonly c = new THREE.Vector3();
-  private upright = 0;
+  private readonly slid = new THREE.Vector3();
+  /** The wrist and elbow as the clip left them, and as this left them (a bone no clip moves keeps what was set). */
+  private readonly anim = [new THREE.Quaternion(), new THREE.Quaternion()];
+  private readonly set = [new THREE.Quaternion(), new THREE.Quaternion()];
   private readonly root: THREE.Object3D;
   private readonly fit: Fit;
+  private readonly hand: THREE.Object3D;
+  private readonly fore: THREE.Object3D;
+  private readonly shoulders: THREE.Object3D[]; // left, right: his right, whatever way he faces
+  private readonly side = new THREE.Vector3();
 
   constructor(root: THREE.Object3D, f: Fit) {
     this.root = root;
     this.fit = f;
+    this.hand = f.bones[f.bone('RightHand')];
+    this.fore = f.bones[f.bone('RightForeArm')];
+    this.shoulders = ['LeftArm', 'RightArm'].map((n) => f.bones[f.bone(n)]);
     for (const p of PARTS) {
       const i = f.bone(p.from), a = f.joint(p.from), b = f.joint(p.to), ids = new Set(p.skin.map((n) => f.bone(n))), c = new THREE.Vector3(), v = new THREE.Vector3(), d: number[] = [];
       for (let k = 0; k < f.dom.length; k++) if (ids.has(f.dom[k])) d.push(v.fromArray(f.pos, k * 3).distanceTo(closest(v, a, b, c)));
       d.sort((x, y) => x - y);
-      const r = d.length ? d[Math.floor(SKIN_Q * d.length)] : FIST;
-      this.body.push({ bone: f.bones[i], a: f.local(i, a), b: f.local(i, b), r: Math.min(0.24, Math.max(FIST, r)) + MARGIN });
+      const r = d.length ? d[Math.floor(SKIN_Q * d.length)] : FIST_R;
+      this.body.push({ bone: f.bones[i], a: f.local(i, a), b: f.local(i, b), r: Math.min(0.24, Math.max(FIST_R, r)) + MARGIN });
     }
   }
 
@@ -400,14 +447,26 @@ class Guard {
     return { bone: this.fit.bones[i], a: c, b: c, r };
   }
 
-  /** The weapon now in the fist (its `held` group, as core/models.ts `arm` put it), or none; `upright` as its Weapon says. */
-  hold(held?: THREE.Object3D, upright = 0): void {
+  /**
+   * The weapon now in the fist (its `held` group, as core/models.ts `arm` put it: the prop and its top), or none; `walk`:
+   * for a staff, where the prop and its top go when the fist slides up to the staff's grip.
+   */
+  hold(held?: THREE.Object3D, walk?: THREE.Vector3[]): void {
+    if (this.held) { this.hand.quaternion.copy(this.anim[0]); this.fore.quaternion.copy(this.anim[1]); } // the arm as the clip has it
     this.held = held;
-    this.upright = upright;
     this.turn.identity();
     this.pts = [];
+    this.ease = 0;
     if (!held) return;
-    this.base.copy(held.quaternion);
+    [this.prop, this.top] = held.children;
+    this.fight[0].copy(this.prop.position);
+    this.fight[1].copy(this.top.position);
+    this.staff = !!walk;
+    if (walk) { this.walk[0].copy(walk[0]); this.walk[1].copy(walk[1]); }
+    this.anim[0].copy(this.hand.quaternion);
+    this.anim[1].copy(this.fore.quaternion);
+    this.set[0].copy(this.anim[0]);
+    this.set[1].copy(this.anim[1]);
     held.updateMatrixWorld(true);
     const inv = held.matrixWorld.clone().invert(), v = new THREE.Vector3(), all: THREE.Vector3[] = [];
     held.traverse((o) => {
@@ -416,25 +475,53 @@ class Guard {
       const p = m.geometry.attributes.position;
       for (let i = 0; i < p.count; i++) all.push(v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv).clone());
     });
-    const step = Math.max(1, Math.floor(all.length / 96)); // its surface, ~96 points
-    for (let i = 0; i < all.length; i += step) if (all[i].length() > NEAR) this.pts.push(all[i]);
+    const step = Math.max(1, Math.floor(all.length / 96)); // its surface, ~96 points (at the fight's grip: `slid` moves them)
+    for (let i = 0; i < all.length; i += step) this.pts.push(all[i]);
   }
 
-  /** After the animation's update: the weapon turned out of him. */
-  update(dt: number): void {
-    const h = this.held;
+  /** After the animation's update: the weapon held as he is at `ease` (0..1), then turned out of him. */
+  update(dt: number, ease: number): void {
+    const h = this.held, hand = this.hand, fore = this.fore;
     if (!h?.parent) return;
-    this.root.updateMatrixWorld(true);
-    const hand = h.parent.getWorldQuaternion(new THREE.Quaternion()), unhand = hand.clone().invert(), base = this.lean.copy(this.base);
-    if (this.upright) { // a staff's head kept up: the fist's way bent toward the sky
-      const way = UP.clone().applyQuaternion(base).applyQuaternion(hand), to = way.clone().lerp(UP, this.upright).normalize();
-      base.premultiply(new THREE.Quaternion().setFromUnitVectors(way, to).premultiply(unhand).multiply(hand));
+    for (const [i, b] of [hand, fore].entries()) { // what the clip set this frame (none: as before this turned it)
+      if (!b.quaternion.equals(this.set[i])) this.anim[i].copy(b.quaternion);
+      b.quaternion.copy(this.anim[i]);
     }
+    const k = (this.ease += (ease - this.ease) * Math.min(1, dt / EASE));
+    if (this.staff) {
+      this.prop!.position.lerpVectors(this.fight[0], this.walk[0], k);
+      this.top!.position.lerpVectors(this.fight[1], this.walk[1], k);
+    }
+    this.slid.subVectors(this.prop!.position, this.fight[0]);
+    this.root.updateMatrixWorld(true);
+    const q = new THREE.Quaternion();
+    const right = this.side.setFromMatrixPosition(this.shoulders[1].matrixWorld).sub(this.p.setFromMatrixPosition(this.shoulders[0].matrixWorld)).setY(0).normalize();
+    const sky = right.clone().multiplyScalar(-Math.sin(PLANT)).setY(Math.cos(PLANT)), front = new THREE.Vector3().crossVectors(UP, right);
+    const hang = front.clone().multiplyScalar(Math.cos(HANG)).setY(-Math.sin(HANG));
+    if (k > 0) { // at ease, the forearm turned at the elbow:
+      const way = new THREE.Vector3(0, 1, 0).applyQuaternion(h.getWorldQuaternion(q)), along = hand.getWorldPosition(this.c).sub(fore.getWorldPosition(this.p)).normalize();
+      let turn: THREE.Quaternion;
+      if (this.staff) { // to hold the staff straight up, its foot out to his side, the forearm ahead and down
+        turn = toward(way, along, sky, front.multiplyScalar(Math.cos(FOREARM[0])).addScaledVector(right, FOREARM[1]).setY(-Math.sin(FOREARM[0])));
+      } else { // only rolled about itself (the thumb turned ahead) until the head hangs ahead and down, out of his legs
+        const a = way.clone().projectOnPlane(along), b = hang.clone().projectOnPlane(along);
+        turn = a.lengthSq() > 1e-6 && b.lengthSq() > 1e-6 ? q.setFromUnitVectors(a.normalize(), b.normalize()).clone() : new THREE.Quaternion();
+      }
+      const foreW = fore.getWorldQuaternion(new THREE.Quaternion());
+      fore.quaternion.multiply(new THREE.Quaternion().slerp(turn.premultiply(foreW.clone().invert()).multiply(foreW), k));
+      fore.updateMatrixWorld(true);
+    }
+    // the wrist bends the head part of the way more (all the way in a few clips would break it): a staff's up in a blow or
+    // a spell, a club's or a mace's down ahead at ease
+    const to = this.staff ? sky : hang, way = new THREE.Vector3(0, 1, 0).applyQuaternion(h.getWorldQuaternion(q));
+    const bend = Math.min(WRIST, (this.staff ? LIFT : k) * way.angleTo(to)), axis0 = way.clone().cross(to), w = hand.getWorldQuaternion(new THREE.Quaternion());
+    if (bend > 1e-3 && axis0.lengthSq() > 1e-8) { hand.quaternion.multiply(q.setFromAxisAngle(axis0.normalize(), bend).premultiply(w.clone().invert()).multiply(w)); hand.updateMatrixWorld(true); }
+    const wristQ = hand.getWorldQuaternion(new THREE.Quaternion()), unhand = wristQ.clone().invert(), anim = hand.quaternion.clone();
     const solids = [...this.body, ...[...this.pieces.values()].flat()].map((s) => ({ a: s.a.clone().applyMatrix4(s.bone.matrixWorld), b: s.b.clone().applyMatrix4(s.bone.matrixWorld), r: s.r }));
-    const grip = h.getWorldPosition(new THREE.Vector3()), deep = new THREE.Vector3(), out = new THREE.Vector3(), r = new THREE.Vector3(), axis = new THREE.Vector3(), q = new THREE.Quaternion();
-    const want = this.want.identity(), set = (t: THREE.Quaternion) => { h.quaternion.multiplyQuaternions(t, base); h.updateMatrixWorld(true); };
-    // the least turn out of him for this pose, from the plain hold, deepest point first; wedged where it can't clear both
-    // sides, the turn that left it least deep
+    const wrist = hand.getWorldPosition(new THREE.Vector3()), deep = new THREE.Vector3(), out = new THREE.Vector3(), r = new THREE.Vector3(), axis = new THREE.Vector3();
+    const want = this.want.identity(), set = (t: THREE.Quaternion) => { hand.quaternion.multiplyQuaternions(anim, t); hand.updateMatrixWorld(true); };
+    // the least turn of the wrist out of him for this pose, deepest point first; wedged where it can't clear both sides,
+    // the turn that left it least deep
     set(want);
     let least = Infinity;
     const best = this.best.identity();
@@ -442,11 +529,11 @@ class Guard {
       const pen = this.deepest(h, solids, deep, out);
       if (pen < least) { least = pen; best.copy(want); }
       if (!pen) break;
-      r.subVectors(deep, grip);
+      r.subVectors(deep, wrist);
       axis.crossVectors(r, out);
       if (axis.lengthSq() < 1e-8) axis.crossVectors(r, THREE.Object3D.DEFAULT_UP); // straight at him: any way round
       const lever = Math.max(0.03, axis.length()); // m the point moves out per radian
-      want.premultiply(q.setFromAxisAngle(axis.normalize(), Math.min(STEP, (pen + 0.005) / lever)).premultiply(unhand).multiply(hand)); // the world turn, in the hand's frame
+      want.premultiply(q.setFromAxisAngle(axis.normalize(), Math.min(STEP, (pen + 0.005) / lever)).premultiply(unhand).multiply(wristQ)); // the world turn, in the wrist's frame
       set(want);
     }
     if (this.deepest(h, solids, deep, out) > least) want.copy(best);
@@ -454,6 +541,8 @@ class Guard {
     const step = this.turn.angleTo(want), most = SWING * dt;
     this.turn.copy(step > most ? this.turn.slerp(want, most / step) : want);
     set(this.turn);
+    this.set[0].copy(hand.quaternion);
+    this.set[1].copy(fore.quaternion);
   }
 
   /** How deep the weapon's deepest point is inside a part of him (0: clear), that point and which way is out. */
@@ -461,7 +550,8 @@ class Guard {
     let pen = 0.002;
     const p = this.p, c = this.c;
     for (const pt of this.pts) {
-      p.copy(pt).applyMatrix4(h.matrixWorld);
+      if (p.addVectors(pt, this.slid).length() < NEAR) continue; // the fist's own business
+      p.applyMatrix4(h.matrixWorld);
       for (const s of solids) {
         const d = p.distanceTo(closest(p, s.a, s.b, c));
         if (s.r - d > pen) { pen = s.r - d; deep.copy(p); out.subVectors(p, c).divideScalar(d || 1); }
@@ -477,11 +567,14 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 const VERT_HEAD = /* glsl */ `
 attribute float aPad;
+attribute vec3 aFist;
 uniform float uPad;
+uniform float uFist;
 uniform vec3 uPadL;
 uniform vec3 uPadR;`;
 const VERT_BODY = /* glsl */ `#include <begin_vertex>
-transformed = mix(transformed, aPad > 0.0 ? uPadL : uPadR, abs(aPad) * uPad);`;
+transformed = mix(transformed, aPad > 0.0 ? uPadL : uPadR, abs(aPad) * uPad);
+transformed += aFist * uFist;`;
 const FRAG_HEAD = /* glsl */ `
 uniform float uGlow;`;
 // Runes, gems, glass: the glow/roughness/metal map's red channel lights its colour up (Outfit.update makes it breathe).
@@ -552,7 +645,7 @@ export class Outfit {
   private readonly paint: Paint;
   private readonly guard: Guard;
   /** Shared with the body's shader (and the pieces': uGlow). */
-  readonly uniforms = { uPad: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
+  readonly uniforms = { uPad: { value: 0 }, uFist: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
   private worn: GearState = {};
   private pieces = new Map<Worn, THREE.SkinnedMesh>();
   private weapon?: THREE.Object3D;
@@ -577,8 +670,8 @@ export class Outfit {
   }
 
   /**
-   * Per vertex: its region (returned), and how far it is pulled in under a pauldron (sign: the side, the `aPad`
-   * attribute), from the skin weights and the rest pose.
+   * Per vertex: its region (returned), how far it is pulled in under a pauldron (sign: the side, the `aPad`
+   * attribute), and where it goes when the right fist closes on a weapon (`aFist`), from the skin weights and the rest pose.
    */
   private mark(): Float32Array {
     const f = this.fit, g = this.body.geometry, n = f.dom.length, sw = g.attributes.skinWeight, si = g.attributes.skinIndex;
@@ -603,6 +696,18 @@ export class Outfit {
     }
     g.setAttribute('aPad', new THREE.BufferAttribute(pad, 1));
     const into = (b: number) => f.skin[b].clone().invert(); // the world into the body's own coordinates
+    const fist = new Float32Array(n * 3), H = f.bone('RightHand'), toBody = new THREE.Matrix3().setFromMatrix4(into(H)), x = new THREE.Vector3(1, 0, 0);
+    for (let i = 0; i < n; i++) {
+      let w = 0;
+      for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === H) w += sw.getComponent(i, k);
+      if (!w) continue;
+      p.fromArray(f.pos, i * 3);
+      const l = f.local(H, p);
+      if (l.x < THUMB || l.y < KNUCKLE.y) continue;
+      const turn = -CURL * w * THREE.MathUtils.smoothstep(l.y, KNUCKLE.y, TIPS), bent = l.sub(KNUCKLE).applyAxisAngle(x, turn).add(KNUCKLE);
+      f.world(H, bent).sub(p).applyMatrix3(toBody).toArray(fist, i * 3);
+    }
+    g.setAttribute('aFist', new THREE.BufferAttribute(fist, 3));
     this.uniforms.uPadL.value.copy(joints[0]).applyMatrix4(into(L));
     this.uniforms.uPadR.value.copy(joints[1]).applyMatrix4(into(R));
     return region;
@@ -692,7 +797,7 @@ export class Outfit {
   }
 
   private arm(id?: string): void {
-    if (this.weapon) { dispose(this.weapon); this.weapon = undefined; this.guard.hold(); this.onWeapon(); }
+    if (this.weapon) { dispose(this.weapon); this.weapon = undefined; this.guard.hold(); this.onWeapon(); this.uniforms.uFist.value = 0; }
     const w = id ? WEAPONS[id] : undefined;
     if (!w) return;
     loadModel(w.file).then((gltf) => {
@@ -703,18 +808,27 @@ export class Outfit {
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (m?.isMeshStandardMaterial) dress(m, this.uniforms.uGlow, !!m.metalnessMap); // his own PBR props painted like his pieces
       });
-      const top = arm(this.root, prop, w.length, w.grip, w.tilt), f = this.fit, wrist = f.joint('RightHand');
-      // in the palm past the wrist as at rest, whatever pose he was in when he took it up
-      top.parent!.position.copy(f.local(f.bone('RightHand'), wrist.clone().addScaledVector(wrist.clone().sub(f.joint('RightForeArm')).normalize(), 0.08 * w.length)));
-      this.weapon = top.parent!;
-      this.guard.hold(this.weapon, w.upright);
+      if (w.flip) prop.rotation.z = Math.PI;
+      const walk = w.staff === undefined ? undefined : [shaft(prop, w.staff), shaft(prop, w.grip)], top = arm(this.root, prop, w.length, w.grip), held = top.parent!;
+      // in the fist: the shaft across the palm, its head out of the thumb side leaned toward the fingertips
+      const way = new THREE.Vector3(-Math.cos(w.lean), Math.sin(w.lean), 0), out = new THREE.Vector3(0, 0, -1);
+      held.position.copy(FIST);
+      held.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(way.clone().cross(out), way, out));
+      if (walk) { // the fist slid up to the staff's grip: the prop down by as much, on the shaft there
+        const k = prop.scale.x, d = walk[1].sub(walk[0]).multiplyScalar(k);
+        walk[0] = prop.position.clone().add(d);
+        walk[1] = top.position.clone().setY(top.position.y + d.y);
+      }
+      this.weapon = held;
+      this.uniforms.uFist.value = 1;
+      this.guard.hold(held, walk);
       this.onWeapon(top);
     }, (e) => console.error('weapon failed to load', e));
   }
 
-  /** After the animation's update: the weapon kept out of him. */
-  clear(dt: number): void {
-    this.guard.update(dt);
+  /** After the animation's update: a staff stood up while he is at `ease` (0..1: no blow or spell under way), the weapon kept out of him. */
+  clear(dt: number, ease = 0): void {
+    this.guard.update(dt, ease);
   }
 
   /** The glowing glass, gems and runes breathe. */

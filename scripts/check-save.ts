@@ -285,11 +285,16 @@ ht.levels.learned = ['pyre', 'cero'];
 const htb = boot();
 deserialize(htb, JSON.parse(JSON.stringify(serialize(ht))));
 if (htb.hero !== 'tizian' || htb.levels.learned.join() !== 'pyre,cero') fail(`Fra' Tizian after load: ${htb.hero} ${htb.levels.learned}`);
+const hz = boot('zanetto'); // Zanetto keeps his Catena di saette and Rintocco del campanile
+hz.levels.learned = ['chain', 'toll'];
+const hzb = boot();
+deserialize(hzb, JSON.parse(JSON.stringify(serialize(hz))));
+if (hzb.hero !== 'zanetto' || hzb.levels.learned.join() !== 'chain,toll') fail(`Zanetto after load: ${hzb.hero} ${hzb.levels.learned}`);
 const hgOld = boot('bortolo');
 deserialize(hgOld, (({ hero: _h, ...o }) => o)(hgs));
 if (hgOld.hero !== 'risorto' || !tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague')) fail('a save from before the choice is not the Risorto with his plague');
 const hgOdd = boot();
-deserialize(hgOdd, { ...hgs, hero: 'zanetto' });
+deserialize(hgOdd, { ...hgs, hero: 'anzola' });
 if (hgOdd.hero !== 'risorto' || hgOdd.levels.learned.includes('plague') || valid({ ...hgs, hero: 3 }) || !valid((({ hero: _h, ...o }) => o)(hgs))) fail('hero field validation');
 // Le teste dei frati: asked, the heads in hand and the boon round-trip; a save from before it loads with it not taken; junk is refused.
 const hq = boot();

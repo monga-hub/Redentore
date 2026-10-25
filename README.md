@@ -139,7 +139,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca, Tizzone per Fra' Tizian), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4), Fra' Tizian con Rogo dell'eretico (2), Cero funebre (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
+| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca, Tizzone per Fra' Tizian, Folgore per Zanetto), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4), Fra' Tizian con Rogo dell'eretico (2), Cero funebre (3) e Preghiera di suffragio (4), Zanetto con Catena di saette (2), Rintocco del campanile (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
 | R | la fiala di linfa tombale (la pozione), su un tasto suo fuori dagli otto |
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
@@ -163,8 +163,10 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 Una partita nuova si apre sulla scelta dell'eroe (`src/ui/select.ts`, `src/player/heroes.ts`), alla Diablo Immortal:
 il Risorto (Ossa, secondaria Ombra), il morto senza nome della Giudecca, e Bortolo (Gelo, secondaria Fulmine), il gondoliere
 annegato l'inverno in cui gelò la laguna, col remo gelato, Suor Fosca (Peste, secondaria Sacro), la monaca del Lazzaretto
-Vecchio che curò gli appestati fino a diventarne il contagio, con lo stiletto d'osso, e Fra' Tizian (Fuoco, secondaria Sacro),
-il frate soffiatore delle fornaci di Murano bruciato vivo al forno, con la canna da vetraio e la sua goccia di vetro fuso. A sinistra la colonna degli eroi (tutti quelli di
+Vecchio che curò gli appestati fino a diventarne il contagio, con lo stiletto d'osso, Fra' Tizian (Fuoco, secondaria Sacro),
+il frate soffiatore delle fornaci di Murano bruciato vivo al forno, con la canna da vetraio e la sua goccia di vetro fuso, e Zanetto
+(Fulmine, secondaria Ossa), il campanaro del Redentore colto dal fulmine mentre suonava a morto, col martello da campana e le due
+campane sul giogo dietro le spalle. A sinistra la colonna degli eroi (tutti quelli di
 `HEROES`, in ordine): ritratto in un rombo dorato, sotto il livello del suo salvataggio migliore (1 se non ne ha), accanto il nome;
 quello scelto è illuminato e mostra titolo, scuola primaria e secondaria. Al centro l'eroe stesso (`src/ui/selectStage.ts`), il
 suo corpo vero vestito come nel salvataggio, che respira su un'isola-cimitero in laguna di notte (muro di mattoni e cipressi
@@ -173,17 +175,18 @@ trascinandolo si gira. In basso a destra "Entra nel mondo" (o Invio) parte con l
 renderer suo e un modello per volta, e tutto torna libero (GPU compresa) prima che nasca quello del gioco. La scuola va col personaggio: il Risorto parte con le Ossa,
 Bortolo col Gelo (Stiletto di ghiaccio sul tasto grande, Dardo di brina e Caligo gelato), Suor Fosca con la Peste (Spina di peste
 sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone sul tasto grande, Rogo dell'eretico e Cero
-funebre); i tomi poi sono gli stessi per tutti, le carte dei
+funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); i tomi poi sono gli stessi per tutti, le carte dei
 livelli pendono verso le scuole dell'eroe (vedi Abilità).
 La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e il
-gioco carica solo il corpo dell'eroe scelto. Bortolo, Suor Fosca e Fra' Tizian sono corpi Meshy sullo stesso scheletro del Risorto, con
+gioco carica solo il corpo dell'eroe scelto. Bortolo, Suor Fosca, Fra' Tizian e Zanetto sono corpi Meshy sullo stesso scheletro del Risorto, con
 le sue 27 clip riapplicate osso per osso; dei set portano solo elmi, cappelli e spallacci (misurati su ciascuno: a Bortolo la
-paglietta, a lei il velo, a Fra' Tizian il cappuccio si ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua), non le
-ridipinture del corpo, e le armi le stringono col proprio pugno.
+paglietta, a lei il velo, a Fra' Tizian e a Zanetto il cappuccio si ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua), non le
+ridipinture del corpo, e le armi le stringono col proprio pugno. Le campane di Zanetto stanno su un giogo fissato al petto,
+appese sotto gli spallacci perché nessun set le tocchi.
 
 ## Abilità
 
-Si parte con l'attacco base della propria scuola, Preghiera di suffragio (la cura) e la fiala, Bortolo anche con Dardo di brina e Caligo gelato, Suor Fosca con Nube di peste e Sputo di bile, Fra' Tizian con Rogo dell'eretico e Cero funebre.
+Si parte con l'attacco base della propria scuola, Preghiera di suffragio (la cura) e la fiala, Bortolo anche con Dardo di brina e Caligo gelato, Suor Fosca con Nube di peste e Sputo di bile, Fra' Tizian con Rogo dell'eretico e Cero funebre, Zanetto con Catena di saette e Rintocco del campanile.
 Ogni scuola ha il suo **attacco base** (`BASE_ATTACK`), da tenere premuto: istantaneo, fuori dal recupero globale, uno ogni 0,3 s, gratis,
 e un colpo ogni tre è il terzo della combo. Ossa: Caduta d'ossa (la clava, combo a tre colpi); Gelo: Stiletto di ghiaccio (triplo su chi è
 congelato, rallenta del 25% per 2 s, schegge per un terzo entro 2 m); Peste: Spina di peste; Ombra: Strale d'ombra; Fuoco: Tizzone (braci per un terzo entro 2 m); Fulmine: Folgore; Sacro: Castigo (gli ultimi cinque, strali da 8
@@ -202,7 +205,7 @@ abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del p
 **Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), insegna subito
 tutte le abilità della scuola che non si conoscono ancora, che vanno nel Libro delle abilità pronte da equipaggiare. Costa 200 oro per
 abilità e 350 per una speciale, solo per quelle che insegna davvero (Ossa completo 1300, Ombra 1150, Peste, Fuoco, Gelo e Fulmine 1000,
-Sacro 800: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 600, Dardo di brina e Caligo gelato li ha già; a Suor Fosca la Peste 600; a Fra' Tizian il Fuoco 600; gli attacchi base non stanno nei tomi); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
+Sacro 800: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 600, Dardo di brina e Caligo gelato li ha già; a Suor Fosca la Peste 600; a Fra' Tizian il Fuoco 600; a Zanetto il Fulmine 600; gli attacchi base non stanno nei tomi); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
 non escono più come carte, i loro potenziamenti sì. Nel salvataggio (`build.learned`; i vecchi si caricano senza).
 
 **Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come
@@ -227,7 +230,7 @@ Cinque abilità per scuola (l'attacco base a parte), sul modello di WoW e Diablo
 | ombra | Passo d'ombra · Velo spettrale · Carica del dannato (a testa bassa sul nemico, stordisce, riempie la furia) · Risucchio d'anima (Drain Life: canalizzato 3 s, 16 danni ogni mezzo secondo e il 2% della salute a te) · Patto della tomba (speciale) |
 | fuoco (mago) | Fuoco fatuo · Rogo dell'eretico (lancio 1,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) · Colonna di fiamme (Flamestrike: lancio 0,8 s, 70 danni entro 3,5 m sotto il bersaglio, brucia e lascia il pavimento in fiamme) · Cero funebre (Living Bomb: 12 al secondo per 4 s, poi scoppia per 60 entro 4 m) · Fornace di Murano (Dragon's Breath: cono di 8 m, 50 danni, brucia e stordisce 2 s) |
 | gelo (mago) | Dardo di brina (lancio 1 s, rallenta il bersaglio e chi gli sta entro 3 m) · Acquasantiera gelata (congela sul posto chi è vicino) · Caligo gelato (Cone of Cold: la nebbia gelata della laguna in un cono di 8 m, 45 danni, rallenta del 60% per 5 s; recupero 6 s) · Bufera di bora (Blizzard: canalizzato 4 s sul bersaglio, 18 danni ogni mezzo secondo entro 4 m, rallenta) · Globo di brina (Frozen Orb: rotola 15 m, 15 danni ogni mezzo secondo a chi sfiora, poi scoppia) |
-| fulmine (sciamano) | Catena di saette (rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) · Scudo di saette (Lightning Shield: 4 saette per 20 s, 45 danni a chi ti arriva entro 3 m) · Parafulmine (un totem: per 12 s fulmina ogni secondo il più vicino entro 9 m, 22 danni) · Burrasca (Thunderstorm: 60 danni entro 6 m e i nemici sbalzati via di 5 m, i boss un terzo) |
+| fulmine (sciamano) | Catena di saette (lancio 1 s, rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) · Scudo di saette (Lightning Shield: 4 saette per 20 s, 45 danni a chi ti arriva entro 3 m) · Parafulmine (un totem: per 12 s fulmina ogni secondo il più vicino entro 9 m, 22 danni) · Burrasca (Thunderstorm: 60 danni entro 6 m e i nemici sbalzati via di 5 m, i boss un terzo) |
 | sacro (paladino) | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, nessun recupero: la limita solo il mana) · Giudizio del Redentore (Judgment: martello di luce, 70 danni, recupero 6 s) · Terra consacrata (Consecration: 14 al secondo per 8 s entro 4 m, e a te l'1% della salute al secondo se ci stai sopra) · Martello della penitenza (Hammer of Justice: 30 danni e stordito 4 s, un terzo sui boss, recupero 30 s) · Aureola del redento (Divine Shield: fuori dal recupero globale, 5 s di immunità, recupero 2 minuti) |
 
 Ogni abilità nuova ha un potenziamento (Doppio sputo, Fossa comune, Processione, Bora scura, Corona di saette, Parafulmine di San

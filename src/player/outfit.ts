@@ -84,6 +84,8 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
  * back down to `grip` and swings it as the clip swings the fist. `flip`: upside down in its file (its head at the bottom).
  */
 interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean; venom?: boolean; ember?: boolean }
+/** Zanetto's bells on their yoke, built from primitives (BODIES `yoke`). */
+const YOKE = 'giogo.glb';
 export const WEAPONS: Record<string, Weapon> = {
   'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, lean: 0.35 },
   'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 },
@@ -95,6 +97,7 @@ export const WEAPONS: Record<string, Weapon> = {
   'remo-gelato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true, ice: true }, // Bortolo's, iced over
   'stiletto-osso': { file: 'stiletto.glb', length: 0.5, grip: 0.22, lean: 0.35, venom: true }, // Suor Fosca's, by its corded grip
   'canna-vetraio': { file: 'canna.glb', length: 1.4, grip: 0.3, lean: 0.2, staff: 0.65, ember: true }, // Fra' Tizian's, by its wooden sleeve
+  'martello-campana': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 }, // Zanetto's, the bell-ringer's mallet
   'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
   'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
 };
@@ -118,7 +121,9 @@ interface Hand { fist: THREE.Vector3; knuckle: THREE.Vector3; tips: number; curl
  */
 /** The crown a hat or veil folds onto, in the head's frame (m from its joint, +Z ahead): an ellipsoid round `c`, `r` m, falling `nape` m behind under its middle. */
 interface Skull { c: V3; r: V3; nape: number }
-interface Body { hand: Hand; pieces: Partial<Record<`${Look}-${Worn}`, Piece>>; paint: boolean; crown?: V3; skull?: Skull; beaked?: Look[] }
+/** A rigid piece of his own body's, always worn (Zanetto's bells on their yoke, `YOKE`): rigid on `bone`, its middle `at` m from the joint, `size` m across. */
+interface Yoke extends Piece { bone: string }
+interface Body { hand: Hand; pieces: Partial<Record<`${Look}-${Worn}`, Piece>>; paint: boolean; crown?: V3; skull?: Skull; beaked?: Look[]; yoke?: Yoke }
 /**
  * The helms on Bortolo, fitted on his bald crown (his boater folded into it, `fold`): measured on him, the crowns resting on
  * his head, the closed ones (Meshy's pieces are solid) sunk until their brims sit on his brow, the beaked mask over his face.
@@ -155,6 +160,17 @@ const HOODED: Body['pieces'] = {
   'merletto-testa': { size: 0.46, at: [-0.009, -0.069, -0.022] },
   'broccato-testa': { size: 0.3, at: [-0.009, -0.051, -0.042] },
 };
+/** The helms on Zanetto, over his hood folded onto his skull (`skull`): measured on him, as on Bortolo. */
+const BELLRINGER: Body['pieces'] = {
+  'becchino-testa': { size: 0.5, at: [-0.006, -0.159, -0.022] },
+  'chierico-testa': { size: 0.56, at: [-0.006, 0.026, -0.042] },
+  'arsenale-testa': { size: 0.42, at: [-0.006, -0.028, -0.042] },
+  'murano-testa': { size: 0.27, at: [-0.006, -0.014, -0.042] },
+  'voto-testa': { size: 0.36, at: [-0.006, -0.1, -0.07] },
+  'gondola-testa': { size: 0.46, at: [-0.006, -0.1, -0.042] },
+  'merletto-testa': { size: 0.46, at: [-0.006, -0.025, -0.042] },
+  'broccato-testa': { size: 0.3, at: [-0.006, -0.063, -0.042] },
+};
 const DOME = 0.08, NAPE = 0.13; // m his bald crown rises over the band where his hat sat, and the back of his head falls under it
 const BODIES: Record<Hero, Body> = {
   risorto: { hand: { fist: FIST, knuckle: new THREE.Vector3(0, 9, -1), tips: 22, curl: 1.0, thumb: -5.5 }, pieces: PIECES, paint: true },
@@ -174,6 +190,14 @@ const BODIES: Record<Hero, Body> = {
   tizian: {
     hand: { fist: new THREE.Vector3(0, 12, -2.5), knuckle: new THREE.Vector3(0, 11, -1), tips: 23, curl: 1.9, thumb: -5.5 }, pieces: { ...PIECES, ...HOODED }, paint: false, crown: [0.06, 0.035, 0.02],
     skull: { c: [0, 0.08, 0.005], r: [0.078, 0.1, 0.085], nape: 0.06 },
+  },
+  // a short gloved hand, the fingers half closed already: the shaft off the palm's front, the fingers turned about it; his
+  // hood folds onto his skull under a helm; his bells ride on his chest bone (the shoulders' own, so they swing together),
+  // slung under the pauldrons' reach
+  zanetto: {
+    hand: { fist: new THREE.Vector3(0, 13, -6.5), knuckle: new THREE.Vector3(0, 11, -4), tips: 21, curl: 2.4, thumb: -5.5 }, pieces: { ...PIECES, ...BELLRINGER }, paint: false, crown: [0.06, 0.035, 0.02],
+    skull: { c: [0, 0.08, 0.04], r: [0.078, 0.1, 0.085], nape: 0.06 },
+    yoke: { bone: 'Spine', at: [0, -0.1, -0.21], size: 0.46 },
   },
 };
 
@@ -478,7 +502,7 @@ function closest(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, out: THRE
  */
 class Guard {
   private readonly body: Solid[] = [];
-  readonly pieces = new Map<Worn, Solid[]>();
+  readonly pieces = new Map<Worn | 'giogo', Solid[]>();
   private held?: THREE.Object3D;
   private prop?: THREE.Object3D;
   private top?: THREE.Object3D;
@@ -755,6 +779,8 @@ export class Outfit {
     if (this.own.paint) this.paint = new Paint(body, region);
     else m.metalness = METAL; // his own maps, made like the painted ones
     this.guard = new Guard(root, this.fit);
+    const yoke = this.own.yoke;
+    if (yoke) loadModel(YOKE).then((gltf) => this.bake('giogo', yoke, gltf.scene), (e) => console.error('yoke failed to load', e));
     m.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, this.uniforms);
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>${VERT_HEAD}`).replace('#include <begin_vertex>', VERT_BODY)
@@ -898,7 +924,7 @@ export class Outfit {
   }
 
   /** A piece's meshes into the body's skinned space, rigid on its bone (both shoulders for pauldrons): one skinned mesh on the body's skeleton. */
-  private bake(slot: Worn, p: Piece, scene: THREE.Group): THREE.SkinnedMesh {
+  private bake(slot: Worn | 'giogo', p: Piece, scene: THREE.Group): THREE.SkinnedMesh {
     scene.updateMatrixWorld(true);
     const parts: THREE.BufferGeometry[] = [];
     let material: THREE.MeshStandardMaterial | undefined;
@@ -915,7 +941,8 @@ export class Outfit {
     g.computeBoundingBox();
     const b = g.boundingBox!, size = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), k = p.size / Math.max(size.x, size.y, size.z);
     g.translate(-c.x, -(slot === 'testa' ? b.min.y : c.y), -c.z).scale(k, k, k).translate(...p.at);
-    const s = this.socket[slot], f = this.fit, flip = new THREE.Matrix4().makeScale(-1, 1, 1), sides: [string, boolean][] = slot === 'testa' ? [['Head', false]] : [['LeftShoulder', false], ['RightShoulder', true]];
+    const s = slot === 'giogo' ? new THREE.Vector3() : this.socket[slot], f = this.fit, flip = new THREE.Matrix4().makeScale(-1, 1, 1);
+    const sides: [string, boolean][] = slot === 'giogo' ? [[(p as Yoke).bone, false]] : slot === 'testa' ? [['Head', false]] : [['LeftShoulder', false], ['RightShoulder', true]];
     g.computeBoundingSphere();
     const bulk = g.boundingSphere!;
     this.guard.pieces.set(slot, sides.map(([bone, mirror]) => { // its bulk, for the weapon to keep out of

@@ -16,7 +16,7 @@
 //   npm run soak                       ~2 minutes of fight
 //   SOAK_SECONDS=600 npm run soak      a longer one
 //   SOAK_LEVEL=2 npm run soak           the Governatrice under the Zitelle's dome instead (level 2's bodies, lace and fuso)
-//   SOAK_HERO=bortolo npm run soak      Bortolo (or fosca, Suor Fosca; tizian, Fra' Tizian) picked on the new game's screen instead of the Risorto (player/heroes.ts)
+//   SOAK_HERO=bortolo npm run soak      Bortolo (or fosca, Suor Fosca; tizian, Fra' Tizian; zanetto, Zanetto) picked on the new game's screen instead of the Risorto (player/heroes.ts)
 //   CHROME=/path/to/chrome npm run soak
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';

@@ -111,7 +111,7 @@ const BASE: Tune = {
   fontDmg: 25, fontRoot: 4, fontCd: 20,
   prim: prims(),
   caligoDmg: 45, caligoRange: 8, caligoFreeze: false,
-  chainDmg: 80, chainHops: 4, chainCast: 1.5,
+  chainDmg: 80, chainHops: 4, chainCast: 1, // under the 1.5 s line too: Fulmine is a caster school
   tollDmg: 90, tollStun: 2.5, tollR: 3.2,
   leapDmg: 60, leapR: 3, leapCd: 12,
   whirlDmg: 22, whirlTime: 3,
@@ -254,7 +254,7 @@ export const CARDS: Card[] = [
   ...baseMods('spark', 'Folgore', ['Folgore viva', 'Folgore biforcuta', 'Folgore del campanaro', 'Folgore avida']),
   ...baseMods('smite', 'Castigo', ['Castigo severo', 'Castigo diffuso', 'Castigo trino', 'Castigo grato']),
   mod('chain', 'chain_long', 'Catena lunga', `Catena di saette: rimbalza su 7 nemici invece di ${BASE.chainHops}.`, 1, (t) => { t.chainHops = 7; }),
-  mod('chain', 'chain_fast', 'Saette rapide', `Catena di saette: lancio da ${it(BASE.chainCast)} a 0,75 s.`, 1, (t) => { t.chainCast = 0.75; }),
+  mod('chain', 'chain_fast', 'Saette rapide', `Catena di saette: lancio da ${it(BASE.chainCast)} a 0,5 s.`, 1, (t) => { t.chainCast = 0.5; }),
   mod('toll', 'toll_long', 'Rintocco funebre', `Rintocco del campanile: storditi 3,5 s invece di ${it(BASE.tollStun)}.`, 1, (t) => { t.tollStun = 3.5; }),
   mod('toll', 'toll_big', 'Campane a morto', `Rintocco del campanile: +35 danni (base ${BASE.tollDmg}), raggio da ${it(BASE.tollR)} a 4,5 m.`, 1, (t) => { t.tollDmg += 35; t.tollR = 4.5; }),
   mod('leap', 'leap_big', 'Balzo devastante', `Balzo del sepolcro: +35 danni (base ${BASE.leapDmg}), raggio da ${BASE.leapR} a 4 m.`, 1, (t) => { t.leapDmg += 35; t.leapR = 4; }),

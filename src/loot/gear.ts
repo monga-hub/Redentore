@@ -59,6 +59,7 @@ const DEFS: [string, string, Slot, Rarity, string, string?][] = [
   ['remo-gelato', 'Remo gelato', 'arma', 'comune', 'potenza', 'Non si è più scongelato, e nemmeno chi lo voga.'], // Bortolo's (player/heroes.ts)
   ['stiletto-osso', 'Stiletto d’osso', 'arma', 'comune', 'potenza', 'Limato da un femore del lazzaretto: punge ancora di febbre.'], // Suor Fosca's (player/heroes.ts)
   ['canna-vetraio', 'Canna da vetraio', 'arma', 'comune', 'potenza', 'La goccia di vetro in cima non si è più raffreddata.'], // Fra' Tizian's (player/heroes.ts)
+  ['martello-campana', 'Martello da campana', 'arma', 'comune', 'potenza', 'Batteva le ore dei morti. Ora a ogni colpo risponde il tuono.'], // Zanetto's (player/heroes.ts)
 
   ['becchino-testa', 'Cappuccio del becchino', 'testa', 'noncomune', 'vigore potenza'],
   ['penitente-testa', 'Zucchetto del penitente', 'testa', 'noncomune', 'intelletto spirito'],
@@ -165,7 +166,7 @@ export const shop = (level2: boolean) => SHOP.filter((g) => level2 || !g.l2);
 /** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
 export const SHOP2 = SHOP.filter((g) => g.l2);
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club (not the other heroes' own weapons). */
-export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune' && !['remo-gelato', 'stiletto-osso', 'canna-vetraio'].includes(g.id)).map((g) => [g.slot, g.id]));
+export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune' && !['remo-gelato', 'stiletto-osso', 'canna-vetraio', 'martello-campana'].includes(g.id)).map((g) => [g.slot, g.id]));
 /** A new game's set: the hemp and the hero's own weapon (player/heroes.ts). */
 export const starter = (weapon: string): GearState => ({ ...STARTER, arma: weapon });
 

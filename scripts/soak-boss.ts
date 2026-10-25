@@ -1,5 +1,6 @@
 // Boss soak (`npm run soak`; not in `npm run check`: it needs Chrome and plays for minutes). The real
-// game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), fights the
+// game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), picks its hero on the new game's
+// screen (whose stage must give back all it held on the GPU on entering), fights the
 // Reverendissimo with every ability on the bar, the church's sacerdoti and priests alive, through all
 // three acts and the berserk, then down the quality ladder one rung at a time mid-fight (the ultra-light ones too) and back to the
 // top, then the kill. On the top rung (before the ladder and after it) the hero changes clothes twice a second (whole sets,
@@ -215,13 +216,22 @@ try {
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `(${track})()` });
   await send('Page.navigate', { url });
   const t0 = Date.now();
+  // The new game's screen: the hero picked, his body on its stage, then in: everything the stage held on the GPU given back
+  // before the game's own renderer is made (ui/selectStage.ts).
+  while (!(await evaluate(`!!document.querySelector('#select .stage') && (document.querySelector('#select .hero[data-id=${HERO}]').click(), true)`).catch(() => false))) {
+    if (Date.now() - t0 > 60e3) throw new Error('the hero select never showed its stage');
+    await sleep(500);
+  }
+  await sleep(4000); // his body and the props loaded and drawn
+  const stage: { held: number; left: number; at: number } = await evaluate(`(() => { const held = SOAK.gpuMB(), at = performance.now(); document.querySelector('#select .go').click(); return { held, left: SOAK.gpuMB(), at }; })()`);
+  if (stage.left > 0.01) fail(`the select's stage kept ${stage.left.toFixed(2)} of its ${stage.held.toFixed(1)} MB on the GPU`);
+  console.log(`select stage: ${stage.held.toFixed(1)} MB on the GPU, ${stage.left.toFixed(2)} MB left on entering`);
   while (!(await evaluate('!!(window.priests?.root.children.length && window.friars?.root.children.length && window.bees?.root.children.length && window.player?.model.root.children.length)').catch(() => false))) {
     if (Date.now() - t0 > 180e3) throw new Error('the game never finished loading');
-    await evaluate(`document.querySelector('#select .card[data-id=${HERO}]')?.click(), document.querySelector('#select button')?.click()`).catch(() => {}); // a new game: the hero's screen
     await sleep(500);
   }
   const files = HERO_IDS.map((h) => HEROES[h].file), mine = HEROES[HERO as keyof typeof HEROES].file;
-  const bodies: string[] = await evaluate(`performance.getEntriesByType('resource').map((e) => e.name.split('/').pop()).filter((n) => ${JSON.stringify(files)}.includes(n))`);
+  const bodies: string[] = await evaluate(`performance.getEntriesByType('resource').filter((e) => e.startTime >= ${stage.at}).map((e) => e.name.split('/').pop()).filter((n) => ${JSON.stringify(files)}.includes(n))`); // the game's, past the select's stage
   if (bodies.join() !== mine) fail(`bodies loaded for ${HERO}: ${bodies.join(', ') || 'none'}`);
   if (!(await evaluate("matchMedia('(pointer: coarse)').matches"))) fail('the emulated phone is not taken for a phone');
   for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro

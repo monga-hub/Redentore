@@ -160,18 +160,23 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
 ## Eroi
 
-Una partita nuova si apre sulla scelta dell'eroe (`src/ui/select.ts`, `src/player/heroes.ts`), dorata come le altre finestre:
+Una partita nuova si apre sulla scelta dell'eroe (`src/ui/select.ts`, `src/player/heroes.ts`), alla Diablo Immortal:
 il Risorto (Ossa, secondaria Ombra), il morto senza nome della Giudecca, e Bortolo (Gelo, secondaria Fulmine), il gondoliere
 annegato l'inverno in cui gelò la laguna, col remo gelato, Suor Fosca (Peste, secondaria Sacro), la monaca del Lazzaretto
 Vecchio che curò gli appestati fino a diventarne il contagio, con lo stiletto d'osso, e Fra' Tizian (Fuoco, secondaria Sacro),
-il frate soffiatore delle fornaci di Murano bruciato vivo al forno, con la canna da vetraio e la sua goccia di vetro fuso. Ogni carta ha il concept dipinto, nome, titolo, le icone delle due
-scuole e una riga di chi era; ←/→ e Invio anche da tastiera. La scuola va col personaggio: il Risorto parte con le Ossa,
+il frate soffiatore delle fornaci di Murano bruciato vivo al forno, con la canna da vetraio e la sua goccia di vetro fuso. A sinistra la colonna degli eroi (tutti quelli di
+`HEROES`, in ordine): ritratto in un rombo dorato, sotto il livello del suo salvataggio migliore (1 se non ne ha), accanto il nome;
+quello scelto è illuminato e mostra titolo, scuola primaria e secondaria. Al centro l'eroe stesso (`src/ui/selectStage.ts`), il
+suo corpo vero vestito come nel salvataggio, che respira su un'isola-cimitero in laguna di notte (muro di mattoni e cipressi
+come a San Michele, lapidi, colonna caduta e braciere da `gotico.glb`, luna, nebbia, la città controluce oltre l'acqua);
+trascinandolo si gira. In basso a destra "Entra nel mondo" (o Invio) parte con lui; ←/→ ↑/↓ cambiano eroe. La scena ha un
+renderer suo e un modello per volta, e tutto torna libero (GPU compresa) prima che nasca quello del gioco. La scuola va col personaggio: il Risorto parte con le Ossa,
 Bortolo col Gelo (Stiletto di ghiaccio sul tasto grande, Dardo di brina e Caligo gelato), Suor Fosca con la Peste (Spina di peste
 sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone sul tasto grande, Rogo dell'eretico e Cero
 funebre); i tomi poi sono gli stessi per tutti, le carte dei
 livelli pendono verso le scuole dell'eroe (vedi Abilità).
-La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e si
-carica solo il corpo dell'eroe scelto. Bortolo, Suor Fosca e Fra' Tizian sono corpi Meshy sullo stesso scheletro del Risorto, con
+La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e il
+gioco carica solo il corpo dell'eroe scelto. Bortolo, Suor Fosca e Fra' Tizian sono corpi Meshy sullo stesso scheletro del Risorto, con
 le sue 27 clip riapplicate osso per osso; dei set portano solo elmi, cappelli e spallacci (misurati su ciascuno: a Bortolo la
 paglietta, a lei il velo, a Fra' Tizian il cappuccio si ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua), non le
 ridipinture del corpo, e le armi le stringono col proprio pugno.

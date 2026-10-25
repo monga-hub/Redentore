@@ -1,110 +1,140 @@
-import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
-import { TOMES, type School } from '../player/levels.ts';
+import { HEROES, HERO_IDS, heroOf, type Hero } from '../player/heroes.ts';
+import { levelOf, type School } from '../player/levels.ts';
+import { resume, slots } from '../core/save.ts';
+import { Equipment, starter, type GearState } from '../loot/gear.ts';
 import { SCHOOL_NAME } from './book.ts';
-import { ICONS } from './icons.ts';
-import risorto from './art/risorto.webp';
-import bortolo from './art/bortolo.webp';
-import fosca from './art/fosca.webp';
-import tizian from './art/tizian.webp';
+import { SelectStage } from './selectStage.ts';
 
-// "Scegli il tuo Risorto": a new game opens on the heroes side by side (player/heroes.ts), each his painted concept, name,
-// title, his school and the one he leans to, a line of who he was. Click or tap one (←/→ too), then Risorgi (Enter); the
-// boot waits for it (main.ts) and loads only the body chosen. Gilded like the other windows, full screen over the
-// unbuilt world.
+// "Scegli il tuo Risorto", Diablo Immortal style: down the left the heroes (player/heroes.ts, every one of them, in order),
+// each his portrait in a gilt diamond, his level under it and his name beside it; the chosen one lit, with his title and
+// his two schools. In the middle the chosen hero himself on a cemetery island by night (ui/selectStage.ts), in what his
+// save has him wear; a drag turns him. "Entra nel mondo" (Enter) starts the new game with him; the boot waits for it
+// (main.ts), and the stage is freed before the game's renderer is made. Tap a portrait (or ←/→, ↑/↓) to change hero.
 
-const ART: Record<Hero, string> = { risorto, bortolo, fosca, tizian };
 const COLOR: Partial<Record<School, string>> = { bone: '#d9c8ff', shadow: '#b27cff', frost: '#8fdcff', storm: '#bcd2ff', plague: '#a8e05a', holy: '#ffe9a0', fire: '#ff9a4a' };
 
 const CSS = `
-#select { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
-  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto;
-  background: radial-gradient(ellipse at 50% 40%, #17202c, #07090d 70%); color: #f3e2b0; font: 15px/1.4 Georgia, serif; user-select: none; touch-action: manipulation; }
-#select .head { text-align: center; }
-#select h1 { margin: 0; font: bold 40px Georgia, serif; letter-spacing: 2px; color: #e0b55a; text-shadow: 0 2px 4px #000, 0 0 18px rgba(255,200,90,.35); }
-#select .head p { margin: 2px 0 0; font-style: italic; color: #b8a888; }
-#select .cards { display: flex; gap: 22px; justify-content: center; width: min(1064px, 100%); }
-#select .card { flex: 1 1 0; max-width: 340px; display: flex; flex-direction: column; cursor: pointer; overflow: hidden; box-sizing: border-box;
-  border: 3px solid transparent; border-radius: 6px; background: var(--panel); box-shadow: var(--panel-shadow); transition: transform .12s, box-shadow .12s, filter .12s; filter: brightness(.8); }
-#select .card:hover { filter: brightness(.95); }
-#select .card.sel { filter: none; transform: translateY(-4px); box-shadow: var(--panel-shadow), 0 0 0 2px #7dff8a, 0 0 22px 4px rgba(255,200,90,.45); }
-#select .art { flex: none; height: 300px; background: #0b0d12 center 20% / cover no-repeat; border-bottom: 1px solid rgba(255,226,150,.25); }
-#select .txt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 12px 14px; text-align: center; }
-#select h2 { margin: 0; font: bold 24px Georgia, serif; color: #ffd75e; }
-#select .title { margin-top: -6px; font-style: italic; color: #d8c8a0; }
-#select .schools { display: flex; gap: 14px; justify-content: center; }
-#select .school { display: flex; align-items: center; gap: 6px; text-align: left; }
-#select .school .ic { width: 36px; height: 36px; flex: none; box-sizing: border-box; overflow: hidden; border: 2px solid transparent; border-radius: 4px;
-  background: linear-gradient(#000, #000) padding-box, var(--gilt) border-box; }
-#select .school.second .ic { width: 28px; height: 28px; }
-#select .school b { display: block; font-size: 16px; }
-#select .school.second b { font-size: 14px; }
-#select .school small { display: block; margin-top: -3px; font-size: 11px; font-style: italic; color: #9a8c70; }
-#select .lore { margin: 0; font-size: 13px; color: #e9dcc0; }
-#select button { min-width: 240px; padding: 9px 30px; font: bold 26px Georgia, serif; color: #ffe3a0; cursor: pointer; border: 3px solid transparent; border-radius: 4px;
-  background: linear-gradient(#4a1f1a, #2a1210) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 6px 20px rgba(0,0,0,.8); }
-#select button:hover { filter: brightness(1.2); }
-body.diablo #select h1, body.diablo #select h2 { color: #ff8a5a; }
-body.diablo #select .card { border-radius: 2px; }
-@media (max-height: 520px) { /* a phone on its side: each card its art beside its words */
-  #select { gap: 8px; justify-content: flex-start; padding-top: calc(8px + env(safe-area-inset-top)); }
-  #select h1 { font-size: 24px; }
-  #select .head p { font-size: 12px; }
-  #select .cards { gap: 8px; }
-  #select .card { flex-direction: row; max-width: 400px; }
-  #select .card.sel { transform: none; }
-  #select .art { width: 34%; height: auto; min-height: 200px; border-bottom: 0; border-right: 1px solid rgba(255,226,150,.25); }
-  #select .txt { flex: 1; justify-content: center; gap: 3px; padding: 6px; }
-  #select h2 { font-size: 18px; line-height: 1.15; }
-  #select .title { margin-top: -2px; font-size: 12px; line-height: 1.25; }
-  #select .schools { flex-direction: column; gap: 3px; align-items: flex-start; }
-  #select .school .ic { width: 30px; height: 30px; }
-  #select .school.second .ic { width: 24px; height: 24px; }
-  #select .lore { font-size: 11px; line-height: 1.3; }
-  #select button { min-width: 200px; padding: 5px 24px; font-size: 20px; }
+#select { position: fixed; inset: 0; z-index: 40; overflow: hidden; background: #07090d; color: #f3e2b0; font: 15px/1.3 Georgia, serif;
+  user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+#select .stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#select .stage:active { cursor: grabbing; }
+#select .shade { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(3,4,7,.85), rgba(3,4,7,.45) 22%, transparent 40%), linear-gradient(0deg, rgba(3,4,7,.6), transparent 22%); }
+#select h1 { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: calc(22px + env(safe-area-inset-right)); margin: 0; pointer-events: none;
+  font: bold 18px Georgia, serif; letter-spacing: 3px; color: rgba(224,181,90,.75); text-shadow: 0 2px 4px #000; }
+#select .roster { position: absolute; top: 0; bottom: 0; left: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  padding: calc(18px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom)) calc(26px + env(safe-area-inset-left));
+  overflow-y: auto; scrollbar-width: none; max-width: 46vw; box-sizing: border-box; }
+#select .hero { --gem: 76px; display: flex; align-items: center; gap: 16px; flex: none; cursor: pointer; outline: none; }
+#select .gem { position: relative; width: calc(var(--gem) * 1.42); height: calc(var(--gem) * 1.42 + 10px); flex: none; display: flex; justify-content: center; }
+#select .gem .frame { position: absolute; top: calc(var(--gem) * .21); width: var(--gem); height: var(--gem); transform: rotate(45deg); box-sizing: border-box; overflow: hidden;
+  border: 3px solid transparent; background: linear-gradient(#120d0a, #120d0a) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 4px 14px rgba(0,0,0,.9); }
+#select .gem img { position: absolute; left: 50%; top: 50%; width: 142%; height: 142%; transform: translate(-50%, -50%) rotate(-45deg); filter: grayscale(.55) brightness(.6); transition: filter .15s; }
+#select .lv { position: absolute; bottom: 0; min-width: 34px; padding: 1px 6px; box-sizing: border-box; text-align: center; font: bold 15px Georgia, serif; color: #f3e2b0;
+  border: 2px solid transparent; border-radius: 2px; background: linear-gradient(#4a1712, #210907) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000; }
+#select .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#select .who b { font: bold 21px Georgia, serif; color: #9a917f; text-shadow: 0 2px 3px #000; white-space: nowrap; transition: color .15s; }
+#select .who i, #select .who .schools { display: none; }
+#select .who i { color: #d8c8a0; font-size: 15px; text-shadow: 0 1px 2px #000; }
+#select .schools { gap: 8px; font-size: 14px; text-shadow: 0 1px 2px #000; }
+#select .schools small { color: #9a8c70; font-style: italic; font-size: 12px; }
+#select .hero:hover img { filter: grayscale(.2) brightness(.85); }
+#select .hero.sel img { filter: none; }
+#select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px rgba(255,170,70,.55), 0 4px 14px rgba(0,0,0,.9); }
+#select .hero.sel .who b { color: #ffe3a0; }
+#select .hero.sel .who i { display: block; }
+#select .hero.sel .who .schools { display: flex; }
+#select .foot { position: absolute; right: calc(28px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+#select .lore { max-width: 420px; margin: 0; text-align: right; font-style: italic; font-size: 16px; color: #d9cdb2; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
+#select .go { position: relative; padding: 13px 46px; white-space: nowrap; font: bold 25px Georgia, serif; letter-spacing: 4px; color: #ffe3a0; cursor: pointer; text-shadow: 0 2px 3px #000;
+  border: 3px solid transparent; border-radius: 3px; background: radial-gradient(ellipse at 50% 0, #8a2a1a, #4a140c 55%, #250805) padding-box, var(--gilt) border-box;
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.7), inset 0 0 0 3px rgba(255,210,120,.25), 0 8px 24px rgba(0,0,0,.85); }
+#select .go::before, #select .go::after { content: ''; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; transform: rotate(45deg);
+  background: linear-gradient(135deg, #fff2c0, #c9973e 50%, #6b4718); box-shadow: 0 0 0 1px #000; }
+#select .go::before { left: -9px; }
+#select .go::after { right: -9px; }
+#select .go:hover { filter: brightness(1.2); }
+body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px rgba(220,50,25,.6), 0 4px 14px rgba(0,0,0,.9); }
+@media (max-height: 520px) { /* a phone on its side */
+  #select h1 { font-size: 13px; letter-spacing: 2px; top: calc(8px + env(safe-area-inset-top)); }
+  #select .roster { gap: 4px; padding-top: calc(6px + env(safe-area-inset-top)); padding-bottom: calc(6px + env(safe-area-inset-bottom)); padding-left: calc(12px + env(safe-area-inset-left)); justify-content: safe center; }
+  #select .hero { --gem: 44px; gap: 8px; }
+  #select .gem { height: calc(var(--gem) * 1.42 + 6px); }
+  #select .lv { min-width: 26px; padding: 0 4px; font-size: 11px; border-width: 1px; }
+  #select .who b { font-size: 15px; }
+  #select .who i { font-size: 11px; }
+  #select .schools { font-size: 11px; gap: 5px; }
+  #select .schools small { font-size: 10px; }
+  #select .foot { right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); gap: 6px; }
+  #select .lore { max-width: 270px; font-size: 11px; }
+  #select .go { padding: 8px 26px; font-size: 17px; letter-spacing: 3px; }
 }
-@media (max-width: 560px) and (min-height: 521px) { /* a phone upright: one under the other */
-  #select { justify-content: flex-start; }
-  #select h1 { font-size: 28px; }
-  #select .cards { flex-direction: column; align-items: stretch; gap: 12px; }
-  #select .card { flex: none; flex-direction: row; max-width: none; }
-  #select .card.sel { transform: none; }
-  #select .art { width: 36%; height: auto; min-height: 200px; border-bottom: 0; }
-  #select .schools { flex-direction: column; gap: 4px; align-items: flex-start; }
-  #select button { position: sticky; bottom: 0; flex: none; } /* in reach under the heroes */
+@media (max-width: 560px) and (min-height: 521px) { /* a phone upright */
+  #select .roster { max-width: 42vw; padding-left: calc(10px + env(safe-area-inset-left)); }
+  #select .hero { --gem: 50px; gap: 6px; }
+  #select .who b { font-size: 14px; white-space: normal; }
+  #select .hero.sel .who i, #select .hero.sel .who .schools { display: none; } /* no room beside him: the name only */
+  #select .go { padding: 10px 28px; font-size: 20px; letter-spacing: 3px; }
+  #select .foot { left: 16px; right: 16px; align-items: center; }
+  #select .lore { text-align: center; }
 }`;
 
-const school = (s: School, second: boolean) => `<div class="school${second ? ' second' : ''}"><div class="ic">${ICONS[TOMES.find((t) => t.school === s)!.icon] ?? ''}</div>
-  <div><b style="color: ${COLOR[s] ?? '#f3e2b0'}">${SCHOOL_NAME.get(s)}</b><small>${second ? 'secondaria' : 'primaria'}</small></div></div>`;
+/** Each hero's own game, if any: the run in progress and the three slots, his highest level among them. */
+function saved(): Map<Hero, { lv: number; worn: GearState }> {
+  const out = new Map<Hero, { lv: number; worn: GearState }>();
+  for (const s of [resume(), ...slots().map((x) => x?.state)]) {
+    if (!s) continue;
+    const hero = heroOf(s.hero), lv = levelOf(s.build?.xp ?? 0).lv;
+    if ((out.get(hero)?.lv ?? 0) >= lv) continue;
+    const gear = new Equipment(); // read as a load would: ids from another build dropped
+    gear.worn = starter(HEROES[hero].weapon);
+    if (s.gear) gear.decode(s.gear);
+    out.set(hero, { lv, worn: gear.worn });
+  }
+  return out;
+}
 
-/** Show the heroes and wait for one to be chosen; the screen goes once he is. */
+const school = (s: School, second: boolean) => `<span style="color: ${COLOR[s] ?? '#f3e2b0'}">${SCHOOL_NAME.get(s)} <small>${second ? 'secondaria' : 'primaria'}</small></span>`;
+
+/** Show the heroes and wait for one to be chosen; the screen and its stage go once he is. */
 export function chooseHero(): Promise<Hero> {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.append(style);
+  const games = saved();
   const el = document.createElement('div');
   el.id = 'select';
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-label', 'Scegli il tuo Risorto');
-  el.innerHTML = `<div class="head"><h1>SCEGLI IL TUO RISORTO</h1><p>Giudecca, notte dei morti: chi si leva dalla fossa?</p></div>
-    <div class="cards">${HERO_IDS.map((id) => { const h = HEROES[id]; return `<div class="card" data-id="${id}" role="button" tabindex="0" aria-label="${h.name}">
-      <div class="art" style="background-image: url(${ART[id]})"></div>
-      <div class="txt"><h2>${h.name}</h2><div class="title">${h.title}</div><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div><p class="lore">${h.lore}</p></div></div>`; }).join('')}</div>
-    <button type="button">Risorgi</button>`;
+  el.innerHTML = `<div class="shade"></div><h1>SCEGLI IL TUO RISORTO</h1>
+    <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id]; return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
+      <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv">${games.get(id)?.lv ?? 1}</span></div>
+      <div class="who"><b>${h.name}</b><i>${h.title}</i><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div></div></div>`; }).join('')}</div>
+    <div class="foot"><p class="lore"></p><button type="button" class="go">ENTRA NEL MONDO</button></div>`;
   document.body.append(el);
-  const cards = [...el.querySelectorAll<HTMLElement>('.card')];
-  let sel = 0;
-  const select = (i: number) => { sel = i; cards.forEach((c, k) => c.classList.toggle('sel', k === i)); };
+  const stage = new SelectStage(el);
+  const rows = [...el.querySelectorAll<HTMLElement>('.hero')], lore = el.querySelector('.lore')!;
+  let sel = -1;
+  const select = (i: number) => {
+    if (i === sel) return;
+    sel = i;
+    const id = HERO_IDS[i];
+    rows.forEach((c, k) => { c.classList.toggle('sel', k === i); c.setAttribute('aria-selected', String(k === i)); });
+    rows[i].scrollIntoView({ block: 'nearest' });
+    lore.textContent = HEROES[id].lore;
+    stage.show(id, games.get(id)?.worn ?? starter(HEROES[id].weapon));
+  };
   select(0);
   return new Promise((done) => {
-    const go = () => { removeEventListener('keydown', key, true); el.remove(); style.remove(); done(HERO_IDS[sel]); };
+    const go = () => { if (!el.isConnected) return; removeEventListener('keydown', key, true); stage.dispose(); el.remove(); style.remove(); done(HERO_IDS[sel]); };
     const key = (e: KeyboardEvent) => {
       e.stopPropagation();
-      if (e.code === 'ArrowLeft' || e.code === 'ArrowUp' || e.code === 'KeyA') select((sel + cards.length - 1) % cards.length);
-      else if (e.code === 'ArrowRight' || e.code === 'ArrowDown' || e.code === 'KeyD') select((sel + 1) % cards.length);
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowUp' || e.code === 'KeyA' || e.code === 'KeyW') select((sel + rows.length - 1) % rows.length);
+      else if (e.code === 'ArrowRight' || e.code === 'ArrowDown' || e.code === 'KeyD' || e.code === 'KeyS') select((sel + 1) % rows.length);
       else if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); go(); }
     };
     addEventListener('keydown', key, true);
-    cards.forEach((c, i) => c.addEventListener('click', () => select(i)));
-    el.querySelector('button')!.addEventListener('click', go);
+    rows.forEach((c, i) => c.addEventListener('click', () => select(i)));
+    el.querySelector('.go')!.addEventListener('click', go);
   });
 }

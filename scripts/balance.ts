@@ -25,6 +25,7 @@
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
 //   TOMES=plague,holy node scripts/balance.ts ...  the hero starts with those schools' tomes read (every ability of theirs; the cards offer the rest)
+//   HERO=bortolo node scripts/balance.ts ...       another hero (player/heroes.ts): his school's base attack, his kit learned from the start, the offers leaning to his schools (default the Risorto)
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
@@ -40,9 +41,10 @@ import { ABILITIES, BAR, MEND, plagueSpot, tune, wispFoe, type Forsaken } from '
 import { Grimoire } from '../src/abilities/grimoire.ts';
 import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
-import { START, TOMES, levelOf, offer, tomeOf, tuneOf } from '../src/player/levels.ts';
+import { TOMES, levelOf, offer, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
 import { SIDE } from '../src/quest/squero.ts';
+import { HEROES, heroOf } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
 const DT = 1 / 30;
@@ -62,8 +64,8 @@ export const BUILDS: Record<string, string[]> = {
   mixed: ['fall_dmg', 'plague_dps', 'veil', 'wisp', 'ward', 'dmg', 'hp', 'fall_third', 'plague_size', 'armor', 'wisp_still', 'leech', 'ward_long', 'potion_big',
     'fury', 'plague_cd', 'fx_fallplague', 'veil_heal', 'fall_reach', 'potion_cd', 'strike', 'nova', 'step', 'regen'],
   // the new schools: a fire-and-frost caster, and a brawler of lightning and heavy blows
-  arcane: ['pyre', 'veil', 'frost', 'ward', 'font', 'lance', 'fx_shatter', 'pyre_fast', 'regen', 'mana', 'frost_fast', 'pyre_big', 'font_long', 'lance_split', 'dmg', 'hp', 'armor',
-    'frost_deep', 'font_cd', 'lance_dmg', 'potion_big', 'cdr', 'veil_heal', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
+  arcane: ['pyre', 'veil', 'frost', 'ward', 'font', 'caligo', 'fx_shatter', 'pyre_fast', 'regen', 'mana', 'frost_fast', 'pyre_big', 'font_long', 'lance_split', 'caligo_freeze', 'dmg', 'hp', 'armor',
+    'frost_deep', 'font_cd', 'lance_dmg', 'lance_third', 'caligo_big', 'lance_mana', 'potion_big', 'cdr', 'veil_heal', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
   storm: ['chain', 'veil', 'toll', 'ward', 'leap', 'whirl', 'grace', 'fx_storm', 'charge', 'chain_fast', 'toll_long', 'whirl_dmg', 'grace_mul', 'leap_big', 'dmg', 'hp', 'armor', 'regen',
     'mana', 'chain_long', 'toll_big', 'leap_cd', 'whirl_long', 'grace_cd', 'charge_stun', 'potion_big', 'leech', 'fury', 'ward_long', 'fall_dmg'],
   // five a school: a poisoner with the drain, a paladin, and a mage-shaman of the new fire, frost and lightning
@@ -75,8 +77,13 @@ export const BUILDS: Record<string, string[]> = {
     'rod_long', 'squall_big', 'regen', 'mana', 'dmg', 'hp', 'armor', 'cdr', 'fx_storm', 'potion_big', 'leech', 'fury', 'ward_long'],
 };
 
-/** TOMES=plague,holy: the abilities those schools' tomes teach, owned from the start. */
-const LEARNED = (process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, START).teaches.map((c) => c.id));
+/** HERO=bortolo: whose kit the bot plays (a new game's `learned`). */
+const HERO = HEROES[heroOf(process.env.HERO)];
+/** TOMES=plague,holy: the abilities those schools' tomes teach, owned from the start, past the hero's kit. */
+const SCHOOLS = HERO.school, START = startOf(SCHOOLS), MAIN = START[0]; // his base attack: Caduta d'ossa's club, or a bolt
+const LEARNED = [...HERO.kit, ...(process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, [...START, ...HERO.kit]).teaches.map((c) => c.id))];
+/** m the bot strikes from with its base attack. */
+const reach = () => (MAIN === 'fall' ? tune.fallRange : 25);
 
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
@@ -90,11 +97,11 @@ function picksTo(build: string, lv: number): string[] {
 }
 /** Past a build's own list, what any player would rather take: with 33 abilities in the offers, often neither card is the build's. */
 const GENERIC = ['veil', 'ward', 'pyre', 'strike', 'drain', 'cero', 'judge', 'hallow', 'spit', 'pillar', 'chain', 'grace', 'toll', 'frost', 'leap', 'whirl', 'furnace',
-  'miasma', 'fever', 'blizzard', 'wisp', 'font', 'lance', 'step', 'charge', 'nova', 'rod', 'orb', 'shield', 'squall', 'hammer', 'bubble', 'untore',
+  'miasma', 'fever', 'blizzard', 'wisp', 'font', 'caligo', 'step', 'charge', 'nova', 'rod', 'orb', 'shield', 'squall', 'hammer', 'bubble', 'untore',
   'dmg', 'hp', 'armor', 'leech', 'potion_big', 'regen', 'mana', 'cdr', 'fury', 'speed'];
 function choose(build: string, picks: string[]): string {
   const pref = BUILDS[build] ?? [], rank = (id: string) => (pref.includes(id) ? pref.indexOf(id) : GENERIC.includes(id) ? 500 + GENERIC.indexOf(id) : 999);
-  const cards = offer(picks, rnd, LEARNED);
+  const cards = offer(picks, rnd, LEARNED, SCHOOLS);
   return cards.reduce((a, b) => (rank(b.id) < rank(a.id) ? b : a)).id;
 }
 
@@ -259,7 +266,9 @@ class Run {
   zones = new Map<string, Zone>();
   log: string[] = [];
   // the kit's ability context
-  player = { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: 0, world: this.world, model: NOOP, mesh: NOOP, blink: (d: number) => this.blink(d) };
+  player = { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: 0, world: this.world, model: this.body(), mesh: NOOP, blink: (d: number) => this.blink(d) };
+  /** No model, but a hand chest-high on the hero: the bolts thrown from it (Stiletto and the base attacks, Sputo, Martello). */
+  private body(): any { return new Proxy(NOOP, { get: (_t, k) => (k === 'hand' ? (v: THREE.Vector3) => v.set(this.player.pos.x, this.player.pos.y + 1.2, this.player.pos.z) : NOOP) }); }
   vfx = NOOP;
   system: AbilitySystem<Forsaken>;
   magic: Grimoire = new Grimoire(this, tune);
@@ -297,7 +306,7 @@ class Run {
   constructor(build: string, dodge: boolean) {
     this.build = build;
     this.dodge = dodge;
-    Object.assign(tune, tuneOf([], LEARNED));
+    Object.assign(tune, tuneOf([], LEARNED, SCHOOLS));
     const c = spawnCasters(this.world, this.level.areas), a = spawnApiary(this.world);
     this.l2 = spawnLevel2(this.world);
     this.casters = [...c.all, ...a.all, ...this.l2.all];
@@ -305,7 +314,7 @@ class Run {
     this.bees = a.all;
     this.mobs = [...this.friars, ...this.casters];
     for (const m of this.mobs) this.worth.set(m, isCaster(m) ? m.kind.xp : FRIAR.xp);
-    this.system = new AbilitySystem<Forsaken>(ABILITIES, BAR, this as unknown as Forsaken, START);
+    this.system = new AbilitySystem<Forsaken>(ABILITIES, [MAIN, ...BAR.slice(1)], this as unknown as Forsaken, START);
     const s = this.stats; // counts what is spent
     this.system.pool = { get mana() { return s.mana; }, spendMana: (n) => s.spendMana(n) && ((this.spent += n), true) };
     this.player.pos.y = this.world.groundAt(SPAWN.x, SPAWN.z, 0);
@@ -356,7 +365,8 @@ class Run {
   }
 
   // --- what the ability table calls ---
-  swingCombo(): void { this.combo = this.comboT < 1.1 ? (this.combo + 1) % 3 : 0; this.comboT = 0; }
+  nextCombo(): number { this.combo = this.comboT < 1.1 ? (this.combo + 1) % 3 : 0; this.comboT = 0; return this.combo; }
+  swingCombo(): void { this.nextCombo(); }
   plague(at?: { x: number; y: number; z: number }, life = tune.plagueLife): void {
     const p = at ?? plagueSpot(this.player.pos, this.player.facing, this.target, this.mobs, this.world);
     if (this.clouds.length >= 6) this.clouds.shift();
@@ -446,7 +456,7 @@ class Run {
     }
   }
   apply(): void {
-    Object.assign(tune, tuneOf(this.picks, LEARNED));
+    Object.assign(tune, tuneOf(this.picks, LEARNED, SCHOOLS));
     this.worn = effects(this.gear.totals);
     this.stats.grow(tune.hp, tune.mana, this.worn.hp, this.worn.mana);
     this.stats.armor = tune.armor * (1 - this.worn.cut);
@@ -567,7 +577,7 @@ class Run {
       if (this.system.casting) this.system.cancel();
       this.flee(danger.x, danger.z, dt);
       if (t) this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
-      if (t && Math.hypot(t.x - p.x, t.z - p.z) < tune.fallRange) this.cast('fall');
+      if (t && Math.hypot(t.x - p.x, t.z - p.z) < reach()) this.cast(MAIN);
     } else if (t) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
@@ -594,6 +604,7 @@ class Run {
         if (this.ready('hallow') && (around(tune.hallowR) >= 2 || (big && d < 3.5))) this.cast('hallow');
         if (this.ready('rod') && d < 7) this.cast('rod');
         if (this.ready('squall') && (around(tune.squallR - 1) >= 3 || (low < 0.6 && around(4) >= 2))) this.cast('squall');
+        if (this.ready('caligo') && d < tune.caligoRange - 1 && (around(tune.caligoRange) >= 2 || big)) this.cast('caligo');
         if (this.ready('furnace') && d < tune.furnaceRange - 1 && (around(tune.furnaceRange) >= 2 || big)) this.cast('furnace');
         if (this.ready('miasma') && (around(tune.miasmaR - 1) >= 2 || (big && d < tune.miasmaR - 1))) this.cast('miasma');
         if (this.ready('fever') && d < 28 && (big || nearT(tune.feverR) >= 3)) this.cast('fever');
@@ -613,8 +624,8 @@ class Run {
         if (this.ready('nova') && (near >= 2 || (big && d < tune.novaR))) this.cast('nova');
         const wait = this.dodge && isCaster(t) && t.state === 'nova'; // don't walk back into a ring still filling
         if (!wait && this.ready('step') && d > 6 && d < 9) this.cast('step');
-        if (!wait && d > tune.fallRange - 0.5) this.go(t.x, t.z, 1.5, dt);
-        if (d < tune.fallRange) this.cast('fall');
+        if (!wait && (d > reach() - 0.5 || (MAIN !== 'fall' && !this.world.sees(p, t)))) this.go(t.x, t.z, 1.5, dt);
+        if (d < reach()) this.cast(MAIN);
       }
     } else if (low < 0.85 && !this.system.casting && this.ready('mend')) { // between pulls the prayer heals up
       this.cast('mend');

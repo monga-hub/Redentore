@@ -1,11 +1,12 @@
 import { duck, playSfx, unduck } from '../audio/engine.ts';
-import type { Card } from '../player/levels.ts';
+import { SCHOOL, type Card } from '../player/levels.ts';
+import { SCHOOL_NAME } from './book.ts';
 import { ICONS } from './icons.ts';
 
 // The level-up window, Vampire Survivors style: the world holds still (main.ts) and two big cards
 // wait for a pick, by click/tap or keys 1 / 2 (←/→ and Enter too). For LOCK s after it opens a press
 // does nothing, so a player mashing 1 for Caduta d'ossa can't pick blind. A gold flash and "Livello N!"
-// mark the level. Plain DOM, styled here like the dialogue window, WoW gold or Diablo stone.
+// mark the level. Each card names its school (an upgrade its ability's): the offers lean to the hero's. Plain DOM, styled here like the dialogue window, WoW gold or Diablo stone.
 
 const CSS = `
 #levelup { position: fixed; inset: 0; z-index: 19; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
@@ -139,7 +140,8 @@ export class LevelUp {
     this.title.textContent = `Livello ${lv}`;
     this.cardsEl.innerHTML = cards.map((c, i) => {
       const stacks = c.max > 1 && Number.isFinite(c.max) ? `<span>${count(c.id) + 1}/${c.max}</span>` : '';
-      return `<button class="card ${c.kind}" data-i="${i}" tabindex="-1"><span class="tag">${c.kind === 'filler' && c.apply ? 'Potenziamento' : TAG[c.kind]}</span><div class="ic">${ICONS[c.icon] ?? ''}</div>`
+      const school = SCHOOL_NAME.get(c.school ?? SCHOOL[c.of ?? '']);
+      return `<button class="card ${c.kind}" data-i="${i}" tabindex="-1"><span class="tag">${c.kind === 'filler' && c.apply ? 'Potenziamento' : TAG[c.kind]}${school ? ` · ${school}` : ''}</span><div class="ic">${ICONS[c.icon] ?? ''}</div>`
         + `<h3></h3><p></p><div class="foot">${stacks}<kbd>${i + 1}</kbd></div></button>`;
     }).join('');
     this.cardsEl.querySelectorAll('.card').forEach((b, i) => {

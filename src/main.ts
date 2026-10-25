@@ -11,11 +11,11 @@ import { Atmosphere } from './fx/atmosphere.ts';
 import { PHONE } from './core/device.ts';
 import { ABILITIES, Forsaken, PLAGUE_RANGE, barOf, tune } from './abilities/forsaken.ts';
 import { CHARGE, GRACE, LEAP, RANGE } from './abilities/grimoire.ts';
-import { CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
+import { BASES, BASE_ATTACK, CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
 import { AbilityBook } from './ui/book.ts';
-import { saveBar } from './abilities/system.ts';
+import { PRIMARY, saveBar } from './abilities/system.ts';
 import { PlayerStats } from './player/stats.ts';
 import { Targeting, type Kind } from './ui/target.ts';
 import { HeroAuras, Plates } from './ui/plates.ts';
@@ -64,7 +64,7 @@ const swap = migration(); // once: the old saves make way for the hero ready for
 const ahead = swap ? undefined : upcoming(); // the game this boot starts, whose hero's body loads
 const fresh = !swap && (!ahead || ahead === 'new'); // a new game: its hero chosen first (ui/select.ts)
 const hero = fresh ? await chooseHero() : heroOf(swap || ahead === 'new' ? undefined : ahead?.hero);
-if (fresh) saveBar({ bar: barOf(HEROES[hero].kit), off: [] }); // his kit on the bar, before the kit reads it
+if (fresh) saveBar({ bar: barOf(HEROES[hero].kit, BASE_ATTACK[HEROES[hero].school[0]]), off: [] }); // his school's base attack and kit on the bar, before the kit reads it
 // Phones: a 1.5 pixel ratio (a third of DPR 3's pixels on an iPhone) and no MSAA on the canvas, which the post chain draws one quad into.
 const renderer = new THREE.WebGLRenderer({ antialias: !PHONE });
 renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.5 : 2));
@@ -92,19 +92,22 @@ const hud = new Hud(HEROES[hero].portrait, HEROES[hero].name);
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
 if (swap) saveBar(BAR); // the prepared hero's bar, before the kit reads it
-const kit = new Forsaken(player, playerStats); // abilities on 1..0 - =
+const kit = new Forsaken(player, playerStats, HEROES[hero].school); // abilities on 1..0 - =
 scene.add(kit.vfx.root);
 const questView = new QuestView(quest, kit.vfx); // gates, chest, Fra' Zuane and his dialogue, tracker
 scene.add(questView.root);
 const bar = new ActionBar(kit.system);
 const levels = new Levels(); // XP from the dead, the cards picked; laid on the kit by `apply`
 levels.learned = [...HEROES[hero].kit]; // his school's start (a load lays its own)
+levels.schools = HEROES[hero].school;
+let booted = false; // past the load: a base attack learnt from now on is called out
 const levelUp = new LevelUp(); // the two-card window
 const gear = new Equipment(); // what the hero wears: the hemp set and his own weapon at first
 gear.worn = starter(HEROES[hero].weapon);
 let worn = effects(gear.totals);
 levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on the kit and the stats
-  Object.assign(tune, tuneOf(levels.picks, levels.learned));
+  const had = tune.owned;
+  Object.assign(tune, tuneOf(levels.picks, levels.learned, levels.schools));
   BOONS.find((b) => b.id === quest.boon)?.apply(tune);
   worn = effects(gear.totals);
   playerStats.grow(tune.hp, tune.mana, worn.hp, worn.mana);
@@ -114,6 +117,11 @@ levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on t
   kit.system.chargeMul = tune.fury;
   kit.system.chargeAfter = tune.furyStart;
   kit.system.unlock(...tune.owned); // all owned before any is placed: the bar keeps its slots across a reload
+  kit.system.setMain(tune.owned.includes(levels.main) ? levels.main : tune.owned[0]); // the book's choice of base attack, else his own
+  if (booted) for (const id of tune.owned) if (BASES.includes(id) && !had.includes(id)) { // 3 of his secondary school's 5: its base attack
+    kit.system.notices.push({ kind: 'info', text: `Hai appreso ${ABILITIES.find((a) => a.id === id)!.name}, attacco base: sceglilo nel libro delle abilità` });
+    book.nudge();
+  }
 };
 gear.onChange = () => { levels.apply(); player.model.wear(gear.worn); }; // the stats, and the hero dressed in it
 gear.onChange(); // the starter set (a load lays its own again)
@@ -187,9 +195,8 @@ kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all];
 kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
-const MAIN = ABILITIES.find((a) => a.id === 'fall')!; // Caduta d'ossa, the swing a click-attack repeats, wherever it sits on the bar
-dctl.swing = () => kit.system.cooldown(MAIN) === 0 && kit.system.tryCast(kit.system.slots.indexOf(MAIN));
-const AIMED = new Set(['fall', 'step', 'plague', 'strike', 'pyre', 'frost', 'lance', 'chain', 'toll', 'leap', 'grace', 'charge', 'spit', 'untore', 'fever', 'drain', 'pillar', 'cero', 'furnace', 'blizzard', 'orb', 'judge', 'hammer']); // casts that go where the hero faces
+dctl.swing = () => { const a = kit.system.slots[PRIMARY]; return !!a && kit.system.cooldown(a) === 0 && kit.system.tryCast(PRIMARY); }; // the base attack a click-attack repeats
+const AIMED = new Set([...BASES, 'step', 'plague', 'strike', 'pyre', 'frost', 'chain', 'toll', 'leap', 'grace', 'charge', 'spit', 'untore', 'fever', 'drain', 'pillar', 'cero', 'furnace', 'blizzard', 'orb', 'judge', 'hammer', 'caligo']); // casts that go where the hero faces
 // No living target: the nearest foe in sight within the cast's reach becomes the target, as if tapped (iPhone taps rarely land on a mob).
 const REACH: Record<string, () => number> = { fall: () => tune.fallRange, grace: () => GRACE.range, step: () => 8, leap: () => LEAP.range, charge: () => CHARGE.max, plague: () => PLAGUE_RANGE, drain: () => 25 }; // the rest: RANGE
 kit.system.aim = (a) => { if (AIMED.has(a.id)) { targeting.ensure(REACH[a.id]?.() ?? RANGE); dctl.aim(); } };
@@ -214,6 +221,7 @@ if (loaded) {
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: pending ? 'Partita caricata' : 'Partita ripresa' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
+booted = true;
 let bossAct = 0, bossRage = false, lastBoss = priests.boss;
 /** A boss's new act, called out: the Reverendissimo's, the Governatrice's. */
 const ACTS = [
@@ -232,7 +240,7 @@ function openLevelUp(): void {
   kit.system.cancel();
   input.consume();
   dctl.stop();
-  levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned), picked, (c: Card) => {
+  levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned, levels.schools), picked, (c: Card) => {
     levels.picks.push(c.id);
     if (c.kind === 'ability') { // onto the first free slot, even if an earlier run took it off the bar
       kit.system.learn(c.id);
@@ -307,7 +315,8 @@ const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commerci
     kit.ascend();
   },
 });
-const book = new AbilityBook(kit.system, ABILITIES, () => levels.picks); // K, the book button or the menu: the ability book
+const mains = [BASE_ATTACK[HEROES[hero].school[0]], BASE_ATTACK[HEROES[hero].school[1]]]; // his base attack, and his secondary school's
+const book = new AbilityBook(kit.system, ABILITIES.filter((a) => !a.main || mains.includes(a.id)), () => levels.picks, (id) => { levels.main = id; kit.system.setMain(id); }); // K, the book button or the menu: the ability book
 book.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); };
 bagPanel.keys.KeyK = () => book.show();
 questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(false) });

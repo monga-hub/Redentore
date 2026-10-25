@@ -29,7 +29,7 @@ export const HEROES: Record<Hero, HeroDef> = {
   bortolo: {
     name: 'Bortolo', title: 'gondoliere annegato', school: ['frost', 'storm'],
     lore: 'Annegò l’inverno in cui gelò la laguna. Il remo non si è più scongelato, e nemmeno lui.',
-    file: 'bortolo.glb', portrait: 'bortolo.webp', weapon: 'remo-gelato', kit: ['frost', 'lance'],
+    file: 'bortolo.glb', portrait: 'bortolo.webp', weapon: 'remo-gelato', kit: ['frost', 'caligo'],
   },
 };
 export const HERO_IDS = Object.keys(HEROES) as Hero[];

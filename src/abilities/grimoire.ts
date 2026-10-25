@@ -14,8 +14,11 @@ import type { Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 
 interface P { x: number; y: number; z: number }
-export type BoltKind = 'pyre' | 'frost' | 'lance' | 'venom' | 'judge' | 'hammer';
+/** The base attacks that fly are bolts too (lance and the five after it: levels.ts BASE_ATTACK). */
+export type BaseBolt = 'lance' | 'thorn' | 'umbra' | 'ember' | 'spark' | 'smite';
+export type BoltKind = 'pyre' | 'frost' | 'venom' | 'judge' | 'hammer' | BaseBolt;
 export interface Bolt { kind: BoltKind; x: number; y: number; z: number; to: Mob; speed: number; t: number; dmg: number }
+export const BASE_BOLTS: readonly BoltKind[] = ['lance', 'thorn', 'umbra', 'ember', 'spark', 'smite'];
 export interface Fire { x: number; y: number; z: number; r: number; t: number; life: number; dps: number }
 export interface Toll { x: number; y: number; z: number; t: number }
 export interface Zone { x: number; y: number; z: number; r: number; t: number; life: number }
@@ -25,14 +28,14 @@ export interface Dash { kind: 'leap' | 'charge'; pts: P[]; len: number; t: numbe
 /** Something the looks should show where it happened (`pts`: the chain's path, hand first). */
 export type SpellEvent =
   | { type: 'pyre' | 'frost' | 'lance' | 'shatter' | 'thaw' | 'font' | 'toll' | 'leap' | 'charge' | 'grace' | 'fizzle' | 'wall'
-      | 'venom' | 'judge' | 'hammer' | 'miasma' | 'fever' | 'pillar' | 'cero' | 'furnace' | 'blizzard' | 'orb' | 'squall' | 'hallow'; x: number; y: number; z: number; big?: boolean; kind?: BoltKind; r?: number; dir?: number }
+      | 'venom' | 'judge' | 'hammer' | 'miasma' | 'fever' | 'pillar' | 'cero' | 'furnace' | 'blizzard' | 'orb' | 'squall' | 'hallow' | 'caligo' | 'base'; x: number; y: number; z: number; big?: boolean; kind?: BoltKind; r?: number; dir?: number }
   | Path<'chain' | 'zap' | 'drain' | 'spread'>;
 type Path<T> = T extends string ? { type: T; pts: P[] } : never; // one member each, so a `type` check narrows
 
 export const RANGE = 30; // m: bolts, the chain and the thunderbolt reach this far
 const ARC = 0.5; // no target: the nearest foe within ~120° in front
 const CHEST = 1.2; // m above the feet where bolts strike
-const SPEED: Record<BoltKind, number> = { pyre: 14, frost: 20, lance: 34, venom: 22, judge: 30, hammer: 26 };
+const SPEED: Record<BoltKind, number> = { pyre: 14, frost: 20, lance: 34, venom: 22, judge: 30, hammer: 26, thorn: 30, umbra: 30, ember: 30, spark: 40, smite: 34 };
 const SPLASH = 0.5; // the fireball's share on its neighbours
 const BURN = { t: 4, dps: 8 }; // the fireball sets its mark burning
 const FIRE = { life: 4, dps: 12 }; // and the floor under it
@@ -40,6 +43,8 @@ const CHILL_T = 6;
 const FONT_R = 5;
 const SHATTER = { mul: 1.6, dmg: 30, r: 3 };
 const LANCE_FROZEN = 3, LANCE_SPLIT = 0.5, LANCE_R = 3;
+const BASE_SPLIT = { k: 0.5, r: 2.5 }; // a base attack's splash upgrade
+const CALIGO = { arc: Math.cos(0.8), slow: 5, k: 0.4, freeze: 2 };
 const HOP = 8; // m a saetta jumps
 const HOP_FALL = 0.75; // each jump keeps this much of the damage
 const STORM = 1.5; // Miasma elettrico on the clouded
@@ -73,7 +78,7 @@ export interface Host {
   /** A plague cloud covers (x, z) (Miasma elettrico, Miasma velenoso). */
   clouded?: (x: number, z: number) => boolean;
   /** The hero's health: the drain and the consecrated ground heal it. */
-  stats?: { hpMax: number; heal(n: number): number };
+  stats?: { hpMax: number; heal(n: number): number; restoreMana?(n: number): void };
 }
 
 const alive = (m: Mob) => m.state !== 'dead' && m.state !== 'evade';
@@ -145,11 +150,12 @@ export class Grimoire {
     return out;
   }
 
-  /** A bolt from `from` (the casting hand) at the target; no target: it fizzles in the hand. */
-  shoot(kind: BoltKind, from: P): void {
+  /** A bolt from `from` (the casting hand) at the target; no target: it fizzles in the hand. `third`: a base attack's third blow. */
+  shoot(kind: BoltKind, from: P, third = false): void {
     const to = this.target();
     if (!to) { this.events.push({ type: 'fizzle', ...from }); return; }
-    const t = this.tune, dmg = { pyre: t.pyreDmg, frost: t.frostDmg, lance: t.lanceDmg, venom: t.spitDmg, judge: t.judgeDmg, hammer: HAMMER_DMG }[kind];
+    const t = this.tune, b = t.prim[kind];
+    const dmg = b ? b.dmg * (third ? b.third : 1) : { pyre: t.pyreDmg, frost: t.frostDmg, venom: t.spitDmg, judge: t.judgeDmg, hammer: HAMMER_DMG }[kind as 'pyre'];
     this.bolts.push({ kind, x: from.x, y: from.y, z: from.z, to, speed: SPEED[kind], t: 0, dmg });
   }
 
@@ -186,11 +192,18 @@ export class Grimoire {
       this.hit(m, b.dmg);
       if (c) chill(c, CHILL_T, t.frostSlow);
       this.events.push({ type: 'frost', ...at });
-    } else {
-      const shatter = !!c && frozen(c);
+    } else if (b.kind === 'lance') {
+      const shatter = !!c && frozen(c), u = t.prim.lance;
       this.hit(m, shatter ? b.dmg * LANCE_FROZEN : b.dmg);
-      if (shatter && t.lanceSplit) for (const o of this.near(m, LANCE_R)) if (o !== m) this.hit(o, b.dmg * LANCE_FROZEN * LANCE_SPLIT);
+      if (shatter && u.split) for (const o of this.near(m, LANCE_R)) if (o !== m) this.hit(o, b.dmg * LANCE_FROZEN * LANCE_SPLIT);
+      if (u.mana) this.host.stats?.restoreMana?.(u.mana);
       this.events.push({ type: shatter ? 'shatter' : 'lance', ...at, big: shatter });
+    } else { // the other base attacks: the hit, the splash, mana back
+      const u = t.prim[b.kind];
+      this.hit(m, b.dmg);
+      if (u.split) for (const o of this.near(m, BASE_SPLIT.r)) if (o !== m) this.hit(o, b.dmg * BASE_SPLIT.k);
+      if (u.mana) this.host.stats?.restoreMana?.(u.mana);
+      this.events.push({ type: 'base', ...at, kind: b.kind, big: u.split });
     }
   }
 
@@ -299,6 +312,20 @@ export class Grimoire {
       if (m.cc) stun(m.cc, FURNACE.stun);
     }
     this.events.push({ type: 'furnace', ...p, r: t.furnaceRange, dir: h.facing });
+  }
+
+  /** Caligo gelato: the frozen lagoon fog in a cone ahead, slowing; Caligo di gennaio freezes who was slowed already. */
+  caligo(): void {
+    const h = this.host.player, p = h.pos, fx = -Math.sin(h.facing), fz = -Math.cos(h.facing), t = this.tune;
+    for (const m of this.near(p, t.caligoRange)) {
+      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
+      if (d > 0.8 && (dx * fx + dz * fz) / d < CALIGO.arc) continue;
+      this.hit(m, t.caligoDmg);
+      if (!m.cc) continue;
+      if (t.caligoFreeze && chilled(m.cc)) root(m.cc, CALIGO.freeze);
+      chill(m.cc, CALIGO.slow, CALIGO.k);
+    }
+    this.events.push({ type: 'caligo', ...p, r: t.caligoRange, dir: h.facing });
   }
 
   // --- frost: Bufera di bora, Globo di brina ---

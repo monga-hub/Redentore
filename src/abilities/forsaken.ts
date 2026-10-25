@@ -3,16 +3,19 @@ import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
 import type { World } from '../core/physics.ts';
 import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
-import { SCHOOL, START, tuneOf, type Tune } from '../player/levels.ts';
+import { SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
-import { Grimoire, type Bolt, type SpellEvent } from './grimoire.ts';
+import { Grimoire, type BaseBolt, type Bolt, type SpellEvent } from './grimoire.ts';
+import type { Sound } from '../audio/engine.ts';
 
 // The Forsaken kit: thirty-three abilities and a potion, five a school (the primary attack apart), three of them specials
 // that unlock when the charge bar fills (system.ts): bone, plague and shadow, fire, frost and lightning, holy (the rules of
 // all but the first few in grimoire.ts). Names are our own; flavour after the undead racials, Diablo's necromancers and
 // WoW's warlocks, mages, shamans and paladins.
+// Each school has its base attack, the big button of a hero of that school (levels.ts BASE_ATTACK): Caduta d'ossa's club,
+// and bolts thrown as fast for the others, Stiletto di ghiaccio first.
 // The run starts with Caduta d'ossa, Nube di peste, Preghiera di suffragio (the long-cast heal) and the potion; level-ups (player/levels.ts) unlock
 // the rest and change the numbers, which every ability reads live from `tune` (tooltips too).
 // Each one has its own clip on the Reietto (player/undead.ts) and layered effects (vfx.ts); a
@@ -181,9 +184,17 @@ interface Later { t: number; f: () => void }
 
 interface Flight { core: THREE.Sprite; halo: THREE.Sprite; trail: number }
 const BOLT_LOOK = { pyre: [0xffb040, FIRE, 0.6, 2.2], frost: [0xc8eeff, DEEP, 0.32, 1.3], lance: [0xffffff, ICE, 0.18, 0.6], venom: [0xc8ff8a, PLAGUE, 0.28, 1.1],
-  judge: [0xfff4d0, GOLD, 0.42, 1.9], hammer: [0xffe080, GOLD, 0.45, 1.6] } as const; // core, halo, core size, halo size
-const BOLT_TRAIL = { pyre: fireTrail, frost: frostTrail, lance: lanceTrail, venom: venomTrail, judge: goldTrail, hammer: goldTrail } as const;
-const BOLT_MOTE = { frost: [snow, 40], lance: [frostMote, 25], venom: [drip, 40], judge: [holyMote, 40], hammer: [goldMote, 30] } as const; // shed in flight (the fireball has its own)
+  judge: [0xfff4d0, GOLD, 0.42, 1.9], hammer: [0xffe080, GOLD, 0.45, 1.6],
+  thorn: [0xd8ff9a, PLAGUE, 0.16, 0.6], umbra: [0xe6c8ff, VIOLET, 0.2, 0.7], ember: [0xffd070, FIRE, 0.2, 0.7], spark: [0xffffff, STORM, 0.18, 0.7], smite: [0xfff4d0, GOLD, 0.2, 0.7] } as const; // core, halo, core size, halo size
+const thinTrail = (t: RibbonStyle): RibbonStyle => ({ ...t, width: 0.12, life: 0.16 }); // the base attacks: small and quick
+const BOLT_TRAIL = { pyre: fireTrail, frost: frostTrail, lance: lanceTrail, venom: venomTrail, judge: goldTrail, hammer: goldTrail,
+  thorn: thinTrail(venomTrail), umbra: thinTrail(drainTrail), ember: thinTrail(fireTrail), spark: thinTrail(frostTrail), smite: thinTrail(goldTrail) } as const;
+const BOLT_MOTE = { frost: [snow, 40], lance: [frostMote, 25], venom: [drip, 40], judge: [holyMote, 40], hammer: [goldMote, 30],
+  thorn: [drip, 20], umbra: [violetSpark, 20], ember: [pyreEmber, 25], spark: [voltSpark, 25], smite: [holyMote, 20] } as const; // shed in flight (the fireball has its own)
+/** Where a base bolt lands or bursts on a wall: sparks, its colour's flash, a sound. */
+const BASE_HIT: Record<Exclude<BaseBolt, 'lance'>, [Style, number, Sound]> = {
+  thorn: [droplet, PLAGUE, 'plague_hit'], umbra: [violetSpark, VIOLET, 'bolt_hit'], ember: [pyreSpark, FIRE, 'fire_hit'], spark: [voltSpark, STORM, 'zap'], smite: [goldMote, GOLD, 'strike_hit'],
+};
 const CASES = 6, MARKS = 3;
 
 /** How tall a foe stands (status looks sit on it): friars and priests, sacerdoti, the hornets, the boss. */
@@ -247,11 +258,12 @@ export class Forsaken {
   aimed?: () => Mob | undefined;
   foes?: () => Iterable<Mob>;
 
-  constructor(player: PlayerController, stats: PlayerStats) {
+  /** `schools`: the hero's (player/heroes.ts), his base attack on the big button. */
+  constructor(player: PlayerController, stats: PlayerStats, schools?: readonly School[]) {
     this.player = player;
     this.stats = stats;
-    const { bar, off } = loadBar(BAR, undefined, ABILITIES.map((a) => a.id));
-    this.system = new AbilitySystem(ABILITIES, bar, this, START, off);
+    const start = startOf(schools), { bar, off } = loadBar([start[0], ...BAR.slice(1)], undefined, ABILITIES.map((a) => a.id));
+    this.system = new AbilitySystem(ABILITIES, bar, this, start, off);
     this.magic = new Grimoire(this, tune);
     this.system.pool = stats;
     const v = this.vfx;
@@ -612,6 +624,23 @@ export class Forsaken {
         v.burst(iceShard, x, y + 1.2, z, 6, 0.15, 3, 1);
         playSfx('frost_hit', { x, y: y + 1, z }, { gain: -5 });
         break;
+      case 'base': { // a base bolt lands
+        const [spark, color, sound] = BASE_HIT[e.kind as Exclude<BaseBolt, 'lance'>];
+        v.burst(spark, x, y + 1.2, z, e.big ? 20 : 12, e.big ? 0.4 : 0.15, 4, 1);
+        v.pulse(x, y + 1.2, z, color, e.big ? 18 : 10);
+        playSfx(sound, { x, y: y + 1, z }, { gain: -9 });
+        break;
+      }
+      case 'caligo': { // the fog rolls out ahead, rime on the floor under it
+        const r = e.r ?? 8, f = e.dir ?? 0;
+        for (let i = 0; i < 70; i++) {
+          const a = f + rnd(-0.75, 0.75), sp = rnd(r * 0.6, r * 1.3), dx = -Math.sin(a), dz = -Math.cos(a);
+          v.spawn(i % 3 ? frostMist : snow, x + dx * 0.8, y + 1.2, z + dz * 0.8, dx * sp, rnd(-0.3, 0.5), dz * sp);
+        }
+        for (let d = 2; d < r; d += 2.2) v.decal({ ...frostFloor, size: d * 0.9 }, x - Math.sin(f) * d, g, z - Math.cos(f) * d);
+        v.pulse(x - Math.sin(f) * 2, y + 1.2, z - Math.cos(f) * 2, ICE, 35);
+        break;
+      }
       case 'shatter':
         v.spawn(flareIce, x, y + 1.2, z);
         v.burst(iceShard, x, y + 1, z, 42, 0.5, 6, 3);
@@ -825,6 +854,10 @@ export class Forsaken {
           v.burst(droplet, x, y, z, 14, 0.15, 3, 1);
           v.pulse(x, y, z, PLAGUE, 12);
           playSfx('plague_hit', { x, y, z }, { gain: -8 });
+        } else if (e.kind && e.kind in BASE_HIT) {
+          const [spark, color] = BASE_HIT[e.kind as Exclude<BaseBolt, 'lance'>];
+          v.burst(spark, x, y, z, 10, 0.15, 3);
+          v.pulse(x, y, z, color, 10);
         } else if (e.kind === 'judge' || e.kind === 'hammer') {
           v.spawn({ ...flareGold, size: 1.2 }, x, y, z);
           v.burst(goldMote, x, y, z, 20, 0.15, 4);
@@ -979,11 +1012,16 @@ export class Forsaken {
 
   // --- helpers the ability table uses ---
 
+  /** The next step of the base attack's combo (0, 1, 2: the third blow), carried on by a press within COMBO s of the last. */
+  nextCombo(): number {
+    this.combo = this.comboT < COMBO ? (this.combo + 1) % 3 : 0;
+    this.comboT = 0;
+    return this.combo;
+  }
+
   /** Caduta d'ossa's swing: the next step of the combo, its arc and its blow. */
   swingCombo(): void {
-    const step = this.comboT < COMBO ? (this.combo + 1) % 3 : 0;
-    this.combo = step;
-    this.comboT = 0;
+    const step = this.nextCombo();
     const f = this.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), v = this.vfx;
     this.player.model.play(step === 0 ? 'slash1' : step === 1 ? 'slash2' : 'slash3', BLOW);
     this.player.model.fight();
@@ -1209,6 +1247,27 @@ const CHEST_Y = 1.2; // grimoire.ts: m above the feet where its chest-high point
 /** Targeted at a foe, but falls ahead with none: only a hidden target stops it (Rintocco, the pillar, the blizzard). */
 const inSight = (k: Forsaken) => (k.magic.why() === 'Bersaglio non in vista.' ? 'Bersaglio non in vista.' : undefined);
 
+/** A base attack that flies (levels.ts BASE_ATTACK): off the GCD like Caduta d'ossa, a throw every 0.3 s for nothing, and
+ *  every third throw of a run is the combo's third blow. `say`: what it does, from its numbers. */
+function baseBolt(id: BaseBolt, name: string, sfx: Sound, say: (u: Prim) => string): Ability<Forsaken> {
+  return {
+    id, name, icon: id, cooldown: 0.3, offGcd: true, swing: true, main: true, charge: 3,
+    get desc() {
+      const u = tune.prim[id];
+      return `Istantaneo. ${say(u)}` + (u.third > 1 ? ` Un colpo ogni tre ne infligge ${dmg(u.dmg * u.third)}.` : '') + (u.split && id !== 'lance' ? ' Il colpo schizza: metà dei danni a chi gli sta entro 2,5 m.' : '')
+        + (u.mana ? ` Ogni colpo che va a segno ti ridà ${u.mana} mana.` : '');
+    },
+    check: (k) => k.magic.why(),
+    fire(k) {
+      const third = k.nextCombo() === 2;
+      k.player.model.play('throw', BLOW);
+      k.player.model.fight();
+      playSfx(sfx, chest(k), { gain: third ? -2 : -7 });
+      k.at(BLOW, () => k.magic.shoot(id, k.player.model.hand(new THREE.Vector3()), third));
+    },
+  };
+}
+
 export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'step', name: "Passo d'ombra", icon: 'step', mana: 40, charge: 10,
@@ -1299,7 +1358,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     // The main attack: off the GCD so the 0.3 s cooldown is the real swing rate, WoW auto-attack style.
-    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 0.3, offGcd: true, swing: true, charge: 3,
+    id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 0.3, offGcd: true, swing: true, main: true, charge: 3,
     get desc() {
       return `Un fendente di schegge d'ossa davanti a te: ${dmg(tune.fallDmg)} danni a tutti i nemici entro ${num(tune.fallRange)} m.`
         + (tune.fallThird > 1 ? ` Il terzo colpo della combo ne infligge ${dmg(tune.fallDmg * tune.fallThird)}.` : '')
@@ -1372,15 +1431,21 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.at(0.15, () => k.magic.font());
     },
   },
+  baseBolt('lance', 'Stiletto di ghiaccio', 'frost_cast', (u) => `Uno stiletto di ghiaccio sul bersaglio: ${dmg(u.dmg)} danni, ${dmg(u.dmg * 3)} se è congelato.${u.split ? ' Chi è congelato va in frantumi: metà dei danni a chi gli sta entro 3 m.' : ''}`),
+  baseBolt('thorn', 'Spina di peste', 'bolt_cast', (u) => `Una spina marcia del lazzaretto sul bersaglio: ${dmg(u.dmg)} danni.`),
+  baseBolt('umbra', "Strale d'ombra", 'bolt_cast', (u) => `Uno strale d'ombra sul bersaglio: ${dmg(u.dmg)} danni.`),
+  baseBolt('ember', 'Tizzone', 'fire_cast', (u) => `Un tizzone dei ceri votivi sul bersaglio: ${dmg(u.dmg)} danni.`),
+  baseBolt('spark', 'Folgore', 'zap', (u) => `Una folgore dalla punta delle dita sul bersaglio: ${dmg(u.dmg)} danni.`),
+  baseBolt('smite', 'Castigo', 'bolt_cast', (u) => `Un raggio di luce del Redentore sul bersaglio: ${dmg(u.dmg)} danni.`),
   {
-    id: 'lance', name: 'Stiletto di ghiaccio', icon: 'lance', mana: 12, cooldown: 0, charge: 6,
-    get desc() { return `Istantaneo. Uno stiletto di ghiaccio sul bersaglio: ${dmg(tune.lanceDmg)} danni, ${dmg(tune.lanceDmg * 3)} se è congelato.${tune.lanceSplit ? ' Chi è congelato va in frantumi: metà dei danni a chi gli sta entro 3 m.' : ''}`; },
-    check: (k) => k.magic.why(),
+    id: 'caligo', name: 'Caligo gelato', icon: 'caligo', mana: 30, charge: 10,
+    get cooldown() { return 8 * tune.cdr; },
+    get desc() { return `Il caligo, la nebbia gelata della laguna, ti esce di bocca davanti a te fino a ${num(tune.caligoRange)} m: ${dmg(tune.caligoDmg)} danni, e chi colpisce cammina del 60% più lento per 5 s.${tune.caligoFreeze ? ' Chi era già rallentato resta congelato sul posto 2 s.' : ''}`; },
     fire(k) {
-      k.player.model.play('throw', BLOW);
+      k.player.model.play('push', 0.12);
       k.player.model.fight();
-      playSfx('frost_cast', chest(k), { gain: -4 });
-      k.at(BLOW, () => k.magic.shoot('lance', k.player.model.hand(new THREE.Vector3())));
+      playSfx('frost_nova', chest(k), { gain: -4 });
+      k.at(0.12, () => k.magic.caligo());
     },
   },
   {
@@ -1778,5 +1843,5 @@ for (const a of ABILITIES) a.school = SCHOOL[a.id]; // each school its own globa
  *  kit on the next slots, which on touch run from the bottom-left of the thumb arc up (ui/actionBar.ts RING). Every unlock
  *  takes the next free slot; the ability book (ui/book.ts) rearranges slots 1-8. */
 export const BAR: (string | null)[] = ['fall', 'mend', null, null, null, null, null, null, null, 'potion'];
-/** A new game's bar: the hero's own kit (player/heroes.ts) ahead of the heal. */
-export const barOf = (kit: readonly string[]): (string | null)[] => ['fall', ...kit, 'mend', ...Array<null>(7 - kit.length).fill(null), 'potion'];
+/** A new game's bar: the hero's base attack (levels.ts BASE_ATTACK) and his own kit (player/heroes.ts) ahead of the heal. */
+export const barOf = (kit: readonly string[], main = 'fall'): (string | null)[] => [main, ...kit, 'mend', ...Array<null>(7 - kit.length).fill(null), 'potion'];

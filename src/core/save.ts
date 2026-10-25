@@ -6,12 +6,12 @@
 // cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
 // over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
-import { CARD, levelOf } from '../player/levels.ts';
+import { BASE_ATTACK, CARD, levelOf } from '../player/levels.ts';
 import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
 import type { SideState } from '../quest/squero.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
-import { heroOf, type Hero } from '../player/heroes.ts';
+import { HEROES, heroOf, type Hero } from '../player/heroes.ts';
 
 const VERSION = 1;
 /** Flags on Quest saved as they are: the second quest's, and Fra' Zuane's corona found and given back. */
@@ -23,6 +23,9 @@ export const SLOTS = 3;
 const GONE = 1e3; // s a loaded corpse has lain: past the sink, so it is hidden from the start
 /** x past which nothing is walkable since level 2 moved to -X (level/plan.ts): the fondamenta's +X end. */
 const OLD_EAST = 60;
+/** Stiletto di ghiaccio left the Gelo's five to become its base attack, Caligo gelato in its place: what an older save
+ *  learnt or picked of it is the fog, and its two upgrades the fog's for a hero with no claim to the stiletto. */
+const STILETTO: Record<string, string> = { lance: 'caligo', lance_dmg: 'caligo_big', lance_split: 'caligo_freeze' };
 
 export interface GameState {
   v: number;
@@ -47,7 +50,8 @@ export interface GameState {
   // saves from before the levels: they load at level 1 with the starting kit, and as XP is the worth of the
   // dead, the level-ups their kills earned are offered one after another right after the load.
   // learned: abilities taught by the merchants' tomes (player/levels.ts TOMES); absent in older saves: none.
-  build?: { xp: number; lv: number; picks: string[]; learned?: string[] };
+  // main: the base attack the book put on the big button (player/levels.ts BASE_ATTACK); absent: the hero's own.
+  build?: { xp: number; lv: number; picks: string[]; learned?: string[]; main?: string };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
   gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
   side?: SideState; // Mastro Iseppo's quests taken, handed in and their kill counts; absent in saves from before him: none
@@ -60,7 +64,7 @@ export interface Game {
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
   kit: { charge: number };
   /** `apply` lays the picks on the kit and stats (raising hpMax), so a load runs it before restoring hp. */
-  levels: { xp: number; picks: string[]; learned: string[]; apply(): void };
+  levels: { xp: number; picks: string[]; learned: string[]; main: string; apply(): void };
   quest: Quest;
   mobs: { state: string; hp: number; t: number; again?: boolean }[];
   time: number;
@@ -81,7 +85,7 @@ export function serialize(g: Game): GameState {
     again: g.mobs.flatMap((m, i) => (m.again ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
-    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks], learned: [...g.levels.learned] },
+    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks], learned: [...g.levels.learned], main: g.levels.main },
     bag: g.bag.encode(),
     gear: g.gear.encode(),
     side: g.quest.side.encode(),
@@ -94,9 +98,11 @@ export function deserialize(g: Game, s: GameState): void {
   Object.assign(g.player.pos, { x: p.x, y: p.y, z: p.z });
   g.player.facing = p.yaw;
   g.levels.xp = s.build?.xp ?? 0;
-  g.levels.picks = (s.build?.picks ?? []).filter((id) => CARD.has(id)); // a card from another build is dropped
   g.hero = heroOf(s.hero);
-  g.levels.learned = (s.build?.learned ?? []).filter((id) => CARD.get(id)?.kind === 'ability');
+  const stiletto = HEROES[g.hero].school.some((k) => BASE_ATTACK[k] === 'lance'), was = (id: string) => (id === 'lance' || !stiletto ? STILETTO[id] ?? id : id);
+  g.levels.picks = (s.build?.picks ?? []).map(was).filter((id) => CARD.has(id)); // a card from another build is dropped
+  g.levels.learned = (s.build?.learned ?? []).map(was).filter((id) => CARD.get(id)?.kind === 'ability');
+  g.levels.main = typeof s.build?.main === 'string' ? s.build.main : '';
   if (s.hero === undefined && !g.levels.learned.includes('plague')) g.levels.learned.push('plague'); // the Risorto's old start
   if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
   g.quest.boon = BOONS.some((b) => b.id === s.quest.boon) ? s.quest.boon! : ''; // before the clamp too: the rite's boon may raise it

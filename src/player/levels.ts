@@ -4,11 +4,14 @@
 // ~870 (scripts/balance.ts) and ~1020 with the key's and Fra' Bortolo's quest XP, level 10: the boss is tuned for 10-11.
 // Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
 // pays 950 XP in all, ~16 with the side quests done too. There is no cap: the curve goes on, and the risen dead keep feeding it.
-// Each level offers two cards, drawn evenly from everything not yet learnt or maxed, whatever was picked before.
+// Each level offers two cards from everything not yet learnt or maxed, leaning to the hero's schools (`LEAN`: half his
+// primary school's, a third his secondary's, the rest everything else), whatever was picked before.
 // Even levels up to 10 offer two new abilities (the specials from level 6), past 10 a new ability against an upgrade;
 // the others a modifier of an owned ability (or a fusion) against a stat passive. With the finite cards all taken, small
-// repeatable ones (and the heal) keep coming. Every run starts with Caduta d'ossa and Preghiera di suffragio (the heal), the
-// potion stays as an item; the hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
+// repeatable ones (and the heal) keep coming. Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
+// Caduta d'ossa for the Ossa, Stiletto di ghiaccio for the Gelo...) and Preghiera di suffragio (the heal), the potion stays as
+// an item; owning 3 of the 5 abilities of his secondary school teaches him that school's base attack too (`SECOND_AT`),
+// which the book can put on the big button instead. The hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
 // upgrade changes is a field of `Tune`, replayed from the picks and the tomes' abilities (`tuneOf`), so a save only needs both lists.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
@@ -39,7 +42,9 @@ export interface Tune {
   pyreDmg: number; pyreCast: number; pyreR: number;
   frostDmg: number; frostCast: number; frostSlow: number;
   fontDmg: number; fontRoot: number; fontCd: number;
-  lanceDmg: number; lanceSplit: boolean;
+  /** The base attacks but Caduta d'ossa (its own fall* above): each one's upgrades apart. */
+  prim: Record<string, Prim>;
+  caligoDmg: number; caligoRange: number; caligoFreeze: boolean;
   chainDmg: number; chainHops: number; chainCast: number;
   tollDmg: number; tollStun: number; tollR: number;
   leapDmg: number; leapR: number; leapCd: number;
@@ -68,7 +73,25 @@ export interface Tune {
   fxVenomCloud: boolean; fxHolyFire: boolean; // fusions: poison in the plague cloud, the judgment set alight
 }
 
-export const START = ['fall', 'mend', 'potion'];
+/** A base attack's numbers: damage a hit, the splash (Stiletto: the frozen shatter), the third blow ×, mana back a hit. */
+export interface Prim { dmg: number; split: boolean; third: number; mana: number }
+
+/** An ability's school: the second card of an ability level leans towards the schools already owned. */
+export type School = 'bone' | 'plague' | 'shadow' | 'fire' | 'frost' | 'storm' | 'holy';
+/** Each school's base attack: the big button of a hero of that school (player/heroes.ts `school[0]`), cheap and fast to spam. */
+export const BASE_ATTACK: Record<School, string> = { bone: 'fall', frost: 'lance', plague: 'thorn', shadow: 'umbra', fire: 'ember', storm: 'spark', holy: 'smite' };
+export const BASES = Object.values(BASE_ATTACK);
+/** Damage a hit of a bolt base attack (Caduta d'ossa: fallDmg). */
+export const PRIM_DMG = 8;
+const prims = (): Record<string, Prim> => Object.fromEntries(BASES.filter((id) => id !== 'fall').map((id) => [id, { dmg: PRIM_DMG, split: false, third: 1, mana: 0 }]));
+/** Abilities of the secondary school owned for its base attack to come by itself. */
+export const SECOND_AT = 3;
+/** The Risorto's: who `tuneOf` and the rest take a hero to be when not told. */
+export const RISORTO: [School, School] = ['bone', 'shadow'];
+
+/** The abilities every run starts with: the hero's base attack, the heal, the potion. */
+export const startOf = (schools: readonly School[] = RISORTO) => [BASE_ATTACK[schools[0]], 'mend', 'potion'];
+export const START = startOf();
 export const SPECIALS = ['strike', 'nova', 'ward'];
 const BASE: Tune = {
   owned: START,
@@ -84,7 +107,8 @@ const BASE: Tune = {
   pyreDmg: 140, pyreCast: 2.2, pyreR: 2.5,
   frostDmg: 65, frostCast: 1.5, frostSlow: 0.5,
   fontDmg: 25, fontRoot: 4, fontCd: 20,
-  lanceDmg: 24, lanceSplit: false,
+  prim: prims(),
+  caligoDmg: 45, caligoRange: 8, caligoFreeze: false,
   chainDmg: 80, chainHops: 4, chainCast: 1.5,
   tollDmg: 90, tollStun: 2.5, tollR: 3.2,
   leapDmg: 60, leapR: 3, leapCd: 12,
@@ -116,8 +140,6 @@ const it = (n: number) => n.toLocaleString('it', { maximumFractionDigits: 2 });
 const pct = (k: number) => `${Math.round(k * 100)}%`;
 
 export type CardKind = 'ability' | 'mod' | 'passive' | 'fusion' | 'filler';
-/** An ability's school: the second card of an ability level leans towards the schools already owned. */
-export type School = 'bone' | 'plague' | 'shadow' | 'fire' | 'frost' | 'storm' | 'holy';
 export interface Card {
   id: string; kind: CardKind; name: string; icon: string; text: string; max: number;
   /** The owned ability a mod belongs to; for an ability card, the one it unlocks (= id). */
@@ -131,12 +153,19 @@ export interface Card {
 
 const special = (_c: (id: string) => number, owns: (a: string) => boolean) => SPECIALS.some(owns);
 /** A school's abilities, for the fusions with any of them. */
-const FROST = ['frost', 'font', 'lance', 'blizzard', 'orb'], STORM = ['chain', 'toll', 'shield', 'rod', 'squall'], FIRE = ['pyre', 'wisp', 'pillar', 'cero', 'furnace'];
+const FROST = ['frost', 'font', 'caligo', 'blizzard', 'orb', 'lance'], STORM = ['chain', 'toll', 'shield', 'rod', 'squall'], FIRE = ['pyre', 'wisp', 'pillar', 'cero', 'furnace'];
 const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text: string): Card => ({ id, kind: 'ability', name, icon: id, text, max: 1, of: id, tier, school });
 /** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
-export const SCHOOL: Record<string, School> = { fall: 'bone', mend: 'holy' };
+export const SCHOOL: Record<string, School> = { mend: 'holy', ...Object.fromEntries(Object.entries(BASE_ATTACK).map(([s, id]) => [id, s as School])) };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
   ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
+/** A base attack's four upgrades, the shape of Caduta d'ossa's: damage (twice), a wider reach, the third blow, mana back. */
+const baseMods = (of: string, name: string, n: [string, string, string, string], split = 'il colpo schizza, metà dei danni a chi gli sta entro 2,5 m.'): Card[] => [
+  mod(of, `${of}_dmg`, n[0], `${name}: +3 danni per colpo (base ${PRIM_DMG}).`, 2, (t) => { t.prim[of].dmg += 3; }),
+  mod(of, `${of}_split`, n[1], `${name}: ${split}`, 1, (t) => { t.prim[of].split = true; }),
+  mod(of, `${of}_third`, n[2], `${name}: un colpo ogni tre ne infligge ×2,5.`, 1, (t) => { t.prim[of].third = 2.5; }),
+  mod(of, `${of}_mana`, n[3], `${name}: ogni colpo che va a segno ti ridà 4 mana.`, 1, (t) => { t.prim[of].mana = 4; }),
+];
 const passive = (id: string, name: string, text: string, max: number, apply: (t: Tune) => void, needs?: Card['needs']): Card =>
   ({ id, kind: 'passive', name, icon: id, text, max, apply, needs });
 
@@ -150,7 +179,7 @@ export const CARDS: Card[] = [
   ability('pyre', "Rogo dell'eretico", 'A', 'fire', `Lancio lungo (${it(BASE.pyreCast)} s): un globo di fuoco dei ceri votivi da ${BASE.pyreDmg} danni, metà ai vicini; il bersaglio brucia e il pavimento arde. 45 mana.`),
   ability('frost', 'Dardo di brina', 'A', 'frost', `Lancio ${it(BASE.frostCast)} s: un dardo della laguna gelata da ${BASE.frostDmg} danni, e il bersaglio rallenta del ${pct(1 - BASE.frostSlow)} per 6 s. 22 mana.`),
   ability('font', 'Acquasantiera gelata', 'A', 'frost', `L'acqua santa ghiaccia attorno a te: ${BASE.fontDmg} danni e chi è entro 5 m resta congelato sul posto ${BASE.fontRoot} s. 40 mana, recupero ${BASE.fontCd} s.`),
-  ability('lance', 'Stiletto di ghiaccio', 'A', 'frost', `Istantaneo: uno stiletto di ghiaccio da ${BASE.lanceDmg} danni, il triplo su chi è congelato. 12 mana.`),
+  ability('caligo', 'Caligo gelato', 'A', 'frost', `Il caligo, la nebbia gelata della laguna, davanti a te fino a ${BASE.caligoRange} m: ${BASE.caligoDmg} danni e chi colpisce rallenta del 60% per 5 s. 30 mana, recupero 8 s.`),
   ability('chain', 'Catena di saette', 'A', 'storm', `Lancio ${it(BASE.chainCast)} s: una saetta da ${BASE.chainDmg} danni che rimbalza su altri ${BASE.chainHops} nemici. 35 mana, recupero 5 s.`),
   ability('toll', 'Rintocco del campanile', 'A', 'storm', `Un fulmine dal campanile sul bersaglio: ${BASE.tollDmg} danni entro ${it(BASE.tollR)} m e storditi ${it(BASE.tollStun)} s. 45 mana, recupero 18 s.`),
   ability('leap', 'Balzo del sepolcro', 'A', 'bone', `Un balzo fino a 12 m sul nemico: ${BASE.leapDmg} danni entro ${BASE.leapR} m e un attimo di stordimento. 30 mana, recupero ${BASE.leapCd} s.`),
@@ -183,7 +212,7 @@ export const CARDS: Card[] = [
   passive('mana', "Pozzo d'anime", '+20% di mana massimo (+80).', 2, (t) => { t.mana += 0.2; }),
   passive('regen', 'Linfa nera', 'Rigenerazione del mana +1 al secondo (base 3).', 2, (t) => { t.regen += 1; }),
   passive('speed', 'Passo del morto', '+8% alla velocità di corsa.', 2, (t) => { t.speed += 0.08; }),
-  passive('cdr', 'Gelo della cripta', '−10% ai tempi di recupero (non a Caduta d’ossa).', 2, (t) => { t.cdr -= 0.1; }),
+  passive('cdr', 'Gelo della cripta', '−10% ai tempi di recupero (non agli attacchi base).', 2, (t) => { t.cdr -= 0.1; }),
   passive('leech', "Sete d'anime", 'Ogni nemico che uccidi ti cura del 3% della salute massima.', 2, (t) => { t.leech += 0.03; }),
   passive('fury', 'Furia del sepolcro', '+30% alla carica della barra della furia.', 2, (t) => { t.fury += 0.3; }, special),
 
@@ -213,8 +242,15 @@ export const CARDS: Card[] = [
   mod('frost', 'frost_fast', 'Dardo rapido', `Dardo di brina: lancio da ${it(BASE.frostCast)} a 1 s.`, 1, (t) => { t.frostCast = 1; }),
   mod('font', 'font_long', 'Gelo eterno', `Acquasantiera gelata: congela 6 s invece di ${BASE.fontRoot}.`, 1, (t) => { t.fontRoot = 6; }),
   mod('font', 'font_cd', 'Acquasantiera colma', `Acquasantiera gelata: recupero da ${BASE.fontCd} a 13 s.`, 1, (t) => { t.fontCd = 13; }),
-  mod('lance', 'lance_dmg', 'Stiletto affilato', `Stiletto di ghiaccio: +10 danni (base ${BASE.lanceDmg}).`, 1, (t) => { t.lanceDmg += 10; }),
-  mod('lance', 'lance_split', 'Frantumi', 'Stiletto di ghiaccio: chi è congelato va in frantumi e le schegge colpiscono per metà chi gli sta entro 3 m.', 1, (t) => { t.lanceSplit = true; }),
+  mod('caligo', 'caligo_big', 'Caligo fitto', `Caligo gelato: +20 danni (base ${BASE.caligoDmg}), arriva a 11 m.`, 1, (t) => { t.caligoDmg += 20; t.caligoRange = 11; }),
+  mod('caligo', 'caligo_freeze', 'Caligo di gennaio', 'Caligo gelato: chi era già rallentato resta congelato sul posto 2 s.', 1, (t) => { t.caligoFreeze = true; }),
+  // the base attacks but Caduta d'ossa (its four are above)
+  ...baseMods('lance', 'Stiletto di ghiaccio', ['Stiletto affilato', 'Frantumi', 'Stiletto del bravo', 'Brina avida'], 'chi è congelato va in frantumi e le schegge colpiscono per metà chi gli sta entro 3 m.'),
+  ...baseMods('thorn', 'Spina di peste', ['Spina marcia', 'Pustola', 'Spina del monatto', 'Spina avida']),
+  ...baseMods('umbra', "Strale d'ombra", ['Strale affilato', 'Ombra che dilaga', 'Strale della bauta', 'Ombra avida']),
+  ...baseMods('ember', 'Tizzone', ['Tizzone rovente', 'Brace sparsa', 'Tizzone del vetraio', 'Brace avida']),
+  ...baseMods('spark', 'Folgore', ['Folgore viva', 'Folgore biforcuta', 'Folgore del campanaro', 'Folgore avida']),
+  ...baseMods('smite', 'Castigo', ['Castigo severo', 'Castigo diffuso', 'Castigo trino', 'Castigo grato']),
   mod('chain', 'chain_long', 'Catena lunga', `Catena di saette: rimbalza su 7 nemici invece di ${BASE.chainHops}.`, 1, (t) => { t.chainHops = 7; }),
   mod('chain', 'chain_fast', 'Saette rapide', `Catena di saette: lancio da ${it(BASE.chainCast)} a 0,75 s.`, 1, (t) => { t.chainCast = 0.75; }),
   mod('toll', 'toll_long', 'Rintocco funebre', `Rintocco del campanile: storditi 3,5 s invece di ${it(BASE.tollStun)}.`, 1, (t) => { t.tollStun = 3.5; }),
@@ -279,9 +315,15 @@ const counter = (picks: readonly string[]) => {
   return (id: string) => n.get(id) ?? 0;
 };
 
-/** The stats and ability numbers the picks and the tomes' `learned` abilities add up to (unknown ids and stacks past `max` are ignored). */
-export function tuneOf(picks: readonly string[], learned: readonly string[] = []): Tune {
-  const t: Tune = { ...BASE, owned: [...START] }, seen = new Map<string, number>();
+/** The abilities of school `s` a slot holds: its five, the base attack apart. */
+export const slotsOf = (s: School) => Object.keys(SCHOOL).filter((id) => SCHOOL[id] === s && !BASES.includes(id));
+
+/**
+ * The stats and ability numbers the picks and the tomes' `learned` abilities add up to (unknown ids and stacks past `max`
+ * are ignored), for a hero of `schools` (primary, secondary): his base attack, and his secondary's once he owns SECOND_AT of its five.
+ */
+export function tuneOf(picks: readonly string[], learned: readonly string[] = [], schools: readonly School[] = RISORTO): Tune {
+  const t: Tune = { ...BASE, owned: startOf(schools), prim: prims() }, seen = new Map<string, number>();
   for (const id of picks) {
     const c = CARD.get(id), k = (seen.get(id) ?? 0) + 1;
     if (!c || k > c.max) continue;
@@ -290,25 +332,38 @@ export function tuneOf(picks: readonly string[], learned: readonly string[] = []
     c.apply?.(t);
   }
   for (const id of learned) if (CARD.get(id)?.kind === 'ability' && !t.owned.includes(id)) t.owned.push(id);
+  if (slotsOf(schools[1]).filter((id) => t.owned.includes(id)).length >= SECOND_AT) t.owned.push(BASE_ATTACK[schools[1]]);
   if (!SPECIALS.some((s) => t.owned.includes(s))) t.fury = 0; // no special to spend it on: the bar stays empty and hidden
   return t;
 }
 
 /** Cards that may still be offered after `picks` and the tomes' `learned`: not maxed nor owned, their ability owned, their needs met. */
-export function eligible(picks: readonly string[], learned: readonly string[] = []): Card[] {
-  const count = counter(picks), owned = tuneOf(picks, learned).owned, owns = (a: string) => owned.includes(a);
+export function eligible(picks: readonly string[], learned: readonly string[] = [], schools: readonly School[] = RISORTO): Card[] {
+  const count = counter(picks), owned = tuneOf(picks, learned, schools).owned, owns = (a: string) => owned.includes(a);
   return CARDS.filter((c) => c.kind !== 'filler' && count(c.id) < c.max && (c.kind === 'ability' ? !owns(c.id) : !c.of || owns(c.of)) && (!c.needs || c.needs(count, owns)));
 }
 
+/** Odds a card is drawn from the hero's primary school, his secondary, everything else (cards of no school too). */
+export const LEAN = [0.5, 0.3, 0.2];
+/** Which of LEAN's shares a card falls in for a hero of `schools`: an upgrade goes with its ability's school. */
+export const leanOf = (c: Card, schools: readonly School[]) => { const s = c.school ?? SCHOOL[c.of ?? '']; return s === schools[0] ? 0 : s === schools[1] ? 1 : 2; };
+
 /**
- * The two cards for the next level-up (the one `picks.length + 2` reaches), each drawn evenly from its kind's pool;
- * the repeatable ones fill in when the pool runs short. The card passed over goes back into the pool.
+ * The two cards for the next level-up (the one `picks.length + 2` reaches), each drawn from its kind's pool: a share
+ * by LEAN (the empty ones' odds go to the rest), then evenly within it; the repeatable ones fill in when the pool runs
+ * short. The card passed over goes back into the pool.
  */
-export function offer(picks: readonly string[], rnd: () => number = Math.random, learned: readonly string[] = []): Card[] {
-  const lv = picks.length + 2, ok = eligible(picks, learned), out: Card[] = [];
+export function offer(picks: readonly string[], rnd: () => number = Math.random, learned: readonly string[] = [], schools: readonly School[] = RISORTO): Card[] {
+  const lv = picks.length + 2, ok = eligible(picks, learned, schools), out: Card[] = [];
   const pick = (from: Card[]) => {
     const left = from.filter((c) => !out.includes(c));
-    if (left.length) out.push(left[Math.floor(rnd() * left.length) % left.length]);
+    if (!left.length) return;
+    const shares = LEAN.map((_, i) => left.filter((c) => leanOf(c, schools) === i)), w = LEAN.map((k, i) => (shares[i].length ? k : 0));
+    let r = rnd() * w.reduce((a, b) => a + b, 0), i = 0;
+    while (i < 2 && (r -= w[i]) >= 0) i++;
+    while (!shares[i].length) i--; // r rounding onto an empty share's edge
+    const of = shares[i];
+    out.push(of[Math.floor(rnd() * of.length) % of.length]);
   };
   const abilities = ok.filter((c) => c.kind === 'ability' && (c.tier === 'A' || lv >= 6));
   const mods = ok.filter((c) => c.kind === 'mod' || c.kind === 'fusion'), passives = ok.filter((c) => c.kind === 'passive');
@@ -356,6 +411,10 @@ export function tomeOf(tome: Tome, owned: readonly string[]): { teaches: Card[];
 /** Runtime level state: XP (main.ts sets it from the dead), the picks, the tomes' abilities, and the hook that lays them on the kit. */
 export class Levels {
   xp = 0;
+  /** The hero's schools, primary and secondary (player/heroes.ts). */
+  schools: readonly School[] = RISORTO;
+  /** The base attack on the big button, if the player put his secondary school's there (the book); else his own. */
+  main = '';
   picks: string[] = [];
   learned: string[] = [];
   /** Lay `picks` on the kit, stats and bar (main.ts). */

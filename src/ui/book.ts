@@ -1,6 +1,6 @@
 import { playSfx } from '../audio/engine.ts';
 import { KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
-import { CARD, SCHOOL, type School } from '../player/levels.ts';
+import { CARD, SCHOOL, SECOND_AT, type School } from '../player/levels.ts';
 import { RING } from './actionBar.ts';
 import { ICONS } from './icons.ts';
 
@@ -13,7 +13,8 @@ import { ICONS } from './icons.ts';
 // row with keys otherwise). Equipaggia lights the eight slots: a tap on one puts the ability there, swapping with an
 // ability already on the bar or sending the one there back to the book. Not armed, a tap on a slot opens its ability.
 // With a mouse, drag an ability (from the list or a slot) onto a slot, or a slot onto the list to take it off.
-// The primary attack and the potion are fixed: the big button and the potion's own button.
+// The primary attack and the potion are fixed: the big button and the potion's own button. The big button takes a base
+// attack only: the hero's own, or his secondary school's once he has learnt it (Sul tasto grande).
 
 const CSS = `
 #book-btn { position: fixed; z-index: 6; right: calc(12px + env(safe-area-inset-right)); top: calc(144px + env(safe-area-inset-top));
@@ -138,9 +139,12 @@ export class AbilityBook<C extends Caster> {
   /** Called as it opens, to stop casts, drags and click-to-move. */
   opened = () => {};
 
-  /** `abilities`: the kit (the potion is left out: it has its own button); `picks`: the level-up cards so far. */
-  constructor(sys: AbilitySystem<C>, abilities: Ability<C>[], picks: () => readonly string[]) {
+  private setMain: (id: string) => void;
+  /** `abilities`: the kit (the potion is left out: it has its own button), the hero's base attacks among them; `picks`: the
+   *  level-up cards so far; `setMain`: a base attack goes on the big button. */
+  constructor(sys: AbilitySystem<C>, abilities: Ability<C>[], picks: () => readonly string[], setMain: (id: string) => void = (id) => sys.setMain(id)) {
     this.sys = sys;
+    this.setMain = setMain;
     this.all = abilities.filter((a) => a.id !== sys.layout().bar[POTION]);
     this.picks = picks;
     this.sel = sys.slots[PRIMARY]?.id ?? this.all[0].id;
@@ -217,11 +221,11 @@ export class AbilityBook<C extends Caster> {
     return [...n];
   }
 
-  /** Passives picked that work on `a`: damage on what deals it, cooldowns on what has one (not the club), fury on the specials. */
+  /** Passives picked that work on `a`: damage on what deals it, cooldowns on what has one (not the base attacks), fury on the specials. */
   private passives(a: Ability<C>): [string, number][] {
     const n = new Map<string, number>();
     for (const p of this.picks()) {
-      const ok = p === 'dmg' || p === 'ossa_eterne' ? /\d danni/.test(a.desc) : p === 'cdr' ? a.cooldown > 0 && a.id !== this.sys.slots[PRIMARY]?.id : p === 'fury' ? !!a.special : false;
+      const ok = p === 'dmg' || p === 'ossa_eterne' ? /\d danni/.test(a.desc) : p === 'cdr' ? a.cooldown > 0 && !a.main : p === 'fury' ? !!a.special : false;
       if (ok) n.set(p, (n.get(p) ?? 0) + 1);
     }
     return [...n];
@@ -229,16 +233,16 @@ export class AbilityBook<C extends Caster> {
 
   private row(a: Ability<C>): string {
     const owned = this.sys.owns(a.id), on = this.slotOf(a.id) >= 0, rank = 1 + this.upgrades(a).reduce((s, [, k]) => s + k, 0);
-    const sub = !owned ? (a.special ? 'Speciale · da imparare' : 'Da imparare') : a.id === this.sys.slots[PRIMARY]?.id ? 'Tasto grande · fisso' : `Rango ${rank}${on ? '' : ' · nel libro'}`;
+    const sub = !owned ? (a.special ? 'Speciale · da imparare' : 'Da imparare') : a.id === this.sys.slots[PRIMARY]?.id ? `Tasto grande · rango ${rank}` : `Rango ${rank}${on ? '' : ' · nel libro'}`;
     return `<button class="row${owned ? '' : ' lock'}${a.id === this.sel ? ' sel' : ''}" data-id="${a.id}"><span class="ic">${ICONS[a.icon] ?? ''}</span>
       <span><b>${esc(a.name)}</b><small>${sub}</small></span>${on ? '<i class="chk" aria-label="Equipaggiata">✓</i>' : ''}</button>`;
   }
 
   private list(): string {
-    const primary = this.sys.slots[PRIMARY];
-    let html = primary ? `<h3>Attacchi primari</h3>${this.row(primary)}` : '';
+    const mains = this.all.filter((a) => a.main);
+    let html = mains.length ? `<h3>Attacchi primari</h3>${mains.map((a) => this.row(a)).join('')}` : '';
     for (const [s, name] of SCHOOLS) {
-      const of = this.all.filter((a) => a !== primary && SCHOOL[a.id] === s);
+      const of = this.all.filter((a) => !a.main && SCHOOL[a.id] === s);
       of.sort((x, y) => +this.sys.owns(y.id) - +this.sys.owns(x.id)); // learnt first
       if (of.length) html += `<h3>${name}</h3>${of.map((a) => this.row(a)).join('')}`;
     }
@@ -255,7 +259,11 @@ export class AbilityBook<C extends Caster> {
     const ups = this.upgrades(a), pas = this.passives(a);
     const mods = ups.length || pas.length ? `<p class="mods">${[...ups, ...pas].map(line).join('<br>')}</p>` : '';
     let note = '', acts = '';
-    if (primary) note = "L'attacco primario sta sempre sul tasto grande: non si toglie e non si sposta.";
+    const school = SCHOOL_NAME.get(SCHOOL[a.id] as School) ?? '';
+    if (primary) note = "L'attacco primario sta sempre sul tasto grande: non si toglie e non si sposta."
+      + (this.all.some((x) => x.main && x !== a && this.sys.owns(x.id)) ? " Al suo posto puoi mettere l'altro attacco base che conosci." : '');
+    else if (a.main && !owned) note = `Non ancora appreso. È l'attacco base della scuola ${school}: lo impari da solo quando conosci ${SECOND_AT} delle sue 5 abilità, e allora può prendere il tasto grande.`;
+    else if (a.main) acts = `<div class="acts"><button class="btn" data-do="main">Sul tasto grande</button><p class="hint">Prende il posto di ${esc(this.sys.slots[PRIMARY]?.name ?? '')}, che resta nel libro. I potenziamenti restano a ciascuno.</p></div>`;
     else if (!owned) note = (a.special ? 'Non ancora appresa. Speciale: la sua carta può uscire dal livello 6 in poi, ai passaggi di livello pari.'
       : 'Non ancora appresa. Ai passaggi di livello pari una delle carte può insegnarla: scegli la sua.')
       + " Oppure compra il tomo della sua scuola da Fra' Bortolo o da Mastro Iseppo: insegna tutta la scuola.";
@@ -265,9 +273,8 @@ export class AbilityBook<C extends Caster> {
       acts = `<div class="acts"><button class="btn${this.armed ? ' on' : ''}" data-do="equip">${at >= 0 ? 'Sposta' : 'Equipaggia'}</button>
         ${at >= 0 ? '<button class="btn dim" data-do="remove">Rimuovi</button>' : ''}${hint}</div>`;
     }
-    const school = SCHOOL_NAME.get(SCHOOL[a.id] as School) ?? '';
     return `<div class="txt"><div class="head"><span class="ic">${ICONS[a.icon] ?? ''}</span><div><h4>${esc(a.name)}</h4>
-        <div class="sub">${primary ? 'Attacco primario · ' : a.special ? 'Speciale · ' : ''}${school}</div></div></div>
+        <div class="sub">${primary ? 'Attacco primario · ' : a.main ? 'Attacco base · ' : a.special ? 'Speciale · ' : ''}${school}</div></div></div>
       <div class="stats">${stats}</div><p class="desc">${lit(a.desc)}</p>${mods}${note ? `<p class="note">${note}</p>` : ''}</div>
       <div class="side">${this.arc()}${acts}</div>`;
   }
@@ -292,7 +299,7 @@ export class AbilityBook<C extends Caster> {
 
   /** Put the selected ability (or `id`) on slot `i`, remember the bar. */
   private put(id: string, i: number): void {
-    if (!SPARE.includes(i) || !this.sys.owns(id) || id === this.sys.slots[PRIMARY]?.id) return;
+    if (!SPARE.includes(i) || !this.sys.owns(id) || this.all.find((a) => a.id === id)?.main) return;
     this.sys.equip(id, i);
     saveBar(this.sys.layout());
     playSfx('ui_click', null, { ui: true, rate: 0.8 });
@@ -309,6 +316,7 @@ export class AbilityBook<C extends Caster> {
       if (this.armed && SPARE.includes(i)) { this.put(this.sel, i); this.armed = false; }
       else if (this.sys.slots[i] && i !== POTION) { this.sel = this.sys.slots[i]!.id; this.armed = false; }
     } else if (act?.dataset.do === 'equip') this.armed = !this.armed;
+    else if (act?.dataset.do === 'main') { this.setMain(this.sel); playSfx('ui_click', null, { ui: true, rate: 0.8 }); }
     else if (act?.dataset.do === 'remove') {
       this.sys.remove(this.slotOf(this.sel));
       saveBar(this.sys.layout());
@@ -323,7 +331,7 @@ export class AbilityBook<C extends Caster> {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
     const t = e.target as HTMLElement, row = t.closest<HTMLElement>('.row'), slot = t.closest<HTMLElement>('.ps[data-slot]');
     const from = slot ? +slot.dataset.slot! : -1, id = row?.dataset.id ?? (SPARE.includes(from) ? this.sys.slots[from]?.id : undefined);
-    if (!id || !this.sys.owns(id) || id === this.sys.slots[PRIMARY]?.id) return;
+    if (!id || !this.sys.owns(id) || this.all.find((a) => a.id === id)?.main) return;
     this.drag = { id, from, x: e.clientX, y: e.clientY, pointer: e.pointerId };
     const move = (m: PointerEvent) => {
       const d = this.drag!;

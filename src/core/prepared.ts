@@ -12,11 +12,11 @@ import { saveBar, type Layout } from '../abilities/system.ts';
 
 export const XP = 1525;
 /** Level-up cards for levels 2..12, as `offer` deals them: an ability on the even levels to 10, an upgrade or passive between. */
-export const PICKS = ['step', 'hp', 'frost', 'plague_dps', 'nova', 'fall_third', 'lance', 'fx_fallplague', 'font', 'dmg', 'hp'];
+export const PICKS = ['step', 'hp', 'frost', 'plague_dps', 'nova', 'fall_third', 'caligo', 'fx_fallplague', 'font', 'dmg', 'hp'];
 /** Level 1's purple set, one piece a slot. */
 export const GEAR = { testa: 'mitria', amuleto: 'ruta-oro', spalle: 'mantella-peste', torso: 'saio-voto', mani: 'guanti-palladio', gambe: 'cosciali-lazzaretto', piedi: 'zoccoli-redentore', anello: 'anello-1576', arma: 'pastorale' };
 /** The bar: the club on 1, the potion on R, the rest in the touch fan's order. */
-export const BAR: Layout = { bar: ['fall', 'frost', 'lance', 'plague', 'font', 'step', 'nova', 'mend', null, 'potion'], off: [] };
+export const BAR: Layout = { bar: ['fall', 'frost', 'caligo', 'plague', 'font', 'step', 'nova', 'mend', null, 'potion'], off: [] };
 const UNSEEN = new Set(['giudecca', 'zitelle']); // level 2's zones: not walked yet
 
 /**

@@ -9,7 +9,7 @@ import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, s
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
-import type { Hero } from '../src/player/heroes.ts';
+import { HEROES, type Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
 import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
 import { eligible, levelOf as lvOf } from '../src/player/levels.ts';
@@ -24,7 +24,7 @@ function boot(hero: Hero = 'risorto'): Game {
     player: { pos: { x: SPAWN.x, y: 0, z: SPAWN.z }, facing: SPAWN.yaw },
     stats,
     kit: { charge: 0 },
-    levels: { xp: 0, picks: [], learned: [], apply() { const t = tuneOf(this.picks, this.learned), w = effects(gear.totals); stats.grow(t.hp, t.mana, w.hp, w.mana); } }, // main.ts lays the rest on the kit
+    levels: { xp: 0, picks: [], learned: [], main: '', apply() { const t = tuneOf(this.picks, this.learned, HEROES[g.hero].school), w = effects(gear.totals); stats.grow(t.hp, t.mana, w.hp, w.mana); } }, // main.ts lays the rest on the kit
     quest: new Quest(level.world),
     mobs: spawnGroups(level.world).flat(),
     time: 0,
@@ -262,10 +262,19 @@ if (!valid(ls) || !valid({ ...ls, build: { ...ls.build, learned: undefined } }) 
 // The hero chosen round-trips with his kit; a save from before the choice is the Risorto's, given back the Nube di peste
 // he started with then; another build's hero is the Risorto; junk is refused.
 const hg = boot('bortolo');
-hg.levels.learned = ['frost', 'lance'];
+hg.levels.learned = ['frost', 'caligo'];
+hg.levels.main = 'spark';
 const hgs = JSON.parse(JSON.stringify(serialize(hg))), hgb = boot();
 deserialize(hgb, hgs);
-if (hgb.hero !== 'bortolo' || hgb.levels.learned.join() !== 'frost,lance' || tuneOf(hgb.levels.picks, hgb.levels.learned).owned.includes('plague')) fail(`hero after load: ${hgb.hero} ${hgb.levels.learned}`);
+if (hgb.hero !== 'bortolo' || hgb.levels.learned.join() !== 'frost,caligo' || hgb.levels.main !== 'spark' || tuneOf(hgb.levels.picks, hgb.levels.learned).owned.includes('plague')) fail(`hero after load: ${hgb.hero} ${hgb.levels.learned} ${hgb.levels.main}`);
+// Stiletto di ghiaccio became the Gelo's base attack, Caligo gelato took its place: an older Bortolo, who started with
+// it, has it as his base attack, the fog in its place and keeps its upgrades; an older Risorto who learnt or picked it
+// has the fog, and the fog's upgrades for the stiletto's. Absent, the big button's choice is the hero's own.
+const older = (hero: string, picks: string[], learned: string[]) => { const g = boot(); deserialize(g, { ...hgs, hero, build: { xp: 400, lv: 6, picks, learned } }); return g; };
+const ob = older('bortolo', ['lance_dmg', 'lance_split', 'hp'], ['frost', 'lance']), obt = tuneOf(ob.levels.picks, ob.levels.learned, HEROES.bortolo.school);
+if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || obt.prim.lance.dmg !== 11 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
+const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']);
+if (or.levels.learned.join() !== 'caligo' || or.levels.picks.join() !== 'caligo,caligo_big,caligo_freeze,hp' || or.levels.picks.length !== 4) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks}`);
 const hgOld = boot('bortolo');
 deserialize(hgOld, (({ hero: _h, ...o }) => o)(hgs));
 if (hgOld.hero !== 'risorto' || !tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague')) fail('a save from before the choice is not the Risorto with his plague');
@@ -305,7 +314,7 @@ PICKS.forEach((id, i) => {
 if (GEAR_SLOTS.some((sl) => GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.rarity !== 'epico' || GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.l2)) fail(`prepared gear ${JSON.stringify(pb.gear.worn)}`);
 if (pb.stats.hp !== pb.stats.hpMax || pb.stats.mana !== pb.stats.manaMax || pb.mobs.some((m) => m.state !== 'dead')) fail('prepared hero not full, or level 1 not cleared');
 if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(-240, -20)) fail('prepared map not level 1 seen');
-const owned = new Set(['fall', 'plague', 'mend', 'potion', ...PICKS.filter((id) => ['step', 'frost', 'nova', 'lance', 'font'].includes(id))]);
+const owned = new Set(['fall', 'plague', 'mend', 'potion', ...PICKS.filter((id) => ['step', 'frost', 'nova', 'caligo', 'font'].includes(id))]);
 if (BAR.bar.filter((x) => x).length !== owned.size || BAR.bar.some((x) => x && !owned.has(x)) || BAR.bar[0] !== 'fall' || BAR.bar[9] !== 'potion') fail(`prepared bar ${BAR.bar}`);
 mem.clear();
 if (migration(store) || migration(store)) fail('a first launch with nothing saved lost its fresh game');

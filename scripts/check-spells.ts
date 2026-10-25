@@ -2,7 +2,7 @@
 // boss's resistance, what a stun, a root and a chill do to a friar's and a priest's brain, and the rules of the
 // fire, frost and lightning spells and the new blows (abilities/grimoire.ts): bolts homing and landing, splash
 // and burning, the chill, the frozen shattering, the chain's jumps, the thunderbolt's delay, the leap's travel,
-// the execute's scaling, Miasma elettrico, Frantumazione, the whirl's parry; the rest of the five a school (poison doses,
+// the execute's scaling, the base attacks' bolts and their upgrades, Caligo gelato, Miasma elettrico, Frantumazione, the whirl's parry; the rest of the five a school (poison doses,
 // the untore, the miasma, the fever and its cap on the bosses, the drain, the pillar, the candle, the furnace, the
 // blizzard, the orb, the lightning shield, the rod, the squall's knockback, the judgment, the consecrated ground, the
 // hammer's stun on the boss, their fusions); and walls: bolts (the hero's and the priests') burst on them, a hidden
@@ -97,14 +97,40 @@ near(pace(foes[0].cc!), tune.frostSlow, 'frostbolt chills');
 hits.clear();
 book.shoot('lance', { x: 0, y: 1.3, z: 0 });
 run(0.5);
-near(dmg(foes[0]), tune.lanceDmg, 'the stiletto on a chilled foe');
+near(dmg(foes[0]), tune.prim.lance.dmg, 'the stiletto on a chilled foe');
 foes = [foe(0, -3)];
 book.font();
 if (!(foes[0].cc!.root > 0)) fail('Acquasantiera gelata freezes');
 hits.clear();
 book.shoot('lance', { x: 0, y: 1.3, z: 0 });
 run(0.5);
-near(dmg(foes[0]), tune.lanceDmg * 3, 'the stiletto shatters the frozen for triple');
+near(dmg(foes[0]), tune.prim.lance.dmg * 3, 'the stiletto shatters the frozen for triple');
+
+// the other base attacks: a bolt's hit; once upgraded the third blow, the splash and mana back. Caligo gelato: the cone
+// ahead slows, and with Caligo di gennaio freezes who was slowed already.
+hits.clear();
+foes = [foe(0, -8), foe(1.5, -8)];
+book.shoot('thorn', { x: 0, y: 1.3, z: 0 });
+run(0.6);
+near(dmg(foes[0]), tune.prim.thorn.dmg, 'a base bolt hits');
+if (dmg(foes[1])) fail('a base bolt splashes before its upgrade');
+Object.assign(tune.prim.spark, { split: true, third: 2.5, mana: 4 });
+hits.clear();
+host.stats.mana = 0;
+book.shoot('spark', { x: 0, y: 1.3, z: 0 }, true);
+run(0.6);
+near(dmg(foes[0]), tune.prim.spark.dmg * 2.5, 'the third blow');
+near(dmg(foes[1]), tune.prim.spark.dmg * 2.5 * 0.5, 'the splash');
+near(host.stats.mana, 4, 'mana back on a hit');
+if (tune.prim.thorn.split) fail('the upgrades follow each base attack');
+hits.clear();
+foes = [foe(0, -5), foe(0, 5)];
+book.caligo();
+near(dmg(foes[0]), tune.caligoDmg, 'the fog ahead');
+if (dmg(foes[1]) || !(foes[0].cc!.slow > 0) || foes[0].cc!.root > 0) fail('the fog: ahead only, slowing, not freezing');
+tune.caligoFreeze = true;
+book.caligo();
+if (!(foes[0].cc!.root > 0)) fail('Caligo di gennaio freezes the slowed');
 
 // the chain: the target, then jumps of 8 m at most, 4 of them, each weaker
 hits.clear();

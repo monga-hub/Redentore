@@ -101,7 +101,7 @@ function fight(seconds: number, level: number, WARDROBE: object[]): void {
     quest.win(); quest.out = true; quest.report(); quest.accept2(); quest.arrived = true; quest.takeKey2();
     quest.open(quest.gates.find((g: { id: string }) => g.id === 'coro-zitelle'));
   }
-  levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'lance', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
+  levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'caligo', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
   levels.apply();
   player.respawn(level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
   const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door

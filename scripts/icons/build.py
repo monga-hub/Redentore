@@ -79,6 +79,13 @@ ICONS = {
     'hallow': ('ability', 'consecrated ground: a glowing golden holy circle with a cross sigil on stone flagstones, golden light rising, dark brown background'),
     'hammer': ('ability', 'a heavy gilded war hammer with a cross on its head spinning through the air, golden motion trail, dark brown background'),
     'bubble': ('ability', 'a radiant golden halo dome of holy light shielding a kneeling hooded undead figure, golden rays, dark brown background'),
+    # the schools' base attacks (levels.ts BASE_ATTACK; Caduta d'ossa is 'fall', Stiletto di ghiaccio 'lance'), and the Gelo's fog
+    'thorn': ('ability', 'a long curved thorn of rotten bone flying diagonally, dripping glowing green plague bile, a few flies around it, black-green background'),
+    'umbra': ('ability', 'a slim arrow of violet shadow energy flying diagonally with a smoky black trail and pale bone tip, dark purple background'),
+    'ember': ('ability', 'a glowing orange smouldering ember brand from a church votive candle flying diagonally, a trail of sparks, dark red background'),
+    'spark': ('ability', 'a short jagged bolt of white-indigo lightning shooting from crackling skeletal fingertips, sparks, dark indigo background'),
+    'smite': ('ability', 'a narrow beam of golden holy light striking down like a spear from above, radiant rays and a small burst where it lands, dark brown background'),
+    'caligo': ('ability', 'a rolling bank of freezing blue-white lagoon fog breathed out in a cone, frost crystals glinting in it, the dark silhouette of a Venetian mooring pole, dark navy background'),
     # --- level-up passives and Fra' Bortolo's blessing (player/levels.ts, quest/view.ts) ---
     'dmg': ('talent', 'a skull split by a glowing red-hot crack, bone shards flying, red fury aura, dark red background'),
     'hp': ('talent', 'a dark red anatomical heart stitched together with bone needles and thread, dark red background'),

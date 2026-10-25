@@ -66,6 +66,8 @@ export interface Ability<C extends Caster = Caster> {
   mobile?: boolean;
   /** A blow of the club (Caduta d'ossa): off the GCD, but the hands are busy while a cast or a channel runs. */
   swing?: boolean;
+  /** A base attack: only the big button holds one (`setMain`), never a slot of the eight. */
+  main?: boolean;
   mana?: number; // cost, paid when the cooldown starts (instant/channel: on press; cast: when the bar fills)
   charge?: number; // added to the charge bar when the cooldown starts
   special?: boolean; // needs a full charge bar and empties it
@@ -220,7 +222,7 @@ export class AbilitySystem<C extends Caster = Caster> {
   /** The book's Equipaggia: owned ability `id` into the player's slot `i`. One already on the bar swaps places; one
    *  from the book sends what was there back to the book. */
   equip(id: string, i: number): void {
-    if (!SPARE.includes(i) || !this.owned.has(id) || (this.bar.includes(id) && !SPARE.includes(this.bar.indexOf(id)))) return; // the fixed ones stay
+    if (!SPARE.includes(i) || !this.owned.has(id) || this.byId.get(id)?.main || (this.bar.includes(id) && !SPARE.includes(this.bar.indexOf(id)))) return; // the fixed ones stay
     if (this.bar.includes(id)) return this.swap(this.bar.indexOf(id), i);
     const was = this.bar[i];
     if (was && this.owned.has(was)) this.off.add(was);
@@ -260,8 +262,15 @@ export class AbilitySystem<C extends Caster = Caster> {
     this.fill();
   }
 
+  /** The book's choice of base attack for the big button: an owned one (the hero's own, or his secondary school's). */
+  setMain(id: string): void {
+    if (!this.owned.has(id) || !this.byId.get(id)?.main) return;
+    this.bar[PRIMARY] = id;
+    this.fill();
+  }
+
   private place(id: string): void {
-    if (this.bar.includes(id) || this.off.has(id)) return;
+    if (this.bar.includes(id) || this.off.has(id) || this.byId.get(id)?.main) return; // a base attack waits in the book for the big button
     const i = SPARE.find((k) => !this.bar[k]) ?? SPARE.find((k) => !this.owned.has(this.bar[k]!)); // an empty one first: a load owns the rest only as it replays the picks
     if (i !== undefined) this.bar[i] = id;
   }

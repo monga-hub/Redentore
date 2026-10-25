@@ -197,10 +197,17 @@ sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone
 funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); i tomi poi sono gli stessi per tutti, le carte dei
 livelli pendono verso le scuole dell'eroe (vedi Abilità).
 La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e il
-gioco carica solo il corpo dell'eroe scelto. Bortolo, Suor Fosca, Fra' Tizian e Zanetto sono corpi Meshy sullo stesso scheletro del Risorto, con
-le sue 27 clip riapplicate osso per osso; dei set portano solo elmi, cappelli e spallacci (misurati su ciascuno: a Bortolo la
-paglietta, a lei il velo, a Fra' Tizian e a Zanetto il cappuccio si ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua), non le
-ridipinture del corpo, e le armi le stringono col proprio pugno. Le campane di Zanetto stanno su un giogo fissato al petto,
+gioco carica solo il corpo dell'eroe scelto. I cinque sono corpi Meshy sullo stesso scheletro a 24 ossa, ciascuno con la sua
+sagoma, la sua altezza (`HEROES.height`: dai 2,25 m del gigante gelato Bortolo agli 1,68 del tozzo Fra' Tizian) e il suo bagliore
+(il fuoco viola nelle costole del Risorto scheletrico, i cristalli di Bortolo, il verde veleno di Suor Fosca, il vetro fuso nelle
+braccia di Fra' Tizian, il verderame di Zanetto), e con le sue clip (idle, passo, corsa, salto, capriola, colpi, incantesimi,
+reazioni, morte) prese dalla libreria di animazioni Meshy e ritagliate sugli stessi nomi e tempi del gioco (colpi, capriola, la
+finestra in aria del salto), così il gioco è identico per tutti. Ognuno ha la sua arma di partenza in un file suo
+(`arma-<eroe>.glb`: la clava di femore, il remo da guerra gelato, lo stiletto al veleno, la canna da vetraio con la goccia fusa,
+il martello da campana). Il Risorto indossa gli otto set ridipinti sul suo corpo; gli altri ne portano solo elmi, cappelli e
+spallacci (misurati su ciascuno: al Risorto, a Fra' Tizian e a Zanetto il cappuccio, a Bortolo la paglietta, a lei il velo si
+ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua); ognuno
+stringe le armi col proprio pugno. Le campane di Zanetto stanno su un giogo fissato al petto,
 appese sotto gli spallacci perché nessun set le tocchi.
 
 ## Abilità
@@ -403,8 +410,8 @@ src/
                              (corpi esclusi fuori dal campo visivo su bounding sphere larghe, ombre solo
                              entro 30 m dall'eroe: `Shadows`)
   player/controller.ts       personaggio segnaposto, WASD, gravità, salto
-  player/undead.ts           modello del Reietto (Meshy) con la clava d'ossa: idle ansimante con
-                             giravolte della clava, guardia dopo il combattimento, passo e corsa a
+  player/undead.ts           il corpo Meshy dell'eroe scelto con le sue clip: idle,
+                             guardia dopo il combattimento, passo e corsa a
                              falcata misurata (niente piedi che scivolano), combo a 3 colpi, una
                              mossa per incantesimo, reazioni ai colpi, morte; aura per Velo e Patto
   player/outfit.ts           l'equipaggiamento sull'eroe: otto set (pezzi sulle ossa, fusi per

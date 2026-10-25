@@ -3,7 +3,7 @@ import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
 import type { World } from '../core/physics.ts';
 import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
-import { SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
+import { PILLAR_CAST, SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
@@ -1406,7 +1406,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'frost', name: 'Dardo di brina', icon: 'frost', mana: 22, cooldown: 0, charge: 8,
     get cast() { return tune.frostCast; },
-    get desc() { return `Un dardo dell'acqua gelata della laguna sul bersaglio: ${dmg(tune.frostDmg)} danni, e per 6 s cammina del ${Math.round((1 - tune.frostSlow) * 100)}% più lento. Muoverti interrompe il lancio.`; },
+    get desc() { return `Un dardo dell'acqua gelata della laguna sul bersaglio: ${dmg(tune.frostDmg)} danni, e per 6 s lui e chi gli sta entro 3 m camminano del ${Math.round((1 - tune.frostSlow) * 100)}% più lenti. Muoverti interrompe il lancio.`; },
     check: (k) => k.magic.why(),
     during(k, prog, dt) {
       k.player.model.channel(true, 'gather');
@@ -1431,15 +1431,15 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.at(0.15, () => k.magic.font());
     },
   },
-  baseBolt('lance', 'Stiletto di ghiaccio', 'frost_cast', (u) => `Uno stiletto di ghiaccio sul bersaglio: ${dmg(u.dmg)} danni, ${dmg(u.dmg * 3)} se è congelato.${u.split ? ' Chi è congelato va in frantumi: metà dei danni a chi gli sta entro 3 m.' : ''}`),
+  baseBolt('lance', 'Stiletto di ghiaccio', 'frost_cast', (u) => `Uno stiletto di ghiaccio sul bersaglio: ${dmg(u.dmg)} danni, ${dmg(u.dmg * 3)} se è congelato, e per 2 s cammina del 25% più lento.${u.split ? ' Chi è congelato va in frantumi: metà dei danni a chi gli sta entro 3 m.' : ''}`),
   baseBolt('thorn', 'Spina di peste', 'bolt_cast', (u) => `Una spina marcia del lazzaretto sul bersaglio: ${dmg(u.dmg)} danni.`),
   baseBolt('umbra', "Strale d'ombra", 'bolt_cast', (u) => `Uno strale d'ombra sul bersaglio: ${dmg(u.dmg)} danni.`),
-  baseBolt('ember', 'Tizzone', 'fire_cast', (u) => `Un tizzone dei ceri votivi sul bersaglio: ${dmg(u.dmg)} danni.`),
+  baseBolt('ember', 'Tizzone', 'fire_cast', (u) => `Un tizzone dei ceri votivi sul bersaglio: ${dmg(u.dmg)} danni, e le braci schizzano ${u.split ? 'per metà su chi gli sta entro 2,5 m' : 'per un terzo su chi gli sta entro 2 m'}.`),
   baseBolt('spark', 'Folgore', 'zap', (u) => `Una folgore dalla punta delle dita sul bersaglio: ${dmg(u.dmg)} danni.`),
   baseBolt('smite', 'Castigo', 'bolt_cast', (u) => `Un raggio di luce del Redentore sul bersaglio: ${dmg(u.dmg)} danni.`),
   {
     id: 'caligo', name: 'Caligo gelato', icon: 'caligo', mana: 30, charge: 10,
-    get cooldown() { return 8 * tune.cdr; },
+    get cooldown() { return 6 * tune.cdr; },
     get desc() { return `Il caligo, la nebbia gelata della laguna, ti esce di bocca davanti a te fino a ${num(tune.caligoRange)} m: ${dmg(tune.caligoDmg)} danni, e chi colpisce cammina del 60% più lento per 5 s.${tune.caligoFreeze ? ' Chi era già rallentato resta congelato sul posto 2 s.' : ''}`; },
     fire(k) {
       k.player.model.play('push', 0.12);
@@ -1595,9 +1595,9 @@ export const ABILITIES: Ability<Forsaken>[] = [
     end(k) { k.player.model.channel(false, 'gather'); },
   },
   {
-    id: 'pillar', name: 'Colonna di fiamme', icon: 'pillar', mana: 50, cast: 1.5, charge: 12,
+    id: 'pillar', name: 'Colonna di fiamme', icon: 'pillar', mana: 50, cast: PILLAR_CAST, charge: 12,
     get cooldown() { return 10 * tune.cdr; },
-    get desc() { return `Lancio di 1,5 s. Una colonna di fuoco sale dal pavimento sotto il bersaglio (o 8 m davanti a te): ${dmg(tune.pillarDmg)} danni entro ${num(tune.pillarR)} m, chi c'è brucia per 4 s e il pavimento arde. Muoverti interrompe il lancio.`; },
+    get desc() { return `Lancio di ${num(PILLAR_CAST)} s. Una colonna di fuoco sale dal pavimento sotto il bersaglio (o 8 m davanti a te): ${dmg(tune.pillarDmg)} danni entro ${num(tune.pillarR)} m, chi c'è brucia per 4 s e il pavimento arde. Muoverti interrompe il lancio.`; },
     check: inSight,
     during(k, prog, dt) {
       k.player.model.channel(true, 'gather');

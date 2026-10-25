@@ -40,10 +40,13 @@ const SPLASH = 0.5; // the fireball's share on its neighbours
 const BURN = { t: 4, dps: 8 }; // the fireball sets its mark burning
 const FIRE = { life: 4, dps: 12 }; // and the floor under it
 const CHILL_T = 6;
+const FROST_R = 3; // Dardo di brina's slow takes whoever runs beside the mark too
 const FONT_R = 5;
 const SHATTER = { mul: 1.6, dmg: 30, r: 3 };
 const LANCE_FROZEN = 3, LANCE_SPLIT = 0.5, LANCE_R = 3;
+export const LANCE_CHILL = { t: 2, k: 0.75 }; // every stiletto slows its mark a little: the one in front of the pack lags
 const BASE_SPLIT = { k: 0.5, r: 2.5 }; // a base attack's splash upgrade
+const SHARDS = { k: 1 / 3, r: 2 }; // Stiletto's shards and Tizzone's embers splash even without the upgrade
 const CALIGO = { arc: Math.cos(0.8), slow: 5, k: 0.4, freeze: 2 };
 const HOP = 8; // m a saetta jumps
 const HOP_FALL = 0.75; // each jump keeps this much of the damage
@@ -190,18 +193,20 @@ export class Grimoire {
       this.events.push({ type: 'hammer', ...at, big: true });
     } else if (b.kind === 'frost') {
       this.hit(m, b.dmg);
-      if (c) chill(c, CHILL_T, t.frostSlow);
+      for (const o of this.near(m, FROST_R)) if (o.cc) chill(o.cc, CHILL_T, t.frostSlow);
       this.events.push({ type: 'frost', ...at });
     } else if (b.kind === 'lance') {
       const shatter = !!c && frozen(c), u = t.prim.lance;
       this.hit(m, shatter ? b.dmg * LANCE_FROZEN : b.dmg);
-      if (shatter && u.split) for (const o of this.near(m, LANCE_R)) if (o !== m) this.hit(o, b.dmg * LANCE_FROZEN * LANCE_SPLIT);
+      if (c) chill(c, LANCE_CHILL.t, LANCE_CHILL.k);
+      const sp = shatter && u.split ? { r: LANCE_R, k: LANCE_FROZEN * LANCE_SPLIT } : SHARDS;
+      for (const o of this.near(m, sp.r)) if (o !== m) this.hit(o, b.dmg * sp.k);
       if (u.mana) this.host.stats?.restoreMana?.(u.mana);
       this.events.push({ type: shatter ? 'shatter' : 'lance', ...at, big: shatter });
     } else { // the other base attacks: the hit, the splash, mana back
-      const u = t.prim[b.kind];
+      const u = t.prim[b.kind], sp = u.split ? BASE_SPLIT : b.kind === 'ember' ? SHARDS : undefined;
       this.hit(m, b.dmg);
-      if (u.split) for (const o of this.near(m, BASE_SPLIT.r)) if (o !== m) this.hit(o, b.dmg * BASE_SPLIT.k);
+      if (sp) for (const o of this.near(m, sp.r)) if (o !== m) this.hit(o, b.dmg * sp.k);
       if (u.mana) this.host.stats?.restoreMana?.(u.mana);
       this.events.push({ type: 'base', ...at, kind: b.kind, big: u.split });
     }

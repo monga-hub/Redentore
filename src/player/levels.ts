@@ -83,6 +83,8 @@ export const BASE_ATTACK: Record<School, string> = { bone: 'fall', frost: 'lance
 export const BASES = Object.values(BASE_ATTACK);
 /** Damage a hit of a bolt base attack (Caduta d'ossa: fallDmg). */
 export const PRIM_DMG = 8;
+/** Colonna di fiamme's cast (abilities/forsaken.ts). */
+export const PILLAR_CAST = 0.8;
 const prims = (): Record<string, Prim> => Object.fromEntries(BASES.filter((id) => id !== 'fall').map((id) => [id, { dmg: PRIM_DMG, split: false, third: 1, mana: 0 }]));
 /** Abilities of the secondary school owned for its base attack to come by itself. */
 export const SECOND_AT = 3;
@@ -98,14 +100,14 @@ const BASE: Tune = {
   dmg: 1, hp: 1, mana: 1, armor: 1, regen: 3, speed: 1, cdr: 1, leech: 0, fury: 1, furyStart: 0,
   fallDmg: 10, fallRange: 2.6, fallArc: Math.cos(1.1), fallThird: 1, fallMana: 0,
   plagueDps: 12, plagueR: 2.2, plagueCd: 5, plagueLife: 8,
-  wispDps: 15, wispR: 1.6, wispCast: 1.5,
+  wispDps: 15, wispR: 1.6, wispCast: 1,
   veilTime: 5, veilHeal: 0,
   stepDmg: 25, stepCd: 12,
   strikeDmg: 50, novaR: 6, novaDmg: 20, wardTime: 5, wardHeal: 0,
   potion: 0.3, potionCd: 30,
   fxWisp: false, fxStep: false, fxFall: false,
-  pyreDmg: 140, pyreCast: 2.2, pyreR: 2.5,
-  frostDmg: 65, frostCast: 1.5, frostSlow: 0.5,
+  pyreDmg: 140, pyreCast: 1.2, pyreR: 2.5, // casts of a second or so: a caster faces a charging pack too
+  frostDmg: 65, frostCast: 1, frostSlow: 0.5,
   fontDmg: 25, fontRoot: 4, fontCd: 20,
   prim: prims(),
   caligoDmg: 45, caligoRange: 8, caligoFreeze: false,
@@ -176,10 +178,10 @@ export const CARDS: Card[] = [
   ability('strike', 'Sentenza del sepolcro', 'B', 'bone', 'Speciale: con la barra della furia piena, una lancia d’ossa da 50 danni.'),
   ability('nova', 'Lamento della cripta', 'B', 'bone', 'Speciale: con la barra della furia piena, 20 danni a tutti entro 6 m.'),
   ability('ward', 'Patto della tomba', 'B', 'shadow', 'Speciale: con la barra della furia piena, 5 s di immunità a ogni danno.'),
-  ability('pyre', "Rogo dell'eretico", 'A', 'fire', `Lancio lungo (${it(BASE.pyreCast)} s): un globo di fuoco dei ceri votivi da ${BASE.pyreDmg} danni, metà ai vicini; il bersaglio brucia e il pavimento arde. 45 mana.`),
-  ability('frost', 'Dardo di brina', 'A', 'frost', `Lancio ${it(BASE.frostCast)} s: un dardo della laguna gelata da ${BASE.frostDmg} danni, e il bersaglio rallenta del ${pct(1 - BASE.frostSlow)} per 6 s. 22 mana.`),
+  ability('pyre', "Rogo dell'eretico", 'A', 'fire', `Lancio ${it(BASE.pyreCast)} s: un globo di fuoco dei ceri votivi da ${BASE.pyreDmg} danni, metà ai vicini; il bersaglio brucia e il pavimento arde. 45 mana.`),
+  ability('frost', 'Dardo di brina', 'A', 'frost', `Lancio ${it(BASE.frostCast)} s: un dardo della laguna gelata da ${BASE.frostDmg} danni, e il bersaglio e chi gli sta entro 3 m rallentano del ${pct(1 - BASE.frostSlow)} per 6 s. 22 mana.`),
   ability('font', 'Acquasantiera gelata', 'A', 'frost', `L'acqua santa ghiaccia attorno a te: ${BASE.fontDmg} danni e chi è entro 5 m resta congelato sul posto ${BASE.fontRoot} s. 40 mana, recupero ${BASE.fontCd} s.`),
-  ability('caligo', 'Caligo gelato', 'A', 'frost', `Il caligo, la nebbia gelata della laguna, davanti a te fino a ${BASE.caligoRange} m: ${BASE.caligoDmg} danni e chi colpisce rallenta del 60% per 5 s. 30 mana, recupero 8 s.`),
+  ability('caligo', 'Caligo gelato', 'A', 'frost', `Il caligo, la nebbia gelata della laguna, davanti a te fino a ${BASE.caligoRange} m: ${BASE.caligoDmg} danni e chi colpisce rallenta del 60% per 5 s. 30 mana, recupero 6 s.`),
   ability('chain', 'Catena di saette', 'A', 'storm', `Lancio ${it(BASE.chainCast)} s: una saetta da ${BASE.chainDmg} danni che rimbalza su altri ${BASE.chainHops} nemici. 35 mana, recupero 5 s.`),
   ability('toll', 'Rintocco del campanile', 'A', 'storm', `Un fulmine dal campanile sul bersaglio: ${BASE.tollDmg} danni entro ${it(BASE.tollR)} m e storditi ${it(BASE.tollStun)} s. 45 mana, recupero 18 s.`),
   ability('leap', 'Balzo del sepolcro', 'A', 'bone', `Un balzo fino a 12 m sul nemico: ${BASE.leapDmg} danni entro ${BASE.leapR} m e un attimo di stordimento. 30 mana, recupero ${BASE.leapCd} s.`),
@@ -193,7 +195,7 @@ export const CARDS: Card[] = [
   ability('miasma', 'Fiato della fossa', 'A', 'plague', `Un anello di miasma esplode da te: ${BASE.miasmaDmg} danni e ${BASE.miasmaStacks} dosi di veleno a chi è entro ${BASE.miasmaR} m. 45 mana, recupero ${BASE.miasmaCd} s.`),
   ability('fever', 'Febbre di palude', 'A', 'plague', `Il bersaglio e chi gli sta entro ${BASE.feverR} m prendono il ${pct(BASE.feverK)} di danni in più da tutto per 12 s (la metà sui più forti). 30 mana, recupero 15 s.`),
   ability('drain', "Risucchio d'anima", 'A', 'shadow', `Canalizzato 3 s: strappi l'anima al bersaglio, ${BASE.drainDmg} danni ogni mezzo secondo, e ognuno ti cura del ${pct(BASE.drainHeal)}. 40 mana, recupero 8 s.`),
-  ability('pillar', 'Colonna di fiamme', 'A', 'fire', `Lancio 1,5 s: una colonna di fuoco sotto il bersaglio, ${BASE.pillarDmg} danni entro ${it(BASE.pillarR)} m, chi c'è brucia e il pavimento arde. 50 mana, recupero 10 s.`),
+  ability('pillar', 'Colonna di fiamme', 'A', 'fire', `Lancio ${it(PILLAR_CAST)} s: una colonna di fuoco sotto il bersaglio, ${BASE.pillarDmg} danni entro ${it(BASE.pillarR)} m, chi c'è brucia e il pavimento arde. 50 mana, recupero 10 s.`),
   ability('cero', 'Cero funebre', 'A', 'fire', `Istantaneo: accendi un cero nel bersaglio, ${BASE.ceroDps} danni al secondo per 4 s, poi scoppia: ${BASE.ceroDmg} danni entro 4 m. 30 mana, recupero 3 s.`),
   ability('furnace', 'Fornace di Murano', 'A', 'fire', `Il soffio della fornace davanti a te, fino a ${BASE.furnaceRange} m: ${BASE.furnaceDmg} danni, chi colpisce brucia ed è stordito 2 s. 45 mana, recupero 14 s.`),
   ability('blizzard', 'Bufera di bora', 'A', 'frost', `Canalizzato 4 s: la bora gelida sul bersaglio, ${BASE.blizzardDmg} danni ogni mezzo secondo entro ${BASE.blizzardR} m e rallentati del 50%. 55 mana, recupero 12 s.`),
@@ -226,7 +228,7 @@ export const CARDS: Card[] = [
   mod('plague', 'plague_long', 'Ristagno', 'Nube di peste: dura 12 s invece di 8.', 1, (t) => { t.plagueLife = 12; }),
   mod('wisp', 'wisp_dps', 'Fiamma vorace', 'Fuoco fatuo: da 15 a 23 danni al secondo.', 1, (t) => { t.wispDps = 23; }),
   mod('wisp', 'wisp_still', 'Fuoco inquieto', 'Fuoco fatuo: brucia entro 2,4 m invece di 1,6.', 1, (t) => { t.wispR = 2.4; }),
-  mod('wisp', 'wisp_fast', 'Evocazione rapida', 'Fuoco fatuo: si evoca all’istante (era 1,5 s).', 1, (t) => { t.wispCast = 0; }),
+  mod('wisp', 'wisp_fast', 'Evocazione rapida', `Fuoco fatuo: si evoca all’istante (era ${it(BASE.wispCast)} s).`, 1, (t) => { t.wispCast = 0; }),
   mod('veil', 'veil_long', 'Velo più lungo', 'Velo spettrale: dura 8 s invece di 5.', 1, (t) => { t.veilTime = 8; }),
   mod('veil', 'veil_heal', 'Velo rigenerante', 'Velo spettrale: mentre dura ti cura del 3% della salute al secondo.', 1, (t) => { t.veilHeal = 0.03; }),
   mod('step', 'step_dmg', 'Passo lacerante', "Passo d'ombra: da 25 a 60 danni.", 1, (t) => { t.stepDmg = 60; }),
@@ -236,10 +238,10 @@ export const CARDS: Card[] = [
   mod('ward', 'ward_long', 'Patto eterno', 'Patto della tomba: 7 s invece di 5, e alla fine ti cura del 15%.', 1, (t) => { t.wardTime = 7; t.wardHeal = 0.15; }),
   mod('potion', 'potion_big', 'Fiala capiente', 'Fiala di linfa tombale: ripristina il 45% invece del 30%.', 1, (t) => { t.potion = 0.45; }),
   mod('potion', 'potion_cd', 'Fiala rapida', 'Fiala di linfa tombale: recupero da 30 a 20 s.', 1, (t) => { t.potionCd = 20; }),
-  mod('pyre', 'pyre_fast', 'Rogo rapido', `Rogo dell'eretico: lancio da ${it(BASE.pyreCast)} a 1,6 s.`, 1, (t) => { t.pyreCast = 1.6; }),
+  mod('pyre', 'pyre_fast', 'Rogo rapido', `Rogo dell'eretico: lancio da ${it(BASE.pyreCast)} a 0,6 s.`, 1, (t) => { t.pyreCast = 0.6; }),
   mod('pyre', 'pyre_big', 'Pira', `Rogo dell'eretico: +50 danni (base ${BASE.pyreDmg}), schizzi e fiamme a terra da ${it(BASE.pyreR)} a 3,2 m.`, 1, (t) => { t.pyreDmg += 50; t.pyreR = 3.2; }),
   mod('frost', 'frost_deep', 'Brina profonda', `Dardo di brina: +15 danni (base ${BASE.frostDmg}) e rallenta del 70% invece del ${pct(1 - BASE.frostSlow)}.`, 1, (t) => { t.frostDmg += 15; t.frostSlow = 0.3; }),
-  mod('frost', 'frost_fast', 'Dardo rapido', `Dardo di brina: lancio da ${it(BASE.frostCast)} a 1 s.`, 1, (t) => { t.frostCast = 1; }),
+  mod('frost', 'frost_fast', 'Dardo rapido', `Dardo di brina: lancio da ${it(BASE.frostCast)} a 0,5 s.`, 1, (t) => { t.frostCast = 0.5; }),
   mod('font', 'font_long', 'Gelo eterno', `Acquasantiera gelata: congela 6 s invece di ${BASE.fontRoot}.`, 1, (t) => { t.fontRoot = 6; }),
   mod('font', 'font_cd', 'Acquasantiera colma', `Acquasantiera gelata: recupero da ${BASE.fontCd} a 13 s.`, 1, (t) => { t.fontCd = 13; }),
   mod('caligo', 'caligo_big', 'Caligo fitto', `Caligo gelato: +20 danni (base ${BASE.caligoDmg}), arriva a 11 m.`, 1, (t) => { t.caligoDmg += 20; t.caligoRange = 11; }),
@@ -248,7 +250,7 @@ export const CARDS: Card[] = [
   ...baseMods('lance', 'Stiletto di ghiaccio', ['Stiletto affilato', 'Frantumi', 'Stiletto del bravo', 'Brina avida'], 'chi è congelato va in frantumi e le schegge colpiscono per metà chi gli sta entro 3 m.'),
   ...baseMods('thorn', 'Spina di peste', ['Spina marcia', 'Pustola', 'Spina del monatto', 'Spina avida']),
   ...baseMods('umbra', "Strale d'ombra", ['Strale affilato', 'Ombra che dilaga', 'Strale della bauta', 'Ombra avida']),
-  ...baseMods('ember', 'Tizzone', ['Tizzone rovente', 'Brace sparsa', 'Tizzone del vetraio', 'Brace avida']),
+  ...baseMods('ember', 'Tizzone', ['Tizzone rovente', 'Brace sparsa', 'Tizzone del vetraio', 'Brace avida'], 'le braci schizzano più forte: metà dei danni a chi gli sta entro 2,5 m (era un terzo entro 2 m).'),
   ...baseMods('spark', 'Folgore', ['Folgore viva', 'Folgore biforcuta', 'Folgore del campanaro', 'Folgore avida']),
   ...baseMods('smite', 'Castigo', ['Castigo severo', 'Castigo diffuso', 'Castigo trino', 'Castigo grato']),
   mod('chain', 'chain_long', 'Catena lunga', `Catena di saette: rimbalza su 7 nemici invece di ${BASE.chainHops}.`, 1, (t) => { t.chainHops = 7; }),

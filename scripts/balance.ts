@@ -26,6 +26,8 @@
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
 //   TOMES=plague,holy node scripts/balance.ts ...  the hero starts with those schools' tomes read (every ability of theirs; the cards offer the rest)
 //   HERO=bortolo node scripts/balance.ts ...       another hero (player/heroes.ts): his school's base attack, his kit learned from the start, the offers leaning to his schools (default the Risorto)
+//   SCHOOLS=fire,holy KIT=pyre,pillar node ...     a hero not in HEROES yet: those schools (the base attack of the first) and that kit, over HERO's
+//   node scripts/balance.ts pack arcane [runs]     four friars rush the hero from 16 m on the orto's open path, the build at levels 1, 4, 6, dodging and not, one life (DEALT=1: casts a run)
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
@@ -80,8 +82,9 @@ export const BUILDS: Record<string, string[]> = {
 /** HERO=bortolo: whose kit the bot plays (a new game's `learned`). */
 const HERO = HEROES[heroOf(process.env.HERO)];
 /** TOMES=plague,holy: the abilities those schools' tomes teach, owned from the start, past the hero's kit. */
-const SCHOOLS = HERO.school, START = startOf(SCHOOLS), MAIN = START[0]; // his base attack: Caduta d'ossa's club, or a bolt
-const LEARNED = [...HERO.kit, ...(process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, [...START, ...HERO.kit]).teaches.map((c) => c.id))];
+const SCHOOLS = (process.env.SCHOOLS?.split(',') as typeof HERO.school | undefined) ?? HERO.school, START = startOf(SCHOOLS), MAIN = START[0]; // his base attack: Caduta d'ossa's club, or a bolt
+const KIT = process.env.KIT?.split(',').filter(Boolean) ?? HERO.kit;
+const LEARNED = [...KIT, ...(process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, [...START, ...KIT]).teaches.map((c) => c.id))];
 /** m the bot strikes from with its base attack. */
 const reach = () => (MAIN === 'fall' ? tune.fallRange : 25);
 
@@ -847,6 +850,37 @@ export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape' 
   return { build, lv, elite, dodge, won: !r.deaths && group.every((m) => m.state === 'dead'), time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
 }
 
+export interface PackResult { build: string; lv: number; dodge: boolean; won: boolean; time: number; potions: number; lost: number; contact: number; kills: number; casts: Map<string, number> }
+
+/** A caster's nightmare: four friars of one pull, set 16 m up the orto's open path and charging, the hero standing his ground at level `lv`, one life. */
+export function playPack(build: string, lv: number, dodge: boolean, s = 1): PackResult {
+  swings.clear();
+  const r = new Run(build, dodge);
+  seed = s * 7919;
+  r.dress(process.env.GEAR ?? 'typical');
+  r.picks = lv > 1 ? picksTo(build, lv) : [];
+  r.apply();
+  r.stats.revive();
+  r.levelUp = () => {};
+  const at = { x: -19.5, z: -96 }, pack = r.friars.slice(0, 4);
+  for (const m of r.mobs) if (!pack.includes(m as Friar)) { m.state = 'dead'; m.hp = 0; }
+  pack.forEach((f, i) => {
+    const x = at.x + (i % 2 ? 0.7 : -0.7) + (rnd() - 0.5) * 0.4, z = at.z - 16 - Math.floor(i / 2) * 1.2 - rnd();
+    Object.assign(f, { x, z, y: r.world.standHeight(x, z), state: 'chase', t: 0, mates: pack, home: { x, z, yaw: 0 } });
+  });
+  Object.assign(r.player.pos, { x: at.x, y: r.world.standHeight(at.x, at.z), z: at.z });
+  const goal = { ...at, r: 1 };
+  let lost = 0, contact = -1, kills = 0, pots = 0;
+  while (r.time < 120 && !r.deaths && pack.some((m) => m.state !== 'dead')) {
+    const h0 = r.stats.hp, z = r.zone('orto'), p0 = z.potions;
+    r.step(goal);
+    lost += Math.max(0, h0 - r.stats.hp) / r.stats.hpMax;
+    pots += z.potions - p0;
+    if (contact < 0 && pack.some((m) => m.state !== 'dead' && Math.hypot(m.x - r.player.pos.x, m.z - r.player.pos.z) < FRIAR.reach + 0.3)) { contact = r.time; kills = pack.filter((m) => m.state === 'dead').length; }
+  }
+  return { build, lv, dodge, won: !r.deaths && pack.every((m) => m.state === 'dead'), time: r.time, potions: pots, lost, contact, kills, casts: r.casts };
+}
+
 // --- reports ---
 const ZONES = ['orto', 'apiario', 'laguna', 'chiostri', 'chiesa', 'boss', 'fond.2', 'gastaldo', 'ospizio', 'maestra', 'boss2', 'viaggio'];
 const pad = (s: string | number, n: number) => String(s).padStart(n);
@@ -890,6 +924,19 @@ export function bossTable(rs: BossResult[]): string {
   return out.join('\n');
 }
 
+/** The pack: per level, wins (one life), s to clear it, hp lost, potions, s to the first friar in reach and friars dead by then. */
+export function packTable(rs: PackResult[]): string {
+  const out = [`${'build'.padEnd(8)}${pad('level', 6)} ${'bot'.padEnd(9)}${pad('wins', 7)}${pad('clear s', 9)}${pad('hp lost', 9)}${pad('pots', 6)}${pad('contact s', 11)}${pad('dead then', 11)}`];
+  const key = (r: PackResult) => `${r.lv}|${r.dodge}`;
+  for (const k of [...new Set(rs.map(key))]) {
+    const g = rs.filter((r) => key(r) === k), lv = g[0].lv, won = g.filter((r) => r.won), met = g.filter((r) => r.contact >= 0);
+    out.push(`${g[0].build.padEnd(8)}${pad(lv, 6)} ${(g[0].dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 7)}${pad(won.length ? f1(mean(won.map((r) => r.time))) : '-', 9)}${pad(`${Math.round(mean(g.map((r) => r.lost)) * 100)}%`, 9)}` +
+      `${pad(f1(mean(g.map((r) => r.potions))), 6)}${pad(met.length ? f1(mean(met.map((r) => r.contact))) : '-', 11)}${pad(met.length ? f1(mean(met.map((r) => r.kills))) : '-', 11)}`);
+    if (process.env.DEALT) out.push(`    casts a run: ${[...new Set(g.flatMap((r) => [...r.casts.keys()]))].map((id) => `${id} ${f1(mean(g.map((r) => r.casts.get(id) ?? 0)))}`).join(', ')}`);
+  }
+  return out.join('\n');
+}
+
 /** Minibosses alone: per elite, build and level, wins (one life each), the fight's length and potions. */
 export function eliteTable(rs: EliteResult[]): string {
   const out = [`${'elite'.padEnd(10)}${'build'.padEnd(8)}${pad('level', 6)} ${'bot'.padEnd(9)}${pad('wins', 7)}${pad('fight s', 8)}${pad('pots', 6)}${pad('hp lost', 9)}`];
@@ -911,6 +958,10 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     const rs: BossResult[] = [], two = mode === 'boss2';
     for (const d of [true, false]) runs(Number(seeds ?? 3), (s) => rs.push(playBoss(build ?? 'mixed', Number(n ?? (two ? 11 : 9)), d, s, process.env.GEAR ?? (two ? 'typical2' : 'typical'), two)));
     console.log(bossTable(rs));
+  } else if (mode === 'pack') {
+    const rs: PackResult[] = [];
+    for (const d of [true, false]) for (const lv of [1, 4, 6]) runs(Number(n ?? 8), (s) => rs.push(playPack(build ?? 'arcane', lv, d, s)));
+    console.log(packTable(rs));
   } else if (mode === 'elite2') {
     const rs: EliteResult[] = [];
     for (const e of ['gastaldo', 'maestra'] as const) for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [9, 10, 11]) runs(Number(build ?? 3), (s) => rs.push(playElite(b, lv, e, d, s)));

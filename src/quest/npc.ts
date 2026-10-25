@@ -68,7 +68,7 @@ export class Npc {
         if (!(o instanceof THREE.Mesh)) return;
         const m = o.material as THREE.MeshStandardMaterial;
         m.emissive.setHex(tint); // the colour map glows: a ghost at night
-        m.emissiveIntensity = 1.8;
+        m.emissiveIntensity = 0.75; // the Meshy bodies' maps are pale: more and their faces wash out
       });
       this.root.add(model);
       this.mixer = new THREE.AnimationMixer(model);

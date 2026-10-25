@@ -2,7 +2,7 @@
 
 Dungeon 3D esplorabile (stile WoW / Scarlet Monastery) basato sulla Chiesa del
 Redentore + Orto dei Frati, Giudecca, Venezia; il livello 2 prosegue lungo la fondamenta
-fino alla chiesa delle Zitelle.
+fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla Punta della Giudecca a San Giorgio Maggiore.
 
 - Three.js nel browser, build Vite.
 - Terza persona, controlli WASD.
@@ -55,6 +55,25 @@ fino alla chiesa delle Zitelle.
   Mastro Iseppo nello squero (vedi sotto), e Fra' Bortolo dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
   Croce, poi nell'andito dietro l'altare. Il salvataggio tiene la nuova missione (i salvataggi vecchi si caricano:
   a livello 1 finito si riparte dal rapporto a Fra' Zuane, la nebbia di guerra resta al suo posto).
+- **Livello 3, "Le nozze di San Giorgio"** (l'ultimo): morta la Governatrice, Fra' Zuane manda il Risorto a
+  est, oltre i Tre Oci, lungo la fondamenta di San Giovanni fino alla Punta della Giudecca (`src/level/zones/sangiorgio.ts`,
+  `buildPunta`); al pontile della Punta Mastro Iseppo rema la gondola (`src/quest/ferry.ts`, ~11 s sul bacino, la
+  camera guarda l'isola e la nebbia del bacino si apre) fino all'approdo di San Giorgio Maggiore (`buildSanGiorgio`):
+  piazzale, facciata palladiana, basilica con navata, crociera sotto la cupola e coro dei monaci, campanile, chiostro
+  dei cipressi e chiostro degli allori, Scalone e Biblioteca del Longhena, antirefettorio e Cenacolo palladiano,
+  darsena, giardino e Teatro Verde. L'Abate di San Giorgio rinnova lo sposalizio del mare con le anime della laguna;
+  nemici (`src/enemies/sangiorgio.ts`, modelli Meshy): marinai annegati (mezzomarinaio), monaci neri (croce), amanuensi
+  (penna, schizzi d'inchiostro), élite il Nostromo nella darsena (ancora) e il Bibliotecario in cima allo Scalone
+  (ha la chiave del Cenacolo); boss l'Abate, alto il doppio dell'eroe, nel Cenacolo: Calice di Cana (cono di vino
+  che versa: si esce di lato), Rintocchi (anelli di campana che corrono sul pavimento: si saltano), Acqua alta (il
+  pavimento si allaga, restano asciutte poche isole: ci si sale), tre atti con onda dorata, rintocco e scossa a
+  ogni cambio d'atto e tre rintocchi quando cade. Bottino di livello 3 con livello oggetto più alto: pezzi verdi e blu,
+  sette epici (Mitra e Baculo dell'Abate, Piviale delle nozze, Cocolla di Cana, Guanti del Bibliotecario...) e il
+  leggendario Anello della Sensa (solo dall'Abate); presa la missione, Fra' Bortolo vende gli epici del livello 3.
+  Al ritorno Fra' Zuane chiude la storia (420 esperienza, 320 oro): i tre nodi sciolti, il voto del 1576 compiuto,
+  lui libero di varcare la soglia; poi l'epilogo a tutto schermo e "Fine" (si continua a vagare). Il salvataggio tiene
+  la missione e l'approdo (i salvataggi vecchi si caricano); i corpi del livello 3 si caricano con la missione e le
+  zone si accendono solo a est dei Tre Oci.
 - Nella serra dell'orto Fra' Bortolo, il fantasma dello speziale (punto esclamativo dorato finché non
   gli si parla), racconta l'antefatto che l'intro accenna: le fosse dell'orto, il conto del
   Reverendissimo, la ruta che ha lasciato al Risorto il suo nome. Una volta per partita congeda con la
@@ -108,9 +127,9 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle due carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2; `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle due carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12, l'Abate a 17), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2, route3 (livelli 1, 2 e 3 di fila: Punta, gondola, isola, Bibliotecario, Abate), boss3, pack3 (un gruppo dell'isola contro chi lancia); `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
-npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, CHROME=... per il binario)
+npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, SOAK_LEVEL=3 per l'Abate nel Cenacolo, CHROME=... per il binario)
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -435,6 +454,8 @@ src/
                              chiostro, evade, morte/respawn) e spawn per dimensione del chiostro
   enemies/zitelle.ts         livello 2: gondolieri, codeghe, zitelle, il Gastaldo, la Maestra, la Governatrice (velo,
                              linee di merletto, fuso) e i loro gruppi; il cervello è quello di caster.ts
+  enemies/sangiorgio.ts      livello 3: marinai, monaci, amanuensi, il Nostromo, il Bibliotecario, l'Abate
+                             (calice, rintocchi, acqua alta) e i loro gruppi
   enemies/bees.ts            ape gigante e operaie: un calabrone Meshy statico animato in codice (volo
                              librato, ali che battono nel vertex shader, picchiata col pungiglione,
                              sciame velenoso, sussulto ai colpi, caduta da morta); IA: caster.ts `APE`
@@ -452,6 +473,7 @@ src/
                              rimovibili), baule con la chiave, Fra' Zuane, prompt di interazione,
                              vittoria. Nessuna dipendenza da three
   quest/dialogue.ts          battute di Fra' Zuane per fase, obiettivi del tracker
+  quest/ferry.ts             la gondola di Mastro Iseppo dalla Punta a San Giorgio e ritorno
   quest/npc.ts               Fra' Zuane (Meshy, idle e gesti mentre parla, "!" sulla testa)
   quest/view.ts              grate e battenti animati, baule Meshy col coperchio che si apre e il
                              bottino, prompt "F", tracker della missione, barra del boss, banner di vittoria
@@ -478,6 +500,7 @@ src/
     orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est
     giudecca.ts              livello 2: fondamenta fino alle Zitelle, rii e ponti, campo, squero, Tre Oci, skyline
     zitelle.ts               livello 2: chiesa delle Zitelle, ospizio, cortile, orto
+    sangiorgio.ts            livello 3: fondamenta San Giovanni e Punta, l'isola di San Giorgio Maggiore
     nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
                              frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest

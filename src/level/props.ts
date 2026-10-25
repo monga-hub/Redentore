@@ -155,9 +155,9 @@ export class Props {
   }
 
   /** Instance `geo` at (x,y,z), scaled, rotated (Euler XYZ), optional colour multiplier. */
-  put(geo: THREE.BufferGeometry, role: Role, x: number, y: number, z: number, sx: number, sy: number, sz: number, rx = 0, ry = 0, rz = 0, tint?: THREE.ColorRepresentation): void {
+  put(geo: THREE.BufferGeometry, role: Role, x: number, y: number, z: number, sx: number, sy: number, sz: number, rx = 0, ry = 0, rz = 0, tint?: THREE.ColorRepresentation, shadow = true): void {
     _q.setFromEuler(_e.set(rx, ry, rz, 'YXZ')); // yaw last: tilts stay local to the prop
-    this.push(geo, role, _m.compose(_p.set(x, y, z), _q, _s.set(sx, sy, sz)), tint);
+    this.push(geo, role, _m.compose(_p.set(x, y, z), _q, _s.set(sx, sy, sz)), tint, shadow);
   }
 
   private push(geo: THREE.BufferGeometry, role: Role, m: THREE.Matrix4, tint?: THREE.ColorRepresentation, shadow = true, chunk = ''): void {

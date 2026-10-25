@@ -240,10 +240,11 @@ export class LevelBuilder {
     return piece;
   }
 
-  /** Visual-only chamfered box by extents in frame `m` (null = world), batched through decor(). */
-  part(m: THREE.Matrix4 | null, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, role: Role, cam = false): void {
+  /** Visual-only chamfered box by extents in frame `m` (null = world), batched through decor(). `tint`: a tinted role's colour (materials.ts). */
+  part(m: THREE.Matrix4 | null, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, role: Role, cam = false, tint?: THREE.Color): void {
     const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1 - z0);
     const g = chamferBox(w, h, d, Math.min(0.06, 0.25 * Math.min(w, h, d))).clone().translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    if (tint) tinted(g, tint);
     const piece = this.decor(m ? g.applyMatrix4(m) : g, role, cam);
     this.solid(piece, (m?.clone() ?? new THREE.Matrix4()).multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)).scale(new THREE.Vector3(w, h, d)));
   }
@@ -259,6 +260,7 @@ export class LevelBuilder {
     for (const d of this.decorBatches.values()) {
       const m = new THREE.Mesh(mergeGeometries(d.geos)!, material(d.role));
       m.userData.role = d.role;
+      if (d.role === 'facade') m.userData.castShadow = false; // skins on walls that cast their own (fx/atmosphere.ts)
       d.zone.add(m);
       // The camera's and the targeting's rays test each part on its own bounds, not the merged mesh's, which can span a
       // whole convent with the hero inside it: the same hits for a fraction of the triangles (the follow camera's ray
@@ -409,12 +411,12 @@ export class LevelBuilder {
     return m;
   }
 
-  /** Closed building volume: box, then zoccolo, marcapiano, eaves cornice and a hipped coppi roof. */
-  block(x0: number, x1: number, z0: number, z1: number, h: number, role: Role = 'mass'): void {
+  /** Closed building volume: box, then zoccolo, marcapiano (`mid`: off where facades.ts sets each front's own), eaves cornice and a hipped coppi roof. */
+  block(x0: number, x1: number, z0: number, z1: number, h: number, role: Role = 'mass', mid = true): void {
     this.together(() => { // one piece: drops as a whole building
       this.box(x0, x1, 0, h, z0, z1, role);
       this.band(x0, x1, z0, z1, 0, 0.6, 0.08);
-      this.band(x0, x1, z0, z1, h * 0.5, h * 0.5 + 0.22, 0.1);
+      if (mid) this.band(x0, x1, z0, z1, h * 0.5, h * 0.5 + 0.22, 0.1);
       this.band(x0, x1, z0, z1, h - 0.35, h, 0.3);
       this.hipRoof(x0, x1, z0, z1, h);
     });
@@ -613,6 +615,13 @@ function chamferBox(w: number, h: number, d: number, b: number): THREE.BufferGeo
   g.computeVertexNormals();
   CHAMFERS.set(key, g);
   return g;
+}
+
+/** Gives every vertex of `g` the colour a tinted role multiplies its plaster by (materials.ts, aTint). */
+export function tinted(g: THREE.BufferGeometry, c: THREE.Color): THREE.BufferGeometry {
+  const n = g.getAttribute('position').count, a = new Float32Array(3 * n);
+  for (let i = 0; i < n; i++) c.toArray(a, 3 * i);
+  return g.setAttribute('aTint', new THREE.BufferAttribute(a, 3));
 }
 
 /** Shape extruded `depth` thick, centred on z = 0, with a one-segment bevel. */

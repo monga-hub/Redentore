@@ -4,6 +4,7 @@ import { material, type Role } from '../materials.ts';
 import { Z } from '../plan.ts';
 import { groundPatch } from '../ground.ts';
 import { Props } from '../props.ts';
+import { front, houses as dress } from '../facades.ts';
 
 // Level 2's way out: the Fondamenta della Giudecca east of the Redentore, to the Zitelle
 // (zones/zitelle.ts). East is -X here (plan.ts: the facade looks north over the canal, +Z), so seen
@@ -65,35 +66,32 @@ export function buildGiudecca(b: LevelBuilder): void {
   // The rio del Squero's west bank south of the quay is a narrow fondamenta of the squero's neighbours: walled off.
   b.barrier(RII.squero[1], RII.squero[1] + 0.4, -40, 10);
 
-  // Houses along the quay, south side: plastered blocks of three or four storeys with shutters and chimneys.
-  const houses: [number, number, number, number, number, Role][] = [
-    [RII.croce[1], -60, -40, 10, 12, 'plaster'], // the Redentore's neighbours, down to the rio
-    [-86, RII.croce[0], -16, 10, 11, 'plaster'],
-    [-104, -90, -16, 10, 13, 'mass'],
-    [-76, -70, -40, -16, 10, 'mass'], [-104, -100, -40, -16, 10, 'plaster'], [-100, -76, -40, -30, 9, 'plaster'], // round the campiello
-    [-110, -104, -40, -14, 12, 'plaster'], [-132, -126, -40, -14, 12, 'plaster'], // flanking Santa Croce
-    [-148, -132, -30, 10, 12, 'mass'], [RII.squero[1], -148, -30, 10, 14, 'plaster'],
-    [-197, RII.squero[0], -60, -26, 10, 'mass'], // behind the squero
-    [-286, -282, -40, 0, 11, 'plaster'], // between the Zitelle and the Tre Oci
-    [-340, -298, -40, 0, 12, 'plaster'], // past the Tre Oci
+  // Houses along the quay, south side, round the campo and the campiello: blocks of three or four storeys, a Venetian
+  // front (facades.ts) on each face onto the quay, a campo or a rio (those in the water with water doors).
+  const houses: [number, number, number, number, number, Role, string, string?][] = [
+    [RII.croce[1], -60, -40, 10, 12, 'plaster', 'sw', 'w'], // the Redentore's neighbours, down to the rio
+    [-86, RII.croce[0], -16, 10, 11, 'plaster', 'sne', 'e'],
+    [-104, -90, -16, 10, 13, 'mass', 'swn'],
+    [-76, -70, -40, -16, 10, 'mass', 'we', 'e'], [-104, -100, -40, -16, 10, 'plaster', 'e'], [-100, -76, -40, -30, 9, 'plaster', 's'], // round the campiello
+    [-110, -104, -40, -14, 12, 'plaster', 's'], [-132, -126, -40, -14, 12, 'plaster', 's'], // flanking Santa Croce
+    [-148, -132, -30, 10, 12, 'mass', 'se'], [RII.squero[1], -148, -30, 10, 14, 'plaster', 'sw', 'w'],
+    [-197, RII.squero[0], -60, -26, 10, 'mass', 's'], // behind the squero
+    [-286, -282, -40, 0, 11, 'plaster', 's'], // between the Zitelle and the Tre Oci
+    [-340, -298, -40, 0, 12, 'plaster', 's'], // past the Tre Oci
   ];
-  for (const [x0, x1, z0, z1, h, role] of houses) {
-    b.block(x0, x1, z0, z1, h, role);
-    if (z1 === 10 || z1 === 0) windows(b, x0, x1, z1, h);
-  }
-  p.box(RII.croce[0] - 2.8, RII.croce[0] - 2, 11, 13.5, -12, -11.2, 'brick'); // chimneys
-  p.box(-140.8, -140, 12, 14, -4, -3.2, 'brick');
-  p.box(-156.8, -156, 14, 16.5, 2, 2.8, 'brick');
+  houses.forEach(([x0, x1, z0, z1, h, role, sides, water], i) => dress(b, p, x0, x1, z0, z1, h, sides, 200 + 17 * i, role, {}, water));
 
   // Sotoportego de la Croce: a covered passage through the houses, beams overhead, into the campiello.
   b.area('Sotoportego de la Croce', -90, -86, -16, 10);
-  b.box(-90, -86, 3.4, 13, -16, 10, 'plaster');
+  b.together(() => {
+    b.box(-90, -86, 3.4, 13, -16, 10, 'plaster');
+    for (const side of ['s', 'n'] as const) front(b, p, -90, -86, -16, 10, side, 12.8, side === 's' ? 61 : 62, { y0: 3.4, cornice: true, ends: false });
+  });
   for (let z = -15; z < 10; z += 2.5) p.box(-90, -86, 3.15, 3.4, z - 0.12, z + 0.12, 'wood');
   b.floor(-90, -86, -16, 10, 'paving', 0, 0.02);
   b.area('Campiello de la Croce', -100, -76, -30, -16);
   b.floor(-100, -76, -30, -16, 'paving', 0, 0.02);
   b.well(-88, -23, 0.9, 0.9);
-  windows(b, -100, -76, -30, 9);
 
   // Campo de Santa Croce: the convent church's closed front (now a prison: no way in), a well, benches.
   b.area('Campo de Santa Croce', -132, -104, -14, 10);
@@ -145,20 +143,6 @@ function bridge(b: LevelBuilder, p: Props, x0: number, x1: number): void {
   p.box(a - RUN - 0.3, a - RUN + 0.3, 0, 1.1, BZ1 - 0.35, BZ1, 'stoneDark');
   p.box(c + RUN - 0.3, c + RUN + 0.3, 0, 1.1, BZ0, BZ0 + 0.35, 'stoneDark');
   p.box(c + RUN - 0.3, c + RUN + 0.3, 0, 1.1, BZ1 - 0.35, BZ1, 'stoneDark');
-}
-
-/** Shuttered windows on a house front at z, facing +Z, two or three rows. */
-export function windows(b: LevelBuilder, x0: number, x1: number, z: number, h: number): void {
-  const s = 1, f = z + 0.02, rows = h > 11 ? [4.2, 7.4, 10.4] : [4, 7.2];
-  for (let x = x0 + 2.2; x < x1 - 1.4; x += 3.6) {
-    for (const y of rows) {
-      const lit = (Math.round(x * 7 + y) % 9) === 0; // now and then a lamp still burns behind the glass
-      b.part(null, x - 0.55, x + 0.55, y, y + 1.6, f, f + s * 0.06, lit ? 'lantern' : 'stoneDark');
-      b.part(null, x - 0.7, x + 0.7, y - 0.12, y, f, f + s * 0.18, 'stone'); // sill
-      for (const d of [-1, 1]) b.part(null, x + d * 0.55, x + d * 1.05, y, y + 1.6, f, f + s * 0.08, 'wood'); // shutters
-    }
-    if (h > 9.5 && (Math.round(x) % 3) === 0) b.part(null, x - 0.6, x + 0.6, 0, 2.4, f, f + s * 0.1, 'wood'); // street doors
-  }
 }
 
 /** A mooring post (bitta) on the quay edge. */

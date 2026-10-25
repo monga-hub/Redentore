@@ -3,6 +3,7 @@ import { type LevelBuilder, extrude, ring, shaped } from '../builder.ts';
 import { material } from '../materials.ts';
 import { groundPatch } from '../ground.ts';
 import { Props, cypress, fruitTree, shrub, wellTop } from '../props.ts';
+import { front } from '../facades.ts';
 
 // Santa Maria della Presentazione, "le Zitelle", and the Pia Casa that wraps it (see the task's
 // DESIGN.md): a white stucco front in two orders under a pediment with a great thermal window,
@@ -178,11 +179,13 @@ function ospizio(b: LevelBuilder, p: Props): void {
       b.band(x0 - 0.3, x1 + 0.3, -36.3, 0.3, 12.6, 13, 0.3);
       b.hipRoof(x0 - 0.3, x1 + 0.3, -36.3, 0.3, 13);
     });
-    for (let x = x0 + 2.5; x < x1 - 1; x += 3.5) for (const y of [7.8, 10.6]) { // upper windows, front and court
-      for (const z of [0.32, -36.32]) b.part(null, x - 0.5, x + 0.5, y, y + 1.5, Math.min(z, z + Math.sign(z) * 0.05), Math.max(z, z + Math.sign(z) * 0.05), (Math.round(x + y) % 7) ? 'stoneDark' : 'lantern');
-    }
-    for (let x = x0 + 3; x < x1 - 2; x += 4) for (const z of [0.32, -36.32]) b.part(null, x - 0.45, x + 0.45, 2.6, 4, Math.min(z, z + Math.sign(z) * 0.05), Math.max(z, z + Math.sign(z) * 0.05), 'stoneDark'); // barred ground windows
+    for (let x = x0 + 2.5; x < x1 - 1; x += 3.5) for (const y of [7.8, 10.6]) b.part(null, x - 0.5, x + 0.5, y, y + 1.5, -36.37, -36.32, (Math.round(x + y) % 7) ? 'stoneDark' : 'lantern'); // upper windows on the court
+    for (let x = x0 + 3; x < x1 - 2; x += 4) b.part(null, x - 0.45, x + 0.45, 2.6, 4, -36.37, -36.32, 'stoneDark'); // barred ground windows
   }
+  // The wings' fronts on the sagrato and the quay (and the west one's flank on the squero): pale plaster, stone-framed windows (facades.ts).
+  front(b, p, -282, -250.5, -36.3, 0.3, 's', 12.6, 91, { convent: true, roof: 13, openings: [{ at: -266, w: 2.8, h: 3.4 }] });
+  front(b, p, -229.5, -198, -36.3, 0.3, 's', 12.6, 92, { convent: true, roof: 13, openings: [{ at: -219, w: 2.6, h: 3.6 }] });
+  front(b, p, -229.5, -197.7, -36.3, 0.3, 'e', 12.6, 93, { convent: true, roof: 13 });
   b.part(null, -267.4, -264.6, 0, 3.4, 0.3, 0.42, 'wood'); // the east wing's street door, long shut
 
   // Furniture: the lace hall's long tables with pillows and bobbins, benches; the refettorio's board; the beds.

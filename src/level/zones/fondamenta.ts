@@ -3,6 +3,8 @@ import type { LevelBuilder } from '../builder.ts';
 import { material } from '../materials.ts';
 import { CHURCH_FLOOR, X, Z } from '../plan.ts';
 import { RII } from './giudecca.ts';
+import { Props } from '../props.ts';
+import { type Side, front } from '../facades.ts';
 
 /** Site base (water, ground slabs), Fondamenta San Giacomo, sagrato + scalinata, calle dell'ingresso. */
 export function buildFondamenta(b: LevelBuilder): void {
@@ -21,16 +23,19 @@ export function buildFondamenta(b: LevelBuilder): void {
   b.barrier(-60, 60, Z.quayEdge, Z.quayEdge + 0.6);
   b.barrier(60, 60.6, Z.sagrato, Z.quayEdge);
   // The -X end (east, plan.ts): the chains across the Ponte de la Croce (quest/progress.ts) until level 2 opens it.
-  // Neighbouring houses along the fondamenta (outside the complex).
-  b.box(-60, X.west, -1.2, 11, -20, Z.sagrato, 'plaster');
-  b.box(X.east, 60, -1.2, 11, -60, Z.sagrato, 'plaster');
-  b.hipRoof(-60, X.west, -20, Z.sagrato, 11);
-  b.hipRoof(X.east, 60, -60, Z.sagrato, 11);
-  // Convent/houses flanking the church.
-  b.box(X.west, -16, 0, 10, -17, Z.sagrato, 'plaster');
-  b.box(13, X.east, 0, 10, -54, Z.sagrato, 'plaster');
-  b.hipRoof(X.west, -16, -17, Z.sagrato, 10);
-  b.hipRoof(13, X.east, -54, Z.sagrato, 10);
+  // Neighbouring houses along the fondamenta (outside the complex), then the convent's and the houses flanking the
+  // church: Venetian fronts on the quay and down the calle dell'ingresso (facades.ts).
+  const p = new Props(b, 17);
+  const row = (x0: number, x1: number, z0: number, y0: number, h: number, sides: Side[], seed: number) => b.together(() => {
+    b.box(x0, x1, y0, h, z0, Z.sagrato, 'plaster');
+    b.hipRoof(x0, x1, z0, Z.sagrato, h);
+    for (const side of sides) front(b, p, x0, x1, z0, Z.sagrato, side, h - 0.2, seed + side.charCodeAt(0), { roof: h, cornice: true });
+  });
+  row(-60, X.west, -20, -1.2, 11, ['s'], 1);
+  row(X.east, 60, -60, -1.2, 11, ['s'], 2);
+  row(X.west, -16, -17, 0, 10, ['s', 'e'], 3);
+  row(13, X.east, -54, 0, 10, ['s'], 4);
+  p.flush();
 
   b.zone('sagrato');
   b.area('Sagrato e scalinata', -13, 13, Z.facade, Z.sagrato);

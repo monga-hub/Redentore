@@ -341,6 +341,7 @@ export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   brick: { paint: agedBrick(1024), size: 1024 },
   plaster: { paint: plaster(0xb4553f), size: 512 },
   mass: { paint: plaster(0xc4a57c), size: 512 },
+  facade: { paint: plaster(0xe2d6c4), size: 512 }, // pale: facades.ts tints each front
   roof: { paint: coppi(), size: 256 },
   paving: { paint: trachite(512), size: 512 },
   ground: { paint: ground(), size: 256 },

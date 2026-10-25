@@ -4,7 +4,8 @@ import { material, type Role } from '../materials.ts';
 import { Z } from '../plan.ts';
 import { groundPatch } from '../ground.ts';
 import { Props, bench, cypress, fruitTree, shrub } from '../props.ts';
-import { bitta, fanale, lampPost, windows } from './giudecca.ts';
+import { bitta, fanale, lampPost } from './giudecca.ts';
+import { front, houses } from '../facades.ts';
 
 // Level 3 (see the task's DESIGN.md): past the Tre Oci the Fondamenta San Giovanni runs on to the Punta della
 // Giudecca, the island's eastern tip, where Mastro Iseppo's gondola waits at a pontile; across the water
@@ -54,10 +55,8 @@ export function buildPunta(b: LevelBuilder): void {
   for (let x = -306; x > -372; x -= 9.5) bitta(p, x, Z.quayEdge - 0.5);
 
   // Houses along the fondamenta past the Tre Oci, and the Cipriani's garden wall closing the Punta to the south.
-  for (const [x0, x1, h, role] of [[-358, -340, 11, 'plaster'], [-376, -358, 14, 'mass']] as const) {
-    b.block(x0, x1, -40, 0, h, role);
-    windows(b, x0, x1, 0, h);
-  }
+  houses(b, p, -358, -340, -40, 0, 11, 's', 301);
+  houses(b, p, -376, -358, -40, 0, 14, 'sw', 302, 'mass');
   for (const x of [-312, -330, -352, -370]) fanale(b, p, x, 0);
   b.wallX(-14, PUNTA_END, -376, { h: 3.4, role: 'brick', trim: true });
   groundPatch(b, PUNTA_END, -376, -40, -14.3, 'grass');
@@ -316,18 +315,21 @@ function campanile(b: LevelBuilder, p: Props): void {
 }
 
 function monastery(b: LevelBuilder, p: Props): void {
-  // Closed ranges round the two cloisters and between the church and the water.
-  const blocks: [number, number, number, number, number, Role][] = [
-    [-512, -452, 80, 86, 12, 'plaster'], // between the cloisters and the church, its front on the piazzale
-    [-462, -452, 44, 80, 7, 'plaster'], // the water front, low: from the gondola the dome and the campanile rise over it
+  // Closed ranges round the two cloisters and between the church and the water; the faces onto the piazzale, the riva,
+  // the garden and the darsena get a convent's front (facades.ts): rows of stone-framed windows, string courses, quoins.
+  const blocks: [number, number, number, number, number, Role, string?][] = [
+    [-512, -452, 80, 86, 12, 'plaster', 'se'], // between the cloisters and the church, its front on the piazzale
+    [-462, -452, 44, 80, 7, 'plaster', 'e'], // the water front, low: from the gondola the dome and the campanile rise over it
     [-512, -504, 44, 60, 13, 'plaster'], [-512, -504, 64, 80, 13, 'plaster'], // Longhena's wing, the passage between
-    [-548, -536, 36, 44, 12, 'plaster'], [-524, -498, 36, 44, 12, 'plaster'], [-484, -452, 36, 44, 8, 'plaster'], // the south range
-    [-512, -498, 20, 36, 12, 'brick'], [-484, -470, 20, 36, 12, 'brick'], [-512, -508, 4, 20, 10, 'brick'], [-470, -452, -8, 36, 7, 'plaster'],
-    [-600, -548, -8, 80, 12, 'brick'], // the Manica lunga and the dormitories
-    [-568, -540, 80, 92, 11, 'brick'], [-600, -578, 80, 124, 12, 'brick'], [-578, -568, 80, 112, 10, 'brick'], // round the choir
+    [-548, -536, 36, 44, 12, 'plaster'], [-524, -498, 36, 44, 12, 'plaster'], [-484, -452, 36, 44, 8, 'plaster', 'e'], // the south range
+    [-512, -498, 20, 36, 12, 'brick'], [-484, -470, 20, 36, 12, 'brick'], [-512, -508, 4, 20, 10, 'brick', 'n'], [-470, -452, -8, 36, 7, 'plaster', 'ne'],
+    [-600, -548, -8, 80, 12, 'brick', 'n'], // the Manica lunga and the dormitories
+    [-568, -540, 80, 92, 11, 'brick'], [-600, -578, 80, 124, 12, 'brick', 's'], [-578, -568, 80, 112, 10, 'brick'], // round the choir
   ];
-  for (const [x0, x1, z0, z1, h, role] of blocks) b.block(x0, x1, z0, z1, h, role);
-  windows(b, -512, -452, 86, 12); // over the piazzale
+  blocks.forEach(([x0, x1, z0, z1, h, role, sides], i) => {
+    if (sides) houses(b, p, x0, x1, z0, z1, h, sides, 400 + 13 * i, role, { convent: true, brick: role === 'brick', tint: 0xf2dcb8 });
+    else b.block(x0, x1, z0, z1, h, role);
+  });
   b.box(-512, -504, 4.2, 13, 60, 64, 'plaster');
   b.floor(-512, -504, 60, 64, 'paving', 0, 0.02);
   for (const x of [-511, -505]) b.lights.push({ x, y: 2.75, z: 62, kind: 'torch', nx: x < -508 ? 1 : -1, nz: 0 });
@@ -389,6 +391,7 @@ function library(b: LevelBuilder, p: Props): void {
   b.area('Biblioteca del Longhena', -508, -470, -6, 20);
   b.box(-508, -470, 0, LIB_F, -6, 20, 'plaster');
   b.room(-508, -470, -6, 20, { h: LIB_F + 7, y0: LIB_F, role: 'plaster', trim: true, floor: 'wood', s: [{ at: -491, w: 2.8, h: 3.4, y0: LIB_F, arch: true }] });
+  front(b, p, -508, -470, -6.3, 20, 'n', LIB_F + 6.7, 451, { convent: true, roof: LIB_F + 7.4, tint: 0xf6e6cc }); // its back on the garden
   b.hipRoof(-508, -470, -6, 20, LIB_F + 7.4);
   const shelf = (x0: number, x1: number, z0: number, z1: number) => {
     b.box(x0, x1, LIB_F, LIB_F + 4.4, z0, z1, 'wood', { camera: false });

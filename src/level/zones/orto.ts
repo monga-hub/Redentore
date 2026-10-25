@@ -1,6 +1,8 @@
 import type { LevelBuilder } from '../builder.ts';
 import { X, Z } from '../plan.ts';
 import { groundPatch } from '../ground.ts';
+import { Props } from '../props.ts';
+import { front } from '../facades.ts';
 
 // Orto dei Frati: walled garden between the convent (south) and the north body.
 // Layout only (ground tints, raised beds, basin, walls); vegetation, the covered
@@ -73,6 +75,10 @@ export function buildOrto(b: LevelBuilder): void {
   b.room(19, X.east, -112, -98, { h: 6, w: [{ at: -105 }], floor: 'paving' });
   b.box(19, X.east, 6.4, 9, -112, -98, 'mass', { collide: false });
   b.hipRoof(19, X.east, -168, -54, 9);
+  // Its front on the uliveto: a convent's range in ochre, stone-framed windows, the segreteria's door (facades.ts).
+  const p = new Props(b, 23);
+  front(b, p, 18.7, X.east, Z.ortoNorth, Z.conventNorth, 'w', 8.75, 31, { convent: true, roof: 9, cornice: true, tint: 0xffd49a, openings: [{ at: -105, w: 2.4, h: 3.2 }] });
+  p.flush();
 }
 
 /** Grid of raised beds (0.3 m, steppable) filling a block with 1.2 m walks between. */

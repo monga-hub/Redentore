@@ -17,17 +17,19 @@ interface Spec {
   macro?: number; // strength of large-scale world-space colour variation (breaks tiling)
   peel?: number; // plaster: world-space scaling threshold (lower = more brick showing)
   shape?: boolean; // paint by form (aShape): banded macro blotches, local foot/top gradient, lit chamfers
+  tinted?: boolean; // the painted map (not the brick under a peel) times the vertex attribute aTint: one batch, many colours (facades.ts)
   vcol?: boolean; // untextured, shaded by the geometry's baked vertex colours (props.ts crowns, bark)
   metal?: number;
   glow?: number; // emissive = tint * glow: accents that must still read in deep shadow
 }
 
 const SPECS = {
-  stone: { tile: 2.4, rough: 0.82, grime: true, macro: 0.12, shape: true }, // pietra d'Istria (facade, church)
+  stone: { tile: 2.4, rough: 0.82, grime: true, macro: 0.12, shape: true, tinted: true }, // pietra d'Istria (facade, church); tinted for the facades' kit (glass, painted wood)
   stoneDark: { tile: 2.4, rough: 0.78, grime: true, macro: 0.1, shape: true }, // columns, cornices, steps
   plaster: { tile: 3.6, rough: 0.95, grime: true, macro: 0.15, peel: 0.6, shape: true }, // red intonaco of the calli and convent
   brick: { tile: 2.88, rough: 0.9, grime: true, macro: 0.18, shape: true }, // cloister walls/arches: 36×9 cm bricks, shuffled per brick
   mass: { tile: 3.6, rough: 0.95, grime: true, macro: 0.18, peel: 0.63, shape: true }, // inaccessible building volumes (ochre plaster)
+  facade: { tile: 3.6, rough: 0.95, grime: true, macro: 0.15, peel: 0.68, shape: true, tinted: true }, // pale intonaco of the house fronts, each tinted its own colour (facades.ts)
   roof: { tile: 1.6, rough: 0.75, macro: 0.2, shape: true }, // coppi
   paving: { tile: 3.2, rough: 0.8, macro: 0.12, shape: true }, // trachite masegni
   ground: { tile: 6, rough: 0.95, macro: 0.15 }, // base site slab
@@ -53,9 +55,12 @@ const SPECS = {
 export type Role = keyof typeof SPECS;
 
 // World-space triplanar projection of `map`, plus large-scale colour drift and wall grime.
-const VERT_DECL = 'attribute vec3 aShape;\nvarying vec3 vShape;\nvarying vec3 vTriPos;\nvarying vec3 vTriNrm;\n';
+const VERT_DECL = 'attribute vec3 aShape;\nvarying vec3 vShape;\nvarying vec3 vTriPos;\nvarying vec3 vTriNrm;\n#ifdef TRI_TINT\nattribute vec3 aTint;\nvarying vec3 vTint;\n#endif\n';
 const VERT_BODY = `#include <project_vertex>
 vShape = aShape;
+#ifdef TRI_TINT
+vTint = aTint;
+#endif
 #ifdef USE_INSTANCING
 vTriPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
 vTriNrm = mat3(modelMatrix) * mat3(instanceMatrix) * objectNormal;
@@ -66,6 +71,9 @@ vTriNrm = mat3(modelMatrix) * objectNormal;
 const FRAG_DECL = `varying vec3 vShape;
 varying vec3 vTriPos;
 varying vec3 vTriNrm;
+#ifdef TRI_TINT
+varying vec3 vTint;
+#endif
 uniform float uTile;
 uniform float uMacro;
 float triHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -140,6 +148,9 @@ const FRAG_MAP = `{
 #else
   vec3 p = vTriPos / uTile;
   vec4 tex = texture2D(map, p.zy) * w.x + texture2D(map, p.xz) * w.y + texture2D(map, p.xy) * w.z;
+#endif
+#ifdef TRI_TINT
+  tex.rgb *= vTint;
 #endif
 #ifdef TRI_PEEL
   {
@@ -243,8 +254,9 @@ function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
   if (role === 'brick') m.defines.TRI_BRICK = '';
   if (s.peel) m.defines.TRI_PEEL = '';
   if (s.shape) m.defines.TRI_SHAPE = '';
-  // aShape for meshes that lack it (props, floors): height 0 = fall back to world y.
-  Object.assign(m, { defaultAttributeValues: { aShape: [0, 0, 0] } });
+  if (s.tinted) m.defines.TRI_TINT = '';
+  // aShape for meshes that lack it (props, floors): height 0 = fall back to world y; untinted: white.
+  Object.assign(m, { defaultAttributeValues: { aShape: [0, 0, 0], aTint: [1, 1, 1] } });
   const peel = s.peel ?? 0;
   const tile = s.tile, macro = s.macro ?? 0;
   m.onBeforeCompile = shader => {

@@ -103,7 +103,7 @@ export class WorldMap {
     this.el.setAttribute('role', 'dialog');
     this.el.setAttribute('aria-modal', 'true');
     this.el.setAttribute('aria-label', 'Mappa');
-    this.el.innerHTML = `<div class="panel"><h2>Giudecca · Redentore e Zitelle</h2>
+    this.el.innerHTML = `<div class="panel"><h2>Giudecca · Redentore, Zitelle e San Giorgio</h2>
       <button class="x" aria-label="Chiudi mappa">✕</button><div class="body">
       <details class="col" open><summary>Luoghi</summary><ul class="places"></ul></details><canvas></canvas>
       <details class="col" open><summary>Missioni</summary><ul class="log"></ul></details></div>

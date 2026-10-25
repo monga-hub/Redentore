@@ -348,6 +348,8 @@ function monastery(b: LevelBuilder, p: Props): void {
   groundPatch(b, -501, -465, 47, 77, 'paving', { skirt: true }).paint(-498, -468, 50, 74, 'grass').paint(-484.5, -481.5, 47, 77, 'gravel');
   b.curb(-498, -484.5, 50, 74); b.curb(-481.5, -468, 50, 74);
   for (const x of [-496, -488, -478, -470]) for (const z of [53, 62, 71]) cypress(p, x, z, p.rand(7, 9));
+  // A lamp post or two in each garden (pooled lights, no shadows): the arcade torches alone leave the middle dark on a phone.
+  for (const [x, z] of [[-533, 59], [-527, 65], [-486, 57.5], [-480, 66.5]]) lampPost(b, p, x, z, 0);
   b.arcade(-548, -512, 44, 80, 3, 4.6, { gaps: [[SGX, 44], [SGX, 80], [-512, 62]], upper: 'nesw' });
   b.arcade(-504, -462, 44, 80, 3, 4.6, { gaps: [[-491, 44], [-504, 62]], upper: 'nsw' });
   for (const [x, z, nx, nz] of [[-547.6, 54, 1, 0], [-547.6, 70, 1, 0], [-512.4, 54, -1, 0], [-503.6, 72, 1, 0], [-462.4, 54, -1, 0], [-462.4, 70, -1, 0]] as const) b.lights.push({ x: x + nx * 0.32, y: 2.75, z: z + nz * 0.32, kind: 'torch', nx, nz });

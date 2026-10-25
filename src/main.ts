@@ -361,6 +361,9 @@ const warm = () => {
   kit.prime(); // and a first real draw of each, at nothing
 };
 let warmed = false;
+/** Level 2's and 3's bodies load with their quests, after the first warm-up: bit 1 and 2 once each roster is in (streamed out or not: a warm-up compiles the whole scene). */
+const later = () => (zitelle.root.children.length ? 1 : 0) | (sangiorgio.root.children.length ? 2 : 0);
+let warmedLater = 0;
 fx.onRebuild = () => { if (warmed) warm(); };
 const bodiesIn = () => !!(friars.root.children.length && priests.root.children.length && bees.root.children.length && player.model.root.children.length); // everyone's bodies in
 fx.loaded = bodiesIn; // the boot test times the scene, not the loading
@@ -520,6 +523,7 @@ renderer.setAnimationLoop(() => {
     }
   }
   if (!warmed && bodiesIn()) { warmed = true; warm(); }
+  if (warmed && later() & ~warmedLater) { warmedLater |= later(); warm(); } // their programs now, not when the first of them comes into view mid-fight
   if (input.pressed('Escape')) { // WoW: Esc interrupts a cast first, otherwise opens the menu
     if (kit.system.casting) kit.system.cancel();
     else menu.toggle();

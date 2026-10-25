@@ -63,7 +63,7 @@ body.touch #quest-prompt kbd { display: none; }
 #quest-done.show { display: block; animation: victory ${BANNER}s ease forwards; }
 body.touch #quest-done { font-size: 24px; }
 #epilogue { position: fixed; inset: 0; display: none; z-index: 9; place-content: center; padding: 0 24px; text-align: center; cursor: pointer;
-  background: radial-gradient(ellipse at 50% 120%, #f0b86a55, transparent 60%), linear-gradient(#05070ce6, #1a1420f0);
+  background: radial-gradient(ellipse at 50% 120%, #f0b86a55, transparent 60%), linear-gradient(#05070c, #1a1420);
   font: italic 17px/1.55 Georgia, serif; color: #f3e6c4; text-shadow: 0 1px 3px #000; }
 #epilogue.show { display: grid; animation: epilogue 2.5s ease; }
 #epilogue p { max-width: 560px; margin: 0 auto 10px; opacity: 0; animation: epilogue 2s ease forwards; }

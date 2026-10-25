@@ -35,7 +35,7 @@ export const MARINAIO: CasterKind = {
 
 export const BIBLIOTECARIO: CasterKind = {
   ...PRIEST,
-  hp: 4400, xp: 180,
+  hp: 3600, xp: 180,
   aggro: 12, leash: 40, blind: 12,
   range: 18, keep: 0, speed: 3.4, cast: 1.7, cooldown: 3.2, bolt: 13, damage: 130,
   radius: 0.6, margin: 1,

@@ -15,17 +15,19 @@
 //   npm run soak                       ~2 minutes of fight
 //   SOAK_SECONDS=600 npm run soak      a longer one
 //   SOAK_LEVEL=2 npm run soak           the Governatrice under the Zitelle's dome instead (level 2's bodies, lace and fuso)
-//   SOAK_HERO=bortolo npm run soak      Bortolo picked on the new game's screen instead of the Risorto (player/heroes.ts)
+//   SOAK_HERO=bortolo npm run soak      Bortolo (or fosca, Suor Fosca) picked on the new game's screen instead of the Risorto (player/heroes.ts)
 //   CHROME=/path/to/chrome npm run soak
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'vite';
+import { HEROES, HERO_IDS } from '../src/player/heroes.ts';
 
 const SECONDS = Number(process.env.SOAK_SECONDS ?? 120);
 const LEVEL = Number(process.env.SOAK_LEVEL ?? 1);
 const HERO = process.env.SOAK_HERO ?? 'risorto';
+if (!(HERO_IDS as string[]).includes(HERO)) throw new Error(`SOAK_HERO: none of ${HERO_IDS.join(', ')}`);
 const BUDGET = 200; // MB of GPU buffers the phone profile may hold (it held ~380 before the phone tier)
 const SLACK = { prog: 4, geo: 12, tex: 4 }; // first uses that may still come late (a loot beam, a death's effects)
 const CHROME = process.env.CHROME ?? (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
@@ -218,8 +220,9 @@ try {
     await evaluate(`document.querySelector('#select .card[data-id=${HERO}]')?.click(), document.querySelector('#select button')?.click()`).catch(() => {}); // a new game: the hero's screen
     await sleep(500);
   }
-  const bodies: string[] = await evaluate("performance.getEntriesByType('resource').map((e) => e.name.split('/').pop()).filter((n) => n === 'reietto.glb' || n === 'bortolo.glb')");
-  if (bodies.join() !== (HERO === 'bortolo' ? 'bortolo.glb' : 'reietto.glb')) fail(`bodies loaded for ${HERO}: ${bodies.join(', ') || 'none'}`);
+  const files = HERO_IDS.map((h) => HEROES[h].file), mine = HEROES[HERO as keyof typeof HEROES].file;
+  const bodies: string[] = await evaluate(`performance.getEntriesByType('resource').map((e) => e.name.split('/').pop()).filter((n) => ${JSON.stringify(files)}.includes(n))`);
+  if (bodies.join() !== mine) fail(`bodies loaded for ${HERO}: ${bodies.join(', ') || 'none'}`);
   if (!(await evaluate("matchMedia('(pointer: coarse)').matches"))) fail('the emulated phone is not taken for a phone');
   for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro
   await sleep(3000);

@@ -1,10 +1,10 @@
-// Who rises from the grave: the heroes a new game offers (ui/select.ts), each with his own body, his school and the kit it
-// starts him with. The choice goes in the save (core/save.ts `hero`; older saves are the Risorto's). Every body is a Meshy
+// Who rises from the grave: the heroes a new game offers (ui/select.ts), each with their own body, their school and the kit it
+// starts them with. The choice goes in the save (core/save.ts `hero`; older saves are the Risorto's). Every body is a Meshy
 // character on the same 24-bone rig, so the clips, the moves and the gear's sockets carry over (player/outfit.ts fits them
 // per body). No three.js and no DOM: `npm run check` reads it in Node.
 import type { School } from './levels.ts';
 
-export type Hero = 'risorto' | 'bortolo';
+export type Hero = 'risorto' | 'bortolo' | 'fosca';
 export interface HeroDef {
   name: string;
   title: string;
@@ -30,6 +30,11 @@ export const HEROES: Record<Hero, HeroDef> = {
     name: 'Bortolo', title: 'gondoliere annegato', school: ['frost', 'storm'],
     lore: 'Annegò l’inverno in cui gelò la laguna. Il remo non si è più scongelato, e nemmeno lui.',
     file: 'bortolo.glb', portrait: 'bortolo.webp', weapon: 'remo-gelato', kit: ['frost', 'caligo'],
+  },
+  fosca: {
+    name: 'Suor Fosca', title: 'monaca del lazzaretto', school: ['plague', 'holy'],
+    lore: 'Curò gli appestati del Lazzaretto Vecchio finché ne divenne il contagio. Ora benedice col miasma.',
+    file: 'fosca.glb', portrait: 'fosca.webp', weapon: 'stiletto-osso', kit: ['plague', 'spit'],
   },
 };
 export const HERO_IDS = Object.keys(HEROES) as Hero[];

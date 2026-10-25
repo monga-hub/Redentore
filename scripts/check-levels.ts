@@ -229,7 +229,7 @@ if (BASE_ATTACK[HEROES.risorto.school[0]] !== 'fall' || BASE_ATTACK[HEROES.borto
   s2.setMain('spark');
   if (s2.slots[PRIMARY]?.id !== 'spark' || s2.layout().bar.includes('lance')) fail(`setMain: ${s2.layout().bar}`);
 }
-if (START.includes('plague') || !HEROES.bortolo.kit.includes('frost') || HEROES.risorto.kit.length) fail('the Risorto starts in Ossa alone, Bortolo in Gelo');
+if (START.includes('plague') || !HEROES.bortolo.kit.includes('frost') || HEROES.risorto.kit.length || HEROES.fosca.kit.join() !== 'plague,spit') fail('the Risorto starts in Ossa alone, Bortolo in Gelo, Suor Fosca in Peste');
 // A reload with a full bar and abilities waiting in the book (tomes): replaying them all keeps every slot where it was.
 {
   const kept = ['fall', 'miasma', 'spit', 'fever', 'pillar', 'furnace', 'blizzard', 'squall', 'hallow', 'potion'], book = ['leap', 'whirl', 'grace', 'untore'];

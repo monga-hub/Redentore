@@ -275,6 +275,11 @@ const ob = older('bortolo', ['lance_dmg', 'lance_split', 'hp'], ['frost', 'lance
 if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || obt.prim.lance.dmg !== 11 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
 const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']);
 if (or.levels.learned.join() !== 'caligo' || or.levels.picks.join() !== 'caligo,caligo_big,caligo_freeze,hp' || or.levels.picks.length !== 4) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks}`);
+const hf = boot('fosca'); // Suor Fosca keeps her Nube di peste and Sputo di bile
+hf.levels.learned = ['plague', 'spit'];
+const hfb = boot();
+deserialize(hfb, JSON.parse(JSON.stringify(serialize(hf))));
+if (hfb.hero !== 'fosca' || hfb.levels.learned.join() !== 'plague,spit') fail(`Suor Fosca after load: ${hfb.hero} ${hfb.levels.learned}`);
 const hgOld = boot('bortolo');
 deserialize(hgOld, (({ hero: _h, ...o }) => o)(hgs));
 if (hgOld.hero !== 'risorto' || !tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague')) fail('a save from before the choice is not the Risorto with his plague');

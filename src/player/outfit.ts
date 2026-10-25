@@ -82,7 +82,7 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
  * the fist this far up the shaft, the elbow bent so the fist holds it straight up. In a blow or a spell the fist slides
  * back down to `grip` and swings it as the clip swings the fist. `flip`: upside down in its file (its head at the bottom).
  */
-interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean }
+interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean; venom?: boolean }
 export const WEAPONS: Record<string, Weapon> = {
   'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, lean: 0.35 },
   'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 },
@@ -92,6 +92,7 @@ export const WEAPONS: Record<string, Weapon> = {
   pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
   'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true }, // by the handle, the blade the head
   'remo-gelato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true, ice: true }, // Bortolo's, iced over
+  'stiletto-osso': { file: 'stiletto.glb', length: 0.5, grip: 0.22, lean: 0.35, venom: true }, // Suor Fosca's, by its corded grip
   'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
   'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
 };
@@ -108,10 +109,14 @@ const FIST = new THREE.Vector3(0, 14, -5.5);
  */
 interface Hand { fist: THREE.Vector3; knuckle: THREE.Vector3; tips: number; curl: number; thumb: number }
 /**
- * Each hero's body: his hand, the pieces as they sit on him (`PIECES` for the Risorto, whom they were made on), and `paint`:
- * whether the sets repaint him (only the Risorto: the looks are painted on his UVs).
+ * Each hero's body: his hand, the pieces as they sit on him (`PIECES` for the Risorto, whom they were made on), `paint`:
+ * whether the sets repaint him (only the Risorto: the looks are painted on his UVs), and `crown`: the colour of the crown
+ * his own hat or veil folds into under a helm (linear RGB), and its shape (`skull`; none: a dome over his brow, `fold`);
+ * `beaked`: the helms with a beak of their own, under which the beak of a mask he wears (the GLB's `_BEAK`) folds away.
  */
-interface Body { hand: Hand; pieces: Partial<Record<`${Look}-${Worn}`, Piece>>; paint: boolean }
+/** The crown a hat or veil folds onto, in the head's frame (m from its joint, +Z ahead): an ellipsoid round `c`, `r` m, falling `nape` m behind under its middle. */
+interface Skull { c: V3; r: V3; nape: number }
+interface Body { hand: Hand; pieces: Partial<Record<`${Look}-${Worn}`, Piece>>; paint: boolean; crown?: V3; skull?: Skull; beaked?: Look[] }
 /**
  * The helms on Bortolo, fitted on his bald crown (his boater folded into it, `fold`): measured on him, the crowns resting on
  * his head, the closed ones (Meshy's pieces are solid) sunk until their brims sit on his brow, the beaked mask over his face.
@@ -126,6 +131,17 @@ const HELMS: Body['pieces'] = {
   'merletto-testa': { size: 0.46, at: [-0.004, -0.019, -0.03] },
   'broccato-testa': { size: 0.3, at: [-0.004, -0.117, -0.05] },
 };
+/** The helms on Suor Fosca, over her veil folded into a coif (`skull`): measured on her, as on Bortolo. */
+const VEILED: Body['pieces'] = {
+  'becchino-testa': { size: 0.5, at: [-0.008, -0.185, -0.005] },
+  'chierico-testa': { size: 0.56, at: [-0.008, 0.035, -0.007] },
+  'arsenale-testa': { size: 0.42, at: [-0.008, -0.032, -0.007] },
+  'murano-testa': { size: 0.27, at: [-0.008, -0.056, -0.007] },
+  'voto-testa': { size: 0.36, at: [-0.008, -0.087, -0.052] },
+  'gondola-testa': { size: 0.46, at: [-0.008, -0.088, -0.007] },
+  'merletto-testa': { size: 0.46, at: [-0.008, -0.093, -0.007] },
+  'broccato-testa': { size: 0.3, at: [-0.008, -0.066, -0.027] },
+};
 const DOME = 0.08, NAPE = 0.13; // m his bald crown rises over the band where his hat sat, and the back of his head falls under it
 const BODIES: Record<Hero, Body> = {
   risorto: { hand: { fist: FIST, knuckle: new THREE.Vector3(0, 9, -1), tips: 22, curl: 1.0, thumb: -5.5 }, pieces: PIECES, paint: true },
@@ -133,7 +149,13 @@ const BODIES: Record<Hero, Body> = {
   // a helm (`HELMS`)
   bortolo: {
     hand: { fist: new THREE.Vector3(0, 12, -4.5), knuckle: new THREE.Vector3(0, 8, -1), tips: 23, curl: 1.7, thumb: -5.5 },
-    pieces: { ...PIECES, ...HELMS }, paint: false,
+    pieces: { ...PIECES, ...HELMS }, paint: false, crown: [0.2, 0.29, 0.38],
+  },
+  // a slender hand, open, the fingers straight: the shaft across the palm under the knuckles, the fingers closed on it; her
+  // veil folds into a coif under a helm, her mask's beak under the becchino's
+  fosca: {
+    hand: { fist: new THREE.Vector3(0, 12, -3.5), knuckle: new THREE.Vector3(0, 13, -1), tips: 21, curl: 1.7, thumb: -4 }, pieces: { ...PIECES, ...VEILED }, paint: false, crown: [0.012, 0.012, 0.016],
+    skull: { c: [0, 0.1, -0.005], r: [0.075, 0.1, 0.09], nape: 0.12 }, beaked: ['becchino'],
   },
 };
 
@@ -608,7 +630,9 @@ attribute float aPad;
 attribute vec3 aFist;
 attribute vec3 aHat;
 attribute vec3 aHatN;
+attribute vec3 aBeak;
 uniform float uPad;
+uniform float uBeak;
 uniform float uFist;
 uniform float uHat;
 uniform vec3 uPadL;
@@ -616,7 +640,7 @@ uniform vec3 uPadR;
 varying float vHat;`;
 const VERT_BODY = /* glsl */ `#include <begin_vertex>
 transformed = mix(transformed, aPad > 0.0 ? uPadL : uPadR, abs(aPad) * uPad);
-transformed += aFist * uFist + aHat * uHat;
+transformed += aFist * uFist + aHat * uHat + aBeak * uBeak;
 vHat = dot(aHat, aHat) > 0.0 ? uHat : 0.0;`;
 const FRAG_HEAD = /* glsl */ `
 uniform float uGlow;`;
@@ -641,6 +665,7 @@ function lit(sh: THREE.WebGLProgramParametersWithUniforms, glow: { value: number
 }
 const GLOW = 1.3;
 const ICE: [number, number, number] = [1.6, 2.1, 2.6], ICE_GLOW = 0x1c4a66; // a frozen weapon's tint (over its own colours) and its cold self-glow
+const VENOM_GLOW = 0x1f3a0c; // a poisoned weapon's sickly green self-glow
 /**
  * × the maps' metalness: the night has no environment to mirror, and full metal shows only the lights' highlights (black
  * steel reads as a hole); half keeps the paint, as WoW's painted armour does.
@@ -690,7 +715,7 @@ export class Outfit {
   private readonly guard: Guard;
   private readonly own: Body;
   /** Shared with the body's shader (and the pieces': uGlow). */
-  readonly uniforms = { uPad: { value: 0 }, uFist: { value: 0 }, uHat: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
+  readonly uniforms = { uPad: { value: 0 }, uFist: { value: 0 }, uHat: { value: 0 }, uBeak: { value: 0 }, uPadL: { value: new THREE.Vector3() }, uPadR: { value: new THREE.Vector3() }, uGlow: { value: GLOW } };
   private worn: GearState = {};
   private pieces = new Map<Worn, THREE.SkinnedMesh>();
   private weapon?: THREE.Object3D;
@@ -706,6 +731,7 @@ export class Outfit {
     const hat = hatOf(body);
     this.socket = sockets(this.fit, hat);
     this.fold(hat);
+    this.unbeak();
     const region = this.mark(), m = body.material as THREE.MeshStandardMaterial;
     if (this.own.paint) this.paint = new Paint(body, region);
     else m.metalness = METAL; // his own maps, made like the painted ones
@@ -715,9 +741,9 @@ export class Outfit {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>${VERT_HEAD}`).replace('#include <begin_vertex>', VERT_BODY)
         .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nif (dot(aHat, aHat) > 0.0) objectNormal = normalize(mix(objectNormal, aHatN, uHat));');
       lit(sh, this.uniforms.uGlow);
-      // his own hat, folded into his bald crown under a helm, his skin's blue (an open crown shows it)
+      // his own hat, folded into his crown under a helm, its colour (`crown`: an open crown shows it)
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vHat;')
-        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.2, 0.29, 0.38), vHat);');
+        .replace('#include <color_fragment>', `#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(${(this.own.crown ?? [0, 0, 0]).join(', ')}), vHat);`);
     };
     m.customProgramCacheKey = () => 'hero-dressed';
   }
@@ -783,11 +809,13 @@ export class Outfit {
       for (let i = 0; i < n; i++) if (f.dom[i] === head && !hat[i] && at(i).y > top - 0.03) band.expandByPoint(at(i));
       // his brow is the front of the dome, the band's width its width, an egg's depth behind (the back of his head is the hat's too)
       const rx = (band.max.x - band.min.x) / 2 * 0.97, r = new THREE.Vector3(rx, DOME, rx * 1.2), c = new THREE.Vector3((band.max.x + band.min.x) / 2, top - 0.03, band.max.z - r.z);
+      const sk = this.own.skull, [up, nape] = sk ? [sk.r[1], sk.nape] : [DOME, NAPE];
+      if (sk) { c.fromArray(sk.c); r.fromArray(sk.r); }
       const toBody = new THREE.Matrix3().setFromMatrix4(f.skin[head].clone().invert()).multiply(turn), d = new THREE.Vector3(), q = new THREE.Vector3();
       for (let i = 0; i < n; i++) {
         if (!hat[i]) continue;
         const p = at(i);
-        const ry = p.y < c.y ? NAPE : DOME; // under the band, down the back of his head to the nape
+        const ry = p.y < c.y ? nape : up; // under the band, down the back of his head to the nape
         d.copy(p).sub(c).divide(r.setY(ry));
         d.y = Math.max(d.z < 0 ? -0.9 : 0, d.y); // the brim and what hangs off it onto the band, behind down to the nape
         d.normalize();
@@ -797,6 +825,20 @@ export class Outfit {
     }
     this.body.geometry.setAttribute('aHat', new THREE.BufferAttribute(out, 3));
     this.body.geometry.setAttribute('aHatN', new THREE.BufferAttribute(normal, 3));
+  }
+
+  /** Where each vertex of the beak of his mask goes under a beaked helm (`aBeak`): into its root on his face, out of sight. */
+  private unbeak(): void {
+    const f = this.fit, a = this.body.geometry.attributes._beak, n = f.dom.length, out = new Float32Array(n * 3);
+    if (a) {
+      const frame = f.frame('Head'), into = frame.clone().invert(), root = new THREE.Vector3(), p = new THREE.Vector3(); // the head's frame: +Z ahead
+      let k = 0, back = Infinity;
+      for (let i = 0; i < n; i++) if (a.getX(i) > 0.5) { root.add(p.fromArray(f.pos, i * 3).applyMatrix4(into)); k++; back = Math.min(back, p.z); }
+      root.divideScalar(Math.max(1, k)).setZ(back).applyMatrix4(frame); // its middle, as far back as it starts
+      const toBody = new THREE.Matrix3().setFromMatrix4(f.skin[f.bone('Head')].clone().invert());
+      for (let i = 0; i < n; i++) if (a.getX(i) > 0.5) p.copy(root).sub(new THREE.Vector3().fromArray(f.pos, i * 3)).applyMatrix3(toBody).toArray(out, i * 3);
+    }
+    this.body.geometry.setAttribute('aBeak', new THREE.BufferAttribute(out, 3));
   }
 
   wear(worn: GearState): void {
@@ -818,7 +860,7 @@ export class Outfit {
     const old = this.pieces.get(slot);
     if (old) { dispose(old); this.pieces.delete(slot); this.guard.pieces.delete(slot); }
     if (slot === 'spalle') this.uniforms.uPad.value = 0;
-    else this.uniforms.uHat.value = 0;
+    else this.uniforms.uHat.value = this.uniforms.uBeak.value = 0;
     const id = this.worn[slot], look = id && lookOf(id), p = look && this.own.pieces[`${look}-${slot}`];
     if (!p) return;
     loadModel(`${DIR}${look}-${slot}.glb`, 256).then((gltf) => {
@@ -827,7 +869,10 @@ export class Outfit {
       const m = this.bake(slot, p, gltf.scene);
       this.pieces.set(slot, m);
       if (slot === 'spalle') this.uniforms.uPad.value = 1;
-      else this.uniforms.uHat.value = 1; // his own hat folded away under it
+      else { // his own hat folded away under it, his mask's beak under a beak
+        this.uniforms.uHat.value = 1;
+        this.uniforms.uBeak.value = this.own.beaked?.includes(look) ? 1 : 0;
+      }
     }, (e) => console.error('outfit piece failed to load', e));
   }
 
@@ -896,6 +941,7 @@ export class Outfit {
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (m?.isMeshStandardMaterial) dress(m, this.uniforms.uGlow, !!m.metalnessMap); // his own PBR props painted like his pieces
         if (w.ice && m?.isMeshStandardMaterial) { m.color.setRGB(...ICE); m.emissive.set(ICE_GLOW); m.roughness = 0.3; } // frozen over: the wood frosted pale
+        if (w.venom && m?.isMeshStandardMaterial) m.emissive.set(VENOM_GLOW); // the plague on it
       });
       if (w.flip) prop.rotation.z = Math.PI;
       const walk = w.staff === undefined ? undefined : [shaft(prop, w.staff), shaft(prop, w.grip)], top = arm(this.root, prop, w.length, w.grip), held = top.parent!;

@@ -4,14 +4,15 @@ import { SCHOOL_NAME } from './book.ts';
 import { ICONS } from './icons.ts';
 import risorto from './art/risorto.webp';
 import bortolo from './art/bortolo.webp';
+import fosca from './art/fosca.webp';
 
 // "Scegli il tuo Risorto": a new game opens on the heroes side by side (player/heroes.ts), each his painted concept, name,
 // title, his school and the one he leans to, a line of who he was. Click or tap one (←/→ too), then Risorgi (Enter); the
 // boot waits for it (main.ts) and loads only the body chosen. Gilded like the other windows, full screen over the
 // unbuilt world.
 
-const ART: Record<Hero, string> = { risorto, bortolo };
-const COLOR: Partial<Record<School, string>> = { bone: '#d9c8ff', shadow: '#b27cff', frost: '#8fdcff', storm: '#bcd2ff' };
+const ART: Record<Hero, string> = { risorto, bortolo, fosca };
+const COLOR: Partial<Record<School, string>> = { bone: '#d9c8ff', shadow: '#b27cff', frost: '#8fdcff', storm: '#bcd2ff', plague: '#a8e05a', holy: '#ffe9a0' };
 
 const CSS = `
 #select { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
@@ -20,7 +21,7 @@ const CSS = `
 #select .head { text-align: center; }
 #select h1 { margin: 0; font: bold 40px Georgia, serif; letter-spacing: 2px; color: #e0b55a; text-shadow: 0 2px 4px #000, 0 0 18px rgba(255,200,90,.35); }
 #select .head p { margin: 2px 0 0; font-style: italic; color: #b8a888; }
-#select .cards { display: flex; gap: 22px; justify-content: center; width: min(760px, 100%); }
+#select .cards { display: flex; gap: 22px; justify-content: center; width: min(1064px, 100%); }
 #select .card { flex: 1 1 0; max-width: 340px; display: flex; flex-direction: column; cursor: pointer; overflow: hidden; box-sizing: border-box;
   border: 3px solid transparent; border-radius: 6px; background: var(--panel); box-shadow: var(--panel-shadow); transition: transform .12s, box-shadow .12s, filter .12s; filter: brightness(.8); }
 #select .card:hover { filter: brightness(.95); }
@@ -62,10 +63,11 @@ body.diablo #select .card { border-radius: 2px; }
   #select { justify-content: flex-start; }
   #select h1 { font-size: 28px; }
   #select .cards { flex-direction: column; align-items: stretch; gap: 12px; }
-  #select .card { flex-direction: row; max-width: none; }
+  #select .card { flex: none; flex-direction: row; max-width: none; }
   #select .card.sel { transform: none; }
   #select .art { width: 36%; height: auto; min-height: 200px; border-bottom: 0; }
   #select .schools { flex-direction: column; gap: 4px; align-items: flex-start; }
+  #select button { position: sticky; bottom: 0; flex: none; } /* in reach under three heroes */
 }`;
 
 const school = (s: School, second: boolean) => `<div class="school${second ? ' second' : ''}"><div class="ic">${ICONS[TOMES.find((t) => t.school === s)!.icon] ?? ''}</div>

@@ -72,7 +72,9 @@ const AURA_VERT = /* glsl */ `
   #include <skinning_pars_vertex>
   uniform float uPush;
   attribute vec3 aHat;
+  attribute vec3 aBeak;
   uniform float uHat;
+  uniform float uBeak;
   varying vec3 vN;
   varying vec3 vV;
   varying float vY;
@@ -81,7 +83,7 @@ const AURA_VERT = /* glsl */ `
     #include <skinbase_vertex>
     #include <skinnormal_vertex>
     #include <begin_vertex>
-    transformed += aHat * uHat; // his own hat folded away under a helm, as on him (player/outfit.ts)
+    transformed += aHat * uHat + aBeak * uBeak; // his own hat (and a mask's beak) folded away under a helm, as on him (player/outfit.ts)
     #include <skinning_vertex>
     vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
     vN = normalize(normalMatrix * objectNormal);
@@ -107,7 +109,7 @@ const AURA_FRAG = /* glsl */ `
 export class Aura {
   readonly material = new THREE.ShaderMaterial({
     vertexShader: AURA_VERT, fragmentShader: AURA_FRAG, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uColor: { value: new THREE.Color() }, uK: { value: 0 }, uTime: { value: 0 }, uPush: { value: 0.025 }, uHat: { value: 0 } },
+    uniforms: { uColor: { value: new THREE.Color() }, uK: { value: 0 }, uTime: { value: 0 }, uPush: { value: 0.025 }, uHat: { value: 0 }, uBeak: { value: 0 } },
   });
   private want = 0;
   private color = new THREE.Color();
@@ -175,6 +177,7 @@ export class UndeadModel {
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
       const outfit = (this.outfit = new Outfit(model, body!, hero));
       this.aura.material.uniforms.uHat = outfit.uniforms.uHat;
+      this.aura.material.uniforms.uBeak = outfit.uniforms.uBeak;
       outfit.onWeapon = (top) => { this.tip = top; this.club = top?.parent ?? undefined; };
       outfit.wear(this.worn);
       this.leftHand = model.getObjectByName('LeftHand');

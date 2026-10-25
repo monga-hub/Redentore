@@ -84,21 +84,21 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
  * the fist this far up the shaft, the elbow bent so the fist holds it straight up. In a blow or a spell the fist slides
  * back down to `grip` and swings it as the clip swings the fist. `flip`: upside down in its file (its head at the bottom).
  */
-interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean; venom?: boolean; ember?: boolean }
+interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean }
 /** Zanetto's bells on their yoke, built from primitives (BODIES `yoke`). */
 const YOKE = 'giogo.glb';
 export const WEAPONS: Record<string, Weapon> = {
-  'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, lean: 0.35 },
+  'clava-osso': { file: 'arma-risorto.glb', length: 1.1, grip: 0.1, lean: 0.35 }, // the Risorto's: a femur greatclub, a horned skull at its head
   'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 },
   'pellegrino-arma': { file: 'bastone.glb', length: 1.5, grip: 0.3, lean: 0.2, staff: 0.6 },
   'ferrata-arma': { file: 'mazza.glb', length: 1.05, grip: 0.12, lean: 0.35 },
   'turibolo-arma': { file: 'turibolo.glb', length: 0.85, grip: 0.12, lean: 0.35 },
   pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
   'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true }, // by the handle, the blade the head
-  'remo-gelato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true, ice: true }, // Bortolo's, iced over
-  'stiletto-osso': { file: 'stiletto.glb', length: 0.5, grip: 0.22, lean: 0.35, venom: true }, // Suor Fosca's, by its corded grip
-  'canna-vetraio': { file: 'canna.glb', length: 1.4, grip: 0.3, lean: 0.2, staff: 0.65, ember: true }, // Fra' Tizian's, by its wooden sleeve
-  'martello-campana': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 }, // Zanetto's, the bell-ringer's mallet
+  'remo-gelato': { file: 'arma-bortolo.glb', length: 1.7, grip: 0.1, lean: 0.35 }, // Bortolo's oar, frozen into a war oar
+  'stiletto-osso': { file: 'arma-fosca.glb', length: 0.55, grip: 0.15, lean: 0.35 }, // Suor Fosca's bone stiletto, venom in its hilt, by its corded grip
+  'canna-vetraio': { file: 'arma-tizian.glb', length: 1.6, grip: 0.3, lean: 0.2, staff: 0.6 }, // Fra' Tizian's blowpipe, molten glass at its top, by its wooden sleeve
+  'martello-campana': { file: 'arma-zanetto.glb', length: 1.0, grip: 0.12, lean: 0.35 }, // Zanetto's bell hammer, lightning round the bronze
   'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
   'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
   // Level 3's: the monks' processional cross, the darsena's boathook, the Abate's crozier (models of enemies/sangiorgio.ts).
@@ -107,19 +107,15 @@ export const WEAPONS: Record<string, Weapon> = {
   'baculo-abate': { file: 'baculo.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
 };
 /**
- * The fist, in RightHand's own coordinates (cm): the channel his curled claws make in front of the palm (-Z), across it,
- * the thumb side -X. A shaft through it along X sits in the claws whatever the clip does with the wrist (his rig has no
- * finger bones: the hand is one piece, its claws already half closed).
- */
-const FIST = new THREE.Vector3(0, 14, -5.5);
-/**
- * The claws closed on it, the hand's own vertices bent in the shader while he holds a weapon (`aFist`): past the knuckle
+ * `fist`, in RightHand's own coordinates (cm): the channel in front of the palm (-Z), across it, the thumb side -X. A shaft
+ * through it along X sits in the hand whatever the clip does with the wrist (the rigs have no finger bones: each hand is
+ * one piece). The fingers closed on it, the hand's own vertices bent in the shader while he holds a weapon (`aFist`): past the knuckle
  * line (`knuckle`, RightHand's coordinates, cm) and off the thumb's side (x > `thumb`), turned about it toward the palm,
  * up to `curl` rad at the tips (`tips` cm up the hand).
  */
 interface Hand { fist: THREE.Vector3; knuckle: THREE.Vector3; tips: number; curl: number; thumb: number }
 /**
- * Each hero's body: his hand, the pieces as they sit on him (`PIECES` for the Risorto, whom they were made on), `paint`:
+ * Each hero's body: his hand, the pieces as they sit on him (`PIECES`, made on the Risorto before his new body, refitted per hero), `paint`:
  * whether the sets repaint him (only the Risorto: the looks are painted on his UVs), and `crown`: the colour of the crown
  * his own hat or veil folds into under a helm (linear RGB), and its shape (`skull`; none: a dome over his brow, `fold`);
  * `beaked`: the helms with a beak of their own, under which the beak of a mask he wears (the GLB's `_BEAK`) folds away.
@@ -176,24 +172,41 @@ const BELLRINGER: Body['pieces'] = {
   'merletto-testa': { size: 0.46, at: [-0.006, -0.025, -0.042] },
   'broccato-testa': { size: 0.3, at: [-0.006, -0.063, -0.042] },
 };
+/** The helms on the Risorto, over his hood folded onto his skull (`skull`): measured on him, as on Bortolo. */
+const RISEN: Body['pieces'] = {
+  'becchino-testa': { size: 0.5, at: [0, -0.185, 0.01] },
+  'chierico-testa': { size: 0.56, at: [0, 0.035, -0.01] },
+  'arsenale-testa': { size: 0.42, at: [0, -0.032, -0.01] },
+  'murano-testa': { size: 0.27, at: [0, -0.056, -0.01] },
+  'voto-testa': { size: 0.36, at: [0, -0.087, -0.055] },
+  'gondola-testa': { size: 0.46, at: [0, -0.088, -0.01] },
+  'merletto-testa': { size: 0.46, at: [0, -0.093, -0.01] },
+  'broccato-testa': { size: 0.3, at: [0, -0.066, -0.03] },
+};
 const DOME = 0.08, NAPE = 0.13; // m his bald crown rises over the band where his hat sat, and the back of his head falls under it
 const BODIES: Record<Hero, Body> = {
-  risorto: { hand: { fist: FIST, knuckle: new THREE.Vector3(0, 9, -1), tips: 22, curl: 1.0, thumb: -5.5 }, pieces: PIECES, paint: true },
-  // a bigger hand, open, the fingers straight: the shaft nearer the knuckles, closed further; his boater folds away under
-  // a helm (`HELMS`)
+  // a long bony hand, open: the shaft across the finger bones, the fingers closed on it; his hood folds onto his skull
+  // under a helm
+  risorto: {
+    hand: { fist: new THREE.Vector3(0, 15, -5), knuckle: new THREE.Vector3(0, 14, -1), tips: 26, curl: 1.8, thumb: -6.5 }, pieces: { ...PIECES, ...RISEN }, paint: true, crown: [0.03, 0.03, 0.03],
+    skull: { c: [0, 0.1, 0.0], r: [0.075, 0.1, 0.09], nape: 0.1 },
+  },
+  // a giant's hand, half closed already, ice up its back: the shaft deep in the curled fingers, closed a little more; his
+  // boater folds away under a helm (`HELMS`)
   bortolo: {
-    hand: { fist: new THREE.Vector3(0, 12, -4.5), knuckle: new THREE.Vector3(0, 8, -1), tips: 23, curl: 1.7, thumb: -5.5 },
+    hand: { fist: new THREE.Vector3(0, 21, -18), knuckle: new THREE.Vector3(0, 20, -4), tips: 46, curl: 1.0, thumb: -16 },
     pieces: { ...PIECES, ...HELMS }, paint: false, crown: [0.2, 0.29, 0.38],
   },
-  // a slender hand, open, the fingers straight: the shaft across the palm under the knuckles, the fingers closed on it; her
+  // a slender gloved hand, open: the shaft across the palm under the knuckles, the fingers closed on it; her
   // veil folds into a coif under a helm, her mask's beak under the becchino's
   fosca: {
-    hand: { fist: new THREE.Vector3(0, 12, -3.5), knuckle: new THREE.Vector3(0, 13, -1), tips: 21, curl: 1.7, thumb: -4 }, pieces: { ...PIECES, ...VEILED }, paint: false, crown: [0.012, 0.012, 0.016],
+    hand: { fist: new THREE.Vector3(0, 10, -3.8), knuckle: new THREE.Vector3(0, 9, -1), tips: 17, curl: 1.8, thumb: -4 }, pieces: { ...PIECES, ...VEILED }, paint: false, crown: [0.012, 0.012, 0.016],
     skull: { c: [0, 0.1, -0.005], r: [0.075, 0.1, 0.09], nape: 0.12 }, beaked: ['becchino'],
   },
-  // his hood folds onto his skull under a helm
+  // a broad hand of molten glass, the fingers curled: the shaft in them, closed on it; his hood folds onto his skull under
+  // a helm
   tizian: {
-    hand: { fist: new THREE.Vector3(0, 12, -2.5), knuckle: new THREE.Vector3(0, 11, -1), tips: 23, curl: 1.9, thumb: -5.5 }, pieces: { ...PIECES, ...HOODED }, paint: false, crown: [0.06, 0.035, 0.02],
+    hand: { fist: new THREE.Vector3(0, 17, -7), knuckle: new THREE.Vector3(0, 15, -1), tips: 30, curl: 1.6, thumb: -5.5 }, pieces: { ...PIECES, ...HOODED }, paint: false, crown: [0.06, 0.035, 0.02],
     skull: { c: [0, 0.08, 0.005], r: [0.078, 0.1, 0.085], nape: 0.06 },
   },
   // a short gloved hand, the fingers half closed already: the shaft off the palm's front, the fingers turned about it; his
@@ -391,10 +404,17 @@ class Paint {
     const c = document.createElement('canvas');
     c.width = c.height = n;
     const ctx = c.getContext('2d', { willReadFrequently: true })!;
-    ctx.drawImage(img, 0, 0, n, n);
-    const base = new Uint32Array(ctx.getImageData(0, 0, n, n).data.buffer);
+    const read = (t: THREE.Texture | null) => { // his own map's texels at n×n
+      if (!t) return undefined;
+      ctx.drawImage(t.image as HTMLImageElement | ImageBitmap, 0, 0, n, n);
+      return new Uint32Array(ctx.getImageData(0, 0, n, n).data.buffer.slice(0));
+    };
+    const base = read(m.map)!;
+    // his own normal and glow/roughness/metal maps where nothing is worn (the glow in its red channel, as the looks')
+    this.own = { base, normal: read(m.normalMap) ?? new Uint32Array(n * n).fill(FLAT), orm: read(m.roughnessMap) ?? new Uint32Array(n * n).fill(rgba(0, Math.round(m.roughness * 255), Math.round(m.metalness * 255))) };
     c.width = c.height = 0;
-    this.own = { base, normal: new Uint32Array(n * n).fill(FLAT), orm: new Uint32Array(n * n).fill(rgba(0, Math.round(m.roughness * 255), Math.round(m.metalness * 255))) };
+    m.normalMap?.dispose();
+    m.roughnessMap?.dispose();
     this.texel = regions(body.geometry, region, n);
     this.maps = [base, this.own.normal, this.own.orm].map((src, i) => {
       const t = new THREE.DataTexture(new Uint8Array(src.slice().buffer), n, n);
@@ -711,9 +731,6 @@ function lit(sh: THREE.WebGLProgramParametersWithUniforms, glow: { value: number
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>${FRAG_HEAD}`).replace('#include <emissivemap_fragment>', FRAG_GLOW).replace('#include <opaque_fragment>', FRAG_SHOULDER);
 }
 const GLOW = 1.3;
-const ICE: [number, number, number] = [1.6, 2.1, 2.6], ICE_GLOW = 0x1c4a66; // a frozen weapon's tint (over its own colours) and its cold self-glow
-const VENOM_GLOW = 0x1f3a0c; // a poisoned weapon's sickly green self-glow
-const EMBER_GLOW = 0xff6a18; // the molten glass on a glassblower's pipe
 /**
  * × the maps' metalness: the night has no environment to mirror, and full metal shows only the lights' highlights (black
  * steel reads as a hole); half keeps the paint, as WoW's painted armour does.
@@ -795,7 +812,7 @@ export class Outfit {
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vHat;')
         .replace('#include <color_fragment>', `#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(${(this.own.crown ?? [0, 0, 0]).join(', ')}), vHat);`);
     };
-    m.customProgramCacheKey = () => 'hero-dressed';
+    m.customProgramCacheKey = () => `hero-dressed|${this.own.crown}`; // the crown's colour is in the source
   }
 
   /**
@@ -993,9 +1010,6 @@ export class Outfit {
         o.userData.xray = true; // no x-ray twin either
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
         if (m?.isMeshStandardMaterial) dress(m, this.uniforms.uGlow, !!m.metalnessMap); // his own PBR props painted like his pieces
-        if (w.ice && m?.isMeshStandardMaterial) { m.color.setRGB(...ICE); m.emissive.set(ICE_GLOW); m.roughness = 0.3; } // frozen over: the wood frosted pale
-        if (w.venom && m?.isMeshStandardMaterial) m.emissive.set(VENOM_GLOW); // the plague on it
-        if (w.ember && m?.name === 'vetro') m.emissive.set(EMBER_GLOW); // the glass on it still molten
       });
       if (w.flip) prop.rotation.z = Math.PI;
       const walk = w.staff === undefined ? undefined : [shaft(prop, w.staff), shaft(prop, w.grip)], top = arm(this.root, prop, w.length, w.grip), held = top.parent!;

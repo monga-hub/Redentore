@@ -61,7 +61,7 @@ export class Figure {
       const across = b.l.getWorldPosition(new THREE.Vector3()).sub(b.r.getWorldPosition(new THREE.Vector3())), f = Math.atan2(across.z, -across.x);
       this.facing = this.facing === undefined ? f : this.facing + Math.atan2(Math.sin(f - this.facing), Math.cos(f - this.facing)) * 0.1;
       ahead.set(-Math.sin(this.facing), 0, -Math.cos(this.facing));
-      top = b.head.getWorldPosition(new THREE.Vector3()).y - at.y + 0.42;
+      top = b.head.getWorldPosition(new THREE.Vector3()).y - at.y + ((b.head.userData.crown as number | undefined) ?? 0.2) + 0.22; // his crown, and a hat's height over it
     }
     ahead.applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
     const side = new THREE.Vector3(ahead.z, 0, -ahead.x), half = (top + 0.06) / 2, mid = top - half;

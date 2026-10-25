@@ -173,6 +173,8 @@ export class UndeadModel {
     loadModel(HEROES[hero].file).then((gltf) => {
       const model = gltf.scene;
       stand(model, HEROES[hero].height);
+      const head = model.getObjectByName('Head');
+      if (head) head.userData.crown = HEROES[hero].height - head.getWorldPosition(new THREE.Vector3()).y; // m from the joint to his crown (ui/figure.ts)
       let body: THREE.SkinnedMesh | undefined;
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
       const outfit = (this.outfit = new Outfit(model, body!, hero));

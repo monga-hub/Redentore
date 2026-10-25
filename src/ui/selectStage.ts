@@ -5,7 +5,7 @@ import { PHONE } from '../core/device.ts';
 import { material, texture } from '../level/materials.ts';
 import { rng } from '../level/props.ts';
 import type { GearState } from '../loot/gear.ts';
-import type { Hero } from '../player/heroes.ts';
+import { HEROES, type Hero } from '../player/heroes.ts';
 import { UndeadModel } from '../player/undead.ts';
 
 // The select screen's stage (ui/select.ts): the chosen hero himself, the game's body in his save's clothes, idling on a
@@ -15,7 +15,7 @@ import { UndeadModel } from '../player/undead.ts';
 // texture and skeleton on it and drops the context, so the game starts with the GPU to itself.
 
 const TURN = 0.01; // rad a dragged px
-const DIST = 4.3; // m from the hero to the lens
+const DIST = 4.3; // m from the hero to the lens (further for one taller than 2 m: `far`)
 const FOV = 35;
 const FIRE = new THREE.Vector3(3.5, 0.8, -3.6); // the flame's base over the brazier's bowl
 const SPARKS = 14;
@@ -131,6 +131,7 @@ export class SelectStage {
   private yaw = -0.35; // a three-quarter view, toward the fire
   /** Where his chest faces in the holder (eased: each body's idle turns him its own way), as the sheet's figure (ui/figure.ts). */
   private facing?: number;
+  private far = 1; // the lens backed off for a tall hero, so his hat stays under the title
   private t = 0;
   private last = performance.now();
   private raf = 0;
@@ -286,6 +287,8 @@ export class SelectStage {
     this.facing = undefined;
     this.model.wear(worn);
     this.holder.add(this.model.root);
+    this.far = Math.max(1, HEROES[hero].height / 2);
+    this.resize();
   }
 
   private readonly resize = () => {
@@ -295,9 +298,9 @@ export class SelectStage {
     c.fov = c.aspect < 1 ? FOV * 1.25 : FOV; // upright: a little more of him and the night
     c.updateProjectionMatrix();
     // The roster covers the left: the hero stands at about 3/5 of the width, his feet near the bottom.
-    const half = DIST * Math.tan(THREE.MathUtils.degToRad(c.fov / 2)) * c.aspect;
-    c.position.set(-0.2 * half, 1.3, DIST);
-    c.lookAt(-0.2 * half, 1.02, 0);
+    const d = DIST * this.far, half = d * Math.tan(THREE.MathUtils.degToRad(c.fov / 2)) * c.aspect;
+    c.position.set(-0.2 * half, 1.3 * this.far, d);
+    c.lookAt(-0.2 * half, 1.02 * this.far, 0);
   };
 
   private readonly frame = (now: number) => {

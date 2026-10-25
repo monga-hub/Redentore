@@ -139,7 +139,7 @@ const zitelle = new Priests(level.world, kit.vfx, playerStats, level.areas, l2, 
 zitelle.rising = (f) => !quest.boss2Dead && (f.kind === GONDOLIERE || f.kind === CODEGA); // the drowned and the codeghe rise again for Mastro Iseppo's quests, until the Governatrice falls
 scene.add(zitelle.root);
 /** Level 2's kinds: name, kind, height. */
-const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85, 11], ['Codega', CODEGA, 1.8, 11], ['Zitella', ZITELLA, 1.65, 12], ['Zitella del velo', VELO, 1.65, 12], ['Il Gastaldo dei gondolieri', GASTALDO, 2.7, 13, 'elite'], ['La Maestra del merletto', MAESTRA, 2.5, 14, 'elite'], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
+const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85, 11], ['Codega', CODEGA, 1.8, 11], ['Zitella', ZITELLA, 1.65, 12], ['Zitella del velo', VELO, 1.9, 12], ['Il Gastaldo dei gondolieri', GASTALDO, 2.7, 13, 'elite'], ['La Maestra del merletto', MAESTRA, 2.5, 14, 'elite'], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
 const l3 = spawnLevel3(level.world); // level 3: the Punta, the gondola, San Giorgio Maggiore, the Abate
 const sangiorgio = new Priests(level.world, kit.vfx, playerStats, level.areas, l3, true); // its bodies load with the third quest (stream)
 scene.add(sangiorgio.root);

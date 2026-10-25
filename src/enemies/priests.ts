@@ -46,8 +46,8 @@ interface Look {
   clips: Record<Exclude<CasterState, 'pour'>, string> & { pour?: string }; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
   shoots: { clip: string; from: number; rate: number }[]; swings: { clip: string; from: number; hit: number }[]; deaths: string[];
   bolt: { core: number; glow: number; size: number };
-  /** A ghost's cold self-glow (rgb 0..1) over its own colours, which it tints: the zitelle. */
-  ghost?: [number, number, number];
+  /** A ghost's self-glow (rgb 0..1) over its own colours, which it tints that hue by the 4th (0..1, 0.5 if left out): the zitelle. */
+  ghost?: [number, number, number, number?];
   /** Its marks' colour if not the Reverendissimo's crimson brands: the Bibliotecario's ink. */
   ink?: boolean;
   /** Vestments that catch the light: self-glow, metalness, roughness over the GLB's own (the Abate's gold and white). */
@@ -94,12 +94,12 @@ const LOOKS = new Map<CasterKind, Look>([
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xf4ffc8, glow: 0x8aff3a, size: 1 }, // a will-o'-wisp out of the lantern
   }],
-  ...([ZITELLA, VELO] as const).map((kind): [CasterKind, Look] => [kind, {
-    body: 'zitella.glb', prop: 'rocca.glb', height: 1.7, staff: 1.3, grip: 0.35,
+  ...([[ZITELLA, 'zitella.glb', 1.7], [VELO, 'velo.glb', 1.95]] as const).map(([kind, body, height]): [CasterKind, Look] => [kind, {
+    body, prop: 'rocca.glb', height, staff: 1.3, grip: 0.35, // the Velo: a crowned bride, the hall's warden
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xffffff, glow: 0x9fd8ff, size: 0.9 }, // a skein of thread
-    ghost: kind === VELO ? [0.62, 0.44, 0.16] : [0.32, 0.55, 0.75], // the veil's girls glow her amber
+    ghost: kind === VELO ? [0.55, 0.32, 0.05, 0.25] : [0.06, 0.16, 0.34, 0.6], // pale lace: tinted ice blue; the Velo's gold kept, glowing amber
   }]),
   [MAESTRA, {
     body: 'maestra.glb', prop: 'forbici.glb', height: 2.7, staff: 1.6, grip: 0.82,
@@ -377,11 +377,12 @@ function dress(scene: THREE.Group, prop: THREE.Group, look: Look): void {
     m.roughness = sh[2];
   });
   const g = look.ghost;
-  if (g) scene.traverse((o) => { // a ghost: its colours cooled and dimmed, a cold glow from within (friars.ts flash keeps it)
+  if (g) scene.traverse((o) => { // a ghost: its colours tinted, a glow from within (friars.ts flash keeps it)
     if (!(o instanceof THREE.Mesh) || o.material === glow || o.parent?.name === 'held') return;
     const m = o.material as THREE.MeshStandardMaterial;
-    m.color.setRGB(0.55, 0.68, 0.85);
-    m.emissive.setRGB(...g);
+    const t = g[3] ?? 0.5, k = t / Math.max(g[0], g[1], g[2]);
+    m.color.setRGB(1 - t + g[0] * k, 1 - t + g[1] * k, 1 - t + g[2] * k); // the maps tinted toward the glow's hue
+    m.emissive.setRGB(g[0], g[1], g[2]);
     m.userData.ghost = g;
     m.transparent = true;
     m.opacity = 0.88;

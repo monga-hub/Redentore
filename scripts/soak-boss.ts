@@ -16,6 +16,7 @@
 //   npm run soak                       ~2 minutes of fight
 //   SOAK_SECONDS=600 npm run soak      a longer one
 //   SOAK_LEVEL=2 npm run soak           the Governatrice under the Zitelle's dome instead (level 2's bodies, lace and fuso)
+//   SOAK_LEVEL=3 npm run soak           the Abate in the Cenacolo instead (level 3's bodies, calice, rintocchi, acqua alta)
 //   SOAK_HERO=bortolo npm run soak      Bortolo (or fosca, Suor Fosca; tizian, Fra' Tizian; zanetto, Zanetto) picked on the new game's screen instead of the Risorto (player/heroes.ts)
 //   CHROME=/path/to/chrome npm run soak
 import { spawn } from 'node:child_process';
@@ -94,20 +95,24 @@ async function rehearse(wardrobe: object[]): Promise<void> {
 
 /** In the page once it has loaded: the church set for the boss, every ability on the bar, a bot that fights him. */
 function fight(seconds: number, level: number, WARDROBE: object[]): void {
-  const w = window as any, { quest, priests, zitelle, player, playerStats, levels, kit, targeting, fx, gear } = w;
+  const w = window as any, { quest, priests, zitelle, sangiorgio, player, playerStats, levels, kit, targeting, fx, gear } = w;
   let dressed = 0;
-  const boss = level === 2 ? zitelle.boss : priests.boss, BERSERK = boss.kind.phases.berserk;
+  const boss = level === 3 ? sangiorgio.boss : level === 2 ? zitelle.boss : priests.boss, BERSERK = boss.kind.phases.berserk;
   quest.accepted = true;
   quest.takeKey();
   for (const g of quest.gates) if (g.needs === 'key') quest.open(g);
-  if (level === 2) { // the Reverendissimo dead, the second quest taken, the Zitelle's back door open
+  if (level >= 2) { // the Reverendissimo dead, the second quest taken, the Zitelle's back door open
     quest.win(); quest.out = true; quest.report(); quest.accept2(); quest.arrived = true; quest.takeKey2();
     quest.open(quest.gates.find((g: { id: string }) => g.id === 'coro-zitelle'));
   }
+  if (level === 3) { // the Governatrice dead too, the third quest taken, across the water, the Cenacolo's key and door
+    quest.win2(); quest.report2(); quest.accept3(); quest.landed = true; quest.takeKey3();
+    quest.open(quest.gate('cenacolo'));
+  }
   levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'caligo', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
   levels.apply();
-  player.respawn(level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
-  const floor = level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
+  player.respawn(level === 3 ? { x: -530, z: 19, yaw: 0 } : level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
+  const floor = level === 3 ? 30 : level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
   let next = 0, raged = false, change = 0;
   const RUNGS = [[0.4, 1], [0.48, 2], [0.56, 3], [0.64, 4], [0.72, 5], [0.82, 0]]; // fraction of the fight, rung
@@ -115,7 +120,7 @@ function fight(seconds: number, level: number, WARDROBE: object[]): void {
   fx.setStep(0, 'soak');
   const tick = () => {
     const t = (performance.now() - t0) / 1000;
-    if (boss.state === 'dead' && t > seconds) { w.SOAK.done = true; w.SOAK.won = level === 2 ? quest.boss2Dead : quest.bossDead; return; }
+    if (boss.state === 'dead' && t > seconds) { w.SOAK.done = true; w.SOAK.won = level === 3 ? quest.boss3Dead : level === 2 ? quest.boss2Dead : quest.bossDead; return; }
     requestAnimationFrame(tick);
     playerStats.hp = playerStats.hpMax; // the fight, not the hero, is under test
     playerStats.mana = playerStats.manaMax;
@@ -241,6 +246,9 @@ try {
   if (LEVEL === 2) { // level 2's bodies load with its quest
     while (!(await evaluate('window.zitelle.root.children.length > 0'))) { if (Date.now() - t0 > 240e3) throw new Error("level 2's bodies never loaded"); await sleep(500); }
   }
+  if (LEVEL === 3) { // and level 3's with its own
+    while (!(await evaluate('window.sangiorgio.root.children.length > 0'))) { if (Date.now() - t0 > 240e3) throw new Error("level 3's bodies never loaded"); await sleep(500); }
+  }
   while (!(await evaluate('!!window.SOAK.done'))) {
     if ((await evaluate('performance.now()')) > (SECONDS + 300) * 1000) throw new Error(`the boss never fell: ${await evaluate("SOAK.samples.filter((x, i, a) => x.state !== a[i - 1]?.state || x.step !== a[i - 1]?.step).map((x) => `${x.t.toFixed(0)}s ${x.state} p${x.phase} r${x.step}`).join(', ')")} (hero ${await evaluate('JSON.stringify(player.pos)')})`);
     await sleep(2000);
@@ -279,7 +287,7 @@ try {
   }
   if (gpu[6] > gpu[0] * 1.02) fail(`back on the top rung the buffers grew: ${gpu[0].toFixed(0)} -> ${gpu[6].toFixed(0)} MB`);
   if (prog[6] > prog[0] + SLACK.prog) fail(`back on the top rung the programs grew: ${prog[0]} -> ${prog[6]}`);
-  console.log(`${LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; ${r.dressed} changes of clothes; the sheet opened 63 times (GPU ${sh.before.gpu.toFixed(1)} -> ${sh.after.gpu.toFixed(1)} MB, programs ${sh.before.prog} -> ${sh.mid.prog} -> ${sh.after.prog}, geometries ${sh.before.geo} -> ${sh.after.geo}); GPU by rung ${gpu.map((g) => g.toFixed(0)).join(' -> ')} MB; programs ${prog.join(' -> ')}; top rung ${top.length} s`);
+  console.log(`${LEVEL === 3 ? 'Abate' : LEVEL === 2 ? 'Governatrice' : 'boss'} soak: ${s.at(-1)!.t.toFixed(0)} s of fight, phases to ${Math.max(...s.map((x) => x.phase))}, berserk, the kill; ${r.dressed} changes of clothes; the sheet opened 63 times (GPU ${sh.before.gpu.toFixed(1)} -> ${sh.after.gpu.toFixed(1)} MB, programs ${sh.before.prog} -> ${sh.mid.prog} -> ${sh.after.prog}, geometries ${sh.before.geo} -> ${sh.after.geo}); GPU by rung ${gpu.map((g) => g.toFixed(0)).join(' -> ')} MB; programs ${prog.join(' -> ')}; top rung ${top.length} s`);
 } catch (e) {
   fail(String((e as Error).message));
 } finally {

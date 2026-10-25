@@ -135,6 +135,25 @@ const l1 = boot();
 deserialize(l1, (({ quest: { reported: _r, accepted2: _a2, arrived: _ar, key2: _k, boss2Dead: _b, reported2: _r2, blessed2: _b2, ...q }, ...o }) => ({ ...o, quest: { ...q, gates: ['grata-nord', 'coro', 'portone'] } }))(zs));
 if (l1.quest.stage !== 'report' || l1.quest.gate('catene').open) fail(`a finished level-1 save loads at ${l1.quest.stage}`);
 if (valid({ ...zs, quest: { ...zs.quest, key2: 1 } })) fail('level 2 flag validation');
+// Level 3: its flags round-trip, the chain past the Tre Oci and the Cenacolo's doors with them; a level-2 save loads at the third offer.
+const l3a = boot();
+deserialize(l3a, { ...zs, quest: { ...zs.quest, boss2Dead: true } });
+l3a.quest.report2();
+l3a.quest.accept3();
+l3a.quest.landed = true;
+l3a.quest.takeKey3();
+l3a.quest.open(l3a.quest.gate('cenacolo'));
+l3a.quest.bless3();
+const s3 = JSON.parse(JSON.stringify(serialize(l3a))), l3b = boot();
+deserialize(l3b, s3);
+if (l3b.quest.stage !== 'boss3' || !l3b.quest.gate('catene-punta').open || !l3b.quest.gate('cenacolo').open || l3b.quest.gate('cenacolo-orto').open || !l3b.quest.blessed3 || !l3b.quest.landed) fail(`level 3 restored at ${l3b.quest.stage}`);
+const l3w = boot();
+deserialize(l3w, { ...s3, quest: { ...s3.quest, boss3Dead: true } });
+if (!l3w.quest.gate('cenacolo-orto').open || l3w.quest.stage !== 'return3') fail("the Abate dead but the Cenacolo's garden door shut");
+const l3o = boot();
+deserialize(l3o, { ...zs, quest: { ...zs.quest, boss2Dead: true, reported2: true, gates: [...zs.quest.gates, 'portone-zitelle'] } });
+if (l3o.quest.stage !== 'offer3' || l3o.quest.gate('catene-punta').open) fail(`a finished level-2 save loads at ${l3o.quest.stage}`);
+if (valid({ ...s3, quest: { ...s3.quest, key3: 'yes' } })) fail('level 3 flag validation');
 // Fra' Zuane's corona: found and given back survive a save; a save from before it loads with it still lost.
 const rz = boot();
 deserialize(rz, { ...zs, quest: { ...zs.quest, relic: true, relicBack: true } });
@@ -169,7 +188,7 @@ if (valid({ ...ss, side: { taken: [1], done: [] } }) || valid({ ...ss, side: { t
 // A fog grid round-trips by its origin; one from before (no origin: level 2 at +X, x 60..300) keeps level 1's cells
 // where they were and lays level 2's on its new side, -X (level/plan.ts).
 const wide = fogOf(boot());
-const legacy1 = buildLevel().areas.filter((x) => x.zone !== 'giudecca' && x.zone !== 'zitelle');
+const legacy1 = buildLevel().areas.filter((x) => !['giudecca', 'zitelle', 'punta', 'sangiorgio'].includes(x.zone));
 const narrow = new Discovery([...legacy1, { x0: 60, x1: 300, z0: -104, z1: 20 }]);
 narrow.reveal(SPAWN.x, SPAWN.z);
 narrow.reveal(78, 15); // the old Fondamenta de la Croce

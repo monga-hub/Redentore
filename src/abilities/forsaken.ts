@@ -307,7 +307,7 @@ export class Forsaken {
 
     const m = this.magic;
     m.update(dt);
-    this.player.carried = m.dash?.kind ?? '';
+    if (this.player.carried !== 'boat') this.player.carried = m.dash?.kind ?? ''; // the gondola's is quest/ferry.ts's
     this.player.model.channel(m.dash?.kind === 'charge', 'rush');
     if (m.dash?.kind === 'charge') for (let n = v.count(30, dt); n > 0; n--) v.spawn(rushDust, p.x + rnd(-0.3, 0.3), p.y + 0.15, p.z + rnd(-0.3, 0.3), 0, 0.4, 0);
     for (const e of m.events) this.spell(e);

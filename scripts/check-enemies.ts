@@ -8,7 +8,9 @@
 import { buildLevel } from '../src/level/index.ts';
 import { World } from '../src/core/physics.ts';
 import { PATHS_X, PATHS_Z } from '../src/level/zones/orto.ts';
-import { ANDITO, CHOIR_DOOR, CROCE } from '../src/quest/progress.ts';
+import { ANDITO, ANTIREF, APPRODO, CHOIR_DOOR, CROCE, PUNTA } from '../src/quest/progress.ts';
+import { ABATE, BIBLIOTECARIO, NOSTROMO, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
+import { LIB_F } from '../src/level/zones/sangiorgio.ts';
 import { GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, VELO, spawnLevel2 } from '../src/enemies/zitelle.ts';
 import { FRIAR, GROUPS, MORE, RISE, hurt, rise, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, spawnApiary, cloisterPlan, fly, gardenPlan, lagoonPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
@@ -504,4 +506,75 @@ console.log(`enemies ok (${dealt} damage over ${swings} swings)`);
   }
   if (!sawSpin || spun < GOVERNATRICE.spin!.dps * 0.3) fail(`governatrice: the fuso ${sawSpin ? `swept ${spun.toFixed(0)}` : 'never spun'} on a player standing in it`);
   console.log(`level 2 ok (${l2.all.length} casters, lines cut ${MAESTRA.lines!.damage}, veil ${GOVERNATRICE.veil!.cut * 100}%, fuso ${spun.toFixed(0)} on one who stood)`);
+}
+
+// Level 3: every pack on open ground inside its bounds, the checkpoints out of reach; the Abate's Calice, Rintocchi and
+// Acqua alta strike who stands in them and spare who sidesteps, jumps or stands on an island; the Bibliotecario's ink blots.
+{
+  const level = buildLevel();
+  const l3 = spawnLevel3(level.world);
+  for (const m of l3.all) {
+    const b = m.bounds, at = `${m.kind === ABATE ? 'Abate' : 'level 3'} spot (${m.x}, ${m.z})`;
+    if (m.x < b.x0 || m.x > b.x1 || m.z < b.z0 || m.z > b.z1) fail(`${at} outside its bounds`);
+    if (level.world.blocked(m.x, m.z, m.y, m.kind.radius)) fail(`${at} inside a wall`);
+  }
+  if (l3.all.filter((m) => m.kind === BIBLIOTECARIO).length !== 1 || l3.all.filter((m) => m.kind === NOSTROMO).length !== 1 || l3.boss.kind !== ABATE) fail('level 3: one Bibliotecario, one Nostromo, the Abate last');
+  if (Math.abs(l3.bibliotecario.y - LIB_F) > 0.05) fail(`the Bibliotecario stands at ${l3.bibliotecario.y}, not on the library's floor`);
+  for (const c of [PUNTA, APPRODO, ANTIREF]) for (const m of l3.all) if (m.kind.aggro && Math.hypot(m.x - c.x, m.z - c.z) < m.kind.aggro + 1 && Math.abs(m.y - level.world.standHeight(c.x, c.z)) < 2.5) fail(`checkpoint (${c.x}, ${c.z}) in reach of a ${m.kind.hp} hp mob at (${m.x}, ${m.z})`);
+
+  const fl = new World();
+  fl.add(0, 0, 100, 100, -1, 0);
+  const B = { x0: -15, x1: 15, z0: -15, z1: 15 }, bolts: Bolt[] = [];
+  const abate = () => { const [a] = spawnPriests(fl, [[[0, 0, Math.PI]]], [B], [[ABATE]])[0]; casterHurt(a, 1); return a; };
+  const hold = (a: Priest) => { a.x = 0; a.z = 0; if (a.state === 'swing' || a.state === 'cast') { a.state = 'chase'; a.t = 0; } a.melee = 99; a.cd = 99; };
+  // The Calice: poured where the hero stood; a step behind him clears it.
+  for (const stay of [true, false]) {
+    const a = abate(), p: Target = { x: 0, y: 0, z: 6 };
+    a.pourCd = 0;
+    let wine = 0, poured = false;
+    for (let t = 0; t < ABATE.pour!.cast + 1; t += 1 / 60) {
+      const was = a.state;
+      const d = casterThink(a, p, fl, 1 / 60, bolts);
+      hold(a);
+      if (a.state === 'pour') { poured = true; if (!stay && a.t > 0.5) { p.x = 0; p.z = -4; } }
+      if (was === 'pour' && a.state !== 'pour') wine += d;
+    }
+    if (!poured || (stay ? wine < ABATE.pour!.damage : wine > 0)) fail(`calice: ${stay ? 'stayed' : 'stepped behind'}, ${wine} damage`);
+  }
+  // The Rintocchi from 70%: three rings; standing takes them, jumping each as it passes clears it.
+  for (const jump of [false, true]) {
+    const a = abate(), p: Target = { x: 0, y: 0, z: 7 };
+    a.hp = ABATE.hp * 0.69;
+    a.tollCd = 0; a.pourCd = 99;
+    let rang = 0, n = 0;
+    for (let t = 0; t < 6; t += 1 / 60) {
+      const d = casterThink(a, p, fl, 1 / 60, bolts);
+      hold(a); a.pourCd = 99;
+      rang += d;
+      n = Math.max(n, a.rings.length);
+      p.y = jump && a.rings.some((r) => r.t >= 0 && Math.abs(r.t * ABATE.toll!.speed - 7) < 1.2) ? 0.8 : 0; // airborne while a ring sweeps under
+    }
+    if (n !== ABATE.toll!.n || (jump ? rang > 0 : rang < ABATE.toll!.damage * ABATE.toll!.n)) fail(`rintocchi: ${n} rings, ${jump ? 'jumped' : 'stood'}, ${rang} damage`);
+  }
+  // Acqua alta from 40%: islands, then the flood; on an island, dry.
+  for (const dry of [false, true]) {
+    const a = abate(), p: Target = { x: 0, y: 0, z: 9 };
+    a.hp = ABATE.hp * 0.39;
+    a.tideCd = 0; a.pourCd = 99; a.tollCd = 99;
+    let wet = 0;
+    for (let t = 0; t < ABATE.tide!.warn + ABATE.tide!.time + 0.5; t += 1 / 60) {
+      const d = casterThink(a, p, fl, 1 / 60, bolts);
+      hold(a); a.pourCd = 99; a.tollCd = 99;
+      if (dry && a.tide) { p.x = a.tide.isles[0].x; p.z = a.tide.isles[0].z; }
+      wet += d;
+    }
+    if (dry ? wet > 0 : wet < ABATE.tide!.dps * ABATE.tide!.time * 0.9) fail(`acqua alta: ${dry ? 'on an island' : 'in the water'}, ${wet.toFixed(0)} damage`);
+  }
+  // The Bibliotecario's ink blots from the first blow.
+  const [lib] = spawnPriests(fl, [[[0, 0, 0]]], [B], [[BIBLIOTECARIO]])[0];
+  casterHurt(lib, 1);
+  let blots = 0;
+  for (let t = 0; t < BIBLIOTECARIO.phases!.marks!.every + 0.5; t += 1 / 60) { casterThink(lib, { x: 0, y: 0, z: -6 }, fl, 1 / 60, bolts); blots = Math.max(blots, lib.marks.length); }
+  if (blots !== BIBLIOTECARIO.phases!.marks!.n) fail(`bibliotecario: ${blots} ink blots`);
+  console.log(`level 3 ok (${l3.all.length} casters, calice ${ABATE.pour!.damage}, rintocchi ${ABATE.toll!.n}×${ABATE.toll!.damage} jumped clear, acqua alta dry on an island)`);
 }

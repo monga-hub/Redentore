@@ -5,7 +5,9 @@ import { D, T, type Decal, type DecalStyle, type RibbonStyle, type Style, type V
 import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
-import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, rise, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest } from './caster.ts';
+import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, rise, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest, type Ring } from './caster.ts';
+import { ABATE, AMANUENSE, BIBLIOTECARIO, MARINAIO, MONACO, NOSTROMO } from './sangiorgio.ts';
+import { playSfx } from '../audio/engine.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA } from './zitelle.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { flash, ownMaterials } from './friars.ts';
@@ -41,11 +43,15 @@ const SHADOW = 0x8a3cff, SMOKE = 0x1a0b26;
  */
 interface Look {
   body: string; prop: string; height: number; staff: number; grip: number;
-  clips: Record<CasterState, string>; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
+  clips: Record<Exclude<CasterState, 'pour'>, string> & { pour?: string }; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
   shoots: { clip: string; from: number; rate: number }[]; swings: { clip: string; from: number; hit: number }[]; deaths: string[];
   bolt: { core: number; glow: number; size: number };
   /** A ghost's cold self-glow (rgb 0..1) over its own colours, which it tints: the zitelle. */
   ghost?: [number, number, number];
+  /** Its marks' colour if not the Reverendissimo's crimson brands: the Bibliotecario's ink. */
+  ink?: boolean;
+  /** Vestments that catch the light: self-glow, metalness, roughness over the GLB's own (the Abate's gold and white). */
+  sheen?: [number, number, number];
 }
 const Y = new THREE.Vector3(0, 1, 0), Q = new THREE.Quaternion(), UP = new THREE.Quaternion();
 const CAST = 'mage_soell_cast', RELEASE = { clip: 'mage_soell_cast_3', from: 0.75, rate: 1.4 }, THROW = { clip: 'Cast_Throw', from: 0.66, rate: 1.2 };
@@ -108,6 +114,33 @@ const LOOKS = new Map<CasterKind, Look>([
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards'],
     bolt: { core: 0xfff4d0, glow: 0xffb030, size: 1.6 },
   }],
+  // Level 3 (enemies/sangiorgio.ts).
+  ...([[MONACO, 'monaco.glb', 'croce.glb', 1.9, 2.1, 0.45], [MARINAIO, 'marinaio.glb', 'mezzomarinaio.glb', 1.85, 2.6, 0.5], [NOSTROMO, 'nostromo.glb', 'ancora.glb', 3, 2.1, 0.85]] as const).map(([kind, body, prop, height, staff, grip]): [CasterKind, Look] => [kind, {
+    body, prop, height, staff, grip,
+    clips: { pray: 'Pray', chase: 'Idle', cast: 'Idle', swing: 'Attack', nova: 'Charged_Ground_Slam', spin: 'Idle', evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: kind === NOSTROMO ? 'Walking' : 'Running' }, pace: { 1: kind === NOSTROMO ? WALK : RUN, [-1]: -WALK, run: RUN }, shoots: [], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xffffff, glow: 0x60d0c0, size: 1 }, // never casts
+  }]),
+  [AMANUENSE, {
+    body: 'amanuense.glb', prop: 'penna.glb', height: 1.8, staff: 0.9, grip: 0.3,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xd8e4ff, glow: 0x2a46c8, size: 1 }, // a flick of ink
+  }],
+  [BIBLIOTECARIO, {
+    body: 'bibliotecario.glb', prop: 'chiave.glb', height: 2.8, staff: 1.5, grip: 0.25,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: CAST, evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xe0e8ff, glow: 0x3050e0, size: 1.3 },
+    ink: true,
+  }],
+  [ABATE, {
+    body: 'abate.glb', prop: 'baculo.glb', height: 5.4, staff: 4.9, grip: 0.45,
+    clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: CAST, pour: 'mage_soell_cast_3', evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards'],
+    bolt: { core: 0xfff0f4, glow: 0xc0204a, size: 1.6 }, // wine
+    sheen: [0.55, 0.15, 0.55],
+  }],
 ]);
 /** The lace: lines and the fuso's threads on the floor, white-gold, a square decal per width along each. */
 const LACE = 0xfff0d0, LACE_DECALS = 48;
@@ -144,6 +177,23 @@ const brandRing: DecalStyle = { life: 0, size: MARK.radius * 2, tile: D.ring, co
 const brandRunes: DecalStyle = { life: 0, size: MARK.radius * 1.7, tile: D.runes, color: BRAND, hdr: 1.3 };
 const brandFlame: Style = { ...novaFlame, color: 0xff8ab4, color2: 0x4a0618 };
 const brandBlast: Style = { ...novaBlast, color: 0xffd0e0, color2: BRAND };
+// The Bibliotecario's ink blots: the same brands in ink blue, a splash of ink for the eruption.
+const INK = 0x3a5cff;
+const inkFlame: Style = { ...novaFlame, color: 0x9ab0ff, color2: 0x050a30 };
+const inkBlast: Style = { ...novaBlast, color: 0xd8e0ff, color2: INK };
+// The Abate's: the Calice's wedge of wine, the bells' bronze rings, the tide's water and its islands of light.
+const WINE = 0xc0204a, BRONZE = 0xffc060, ISLE = 0xfff0b0;
+const wineTele: DecalStyle = { life: 0, size: 2, tile: D.disc, color: WINE, hdr: 1.4 };
+const wineSplash: Style = { life: [0.5, 0.9], size: [0.12, 0.24], color: 0xff6a90, color2: 0x40000c, hdr: 2, tex: T.ember, drag: 1.2, grav: 7 };
+const wineMist: Style = { life: [0.6, 1], size: [0.6, 1], grow: 1.5, color: WINE, color2: 0x200006, hdr: 1.2, alpha: 0.6, tex: T.smoke, erode: true, drag: 2, grav: -0.3 };
+const tollRing: DecalStyle = { life: 0, size: 2, tile: D.ring, color: BRONZE, hdr: 2.4 };
+const tollSpark: Style = { life: [0.3, 0.5], size: [0.05, 0.09], color: 0xfff0c0, color2: BRONZE, hdr: 4, tex: T.spark, drag: 2, grav: 2 };
+const isleDisc: DecalStyle = { life: 0, size: 4, tile: D.disc, color: ISLE, hdr: 1.3 };
+const isleRing: DecalStyle = { life: 0, size: 4, tile: D.ring, color: ISLE, hdr: 2.2 };
+const POUR_DECALS = 72, RAYS = 7;
+// The finale: each new act a toll and a gold wave off the Abate, his fall a column of light and the bells' last strokes.
+const holyRise: Style = { life: [1.2, 2], size: [0.08, 0.16], color: 0xfff6d8, color2: BRONZE, hdr: 4, tex: T.spark, stretch: 0.05, drag: 0.4, grav: -4 };
+const holyWave: DecalStyle = { life: 1.2, size: 2, grow: 14, tile: D.ring, color: BRONZE, hdr: 2.6, fadeOut: 0.8 };
 const darkSoul: Style = { life: [1.6, 2], size: 0.55, grow: 1.5, color: 0xd0a0ff, hdr: 1.2, alpha: 0.6, tex: T.skull, grav: -1.1, fadeIn: 0.25 };
 const deathSmoke: Style = { life: [1, 1.5], size: [0.6, 1], grow: 2, color: SMOKE, alpha: 0.75, tex: T.smoke2, erode: true, dark: true, drag: 2, grav: -0.6 };
 const swingTrail: RibbonStyle = { color: 0xf0e0ff, color2: SHADOW, hdr: 1.8, alpha: 0.7, width: 0, life: 0.14 };
@@ -243,11 +293,11 @@ class View {
       const step = f.state === 'chase' && f.move ? f.move : 0;
       const k = 1.8 / L.height; // paces are for a 1.8 m body: a giant's stride covers more ground
       const rate = f.state === 'evade' ? f.kind.walk * k / L.pace.run : step ? (step === 1 ? f.kind.speed : f.kind.back) * k / L.pace[step] : 1;
-      this.play(step ? L.step[step] : f.state === 'dead' ? this.deadClip : L.clips[f.state], false, rate);
+      this.play(step ? L.step[step] : f.state === 'dead' ? this.deadClip : (L.clips[f.state as keyof Look['clips']] ?? L.clips.cast), false, rate);
     }
 
     // Casting: the crystal swells and glows, shadow motes spiral into it (a nova draws them in too).
-    const p = f.state === 'cast' ? Math.min(f.t / f.kind.cast, 1) : f.state === 'nova' ? Math.min(f.t / f.kind.nova!.cast, 1) : 0;
+    const p = f.state === 'cast' ? Math.min(f.t / f.kind.cast, 1) : f.state === 'nova' ? Math.min(f.t / f.kind.nova!.cast, 1) : f.state === 'pour' ? Math.min(f.t / f.kind.pour!.cast, 1) : 0;
     this.tip.scale.setScalar(1 + p * 1.2);
     this.glow.visible = p > 0;
     if (p > 0) {
@@ -270,7 +320,7 @@ class View {
       if (!live) { vfx.ribbons.end(this.trail); this.trail = -1; }
     }
 
-    this.overlay.update(dt, f.state === 'swing' || f.state === 'cast' || f.state === 'nova' || f.state === 'dead');
+    this.overlay.update(dt, f.state === 'swing' || f.state === 'cast' || f.state === 'nova' || f.state === 'pour' || f.state === 'dead');
     if (d < FAR || f.state !== 'pray') this.mixer.update(dt * still(f.cc));
     this.shadows.update(d);
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 4);
@@ -318,6 +368,14 @@ function dress(scene: THREE.Group, prop: THREE.Group, look: Look): void {
   tip.name = 'staffTip';
   stand(scene, look.height);
   arm(scene, prop, look.staff, look.grip).add(tip);
+  const sh = look.sheen;
+  if (sh) scene.traverse((o) => {
+    if (!(o instanceof THREE.Mesh) || o.material === glow || o.parent?.name === 'held') return;
+    const m = o.material as THREE.MeshStandardMaterial;
+    m.emissive.setScalar(sh[0]);
+    m.metalness = sh[1];
+    m.roughness = sh[2];
+  });
   const g = look.ghost;
   if (g) scene.traverse((o) => { // a ghost: its colours cooled and dimmed, a cold glow from within (friars.ts flash keeps it)
     if (!(o instanceof THREE.Mesh) || o.material === glow || o.parent?.name === 'held') return;
@@ -346,8 +404,14 @@ export class Priests {
   private teles: [Decal, Decal][] = []; // nova telegraphs (ring, sigil) on the floor, lent to whoever channels one
   private laces: Decal[] = []; // lace lines and the fuso's threads
   private laid = new Set<Line>(); // lines seen last frame: the ones gone with their time run out cut
-  private brands: [Decal, Decal][] = []; // the boss's marks (ring, runes)
-  private branded = new Set<Mark>(); // marks seen last frame: the ones gone with their time run out erupted
+  private brands: [Decal, Decal][] = []; // the marks (ring, runes): the Reverendissimo's, the Bibliotecario's
+  private branded = new Map<Mark, Priest>(); // marks seen last frame and whose: the ones gone with their time run out erupted
+  private wine: Decal[] = []; // the Calice's wedge
+  private bells: Decal[] = []; // the Rintocchi's rings
+  private isles: [Decal, Decal][] = []; // Acqua alta's islands
+  private water?: THREE.Mesh; // and its flood
+  private act = -1; // the Abate's act last frame (-1 before the first: a loaded game's fallen Abate stays quiet), and whether his fall has been shown
+  private fallen = false;
   private world: World;
   private vfx: Vfx;
   private stats: PlayerStats;
@@ -363,7 +427,23 @@ export class Priests {
     this.all = casters.all;
     if (this.all.some((f) => f.kind.lines)) for (let i = 0; i < LACE_DECALS; i++) this.laces.push(vfx.hold(laceTele));
     for (let i = 0; i < 3; i++) this.teles.push([vfx.hold(tele), vfx.hold(teleSigil)]); // ponytail: three rings at once, a fourth nova goes unmarked
-    if (this.boss.kind.phases?.marks) for (let i = 0; i < MARK.n * 2; i++) this.brands.push([vfx.hold(brandRing), vfx.hold(brandRunes)]);
+    const marks = Math.max(0, ...this.all.map((f) => f.kind.phases?.marks?.n ?? 0));
+    for (let i = 0; i < marks * 2; i++) this.brands.push([vfx.hold(brandRing), vfx.hold(brandRunes)]);
+    const abate = this.all.find((f) => f.kind.pour || f.kind.toll || f.kind.tide);
+    if (abate) {
+      const K = abate.kind, b = abate.bounds;
+      if (K.pour) for (let i = 0; i < POUR_DECALS; i++) this.wine.push(vfx.hold(wineTele));
+      if (K.toll) for (let i = 0; i < K.toll.n * 2; i++) this.bells.push(vfx.hold(tollRing));
+      if (K.tide) {
+        for (let i = 0; i < K.tide.n; i++) this.isles.push([vfx.hold(isleDisc), vfx.hold(isleRing)]);
+        // The flood over the whole hall: its floor less the boss's margins, and the margins again.
+        this.water = new THREE.Mesh(new THREE.PlaneGeometry(b.x1 - b.x0 + 7, b.z1 - b.z0 + 5.5).rotateX(-Math.PI / 2),
+          new THREE.MeshStandardMaterial({ color: 0x163c4a, roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0, depthWrite: false }));
+        this.water.position.set((b.x0 + b.x1) / 2, abate.y, (b.z0 + b.z1) / 2);
+        this.water.visible = false;
+        this.root.add(this.water);
+      }
+    }
     if (!lazy) this.load();
   }
 
@@ -413,6 +493,7 @@ export class Priests {
       const hit = think(f, player, this.world, dt, this.bolts);
       dmg += hit;
       if (was === 'nova' && f.state !== 'nova') this.nova(f, hit > 0);
+      if (was === 'pour' && f.state !== 'pour') this.poured(f, hit > 0);
       if (this.bolts.length === n) return;
       // A new bolt leaves from the caster's crystal, with a flare.
       const b = this.bolts[n], look = LOOKS.get(f.kind)!;
@@ -425,12 +506,13 @@ export class Priests {
     separate(this.all, this.world);
     dmg += fly(this.bolts, player, dt, this.spent, this.world); // walls stop them
     for (const b of this.spent) this.land(b, b.hit);
-    const boss = this.boss;
-    for (const m of this.branded) if (m.t <= 0 && !boss.marks.includes(m)) this.erupt(m, Math.hypot(player.x - m.x, player.z - m.z) < MARK.radius);
-    this.branded = new Set(boss.marks);
+    for (const [m, f] of this.branded) if (m.t <= 0 && !f.marks.includes(m)) this.erupt(m, f, Math.hypot(player.x - m.x, player.z - m.z) < f.kind.phases!.marks!.radius);
+    this.branded.clear();
+    for (const f of this.all) for (const m of f.marks) this.branded.set(m, f);
     this.drawBolts(dt);
     this.drawTelegraphs(dt);
     this.drawLace(dt, player);
+    this.drawAbate(dt);
     this.all.forEach((f, i) => this.views[i].update(f, dt, this.vfx, Math.hypot(f.x - player.x, f.z - player.z)));
     if (dmg > 0) this.stats.takeDamage(dmg);
   }
@@ -513,20 +595,24 @@ export class Priests {
     }
     for (; k < this.teles.length; k++) this.teles[k][0].on = this.teles[k][1].on = false;
 
-    const marks = this.boss.marks;
+    const marks = [...this.branded];
     this.brands.forEach(([ring, runes], i) => {
-      const m = marks[i];
+      const [m, f] = marks[i] ?? [];
       ring.on = runes.on = !!m;
-      if (!m) return;
-      const p = 1 - Math.max(m.t, 0) / MARK.cast;
+      if (!m || !f) return;
+      const M = f.kind.phases!.marks!, ink = LOOKS.get(f.kind)!.ink, p = 1 - Math.max(m.t, 0) / M.cast;
+      ring.color.setHex(ink ? INK : BRAND).multiplyScalar(brandRing.hdr!);
+      runes.color.setHex(ink ? INK : BRAND).multiplyScalar(brandRunes.hdr!);
+      ring.size = M.radius * 2;
+      runes.size = M.radius * 1.7;
       ring.x = runes.x = m.x; ring.y = runes.y = m.y + 0.07; ring.z = runes.z = m.z;
       ring.fill = 0.1 + 0.9 * p;
       ring.alpha = 0.6 + 0.4 * p;
       runes.alpha = Math.min(1, p * 4) * 0.85;
       runes.rot += dt * (1 + p * 4);
       for (let j = v.count(25 + p * 70, dt); j > 0; j--) {
-        const a = Math.random() * Math.PI * 2, e = MARK.radius * (0.95 + Math.random() * 0.08);
-        v.spawn(brandFlame, m.x + Math.cos(a) * e, m.y + 0.1, m.z + Math.sin(a) * e, 0, 0.5 + p * 1.5, 0);
+        const a = Math.random() * Math.PI * 2, e = M.radius * (0.95 + Math.random() * 0.08);
+        v.spawn(ink ? inkFlame : brandFlame, m.x + Math.cos(a) * e, m.y + 0.1, m.z + Math.sin(a) * e, 0, 0.5 + p * 1.5, 0);
       }
     });
   }
@@ -574,20 +660,103 @@ export class Priests {
     this.laid = now;
   }
 
-  /** A mark erupts: a column of crimson flame out of the brand, a shock wave to its edge. */
-  private erupt(m: Mark, hit: boolean): void {
-    const v = this.vfx, r = MARK.radius, [wave, cracks, scar] = blastOf(r);
+  /** A mark erupts: a column of crimson flame (or ink) out of the brand, a shock wave to its edge. */
+  private erupt(m: Mark, f: Priest, hit: boolean): void {
+    const v = this.vfx, r = f.kind.phases!.marks!.radius, [wave, cracks, scar] = blastOf(r), ink = LOOKS.get(f.kind)!.ink;
+    const blast = ink ? inkBlast : brandBlast, flame = ink ? inkFlame : brandFlame;
     v.decal(wave, m.x, m.y + 0.07, m.z);
     v.decal(cracks, m.x, m.y + 0.05, m.z);
     v.decal(scar, m.x, m.y + 0.06, m.z);
     for (let k = 0; k < 28; k++) {
       const a = (k / 28) * Math.PI * 2, d = Math.random() * r * 0.8;
-      v.spawn(brandBlast, m.x + Math.cos(a) * d, m.y + 0.2, m.z + Math.sin(a) * d, Math.cos(a) * 1.5, 6 + Math.random() * 4, Math.sin(a) * 1.5);
+      v.spawn(blast, m.x + Math.cos(a) * d, m.y + 0.2, m.z + Math.sin(a) * d, Math.cos(a) * 1.5, 6 + Math.random() * 4, Math.sin(a) * 1.5);
     }
-    v.burst(brandFlame, m.x, m.y + 0.4, m.z, 24, r * 0.7, 1.5, 3);
+    v.burst(flame, m.x, m.y + 0.4, m.z, 24, r * 0.7, 1.5, 3);
     v.ring(novaSmoke, m.x, m.y + 0.3, m.z, 8, 0.6, r, 0.4);
-    v.pulse(m.x, m.y + 1, m.z, BRAND, hit ? 45 : 30);
+    v.pulse(m.x, m.y + 1, m.z, ink ? INK : BRAND, hit ? 45 : 30);
     v.shake(hit ? 0.45 : 0.15);
+  }
+
+  /**
+   * The Abate's: the Calice's wedge of wine filling out from him while he pours; the bells' bronze rings racing over
+   * the floor (a toll as each leaves); the islands of light, then the water rising round them.
+   */
+  private drawAbate(dt: number): void {
+    if (!this.wine.length && !this.bells.length && !this.isles.length) return;
+    const v = this.vfx, f = this.all.find((c) => c.kind.pour || c.kind.toll || c.kind.tide)!, K = f.kind;
+    if (this.act < 0) this.fallen = f.state === 'dead';
+    else if (f.phase > this.act || (f.state === 'dead' && !this.fallen)) this.finale(f);
+    this.act = f.phase;
+    let k = 0;
+    if (K.pour && f.state === 'pour') {
+      const C = K.pour, p = Math.min(f.t / C.cast, 1);
+      for (let r = 0; r < RAYS; r++) {
+        const a = f.pourA + (r / (RAYS - 1) - 0.5) * C.angle * 0.92, dx = Math.sin(a), dz = Math.cos(a);
+        for (let d = 1.2; d < C.length * p + 0.6 && d < C.length && k < this.wine.length; d += Math.max(1, (d * C.angle) / (RAYS - 1)) * 0.8) {
+          const c = this.wine[k++];
+          c.on = true;
+          c.x = f.x + dx * d; c.y = f.y + 0.06; c.z = f.z + dz * d;
+          c.size = Math.max(1.3, (d * C.angle) / (RAYS - 1) * 1.3);
+          c.alpha = 0.3 + 0.6 * p;
+        }
+      }
+      if (Math.random() < dt * 20) { const a = f.pourA + (Math.random() - 0.5) * C.angle, d = Math.random() * C.length * p; v.spawn(wineMist, f.x + Math.sin(a) * d, f.y + 0.2, f.z + Math.cos(a) * d, 0, 0.4, 0); }
+    }
+    for (; k < this.wine.length; k++) this.wine[k].on = false;
+    const B = K.toll;
+    this.bells.forEach((c, i) => {
+      const r: Ring | undefined = f.rings[i];
+      c.on = !!B && !!r && r.t >= 0;
+      if (!c.on) return;
+      const R = r.t * B!.speed;
+      if (r.t < dt * 1.5) playSfx('toll_bell', { x: r.x, y: r.y + 3, z: r.z }); // a ring just left: its stroke of the bell
+      c.x = r.x; c.y = r.y + 0.08; c.z = r.z;
+      c.size = Math.max(0.5, R * 2);
+      c.alpha = 1 - (R / B!.reach) ** 2;
+      if (Math.random() < dt * 40) { const a = Math.random() * Math.PI * 2; v.spawn(tollSpark, r.x + Math.cos(a) * R, r.y + 0.2, r.z + Math.sin(a) * R, 0, 1.2, 0); }
+    });
+    const W = K.tide, t = f.tide;
+    this.isles.forEach(([disc, ring], i) => {
+      const s = t?.isles[i];
+      disc.on = ring.on = !!s;
+      if (!s || !W) return;
+      const p = Math.min(1, t!.t / W.warn);
+      disc.x = ring.x = s.x; disc.y = ring.y = f.y + 0.2; disc.z = ring.z = s.z;
+      disc.size = ring.size = W.r * 2;
+      disc.alpha = 0.25 + 0.35 * p;
+      ring.alpha = 0.5 + 0.5 * p;
+      ring.rot += dt * 0.5;
+    });
+    if (this.water && W) {
+      const p = t ? Math.min(1, t.t / W.warn) : 0, end = t ? THREE.MathUtils.clamp((W.warn + W.time - t.t) / 0.8, 0, 1) : 0;
+      this.water.visible = !!t;
+      (this.water.material as THREE.MeshStandardMaterial).opacity = 0.75 * p * end;
+      this.water.position.y = f.y - 0.1 + 0.25 * p * end;
+    }
+  }
+
+  /** The Abate's new act (a toll, a gold wave racing out, a shake) or his fall (a column of light to the beams, the bells' last three strokes). */
+  private finale(f: Priest): void {
+    const v = this.vfx, dead = f.state === 'dead', y = f.y + 0.05;
+    v.decal(holyWave, f.x, y, f.z);
+    v.ring(holyRise, f.x, f.y + 0.3, f.z, dead ? 60 : 30, 1.5, 6, 2);
+    v.burst(holyRise, f.x, f.y + 1, f.z, dead ? 140 : 40, dead ? 1.2 : 0.8, dead ? 3 : 2, dead ? 9 : 4);
+    v.pulse(f.x, f.y + 3, f.z, dead ? 0xfff0c0 : BRONZE, dead ? 120 : 60);
+    v.shake(dead ? 0.9 : 0.45);
+    for (let i = 0; i < (dead ? 3 : 1); i++) playSfx('toll_bell', { x: f.x, y: f.y + 5, z: f.z }, { delay: i * 1.6, rate: dead ? 0.8 : 1, gain: 1.3 });
+    if (dead) this.fallen = true;
+  }
+
+  /** The Calice is poured: wine splashing out along the wedge, a red mist, a shake if it caught the hero. */
+  private poured(f: Priest, hit: boolean): void {
+    const C = f.kind.pour!, v = this.vfx;
+    for (let i = 0; i < 40; i++) {
+      const a = f.pourA + (Math.random() - 0.5) * C.angle, d = 1 + Math.random() * (C.length - 1);
+      v.spawn(wineSplash, f.x + Math.sin(a) * d, f.y + 0.2, f.z + Math.cos(a) * d, Math.sin(a) * 2, 3 + Math.random() * 3, Math.cos(a) * 2);
+    }
+    v.burst(wineMist, f.x + Math.sin(f.pourA) * C.length / 2, f.y + 0.3, f.z + Math.cos(f.pourA) * C.length / 2, 12, C.length / 3, 0.6);
+    v.pulse(f.x, f.y + 2, f.z, WINE, hit ? 50 : 30);
+    v.shake(hit ? 0.5 : 0.15);
   }
 
   /** A nova goes off: a shock wave racing out to its radius, a ring of shadow flame, scorched cracks. */

@@ -14,8 +14,9 @@ import type { Equipment, GearState } from '../loot/gear.ts';
 import { HEROES, heroOf, type Hero } from '../player/heroes.ts';
 
 const VERSION = 1;
-/** Flags on Quest saved as they are: the second quest's, and Fra' Zuane's corona found and given back. */
-const LEVEL2 = ['reported', 'accepted2', 'arrived', 'key2', 'boss2Dead', 'reported2', 'blessed2', 'relic', 'relicBack'] as const;
+/** Flags on Quest saved as they are: the second quest's, Fra' Zuane's corona found and given back, the third quest's. */
+const LEVEL2 = ['reported', 'accepted2', 'arrived', 'key2', 'boss2Dead', 'reported2', 'blessed2', 'relic', 'relicBack',
+  'accepted3', 'landed', 'key3', 'boss3Dead', 'reported3', 'blessed3'] as const;
 const SLOT_KEY = (i: number) => `redentore.save.${i}`;
 const PENDING = 'redentore.pending'; // sessionStorage: the state to apply on the next boot
 const AUTO = 'redentore.auto'; // localStorage: the run in progress, resumed by a boot with nothing pending
@@ -37,6 +38,8 @@ export interface GameState {
   // Level 2 (all absent in older saves: false): reported (first quest handed in), accepted2 (La dote delle Zitelle taken),
   // arrived (reached the Zitelle), key2 (the Maestra's key), boss2Dead, reported2, blessed2 (Fra' Bortolo's second infusion);
   // relic, relicBack: Fra' Zuane's corona picked up and given back (absent: false).
+  // Level 3 (absent: false): accepted3 (Le nozze di San Giorgio taken), landed (set down on San Giorgio), key3 (the
+  // Bibliotecario's key), boss3Dead, reported3, blessed3 (Fra' Bortolo's third infusion).
   // found: Fra' Bortolo found as Fra' Zuane asked; done: the quests done (quest/progress.ts QUESTS), whose XP is in build.xp.
   // Both absent in saves from before the quest rewards: found if he blessed the hero, done rebuilt from the flags.
   // Fra' Bortolo's Le teste dei frati (absent in older saves: not taken): asked, the heads in hand, the rite's boon ('' until then).
@@ -121,6 +124,7 @@ export function deserialize(g: Game, s: GameState): void {
   if (s.quest.bossDead) g.quest.win();
   for (const k of LEVEL2) g.quest[k] = s.quest[k] ?? false;
   if (s.quest.boss2Dead) { g.quest.boss2Dead = false; g.quest.win2(); }
+  if (s.quest.boss3Dead) { g.quest.boss3Dead = false; g.quest.win3(); }
   if (p.x > OLD_EAST) { // a save from when level 2 lay at +X: its hero stood out there, now open ground; woken at the checkpoint
     const c = g.quest.checkpoint();
     Object.assign(g.player.pos, { x: c.x, y: 0, z: c.z });
@@ -128,7 +132,7 @@ export function deserialize(g: Game, s: GameState): void {
   }
   g.quest.found = s.quest.found ?? g.quest.blessed;
   g.quest.done = s.quest.done ? s.quest.done.filter((id): id is QuestId => id in QUESTS) // one from another build is dropped
-    : ([['chiave', g.quest.key], ['bortolo', g.quest.found], ['reverendissimo', g.quest.reported], ['zitelle', g.quest.reported2], ['relic', g.quest.relicBack]] as const).flatMap(([id, d]) => (d ? [id] : []));
+    : ([['chiave', g.quest.key], ['bortolo', g.quest.found], ['reverendissimo', g.quest.reported], ['zitelle', g.quest.reported2], ['relic', g.quest.relicBack], ['sangiorgio', g.quest.reported3]] as const).flatMap(([id, d]) => (d ? [id] : []));
   const dead = s.dead.map((i) => g.mobs[i]).filter((m) => m);
   killAll(dead);
   for (const m of dead) m.t = GONE;

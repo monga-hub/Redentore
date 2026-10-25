@@ -8,12 +8,13 @@
 // threshold, which he can neither cross nor leave. He has waited four centuries for someone the
 // vow raised and did not keep.
 
-import { BOONS, SECOND, type Stage } from './progress.ts';
+import { BOONS, SECOND, THIRD, type Stage } from './progress.ts';
 
 export const QUEST_TITLE = 'La chiave del portinaio';
 export const QUEST2_TITLE = 'La dote delle Zitelle';
-/** The tracker's title at a stage: the first quest until it is handed in, then the second. */
-export const titleOf = (s: Stage) => (SECOND.includes(s) ? QUEST2_TITLE : QUEST_TITLE);
+export const QUEST3_TITLE = 'Le nozze di San Giorgio';
+/** The tracker's title at a stage: the first quest until it is handed in, then the second, then the third. */
+export const titleOf = (s: Stage) => (THIRD.includes(s) ? QUEST3_TITLE : SECOND.includes(s) ? QUEST2_TITLE : QUEST_TITLE);
 
 /** The tracker's line for each stage. */
 export const OBJECTIVE: Record<Stage, string> = {
@@ -29,7 +30,13 @@ export const OBJECTIVE: Record<Stage, string> = {
   church: 'Apri la porta della chiesa dal cortile delle Zitelle',
   boss2: 'Sconfiggi la Governatrice sotto la cupola delle Zitelle',
   return: "Torna da Fra' Zuane",
-  done: 'La dote è resa',
+  offer3: "Parla con Fra' Zuane",
+  route3: 'Raggiungi la punta della Giudecca e sali sulla gondola di Mastro Iseppo',
+  biblioteca: 'Prendi la chiave del Cenacolo al Bibliotecario, in cima allo scalone del Longhena',
+  cenacolo: "Apri la porta del Cenacolo dall'antirefettorio",
+  boss3: "Sconfiggi l'Abate di San Giorgio nel Cenacolo",
+  return3: "Torna da Fra' Zuane, al Redentore",
+  done: 'Le nozze sono rotte',
 };
 
 /** The tracker's line for Fra' Bortolo's errand, from Fra' Zuane's first quest until he is found. */
@@ -90,7 +97,35 @@ export const TALK: Record<Stage, Talk> = {
       'Ma senti la laguna? Non è quieta. Il Reverendissimo e la Governatrice erano due nodi dello stesso filo, e il filo continua oltre San Giorgio. Riposa, per stanotte. Domani parleremo di chi l\'ha teso.',
     ],
   },
-  done: { pages: ['Va\' dove vuoi, Risorto: la fondamenta è tua. Io resto ancora un poco a guardare l\'acqua. Quando sarai pronto, la storia continua.'] },
+  // Level 3: the second quest handed in, the third offered (Le nozze di San Giorgio), the Abate's wedding to the lagoon.
+  offer3: {
+    pages: [
+      'Per i morti la notte è una sola, Risorto: il domani che ti avevo promesso è già qui. Ascolta le campane. Non le Zitelle: più in là, oltre la punta della Giudecca. San Giorgio Maggiore suona a nozze.',
+      'Il Reverendissimo contava le anime. La Governatrice le cuciva nel suo velo, come una dote. Ma una dote serve a una cosa sola, Risorto: a sposarsi. Chi ha teso il filo è l\'Abate di San Giorgio, il signore dell\'isola qui di fronte.',
+      'Nel 1576 la peste arrivava dall\'acqua. L\'Abate fece un patto con la laguna: le anime della Giudecca, velate dal merletto delle Zitelle, in sposa al mare, e l\'acqua avrebbe risparmiato la sua isola.',
+      'Come il Doge alla Sensa, quando getta l\'anello in laguna e dice: ti sposiamo, mare. Le nozze si celebrano nel Cenacolo dei monaci, sotto le Nozze di Cana del Veronese.',
+      'Là l\'acqua si fece vino; lui vuole che il vino torni acqua, e i vivi marea. Il quadro lo portarono via i Francesi, due secoli dopo: la festa perse i suoi testimoni, e non è mai finita.',
+      'Le catene oltre i Tre Oci cadranno al tuo passo. Segui la fondamenta fino alla punta della Giudecca: Mastro Iseppo mi manda a dire che la sua gondola è varata, e ti aspetta al pontile.',
+      'Il Cenacolo è chiuso a chiave, e la chiave la tiene il Bibliotecario, in cima allo scalone del Longhena.',
+      'Va\', Risorto. Rompi quelle nozze prima che l\'acqua dica di sì.',
+    ],
+    offer: true, title: QUEST3_TITLE,
+    decline: 'Le nozze aspettano da quattro secoli, Risorto. Ma ogni notte la marea sale di un dito. Torna presto.',
+  },
+  route3: { pages: ['La fondamenta continua oltre i Tre Oci, fino alla punta. Là c\'è il pontile, e la gondola di Iseppo. Non serve remare: il ferro sa la strada. E non guardare giù, Risorto: in quell\'acqua c\'è gente che aspetta un passaggio.'] },
+  biblioteca: { pages: ['La biblioteca è in cima allo scalone del Longhena. Dalla basilica passi al chiostro degli allori, poi a quello dei cipressi. Il Bibliotecario copia i nomi dei morti in un registro che non finisce mai: prendigli la chiave del Cenacolo.'] },
+  cenacolo: { pages: ['Hai la chiave. Il Cenacolo si apre dall\'antirefettorio, sul lato sud del chiostro degli allori. Dentro i monaci apparecchiano ancora la tavola. Non bere niente, Risorto.'] },
+  boss3: { pages: ['L\'Abate è nel Cenacolo, sotto la cornice vuota. Quando versa il calice, fatti da parte. Quando suonano le campane, salta. E quando sale l\'acqua... cerca la luce.'] },
+  return3: {
+    pages: [
+      'Le campane di San Giorgio tacciono. L\'ho sentito da qui, Risorto: un tonfo nell\'acqua, come un anello che cade. Le nozze sono rotte. La marea torna marea.',
+      'Il Reverendissimo, la Governatrice, l\'Abate: tre nodi di un filo solo, e li hai sciolti tutti. Il voto del 1576 voleva una chiesa per la città salvata, non anime in dote. Ora è compiuto davvero.',
+      'Guarda i miei polsi. Niente ferro, niente merletto. Solo pelle vecchia. Dopo quattro secoli posso varcare questa soglia, e non ho più nessuna porta da custodire.',
+      'Nell\'orto i frati hanno posato le zappe. Sui rii delle Zitelle i gondolieri tirano i remi in barca. A San Giorgio i monaci sparecchiano la tavola. Riposano tutti, Risorto. Tutti, tranne te.',
+      'Prendi le chiavi del Redentore: erano mie, adesso sono tue. Io scendo al pontile ad aspettare l\'alba. Sarà la prima che vedo, e l\'ultima. Grazie, fratello. Adesso sì, fratello.',
+    ],
+  },
+  done: { pages: ['L\'alba è vicina, Risorto. La fondamenta è tua, e la laguna anche: va\' dove vuoi, nessuno ti chiamerà più. Quando sarai stanco, l\'orto del Redentore ha zolle morbide.'] },
 };
 
 /** Said when the offer is turned down. */
@@ -124,6 +159,14 @@ export const SPEZIALE_ZITELLE: Talk = {
     'Il filo, Risorto. Lei cuciva i nostri morti nel suo velo e le ragazze contavano i punti. Se il Reverendissimo era il conto, lei era la cassa. Bevi: l\'ultima ruta che ho. Fa\' che basti.',
   ],
 };
+/** On the way to San Giorgio: why the Abate wanted his rue, a third infusion (once), and level 3's goods in his chest. */
+export const SPEZIALE_SANGIORGIO: Talk = {
+  pages: [
+    'San Giorgio? Nella peste i benedettini compravano la mia ruta a sacchi. L\'Abate la voleva tutta, e io credevo che fosse per i malati. No: contava chi l\'aveva avuta. Chi muore con la ruta in bocca, la laguna non può sposarlo.',
+    'Per questo ti cercherà, Risorto: sei l\'unico invitato che non può prendere. Bevi l\'ultimo infuso. E guarda nella mia cassa: per l\'isola ho tenuto da parte cose che i morti di San Giorgio non devono avere.',
+  ],
+};
+export const SPEZIALE_SANGIORGIO_AGAIN: Talk = { pages: ['La ruta è finita, Risorto, ma la cassa è aperta: prendi quello che ti serve per San Giorgio. E se senti cantare in coro, non rispondere all\'amen.'] };
 export const SPEZIALE_ZITELLE_AGAIN: Talk = { pages: ['Non ho altra ruta, Risorto. Va\' alle Zitelle. Se senti cantare sottovoce tra i tavoli del merletto, non fermarti ad ascoltare.'] };
 
 // Fra' Zuane's corona: the Capuchin rosary he wore at the cord, olive-wood beads and a worn medal of

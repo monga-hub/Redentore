@@ -7,9 +7,9 @@ import { RII } from './giudecca.ts';
 /** Site base (water, ground slabs), Fondamenta San Giacomo, sagrato + scalinata, calle dell'ingresso. */
 export function buildFondamenta(b: LevelBuilder): void {
   b.zone('site');
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), material('water'));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(1300, 1000), material('water'));
   water.rotation.x = -Math.PI / 2;
-  water.position.set(-80, -1.2, -80); // the lagoon, the canal and the rii of level 2 (zones/giudecca.ts)
+  water.position.set(-230, -1.2, -80); // the lagoon, the canal, the rii of level 2 (zones/giudecca.ts) and San Giorgio's water (level 3)
   b.add(water, 'water');
   // Island ground: the fondamenta, the walled complex and the neighbouring land seen over the walls.
   b.box(RII.croce[1], 120, -1.2, 0, Z.riva, Z.quayEdge, 'ground'); // past it (-X) the rio de la Croce, then zones/giudecca.ts

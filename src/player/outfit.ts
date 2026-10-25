@@ -38,9 +38,10 @@ const SHIN = 0.36; // m: the leg's skin below this is the boot's (piedi), above 
 export function lookOf(id: string): Look | undefined {
   const it = GEAR.find((g) => g.id === id);
   if (!it || it.rarity === 'comune') return undefined;
+  const caster = Object.keys(it.stats ?? {})[0] === 'intelletto';
+  if (it.l3) return it.rarity === 'raro' ? (caster ? 'murano' : 'arsenale') : it.rarity === 'noncomune' ? (caster ? 'chierico' : 'gondola') : caster ? 'broccato' : 'voto'; // San Giorgio's: the old looks, crossed
   if (it.rarity === 'epico' || it.rarity === 'leggendario') return it.l2 ? 'broccato' : 'voto';
   if (it.l2) return it.rarity === 'raro' ? 'merletto' : 'gondola';
-  const caster = Object.keys(it.stats ?? {})[0] === 'intelletto';
   return it.rarity === 'raro' ? (caster ? 'murano' : 'arsenale') : caster ? 'chierico' : 'becchino';
 }
 export const LOOKS: readonly Look[] = ['becchino', 'chierico', 'arsenale', 'murano', 'voto', 'gondola', 'merletto', 'broccato'];
@@ -100,6 +101,10 @@ export const WEAPONS: Record<string, Weapon> = {
   'martello-campana': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 }, // Zanetto's, the bell-ringer's mallet
   'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
   'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
+  // Level 3's: the monks' processional cross, the darsena's boathook, the Abate's crozier (models of enemies/sangiorgio.ts).
+  'croce-astile': { file: 'croce.glb', length: 1.3, grip: 0.3, lean: 0.2, staff: 0.55 },
+  mezzomarinaio: { file: 'mezzomarinaio.glb', length: 1.6, grip: 0.3, lean: 0.2, staff: 0.6 },
+  'baculo-abate': { file: 'baculo.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
 };
 /**
  * The fist, in RightHand's own coordinates (cm): the channel his curled claws make in front of the palm (-Z), across it,

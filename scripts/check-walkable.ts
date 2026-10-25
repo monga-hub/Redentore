@@ -6,11 +6,14 @@
 // the nave; with every gate open every named area must be reachable. Level 2: the chains on the Ponte
 // de la Croce keep the Giudecca east of the Redentore and the Zitelle shut until Fra' Zuane's second quest is
 // taken; then everything there but the Zitelle's church is open, the key of the church opens it from the
-// court, and the Governatrice's death opens its portone on the sagrato.
+// court, and the Governatrice's death opens its portone on the sagrato. Level 3: the chain past the Tre Oci keeps the
+// Punta shut until the third quest is taken; San Giorgio is reached only by Mastro Iseppo's gondola (a link between the
+// two berths, quest/ferry.ts); its Cenacolo opens with the Bibliotecario's key, its garden door with the Abate's death.
 import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { ANDITO, CHEST, CHOIR_DOOR, CROCE, Quest, SPEZIALE } from '../src/quest/progress.ts';
+import { ANDITO, ANTIREF, APPRODO, BERTHS, CHEST, CHOIR_DOOR, CROCE, PUNTA, Quest, SPEZIALE } from '../src/quest/progress.ts';
+import { CENACOLO, SG } from '../src/level/zones/sangiorgio.ts';
 import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
@@ -28,18 +31,36 @@ import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
 const level = buildLevel();
 const { world } = level;
 const quest = new Quest(world); // shut gates and the key chest, as at the start of a game
-const STEP = 0.5, X0 = -302, X1 = 66, Z0 = -197, Z1 = 22;
+const STEP = 0.5, X0 = -602, X1 = 66, Z0 = -197, Z1 = 152;
 const nx = Math.round((X1 - X0) / STEP), nz = Math.round((Z1 - Z0) / STEP);
 const idx = (i: number, j: number) => j * nx + i;
 const toI = (x: number) => Math.round((x - X0) / STEP), toJ = (z: number) => Math.round((z - Z0) / STEP);
 
-/** Flood-fill from the spawn with the player's step and radius: feet height per reached cell, NaN elsewhere. */
+/**
+ * Flood-fill from the spawn with the player's step and radius: feet height per reached cell, NaN elsewhere. Once the
+ * third quest is taken the gondola joins its two berths: either reached, the fill goes on from the other.
+ */
 function flood(): Float32Array {
   const feet = new Float32Array(nx * nz).fill(NaN);
   const queue: number[] = [];
-  const si = toI(SPAWN.x), sj = toJ(SPAWN.z);
-  feet[idx(si, sj)] = world.groundAt(SPAWN.x, SPAWN.z, 0);
-  queue.push(idx(si, sj));
+  const seed = (x: number, z: number) => {
+    const c = idx(toI(x), toJ(z));
+    if (!Number.isNaN(feet[c])) return false;
+    feet[c] = world.standHeight(x, z);
+    queue.push(c);
+    return true;
+  };
+  seed(SPAWN.x, SPAWN.z);
+  const { punta, sangiorgio } = BERTHS;
+  for (;;) {
+    fill(feet, queue);
+    if (!quest.accepted3) break;
+    const a = at(feet, punta.x, punta.z), b = at(feet, sangiorgio.x, sangiorgio.z);
+    if (!(a && seed(sangiorgio.x, sangiorgio.z)) && !(b && seed(punta.x, punta.z))) break;
+  }
+  return feet;
+}
+function fill(feet: Float32Array, queue: number[]): void {
   while (queue.length) {
     const c = queue.pop()!;
     const i = c % nx, j = (c - i) / nx, f = feet[c];
@@ -55,7 +76,6 @@ function flood(): Float32Array {
       queue.push(n);
     }
   }
-  return feet;
 }
 const at = (feet: Float32Array, x: number, z: number) => !Number.isNaN(feet[idx(toI(x), toJ(z))]);
 /** Reached cells inside the area's rectangle. */
@@ -74,8 +94,9 @@ const t0 = performance.now();
 // Start of the game: the grates and both church doors are shut. Everything but the chiostro
 // grande and the church is reachable, the chest with the key among it; those two are not.
 const level2 = (a: { zone: string }) => a.zone === 'giudecca' || a.zone === 'zitelle';
+const level3 = (a: { zone: string }) => a.zone === 'punta' || a.zone === 'sangiorgio';
 const zChurch = (a: { label: string }) => /^Le Zitelle:|^Altar maggiore delle Zitelle/.test(a.label);
-const locked = (a: { zone: string; label: string }) => a.zone === 'chiesa' || a.label === 'Chiostro grande' || level2(a);
+const locked = (a: { zone: string; label: string }) => a.zone === 'chiesa' || a.label === 'Chiostro grande' || level2(a) || level3(a);
 const start = flood();
 const near = [[0, 0.8], [-0.8, 0], [0.8, 0], [0, -0.8]].some(([dx, dz]) => at(start, CHEST.x + dx * 1.2, CHEST.z + dz * 1.2));
 if (!near) fail('quest      the key chest on the pontile is out of reach');
@@ -111,6 +132,7 @@ quest.accept2();
 const road = flood();
 console.log('-- level 2: the chains on the Ponte de la Croce fallen');
 for (const a of level.areas) {
+  if (level3(a) && cells(road, a)) fail(`${a.zone.padEnd(11)} ${a.label} reachable before the third quest`);
   if (!level2(a)) continue;
   const hit = cells(road, a), shut = zChurch(a);
   if (shut ? hit > 0 : !hit) fail(`${a.zone.padEnd(11)} ${a.label}: ${hit} cells reached, want ${shut ? 'none (locked)' : 'some'}`);
@@ -120,9 +142,9 @@ if (quest.checkpoint() !== CROCE || !at(road, CROCE.x, CROCE.z)) fail('quest    
 // Level 2 runs east, -X (level/plan.ts): nothing walkable past its quay's end or south of the Zitelle's orto, nor past the fondamenta's +X end.
 let east = Infinity, south = Infinity, west = -Infinity;
 for (let n = 0; n < road.length; n++) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP; west = Math.max(west, x); if (x < -60) { east = Math.min(east, x); south = Math.min(south, Z0 + j * STEP); } }
-if (east < -300.5 || south < -104.5 || west > 60.5) {
+if (east < -302 || south < -104.5 || west > 60.5) { // the chain past the Tre Oci stands at -302
   fail(`level 2 leaks: walkable as far as x ${east}..${west}, z ${south}`);
-  for (let n = 0; n < road.length; n += 1) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP; if ((x < -300.5 || x > 60.5 || (x < -60 && z < -104.5)) && (i + j) % 40 === 0) console.log('  leak at', x, z); }
+  for (let n = 0; n < road.length; n += 1) if (!Number.isNaN(road[n])) { const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP; if ((x < -302 || x > 60.5 || (x < -60 && z < -104.5)) && (i + j) % 40 === 0) console.log('  leak at', x, z); }
 }
 quest.takeKey2();
 quest.open(quest.gate('coro-zitelle'));
@@ -132,6 +154,37 @@ for (const [x, z] of [[ZCX, -22], [ZCX, -10], [ZCX, -2]]) if (!at(nave, x, z)) f
 quest.win2();
 const won2 = flood();
 if (!at(won2, ZCX, 1.5) || Math.abs(won2[idx(toI(ZCX), toJ(-2))] - ZF) > 0.05) fail('quest      the open portone of the Zitelle does not join the sagrato to the hall');
+
+// Level 3: the third quest taken, the chain past the Tre Oci falls; the gondola crosses; the Cenacolo stays shut until its key.
+quest.reported2 = true;
+quest.accept3();
+const isle = flood();
+console.log('-- level 3: the chain past the Tre Oci fallen, the gondola running');
+const cenacolo = (a: { label: string }) => a.label === 'Cenacolo palladiano';
+for (const a of level.areas) {
+  if (!level3(a)) continue;
+  const hit = cells(isle, a), shut = cenacolo(a);
+  if (shut ? hit > 0 : !hit) fail(`${a.zone.padEnd(11)} ${a.label}: ${hit} cells reached, want ${shut ? 'none (locked)' : 'some'}`);
+  else console.log(`ok   ${a.zone.padEnd(11)} ${a.label} (${shut ? 'locked' : `${hit} cells`})`);
+}
+for (const [name, b] of Object.entries(BERTHS)) if (!at(isle, b.x, b.z)) fail(`quest      the gondola's ${name} berth is out of reach`);
+if (quest.checkpoint() !== PUNTA || !at(isle, PUNTA.x, PUNTA.z)) fail('quest      past the chain a death should wake on the Punta, on open ground');
+quest.landed = true;
+if (quest.checkpoint() !== APPRODO || !at(isle, APPRODO.x, APPRODO.z)) fail("quest      once ashore a death should wake on San Giorgio's approdo, on open ground");
+// Nothing walkable past the island or the Punta: the water all round, the darsena's basin.
+let leaks = 0;
+for (let n = 0; n < isle.length; n++) if (!Number.isNaN(isle[n])) {
+  const i = n % nx, j = (n - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP;
+  const sg = x <= SG.x1 + 11.5 && x >= SG.x0 && z >= SG.z0 && z <= 150.5, punta = x > -417.5 && x < -60 && z <= 20.5 && z >= -40;
+  if (x < -300 && !sg && !punta && leaks++ < 5) console.log('  level 3 leak at', x, z);
+}
+if (leaks) fail(`level 3 leaks: ${leaks} cells walkable off the island and the Punta`);
+quest.takeKey3();
+quest.open(quest.gate('cenacolo'));
+const hall = flood();
+if (quest.checkpoint() !== ANTIREF || !at(hall, ANTIREF.x, ANTIREF.z)) fail('quest      with the Cenacolo open a death should wake in the antirefettorio, on open ground');
+for (const z of [30, 20, 10]) if (!at(hall, (CENACOLO.x0 + CENACOLO.x1) / 2, z)) fail(`sangiorgio  Cenacolo point z ${z} unreachable through its door`);
+quest.win3();
 
 const won = flood();
 console.log('-- every gate open');

@@ -13,8 +13,8 @@ export class PlayerController {
   readonly model: UndeadModel;
   /** Dead and falling: keys, stick and steering are ignored (gravity still applies). */
   frozen = false;
-  /** Carried by a leap or a charge (abilities/grimoire.ts moves the feet): no keys, no gravity. */
-  carried: '' | 'leap' | 'charge' = '';
+  /** Carried by a leap or a charge (abilities/grimoire.ts moves the feet), or standing in the gondola (quest/ferry.ts): no keys, no gravity. */
+  carried: '' | 'leap' | 'charge' | 'boat' = '';
   /** Run speed × (level-up card). */
   speed = 1;
   readonly pos = new THREE.Vector3(); // feet position
@@ -78,7 +78,7 @@ export class PlayerController {
     d = Math.atan2(Math.sin(d), Math.cos(d));
     this.facing += d * Math.min(1, TURN * dt);
 
-    if (this.carried) { this.vy = 0; this.grounded = this.carried === 'charge'; this.finish(dt); return; }
+    if (this.carried) { this.vy = 0; this.grounded = this.carried !== 'leap'; this.finish(dt); return; }
     this.world.resolve(this.pos, this.pos.y);
 
     if (this.grounded && !this.frozen && input.down('Space')) { this.vy = JUMP; this.grounded = false; }
@@ -97,7 +97,7 @@ export class PlayerController {
 
   private finish(dt: number): void {
     const moved = dt > 0 ? Math.hypot(this.pos.x - this.mesh.position.x, this.pos.z - this.mesh.position.z) / dt : 0;
-    this.model.animate(dt, Math.min(moved, RUN * 1.5), this.grounded); // clamp: respawn teleports
+    this.model.animate(dt, this.carried === 'boat' ? 0 : Math.min(moved, RUN * 1.5), this.grounded); // clamp: respawn teleports; in the gondola he stands
     this.mesh.position.copy(this.pos);
     this.mesh.rotation.y = this.facing;
   }

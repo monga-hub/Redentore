@@ -44,6 +44,8 @@ const ILVL: Partial<Record<Rarity, number>> = { comune: 5, noncomune: 10, raro: 
 const BUY: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 40, raro: 120, epico: 480, leggendario: 1200 };
 /** Level 2's pieces (the Giudecca and the Zitelle): a bigger budget and more armor at each quality, a higher item level, dearer. */
 const L2 = { budget: 1.4, armor: 1.3, ilvl: 12, buy: 1.6 };
+/** Level 3's (San Giorgio Maggiore): bigger again. */
+const L3 = { budget: 1.85, armor: 1.65, ilvl: 24, buy: 2.3 };
 const JUNK: Record<Rarity, number> = { comune: 3, noncomune: 8, raro: 20, epico: 50, leggendario: 150 }; // flavour items' sell price
 const SHARES = [[1], [0.6, 0.4], [0.5, 0.3, 0.2]];
 
@@ -145,6 +147,38 @@ const DEFS2: typeof DEFS = [
   ['fede-senza-dote', 'Fede senza dote', 'anello', 'epico', 'critico potenza vigore', 'Nessuno l’ha mai portata all’altare.'],
 ];
 
+// Level 3: off the dead of the Punta and San Giorgio (loot/bag.ts roll at level 3); the Abate's ring, the legendary, only off him.
+const DEFS3: typeof DEFS = [
+  ['cocolla-testa', 'Cappuccio della cocolla nera', 'testa', 'noncomune', 'vigore potenza'],
+  ['scriptorium-spalle', 'Mantellina dello scriptorium', 'spalle', 'noncomune', 'intelletto celerita'],
+  ['marinaio-torso', 'Casacca del marinaio annegato', 'torso', 'noncomune', 'vigore critico'],
+  ['amanuense-mani', 'Mezziguanti dell’amanuense', 'mani', 'noncomune', 'intelletto spirito'],
+  ['darsena-gambe', 'Braghe della darsena', 'gambe', 'noncomune', 'vigore potenza'],
+  ['converso-piedi', 'Sandali del converso', 'piedi', 'noncomune', 'intelletto celerita'],
+  ['croce-astile', 'Croce astile spezzata', 'arma', 'noncomune', 'potenza critico'],
+  ['scapolare-nero', 'Scapolare benedettino', 'amuleto', 'noncomune', 'vigore spirito'],
+  ['anello-converso', 'Anello del converso', 'anello', 'noncomune', 'intelletto potenza'],
+
+  ['cappuccio-priore', 'Cappuccio del priore', 'testa', 'raro', 'vigore potenza critico'],
+  ['longhena-spalle', 'Stola del Longhena', 'spalle', 'raro', 'intelletto critico'],
+  ['cocolla-torso', 'Cocolla di San Benedetto', 'torso', 'raro', 'intelletto celerita spirito'],
+  ['nostromo-mani', 'Manopole del nostromo', 'mani', 'raro', 'potenza critico'],
+  ['coro-gambe', 'Sottana del coro', 'gambe', 'raro', 'intelletto spirito'],
+  ['fanale-piedi', 'Stivali del fanalista', 'piedi', 'raro', 'vigore celerita'],
+  ['mezzomarinaio', 'Mezzomarinaio della darsena', 'arma', 'raro', 'potenza celerita vigore'],
+  ['penna-amanuense', 'Penna dell’amanuense', 'amuleto', 'raro', 'intelletto celerita'],
+  ['sigillo-abbazia', 'Sigillo dell’abbazia', 'anello', 'raro', 'potenza critico'],
+
+  ['mitra-abate', 'Mitra dell’Abate', 'testa', 'epico', 'intelletto potenza critico', 'Due corna d’oro: una per i vivi, una per l’acqua.'],
+  ['piviale-nozze', 'Piviale delle nozze', 'spalle', 'epico', 'vigore celerita potenza', 'Ricamato di onde. Bagnato, anche se non piove.'],
+  ['cocolla-cana', 'Cocolla di Cana', 'torso', 'epico', 'vigore potenza critico', 'Una macchia di vino che non vuole uscire, sul cuore.'],
+  ['guanti-bibliotecario', 'Guanti del Bibliotecario', 'mani', 'epico', 'potenza celerita critico', 'Hanno girato ogni pagina del registro dei morti. Due volte.'],
+  ['gambali-darsena', 'Gambali della darsena', 'gambe', 'epico', 'vigore intelletto potenza', 'Hanno camminato sul fondo, dal faro alla riva.'],
+  ['baculo-abate', 'Baculo dell’Abate', 'arma', 'epico', 'potenza critico celerita', 'Il riccio si chiude come un’onda sul nome che tocca.'],
+  // The Abate's fall (loot/bag.ts BOSS3_PRIZE): no table rolls it.
+  ['anello-sensa', 'Anello della Sensa', 'anello', 'leggendario', 'critico potenza vigore', 'Il Doge lo gettava in laguna: «Ti sposiamo, mare». Questo è tornato indietro.'],
+];
+
 /** The stats a budget of `points` buys, split over `focus` (best first). */
 function spend(points: number, focus: Stat[]): Stats {
   const out: Stats = {};
@@ -152,17 +186,17 @@ function spend(points: number, focus: Stat[]): Stats {
   return out;
 }
 
-const make = (lvl: 1 | 2) => ([id, name, slot, rarity, focus, lore]: typeof DEFS[number]): Item => {
-  const k = lvl === 2 ? L2 : { budget: 1, armor: 1, ilvl: 0 };
+const make = (lvl: 1 | 2 | 3) => ([id, name, slot, rarity, focus, lore]: typeof DEFS[number]): Item => {
+  const k = lvl === 3 ? L3 : lvl === 2 ? L2 : { budget: 1, armor: 1, ilvl: 0 };
   const s = SLOT.get(slot)!, stats = spend(BUDGET[rarity]! * k.budget * s.w, focus.split(' ') as Stat[]);
   if (s.armor) stats.armatura = Math.round(ARMOR[rarity]! * k.armor * s.armor);
-  return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : {}) };
+  return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : lvl === 3 ? { l3: true as const } : {}) };
 };
-export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2))];
+export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3))];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
-/** Every purple piece on sale: level 1's from Fra' Bortolo, level 2's (`shop` with level2) from Mastro Iseppo. */
+/** Every purple piece on sale: level 1's from Fra' Bortolo (and level 3's once the third quest is taken), level 2's from Mastro Iseppo. */
 export const SHOP = GEAR.filter((g) => g.rarity === 'epico');
-export const shop = (level2: boolean) => SHOP.filter((g) => level2 || !g.l2);
+export const shop = (level3: boolean) => SHOP.filter((g) => !g.l2 && (level3 || !g.l3));
 /** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
 export const SHOP2 = SHOP.filter((g) => g.l2);
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club (not the other heroes' own weapons). */
@@ -171,7 +205,7 @@ export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.fi
 export const starter = (weapon: string): GearState => ({ ...STARTER, arma: weapon });
 
 /** Gold Fra' Bortolo asks for it. */
-export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w * (it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);
+export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w * (it.l3 ? L3.buy : it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);
 /** Gold he gives for one: a quarter of his price. */
 export const sellPrice = (it: Item) => Math.floor(buyPrice(it) / 4);
 /** Share of a blow armor turns aside. */

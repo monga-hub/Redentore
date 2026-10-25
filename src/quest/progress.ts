@@ -12,18 +12,28 @@
 // Zitelle, takes the key of the church off the Maestra del merletto in the ospizio's lace hall, opens the
 // church's back door from the court and kills the Governatrice under the dome; her portone opens on the
 // sagrato, and Fra' Zuane hears it done.
+//
+// Level 3 (Le nozze di San Giorgio): Fra' Zuane's third quest drops the chain past the Tre Oci; the hero walks the
+// Fondamenta San Giovanni to the Punta della Giudecca, where Mastro Iseppo's gondola rows itself across to San Giorgio
+// Maggiore (quest/ferry.ts); takes the key of the Cenacolo off the Bibliotecario in Longhena's library, opens the
+// refectory from the antirefettorio and kills the Abate under the empty frame of the Nozze di Cana; the refectory's
+// garden door opens, and the gondola rows the hero home to Fra' Zuane.
 import type { Box, World } from '../core/physics.ts';
 import type { Tune } from '../player/levels.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 import { ZCX, ZF } from '../level/zones/zitelle.ts';
 import { ISEPPO, SideQuests } from './squero.ts';
+import { CENACOLO, LANDING, PIER } from '../level/zones/sangiorgio.ts';
 
-export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2';
+export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2' | 'quest3' | 'key3' | 'boss3';
 
 /** Where the quests stand, in order; derived from the flags, never stored. */
-export type Stage = 'talk' | 'key' | 'grate' | 'boss' | 'leave' | 'report' | 'offer' | 'route' | 'ospizio' | 'church' | 'boss2' | 'return' | 'done';
+export type Stage = 'talk' | 'key' | 'grate' | 'boss' | 'leave' | 'report' | 'offer' | 'route' | 'ospizio' | 'church' | 'boss2' | 'return'
+  | 'offer3' | 'route3' | 'biblioteca' | 'cenacolo' | 'boss3' | 'return3' | 'done';
 /** The stages of the second quest, La dote delle Zitelle (from Zuane's offer on). */
-export const SECOND: readonly Stage[] = ['offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'done'];
+export const SECOND: readonly Stage[] = ['offer', 'route', 'ospizio', 'church', 'boss2', 'return'];
+/** The third's, Le nozze di San Giorgio (from his third offer on); 'done' is the end of all three. */
+export const THIRD: readonly Stage[] = ['offer3', 'route3', 'biblioteca', 'cenacolo', 'boss3', 'return3', 'done'];
 
 export interface Gate {
   id: string;
@@ -34,7 +44,7 @@ export interface Gate {
   at: number; // centre along the wall
   c: number; // the wall's line (z for an 'x' wall, x for a 'z' wall)
   w: number; t: number; y0: number; h: number;
-  needs: Need; // 'key', 'key2': opened by the player holding that key; 'boss', 'boss2': swings open when that boss dies; 'quest2': falls when the second quest is taken
+  needs: Need; // 'key', 'key2', 'key3': opened by the player holding that key; 'boss', 'boss2', 'boss3': swings open when that boss dies; 'quest2', 'quest3': falls when that quest is taken
   open: boolean;
   box: Box; // its collider while shut
 }
@@ -50,6 +60,10 @@ export const GATES: GateSpec[] = [
   { id: 'catene', label: 'le catene del Ponte de la Croce', kind: 'chain', axis: 'z', at: 15, c: -56.5, w: 10, t: 0.6, y0: 0, h: 3, needs: 'quest2' }, // across the whole quay
   { id: 'coro-zitelle', label: 'la porta della chiesa delle Zitelle', kind: 'door', axis: 'x', at: ZCX, c: -30, w: 2.4, t: 1, y0: ZF, h: 3.2, needs: 'key2' }, // the presbytery's back door, from the court
   { id: 'portone-zitelle', label: 'il portone delle Zitelle', kind: 'door', axis: 'x', at: ZCX, c: 0, w: 3.4, t: 1, y0: ZF, h: 6, needs: 'boss2' }, // facade
+  // Level 3 (zones/sangiorgio.ts).
+  { id: 'catene-punta', label: 'le catene oltre i Tre Oci', kind: 'chain', axis: 'z', at: 10, c: -302, w: 20, t: 0.6, y0: 0, h: 3, needs: 'quest3' }, // across the quay past the Tre Oci
+  { id: 'cenacolo', label: 'la porta del Cenacolo', kind: 'door', axis: 'x', at: -530, c: CENACOLO.z1, w: 2.4, t: 1, y0: 0, h: 3.6, needs: 'key3' }, // from the antirefettorio
+  { id: 'cenacolo-orto', label: 'la porta del giardino', kind: 'door', axis: 'x', at: -530, c: CENACOLO.z0, w: 2.4, t: 1, y0: 0, h: 3.6, needs: 'boss3' }, // the refectory's garden door
 ];
 
 /** The chest with the key, at the far end of the pontile (zones/nord.ts: x -38..-32, z -194..-186, deck at 0). */
@@ -82,6 +96,14 @@ const ZITELLE = -196;
 /** Level 2 checkpoints: past the chains, the foot of the Ponte de la Croce's far side; once the church's back door is open, the andito at its steps. */
 export const CROCE = { x: -78, z: 15, yaw: Math.PI / 2 } as const;
 export const ANDITO = { x: ZCX, z: -35, yaw: Math.PI } as const; // facing the back door
+/** Level 3 checkpoints: on the Punta by the gondola, once ashore on the approdo before the basilica, then in the antirefettorio. */
+export const PUNTA = { x: -398, z: 10, yaw: Math.PI / 2 } as const;
+export const APPRODO = { x: -440, z: 100, yaw: Math.PI / 2 } as const; // facing the facade (-X)
+export const ANTIREF = { x: -530, z: 41, yaw: 0 } as const; // facing the Cenacolo's door
+/** x past which (-X) the gondola has set the hero down on San Giorgio (the approdo, zones/sangiorgio.ts). */
+const ASHORE = LANDING.x1 - 2;
+/** Where the gondola is boarded: the end of each landing stage. */
+export const BERTHS = { punta: { x: PIER.x0 + 1.4, z: (PIER.z0 + PIER.z1) / 2 }, sangiorgio: { x: LANDING.x1 - 1.4, z: (LANDING.z0 + LANDING.z1) / 2 } } as const;
 
 /**
  * What every quest is worth when done: experience on top of the dead's, gold into the bag, and the name on the
@@ -117,6 +139,7 @@ export const QUESTS = {
   maestra: { title: 'Le forbici della Maestra', xp: 170, gold: 80 },
   exvoto: { title: 'L\'ex voto del Redentore', xp: 170, gold: 70 },
   lettera: { title: 'La lettera di Marieta', xp: 160, gold: 40 }, // a rare drop off the zitelle
+  sangiorgio: { title: 'Le nozze di San Giorgio', xp: 420, gold: 320 }, // handed in to Fra' Zuane, ~level 17-18
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -132,7 +155,9 @@ export const RELIC_DROP = { base: 0.02, ramp: 0.01 } as const;
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | 'iseppo' }
+export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | 'iseppo'; ferry?: Crossing }
+/** The gondola's trips (quest/ferry.ts): the Punta to San Giorgio, back, or home to the Redentore once the Abate is dead. */
+export type Crossing = 'out' | 'back' | 'home';
 
 /** WoW's marker over a quest giver: gold "?" with a quest ready to hand in, gold "!" with one on offer, else none. */
 export type Mark = 'ready' | 'offer' | undefined;
@@ -155,6 +180,12 @@ export class Quest {
   reported2 = false; // the second quest handed in
   relic = false; // Fra' Zuane's corona picked up (main.ts), once a run
   relicBack = false; // and given back to him
+  accepted3 = false; // Le nozze di San Giorgio taken
+  landed = false; // set down on San Giorgio by the gondola
+  key3 = false; // the key of the Cenacolo, off the Bibliotecario
+  boss3Dead = false; // the Abate
+  reported3 = false; // the third quest handed in
+  blessed3 = false; // Fra' Bortolo's third rue, on the way to San Giorgio
   /** Mastro Iseppo's side quests in the squero (quest/squero.ts); their rewards go through `complete`. */
   readonly side = new SideQuests();
   private relicKills = 0; // kills rolled for it so far (not saved: a load starts the ramp over)
@@ -194,7 +225,13 @@ export class Quest {
     if (!this.key2) return 'ospizio';
     if (!this.gate('coro-zitelle').open) return 'church';
     if (!this.boss2Dead) return 'boss2';
-    return this.reported2 ? 'done' : 'return';
+    if (!this.reported2) return 'return';
+    if (!this.accepted3) return 'offer3';
+    if (!this.landed) return 'route3';
+    if (!this.key3) return 'biblioteca';
+    if (!this.gate('cenacolo').open) return 'cenacolo';
+    if (!this.boss3Dead) return 'boss3';
+    return this.reported3 ? 'done' : 'return3';
   }
 
   gate(id: string): Gate {
@@ -206,6 +243,7 @@ export class Quest {
     const s = this.stage;
     if (s === 'leave' && p.z >= OUTSIDE) return (this.out = true);
     if (s === 'route' && p.x <= ZITELLE) return (this.arrived = true);
+    if (s === 'route3' && p.x <= ASHORE) return (this.landed = true);
     return false;
   }
 
@@ -227,9 +265,9 @@ export class Quest {
   marks(alive: number): Record<NonNullable<Prompt['talk']>, Mark> {
     const s = this.stage, over = this.boss2Dead;
     return {
-      zuane: mark(s === 'report' || s === 'return' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer'),
+      zuane: mark(s === 'report' || s === 'return' || s === 'return3' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer' || s === 'offer3'),
       speziale: mark((this.accepted && !this.found) || this.headsReady(alive),
-        !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (!this.asked && !this.bossDead && alive > 0)),
+        !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (this.accepted3 && !this.blessed3 && !this.boss3Dead) || (!this.asked && !this.bossDead && alive > 0)),
       iseppo: this.accepted2 ? mark(this.side.handInReady(over), this.side.open().length > 0) : undefined, // out of sight until the chains fall: level 2 opens
     };
   }
@@ -265,6 +303,32 @@ export class Quest {
     if (this.stage !== 'return') return false;
     this.reported2 = true;
     return this.complete('zitelle');
+  }
+
+  /** Le nozze di San Giorgio taken: the chain past the Tre Oci falls. */
+  accept3(): void {
+    this.report2();
+    this.accepted3 = true;
+    for (const g of this.gates) if (g.needs === 'quest3') this.open(g);
+  }
+
+  /** The Bibliotecario is dead: the key of the Cenacolo is the hero's. */
+  takeKey3(): void {
+    this.key3 = true;
+  }
+
+  /** The Abate is dead: the refectory's garden door opens. */
+  win3(): void {
+    if (this.boss3Dead) return;
+    this.boss3Dead = true;
+    for (const g of this.gates) if (g.needs === 'boss3') this.open(g);
+  }
+
+  /** Fra' Zuane hears the third quest done (once). */
+  report3(): boolean {
+    if (this.stage !== 'return3') return false;
+    this.reported3 = true;
+    return this.complete('sangiorgio');
   }
 
   /** Experience the quests done have earned, on top of the dead's (main.ts adds it). */
@@ -341,6 +405,14 @@ export class Quest {
     return true;
   }
 
+  /** His rue for San Giorgio, once the third quest is taken: the blessing once more. */
+  bless3(): boolean {
+    if (this.blessed3 || !this.accepted3) return false;
+    this.blessed3 = true;
+    this.blessLeft = BLESSING.time;
+    return true;
+  }
+
   /** His last rue, once the second quest is taken: the same blessing again, once. */
   bless2(): boolean {
     if (this.blessed2 || !this.accepted2) return false;
@@ -359,9 +431,26 @@ export class Quest {
    * In level 2, past the Ponte de la Croce, then in the andito behind the Zitelle's altar.
    */
   checkpoint(): { x: number; z: number; yaw: number } {
+    if (this.gate('cenacolo').open) return ANTIREF;
+    if (this.landed) return APPRODO;
+    if (this.gate('catene-punta').open) return PUNTA;
     if (this.gate('coro-zitelle').open) return ANDITO;
     if (this.gate('catene').open) return CROCE;
     return this.gate('coro').open ? CHOIR_DOOR : SPAWN;
+  }
+
+  /**
+   * Mastro Iseppo's gondola at the end of either landing stage: across to San Giorgio from the Punta; back from San
+   * Giorgio to the Punta, or once the Abate is dead home to the Redentore, where Fra' Zuane waits.
+   */
+  ferry(p: { x: number; y: number; z: number }): Prompt | undefined {
+    if (Math.abs(p.y) > 1 || !this.accepted3) return undefined;
+    const { punta, sangiorgio } = BERTHS;
+    if (Math.hypot(p.x - punta.x, p.z - punta.z) < REACH) return { text: 'Sali sulla gondola: a San Giorgio', act: () => '', ferry: 'out' };
+    if (Math.hypot(p.x - sangiorgio.x, p.z - sangiorgio.z) < REACH) {
+      return this.boss3Dead ? { text: "Sali sulla gondola: al Redentore, da Fra' Zuane", act: () => '', ferry: 'home' } : { text: 'Sali sulla gondola: alla Punta della Giudecca', act: () => '', ferry: 'back' };
+    }
+    return undefined;
   }
 
   /** The nearest thing to interact with around the player's feet `p`, if any. */
@@ -371,6 +460,8 @@ export class Quest {
     if (Math.hypot(p.x - ISEPPO.x, p.z - ISEPPO.z) < REACH && p.y < 1.5) return { text: `Parla con ${ISEPPO.name}`, act: () => '', talk: 'iseppo' };
     const find = this.side.prompt(p);
     if (find) return find;
+    const ferry = this.ferry(p);
+    if (ferry) return ferry;
     if (!this.chestOpen && Math.hypot(p.x - CHEST.x, p.z - CHEST.z) < REACH && Math.abs(p.y - CHEST.y) < 1.5) {
       if (!this.accepted) return { text: 'Un sigillo spettrale chiude il baule' };
       return { text: 'Apri il baule', act: () => { this.takeKey(); return 'Hai trovato la chiave del chiostro grande'; } };
@@ -379,8 +470,9 @@ export class Quest {
       const c = this.centre(g);
       if (g.open || Math.hypot(p.x - c.x, p.z - c.z) > REACH || Math.abs(p.y - g.y0) > 1.5) continue;
       if (g.needs === 'boss' || g.needs === 'boss2') return { text: `${cap(g.label)} è sbarrato` };
-      if (g.needs === 'quest2') return { text: `${cap(g.label)} sbarrano la fondamenta` };
-      if (!(g.needs === 'key2' ? this.key2 : this.key)) return { text: `${cap(g.label)} è chiusa a chiave` };
+      if (g.needs === 'boss3') return { text: `${cap(g.label)} è sbarrata` };
+      if (g.needs === 'quest2' || g.needs === 'quest3') return { text: `${cap(g.label)} sbarrano la fondamenta` };
+      if (!(g.needs === 'key3' ? this.key3 : g.needs === 'key2' ? this.key2 : this.key)) return { text: `${cap(g.label)} è chiusa a chiave` };
       return { text: `Apri ${g.label}`, act: () => { this.open(g); return ''; } };
     }
     return undefined;

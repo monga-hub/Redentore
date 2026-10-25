@@ -5,6 +5,7 @@
 import { APE, PRIEST, REVERENDISSIMO, SACERDOTE, type CasterKind } from '../enemies/caster.ts';
 import type { Control } from '../enemies/control.ts';
 import { CODEGA, GASTALDO, GOVERNATRICE, MAESTRA, VELO, ZITELLA } from '../enemies/zitelle.ts';
+import { ABATE, AMANUENSE, BIBLIOTECARIO, NOSTROMO } from '../enemies/sangiorgio.ts';
 
 /** The school colours an aura's border, WoW's debuff-type colours. */
 export type School = 'poison' | 'fire' | 'frost' | 'holy' | 'shadow';
@@ -40,18 +41,20 @@ const BOLT = new Map<CasterKind, Spell>([
   [PRIEST, SHADOW], [SACERDOTE, SHADOW], [REVERENDISSIMO, SHADOW],
   [CODEGA, ['Fuoco fatuo', 'wisp']], [ZITELLA, ['Filo della rocca', 'rosary']], [VELO, ['Filo della rocca', 'rosary']],
   [MAESTRA, ['Filo di merletto', 'rosary']], [GOVERNATRICE, ['Filo di merletto', 'rosary']],
+  [AMANUENSE, ['Schizzo d’inchiostro', 'wisp']], [BIBLIOTECARIO, ['Schizzo d’inchiostro', 'wisp']], [ABATE, ['Vino amaro', 'wisp']],
 ]);
 const NOVA = new Map<CasterKind, Spell>([
-  [SACERDOTE, ["Anello d'ombra", 'nova']], [REVERENDISSIMO, ["Nova d'ombra", 'nova']], [APE, ['Sciame velenoso', 'plague']], [GASTALDO, ['Vortice del remo', 'whirl']],
+  [SACERDOTE, ["Anello d'ombra", 'nova']], [REVERENDISSIMO, ["Nova d'ombra", 'nova']], [APE, ['Sciame velenoso', 'plague']], [GASTALDO, ['Vortice del remo', 'whirl']], [NOSTROMO, ['Giro dell’ancora', 'whirl']],
 ]);
 
-/** What a caster is casting now: its bolt, its nova, the Governatrice's fuso; nothing for a friar or a swing. */
+/** What a caster is casting now: its bolt, its nova, the Governatrice's fuso, the Abate's Calice; nothing for a friar or a swing. */
 export function castOf(m: { state: string; t?: number; kind?: CasterKind }): Cast | undefined {
   const k = m.kind, t = m.t ?? 0;
   if (!k) return undefined;
   if (m.state === 'cast') { const [name, icon] = BOLT.get(k) ?? SHADOW; return { name, icon, t, total: k.cast }; }
   if (m.state === 'nova' && k.nova) { const [name, icon] = NOVA.get(k) ?? ["Nova d'ombra", 'nova']; return { name, icon, t, total: k.nova.cast }; }
   if (m.state === 'spin' && k.spin) return { name: 'Il fuso', icon: 'whirl', t, total: k.spin.time, channel: true };
+  if (m.state === 'pour' && k.pour) return { name: 'Calice di Cana', icon: 'nova', t, total: k.pour.cast };
   return undefined;
 }
 

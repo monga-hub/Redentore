@@ -25,7 +25,7 @@ const QUEST_BEAM = 1.8; // m: a quest item's beam, whatever its rarity
  * Watched enemies, what tier of loot they drop, from which level's tables, and when their deaths drop nothing (a victory takes them all).
  * `quest`: asked at each death, a quest item to throw out too, if any.
  */
-export interface Dropper { all: readonly Mob[]; tier: Tier; level?: 1 | 2; quiet?: () => boolean; quest?: () => string | undefined }
+export interface Dropper { all: readonly Mob[]; tier: Tier; level?: 1 | 2 | 3; quiet?: () => boolean; quest?: () => string | undefined }
 
 interface Loose {
   gold: number; id: string; // gold > 0: a pile, else the item `id`
@@ -99,7 +99,7 @@ function star(): THREE.Texture {
 export class Drops {
   readonly root = new THREE.Group();
   private pool: Loose[] = [];
-  private tracks: { mob: Mob; tier: Tier; level: 1 | 2; quiet?: () => boolean; quest?: () => string | undefined; dead: boolean; t: number }[];
+  private tracks: { mob: Mob; tier: Tier; level: 1 | 2 | 3; quiet?: () => boolean; quest?: () => string | undefined; dead: boolean; t: number }[];
   /** A quest item walked over: true when its quest takes it (main.ts) instead of the bag. */
   collect?: (id: string) => boolean;
   private layer = document.createElement('div');

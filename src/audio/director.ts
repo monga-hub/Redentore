@@ -4,6 +4,7 @@ import { musicState, setAmbience, setMusic, syncIntro } from './music.ts';
 import { FRIAR, type Friar } from '../enemies/brain.ts';
 import { APE, APETTA, REVERENDISSIMO, SACERDOTE, type Bolt, type Priest } from '../enemies/caster.ts';
 import { GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA } from '../enemies/zitelle.ts';
+import { ABATE, BIBLIOTECARIO, MARINAIO, MONACO, NOSTROMO } from '../enemies/sangiorgio.ts';
 import { CHARGE_MAX } from '../abilities/system.ts';
 import { CHEST, type Quest } from '../quest/progress.ts';
 import { surfaceAt } from '../level/ground.ts';
@@ -44,9 +45,10 @@ const VOX: Record<Kind, Vox> = { // `peak`: s into the swing sound where the blo
   worker: { aggro: 'bee_hurt', hurt: 'bee_hurt', death: 'bee_death', hit: 'hit_flesh', swing: 'bee_sting', peak: 0.45, height: 1.1 },
 };
 /** Level 2's kinds speak with level 1's voices: the gondolieri as friars, the elites as sacerdoti, the Governatrice as a boss. */
-const VOICE = new Map<object, Kind>([[SACERDOTE, 'sacerdote'], [REVERENDISSIMO, 'boss'], [APE, 'queen'], [APETTA, 'worker'], [GONDOLIERE, 'friar'], [GASTALDO, 'sacerdote'], [MAESTRA, 'sacerdote'], [GOVERNATRICE, 'boss']]);
+const VOICE = new Map<object, Kind>([[SACERDOTE, 'sacerdote'], [REVERENDISSIMO, 'boss'], [APE, 'queen'], [APETTA, 'worker'], [GONDOLIERE, 'friar'], [GASTALDO, 'sacerdote'], [MAESTRA, 'sacerdote'], [GOVERNATRICE, 'boss'],
+  [MONACO, 'friar'], [MARINAIO, 'friar'], [BIBLIOTECARIO, 'sacerdote'], [NOSTROMO, 'sacerdote'], [ABATE, 'boss']]);
 const kindOf = (m: Friar | Priest): Kind => !('kind' in m) ? 'friar' : VOICE.get(m.kind) ?? 'priest';
-const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova']);
+const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin', 'pour']);
 const CAST_LEN = 1.6; // s of priest_cast at rate 1
 
 /** Per-area ambience: the bed, how loud, an indoor low-pass, and random one-shots [sound, every min..max s, placed?]. */
@@ -62,8 +64,9 @@ const PLACES: Record<string, Place> = {
   chiesa: { bed: 'chiesa', level: 1, lowpass: 20000, shots: [['chant_far', 25, 45, 'flat'], ['creak', 15, 30, 'near']] },
 };
 const placeOf = (zone: string | undefined, label = ''): Place =>
-  zone === 'orto' || zone === 'giardini' || label === 'Orto delle Zitelle' ? PLACES.orto : zone === 'convento' || label === 'Cortile delle Zitelle' ? PLACES.chiostro
-    : zone === 'chiesa' || /^Le Zitelle:|^Altar maggiore delle/.test(label) ? PLACES.chiesa : zone === 'corpo-nord' || (zone === 'zitelle' && !/^Sagrato/.test(label)) ? PLACES.interno : PLACES.laguna;
+  zone === 'orto' || zone === 'giardini' || label === 'Orto delle Zitelle' || /^Giardino di San|^Teatro Verde/.test(label) ? PLACES.orto
+    : zone === 'convento' || label === 'Cortile delle Zitelle' || /^Chiostro d/.test(label) ? PLACES.chiostro
+    : zone === 'chiesa' || /^Le Zitelle:|^Altar maggiore delle|^Basilica di San|^Crociera|^Presbiterio di San|^Coro dei monaci|^Cenacolo|^Antirefettorio|^Biblioteca del|^Scalone del/.test(label) ? PLACES.chiesa : zone === 'corpo-nord' || (zone === 'zitelle' && !/^Sagrato/.test(label)) ? PLACES.interno : PLACES.laguna;
 
 interface Seen { state: string; hp: number; struck: boolean; cast?: Voice; x: number; z: number }
 
@@ -157,7 +160,7 @@ export class Director {
     this.hp = w.stats.hp;
     this.charge = w.kit.system.charge;
     this.chest = w.quest.chestOpen;
-    this.won = +w.quest.bossDead + +w.quest.boss2Dead;
+    this.won = +w.quest.bossDead + +w.quest.boss2Dead + +w.quest.boss3Dead;
     for (const g of w.quest.gates) this.gates.set(g, { open: g.open, p: 0 });
     this.grounded = w.player.grounded;
     this.ready = true;
@@ -269,7 +272,7 @@ export class Director {
 
   private mobs(dt: number): void {
     const w = this.w, p = w.player.pos;
-    const victory = +w.quest.bossDead + +w.quest.boss2Dead > this.won; // everyone falls at once: only the boss gets the scream
+    const victory = +w.quest.bossDead + +w.quest.boss2Dead + +w.quest.boss3Dead > this.won; // everyone falls at once: only the boss gets the scream
     const diablo = isDiablo();
     for (const m of [...w.friars, ...w.casters, ...w.bees]) {
       const s = this.seen.get(m)!, k = kindOf(m), v = VOX[k];
@@ -370,7 +373,7 @@ export class Director {
 
   private score(dt: number): void {
     const w = this.w, p = w.player.pos;
-    const won = +w.quest.bossDead + +w.quest.boss2Dead;
+    const won = +w.quest.bossDead + +w.quest.boss2Dead + +w.quest.boss3Dead;
     if (won > this.won) { this.won = won; setMusic('victory'); return; }
     if (w.stats.dead) return; // the death sting plays on
     const fighting = (m: Friar | Priest) => FIGHTING.has(m.state) && Math.hypot(m.x - p.x, m.z - p.z) < 35;

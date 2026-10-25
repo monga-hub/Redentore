@@ -5,9 +5,9 @@ import { T, type Style, type Vfx } from '../abilities/vfx.ts';
 import { loadModel } from '../core/models.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Dialogue, type Entry } from '../ui/dialogue.ts';
-import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
+import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE, QUEST3_TITLE, QUEST_TITLE, RELIC_OBJECTIVE, RELIC_TALK, RELIC_TITLE, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_TALK, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK, spezialeWait, titleOf, type Talk } from './dialogue.ts';
 import { Npc } from './npc.ts';
-import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
+import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
 import { ISEPPO, ISEPPO_DECLINE, ISEPPO_DONE, ISEPPO_FULL, SIDE, SIDE_BY, type SideQuest } from './squero.ts';
 
@@ -22,7 +22,7 @@ import { ISEPPO, ISEPPO_DECLINE, ISEPPO_DONE, ISEPPO_FULL, SIDE, SIDE_BY, type S
 const join = (t: Talk) => t.pages.join('\n\n'); // a quest's text, whole, in the list window
 const pay = (id: QuestId, item?: string) => ({ xp: QUESTS[id].xp, gold: QUESTS[id].gold, item });
 const OPEN_TIME = 1.6; // s for a gate to open
-const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls
+const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1, cenacolo: -1, 'cenacolo-orto': -1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls; the Cenacolo's into the hall and out to the garden
 const GOLD = 0xffd36a;
 const LOOT = 2.2; // s of the chest's opening: lid, burst, the key rising and fading
 const BANNER = 4; // s a "Missione completata" banner stays up; quests done together queue
@@ -62,6 +62,16 @@ body.touch #quest-prompt kbd { display: none; }
 #quest-done i b { color: #ffd36a; }
 #quest-done.show { display: block; animation: victory ${BANNER}s ease forwards; }
 body.touch #quest-done { font-size: 24px; }
+#epilogue { position: fixed; inset: 0; display: none; z-index: 9; place-content: center; padding: 0 24px; text-align: center; cursor: pointer;
+  background: radial-gradient(ellipse at 50% 120%, #f0b86a55, transparent 60%), linear-gradient(#05070ce6, #1a1420f0);
+  font: italic 17px/1.55 Georgia, serif; color: #f3e6c4; text-shadow: 0 1px 3px #000; }
+#epilogue.show { display: grid; animation: epilogue 2.5s ease; }
+#epilogue p { max-width: 560px; margin: 0 auto 10px; opacity: 0; animation: epilogue 2s ease forwards; }
+#epilogue h1 { margin: 14px 0 6px; font: 700 52px/1 Georgia, serif; font-style: normal; color: #ffe39a; text-shadow: 0 0 22px #a06a10, 0 2px 4px #000; opacity: 0; animation: epilogue 3s ease forwards; }
+#epilogue small { font: 13px/1.3 sans-serif; font-style: normal; color: #b9a98a; opacity: 0; animation: epilogue 2s ease forwards; }
+body.touch #epilogue { font-size: 14px; line-height: 1.4; }
+body.touch #epilogue h1 { font-size: 38px; }
+@keyframes epilogue { 0% { opacity: 0; } 100% { opacity: 1; } }
 #quests { position: absolute; top: calc(100% + 34px); right: -6px; width: 230px; text-align: right; pointer-events: none;
   font: 13px/1.35 Georgia, serif; color: #f3e6c4; text-shadow: 0 1px 2px #000, 0 0 6px #000; }
 #quests b { display: block; font-size: 14px; color: #ffd200; }
@@ -110,6 +120,8 @@ export class QuestView {
   private doneEl = document.createElement('div');
   private paidOut = 0; // quests in quest.done whose banner and gold have been given
   private bannerT = 0;
+  private epilogueEl = document.createElement('div');
+  private epilogueT = 0; // s until the closing card, once the last quest's banner has had its say
   private side = ''; // the side quests on the tracker: 'b' Fra' Bortolo's errand, 'r' the corona to give back, then the heads (`heads`)
   private bossName?: object; // the kind the boss bar is named for
   /** The boss bar is up: the target frame and the boss's own nameplate bar give way to it. */
@@ -126,6 +138,8 @@ export class QuestView {
   friars: () => number = () => HEADS.need;
   /** The rite's boon is picked: main.ts lays it on the kit. */
   boonTaken?: () => void;
+  /** The gondola is boarded at a landing stage: main.ts rows the crossing (quest/ferry.ts). */
+  board?: (c: Crossing) => void;
   private shown = '';
   private tapped = false;
 
@@ -178,11 +192,13 @@ export class QuestView {
     this.victoryEl.innerHTML = 'Il Reverendissimo è caduto<small>Le porte della chiesa si aprono sulla fondamenta</small>';
     this.trackEl.id = 'quests';
     this.doneEl.id = 'quest-done';
-    document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl);
+    this.epilogueEl.id = 'epilogue';
+    this.epilogueEl.onclick = () => this.epilogueEl.classList.remove('show');
+    document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl, this.epilogueEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
       this.npc.talking = false;
-      if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
+      if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted3 ? !this.quest.boss3Dead && this.quest.bless3() : this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
       this.iseppo.talking = false;
     };
@@ -190,6 +206,7 @@ export class QuestView {
 
   /** The next quest done and not yet paid: its gold into the bag and WoW's "Missione completata" (its XP is main.ts's, from quest.done). */
   private payout(dt: number): void {
+    if (this.epilogueT > 0 && (this.epilogueT -= dt) <= 0) this.epilogue();
     if ((this.bannerT -= dt) > 0 || this.paidOut >= this.quest.done.length) return;
     const r = QUESTS[this.quest.done[this.paidOut++]];
     this.reward?.(r.gold);
@@ -200,6 +217,21 @@ export class QuestView {
     playSfx('quest', null, { rate: 0.84, gain: 1.3 });
     this.vfx.burst(goldMote, this.hero.x, this.hero.y + 0.6, this.hero.z, 24, 0.5, 1, 1.5);
     this.bannerT = BANNER;
+    if (r === QUESTS.sangiorgio) this.epilogueT = BANNER + 1.5;
+  }
+
+  /** The game's end: the three knots undone, the dead at rest, Fra' Zuane at the pontile for the dawn. A tap closes it and the night goes on. */
+  epilogue(): void {
+    const lines = [
+      "Quella notte le campane di San Giorgio suonarono un'ultima volta, e tacquero.",
+      'Nell\'orto del Redentore i frati posarono le zappe. Sui rii delle Zitelle i gondolieri tirarono i remi in barca. Nel Cenacolo i monaci sparecchiarono la tavola.',
+      "All'alba Fra' Zuane scese al pontile. Varcò la soglia senza catene, e la laguna, questa volta, lo volle.",
+      'Il voto del 1576 era compiuto: una chiesa per la città salvata, e nessuna anima in dote.',
+    ];
+    this.epilogueEl.innerHTML = lines.map((l, i) => `<p style="animation-delay:${1 + i * 2.2}s">${l}</p>`).join('')
+      + `<h1 style="animation-delay:${1 + lines.length * 2.2}s">Fine</h1><small style="animation-delay:${2.5 + lines.length * 2.2}s">Tocca per continuare a vagare nella notte</small>`;
+    this.epilogueEl.classList.add('show');
+    playSfx('quest', null, { rate: 0.6, gain: 1.2 });
   }
 
   /** Fra' Zuane has his corona back: his medal, once (its XP and gold are payout's). */
@@ -259,15 +291,17 @@ export class QuestView {
     else if (s === 'report') out.push({ title: QUEST_TITLE, state: 'ready', text: TALK.report.pages[0], reward: pay('reverendissimo'), act: () => { q.report(); } });
     else if (s === 'offer') out.push({ title: QUEST2_TITLE, state: 'offer', text: TALK.report.pages.slice(1).join('\n\n'), objective: OBJECTIVE.route, reward: pay('zitelle'), decline: TALK.offer.decline, act: () => q.accept2() }); // the lore of the Zitelle that came with the report
     else if (s === 'return') out.push({ title: QUEST2_TITLE, state: 'ready', text: join(TALK.return), reward: pay('zitelle'), act: () => { q.report2(); } });
+    else if (s === 'offer3') out.push({ title: QUEST3_TITLE, state: 'offer', text: join(TALK.offer3), objective: OBJECTIVE.route3, reward: pay('sangiorgio'), decline: TALK.offer3.decline, act: () => q.accept3() });
+    else if (s === 'return3') out.push({ title: QUEST3_TITLE, state: 'ready', text: join(TALK.return3), reward: pay('sangiorgio'), act: () => { q.report3(); } });
     else if (s === 'done') out.push({ title: 'Parla', state: 'talk', text: join(TALK.done) });
-    else out.push({ title: titleOf(s), state: 'busy', text: join(TALK[s]), objective: OBJECTIVE[s], reward: pay(SECOND.includes(s) ? 'zitelle' : 'reverendissimo') });
+    else out.push({ title: titleOf(s), state: 'busy', text: join(TALK[s]), objective: OBJECTIVE[s], reward: pay(THIRD.includes(s) ? 'sangiorgio' : SECOND.includes(s) ? 'zitelle' : 'reverendissimo') });
     return out;
   }
 
   /** Fra' Bortolo's list: his talk (the errand handed in on it), and Le teste dei frati. */
   private spezialeEntries(): Entry[] {
     const q = this.quest, alive = this.friars();
-    const t = q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
+    const t = q.accepted3 && !q.boss3Dead ? (q.blessed3 ? SPEZIALE_SANGIORGIO_AGAIN : SPEZIALE_SANGIORGIO) : q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
     const out: Entry[] = [q.accepted && !q.found
       ? { title: QUESTS.bortolo.title, state: 'ready', text: join(t), reward: pay('bortolo'), act: () => { q.meet(); } } // found, as Fra' Zuane asked
       : { title: 'Parla', state: 'talk', text: join(t) }];
@@ -338,7 +372,7 @@ export class QuestView {
   /** The quests running, as the tracker lists them, for the world map's quest log (main.ts adds where each points). */
   log(): { id: 'main' | 'bortolo' | 'relic' | 'teste' | SideQuest['id']; title: string; line: string; ready: boolean }[] {
     const q = this.quest, s = q.stage, alive = this.friars(), out: ReturnType<QuestView['log']> = [];
-    if (s !== 'done') out.push({ id: 'main', title: titleOf(s), line: OBJECTIVE[s], ready: s === 'report' || s === 'return' });
+    if (s !== 'done') out.push({ id: 'main', title: titleOf(s), line: OBJECTIVE[s], ready: s === 'report' || s === 'return' || s === 'return3' });
     if (q.accepted && !q.found) out.push({ id: 'bortolo', title: QUESTS.bortolo.title, line: BORTOLO_OBJECTIVE, ready: false });
     if (q.relic && !q.relicBack) out.push({ id: 'relic', title: RELIC_TITLE, line: RELIC_OBJECTIVE, ready: true });
     if (q.asked && !q.boon) {
@@ -433,6 +467,7 @@ export class QuestView {
     if ((pressed('KeyF') || this.tapped) && pr?.act) {
       const n = pr.act();
       if (n) notices.push(n);
+      if (pr.ferry) this.board?.(pr.ferry);
       if (pr.talk === 'zuane') {
         this.npc.talking = true;
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, GREET.zuane, () => this.zuaneEntries());
@@ -450,9 +485,10 @@ export class QuestView {
     this.quest.update(player);
     const q = this.quest, stage = q.stage, side = (q.accepted && !q.found ? 'b' : '') + (q.relic && !q.relicBack ? 'r' : '') + this.heads();
     if (stage !== this.stage) {
-      const was = this.stage, done = was === 'report' || was === 'return'; // complete: its banner and chime are payout's
+      const was = this.stage, done = was === 'report' || was === 'return' || was === 'return3'; // complete: its banner and chime are payout's
       if (was === 'talk') notices.push(`Missione accettata: ${QUEST_TITLE}`);
       else if (stage === 'route') notices.push(`Missione accettata: ${QUEST2_TITLE}`);
+      else if (stage === 'route3') notices.push(`Missione accettata: ${QUEST3_TITLE}`);
       else if (was && !done) notices.push(OBJECTIVE[stage]);
       if (was && !done) playSfx('quest');
       this.side = side;
@@ -499,9 +535,9 @@ export class QuestView {
 
     const fighting = (this.bossShown = boss.state !== 'pray' && boss.state !== 'dead' && boss.state !== 'evade');
     this.bossEl.style.display = fighting ? 'block' : 'none';
-    if (fighting && this.bossName !== boss.kind) { // whose bar: the Reverendissimo's, then the Governatrice's
+    if (fighting && this.bossName !== boss.kind) { // whose bar: the Reverendissimo's, the Governatrice's, the Abate's
       this.bossName = boss.kind;
-      this.bossEl.firstChild!.textContent = boss.kind.phases?.marks ? 'Il Reverendissimo' : 'La Governatrice';
+      this.bossEl.firstChild!.textContent = boss.kind.name ?? 'Il Reverendissimo';
     }
     if (fighting) {
       this.bossFill.style.width = `${(boss.hp / boss.kind.hp) * 100}%`;
@@ -571,9 +607,10 @@ export class QuestView {
     }
   }
 
-  /** The banner: the Reverendissimo's fall, or (`second`) the Governatrice's. */
-  victory(second = false): void {
-    if (second) this.victoryEl.innerHTML = 'La Governatrice è caduta<small>Il velo si scioglie: il portone delle Zitelle si apre sulla fondamenta</small>';
+  /** The banner: the Reverendissimo's fall, the Governatrice's (2) or the Abate's (3). */
+  victory(level: 1 | 2 | 3 = 1): void {
+    if (level === 2) this.victoryEl.innerHTML = 'La Governatrice è caduta<small>Il velo si scioglie: il portone delle Zitelle si apre sulla fondamenta</small>';
+    if (level === 3) this.victoryEl.innerHTML = "L'Abate di San Giorgio è caduto<small>Le nozze sono rotte: la porta del giardino si apre</small>";
     this.victoryEl.classList.remove('show');
     void this.victoryEl.offsetWidth; // replay the fade
     this.victoryEl.classList.add('show');

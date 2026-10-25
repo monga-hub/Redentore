@@ -55,11 +55,12 @@ export interface MapView {
   x: number; z: number; facing: number; view: number; area?: string; goal?: Pin; npcs?: Pin[];
   /** The quest log: the quests running and the spot each points at (objective, else giver). */
   quests?: { title: string; line: string; ready: boolean; at?: { x: number; z: number } }[];
-  /** The second level's places (the Giudecca and the Zitelle) are the ones listed. */
-  level2?: boolean;
+  /** The level whose places are listed: 1 the Redentore's, 2 the Giudecca and the Zitelle, 3 the Punta and San Giorgio. */
+  level?: 1 | 2 | 3;
 }
 
-const LEVEL2 = new Set(['giudecca', 'zitelle']); // zones past the Ponte de la Croce
+/** Each zone's level (level/index.ts); the Redentore's are the rest. */
+const LEVELS = new Map([['giudecca', 2], ['zitelle', 2], ['punta', 3], ['sangiorgio', 3]]);
 
 export class WorldMap {
   private el = document.createElement('div');
@@ -324,7 +325,7 @@ export class WorldMap {
     };
     const tag = (t: 'b' | 'small', text: string) => Object.assign(document.createElement(t), { textContent: text });
     const none = (text: string) => Object.assign(document.createElement('li'), { className: 'none', textContent: text });
-    const names = [...new Set(this.areas.filter((a) => LEVEL2.has(a.zone) === !!v.level2 && this.d.discovered(a)).map((a) => a.label))]
+    const names = [...new Set(this.areas.filter((a) => (LEVELS.get(a.zone) ?? 1) === (v.level ?? 1) && this.d.discovered(a)).map((a) => a.label))]
       .sort((a, b) => a.localeCompare(b, 'it'));
     this.places.replaceChildren(...(names.length ? names.map((n) => li(`a${n}`, n === v.area ? 'here' : '', n)) : [none('Nessun luogo scoperto')]));
     const qs = v.quests ?? [];

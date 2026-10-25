@@ -20,9 +20,10 @@ import { Props } from '../props.ts';
 //   campo Santa Croce x -132..-104, z -14..10; church front z -14, x -126..-110
 //   rio del Squero    x -172..-166, z -40..20; bridge steps x -177..-173, -165..-161
 //   squero            x -196..-172, z -26..10 (tezon x -195..-182, z -25..-13)
-//   Zitelle           x -284..-196 (zitelle.ts); Tre Oci x -298..-286, z -40..0; quay ends at x -300
+//   Zitelle           x -284..-196 (zitelle.ts); Tre Oci x -298..-286, z -40..0; level 2's quay ends at x -300,
+//                     where level 3's chain stands (zones/sangiorgio.ts goes on to the Punta)
 
-/** x where the walkable quay ends, east. */
+/** x where level 2's quay ends, east: the chain across it falls with the third quest (quest/progress.ts). */
 export const QUAY_END = -300;
 /** The two rii crossing the fondamenta: water x0..x1 (x0 < x1). */
 export const RII = { croce: [-70, -62], squero: [-172, -166] } as const;
@@ -48,7 +49,6 @@ export function buildGiudecca(b: LevelBuilder): void {
     b.box(x0, x1, 0, 0.12, Z.quayEdge - 0.25, Z.quayEdge, 'stoneDark', { camera: false });
     b.barrier(x0, x1, Z.quayEdge, Z.quayEdge + 0.6);
   }
-  b.barrier(QUAY_END - 0.6, QUAY_END, 0, Z.quayEdge);
   for (let x = -74; x > QUAY_END; x -= 9.5) if (x > -160 || x < -178) bitta(p, x, Z.quayEdge - 0.5); // mooring posts
 
   // The two rii: stone banks down to the water, the edges barred where the quay meets them, and a bridge each.
@@ -115,7 +115,7 @@ export function buildGiudecca(b: LevelBuilder): void {
   // The Casa dei Tre Oci (1913): a neo-gothic front with its three great windows on the canal.
   treOci(b, p);
 
-  // Across the canal: the Zattere, the Salute, the Dogana and San Giorgio as a dark skyline.
+  // Across the canal: the Zattere, the Salute and the Dogana as a dark skyline (San Giorgio is level 3, zones/sangiorgio.ts).
   skyline(b);
   p.flush();
 }
@@ -148,7 +148,7 @@ function bridge(b: LevelBuilder, p: Props, x0: number, x1: number): void {
 }
 
 /** Shuttered windows on a house front at z, facing +Z, two or three rows. */
-function windows(b: LevelBuilder, x0: number, x1: number, z: number, h: number): void {
+export function windows(b: LevelBuilder, x0: number, x1: number, z: number, h: number): void {
   const s = 1, f = z + 0.02, rows = h > 11 ? [4.2, 7.4, 10.4] : [4, 7.2];
   for (let x = x0 + 2.2; x < x1 - 1.4; x += 3.6) {
     for (const y of rows) {
@@ -162,13 +162,13 @@ function windows(b: LevelBuilder, x0: number, x1: number, z: number, h: number):
 }
 
 /** A mooring post (bitta) on the quay edge. */
-function bitta(p: Props, x: number, z: number): void {
+export function bitta(p: Props, x: number, z: number): void {
   p.disc(x, 0, z, 0.22, 0.75, 'stoneDark');
   p.disc(x, 0.75, z, 0.27, 0.12, 'stoneDark');
 }
 
 /** An iron fanale on a bracket on the wall face at (x, z), facing +Z; lit by the torch pool. */
-function fanale(b: LevelBuilder, p: Props, x: number, z: number): void {
+export function fanale(b: LevelBuilder, p: Props, x: number, z: number): void {
   const zz = z + 0.05, y = 3.6;
   p.box(x - 0.04, x + 0.04, y + 0.35, y + 0.45, zz, zz + 0.9, 'iron'); // arm
   p.box(x - 0.02, x + 0.02, y - 0.2, y + 0.45, zz, zz + 0.04, 'iron');
@@ -178,7 +178,7 @@ function fanale(b: LevelBuilder, p: Props, x: number, z: number): void {
 }
 
 /** A lamp post on a bridge's crown. */
-function lampPost(b: LevelBuilder, p: Props, x: number, z: number, y0: number): void {
+export function lampPost(b: LevelBuilder, p: Props, x: number, z: number, y0: number): void {
   p.disc(x, y0 + 0.95, z, 0.08, 1.6, 'iron');
   p.box(x - 0.18, x + 0.18, y0 + 2.5, y0 + 2.95, z - 0.18, z + 0.18, 'lantern');
   p.cone(x, y0 + 2.95, z, 0.26, 0.28, 'iron');
@@ -254,8 +254,4 @@ function skyline(b: LevelBuilder): void {
   far(-150, -120, 318, 348, 24); // la Salute
   dome(-135, 333, 13, 24);
   b.column(-135, 333, 2, 37, 42, 'stone', false);
-  far(-372, -330, 250, 290, 22); // San Giorgio Maggiore
-  dome(-351, 274, 9, 22);
-  b.column(-372, 292, 3, -1.2, 56, 'brick', false); // its campanile
-  b.add(new THREE.Mesh(new THREE.ConeGeometry(3.5, 8, 4), material('roof')), 'roof').position.set(-372, 60, 292);
 }

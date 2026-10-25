@@ -34,6 +34,23 @@ export interface CasterKind {
    * long either side and `width` wide turning round her at `speed` rad/s, `dps` to whoever they sweep.
    */
   spin?: { phase: number; every: number; time: number; speed: number; length: number; width: number; dps: number };
+  /** A boss's name on its health bar (quest/view.ts). */
+  name?: string;
+  /**
+   * The Calice di Cana (level 3's Abate): every `every` s of fighting with the player within `length`, it roots and pours
+   * for `cast` s, a wedge `angle` rad wide and `length` m long aimed where the player stood; `damage` to whoever is in it then.
+   */
+  pour?: { every: number; cast: number; angle: number; length: number; damage: number };
+  /**
+   * The Rintocchi: from phase `phase` on, every `every` s, `n` rings of sound `gap` s apart race out from it at `speed` m/s
+   * to `reach` m, `width` m thick; one that sweeps a hero standing on the floor deals `damage` (a jump clears it).
+   */
+  toll?: { phase: number; every: number; n: number; gap: number; speed: number; width: number; reach: number; damage: number };
+  /**
+   * Acqua alta: from phase `phase` on, every `every` s, `n` islands of light `r` m wide (the first a few steps from the
+   * player) show on its floor; `warn` s later the tide floods everything else for `time` s, `dps` to a hero out of them.
+   */
+  tide?: { phase: number; every: number; warn: number; time: number; n: number; r: number; dps: number };
 }
 
 /**
@@ -54,6 +71,10 @@ export interface Phases {
 export interface Mark { x: number; y: number; z: number; t: number }
 /** A lace line on the floor from (x, z) along the unit (dx, dz), `len` long: cuts when `t` runs out. */
 export interface Line { x: number; y: number; z: number; dx: number; dz: number; len: number; t: number }
+/** A ring of a bell's toll from (x, z): `t` s since it left (negative: still to come), `hit` once it has struck the hero. */
+export interface Ring { x: number; y: number; z: number; t: number; hit: boolean }
+/** The tide: `t` s since the islands showed (it floods from `warn`), the islands. */
+export interface Tide { t: number; isles: { x: number; z: number }[] }
 
 export const PRIEST: CasterKind = {
   hp: 90, // casters are squishy: nine bone slashes
@@ -103,6 +124,7 @@ export const SACERDOTE: CasterKind = {
  */
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
+  name: 'Il Reverendissimo',
   hp: 12000, // 11000 before the quests paid XP: the hero now walks in a level or two higher
   xp: 0, // his fall ends the run
   aggro: 15, leash: 60, blind: 15,
@@ -173,7 +195,7 @@ const LOS_EVERY = 0.25;
 export const SPIN_DRAW = 0.8; // s: tracing a ray through the cloister costs ~0.2 ms
 const CHEST = 1.1; // m above the feet: where bolts leave the staff and strike the player
 
-export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'spin' | 'evade' | 'dead';
+export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'spin' | 'pour' | 'evade' | 'dead';
 
 export interface Bounds { x0: number; x1: number; z0: number; z1: number }
 
@@ -196,6 +218,12 @@ export interface Priest {
   lineCd: number; // s until the next lines
   spinCd: number; // s until the next fuso
   spinA: number; // the fuso's angle, rad
+  pourCd: number; // s until the next Calice (level 3's Abate)
+  pourA: number; // the Calice's aim, rad (atan2 of x, z)
+  rings: Ring[]; // the Rintocchi racing out
+  tollCd: number; // s until the next Rintocchi
+  tide?: Tide; // Acqua alta, while it is on
+  tideCd: number; // s until the next
   wards?: Priest[]; // the Governatrice's: the zitelle she calls, two at each new phase, who keep her veil up
   backoff: number; // backpedal budget left until the next cast
   blind: number; // s pulled without line of sight
@@ -272,8 +300,8 @@ export function cloisterSpots(world: World, b: Bounds, n: number): [number, numb
  * priests keep to. Not the whole area: chasing a player into the arcade walks used to lead them
  * through a door gap in the muretto, and the straight walk home then pinned them against it for good.
  */
-export function cloisterPlan(world: World, areas: (Bounds & { label: string })[]): { area: Bounds & { label: string }; court: Bounds; groups: [number, number, number][][] }[] {
-  const cloisters = areas.filter((a) => isCloister(a.label));
+export function cloisterPlan(world: World, areas: (Bounds & { label: string; zone?: string })[]): { area: Bounds & { label: string }; court: Bounds; groups: [number, number, number][][] }[] {
+  const cloisters = areas.filter((a) => isCloister(a.label) && a.zone !== 'sangiorgio'); // San Giorgio's cloisters keep their own packs (enemies/sangiorgio.ts)
   const size = (a: Bounds) => (a.x1 - a.x0) * (a.z1 - a.z0);
   const largest = Math.max(...cloisters.map(size));
   return cloisters.map((area) => ({ area, court: court(area), groups: cloisterSpots(world, area, groupsFor(size(area), largest)) }));
@@ -317,7 +345,7 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
     g.forEach(([x, z, yaw], k) => {
       const kind = kinds[i]?.[k] ?? PRIEST;
       mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false,
-        phase: 0, fight: 0, brand: kind.phases?.marks?.every ?? 0, marks: [], lines: [], lineCd: kind.lines ? kind.lines.every * 0.5 : 0, spinCd: 0, spinA: 0, backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
+        phase: 0, fight: 0, brand: kind.phases?.marks?.every ?? 0, marks: [], lines: [], lineCd: kind.lines ? kind.lines.every * 0.5 : 0, spinCd: 0, spinA: 0, ...calm(kind), backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
     });
     return mates;
   });
@@ -351,7 +379,7 @@ export function spawnChurch(world: World): { all: Priest[]; boss: Priest } {
 }
 
 /** Every caster on the map, in the order saved games index them: cloisters, gardens, the church (boss last), the lagoon. */
-export function spawnCasters(world: World, areas: (Bounds & { label: string })[]): { all: Priest[]; boss: Priest } {
+export function spawnCasters(world: World, areas: (Bounds & { label: string; zone?: string })[]): { all: Priest[]; boss: Priest } {
   const plan = cloisterPlan(world, areas), gardens = gardenPlan(world, areas), church = spawnChurch(world), lagoon = lagoonPlan(areas);
   return {
     boss: church.boss,
@@ -384,6 +412,11 @@ export function wipe(fs: { state: string; t: number }[]): void {
     f.state = 'evade';
     f.t = 0;
   }
+}
+
+/** The Abate's timers at the start of a fight: the Calice, the bells and the tide all wait a while. */
+function calm(K: CasterKind): Pick<Priest, 'pourCd' | 'pourA' | 'rings' | 'tollCd' | 'tide' | 'tideCd'> {
+  return { pourCd: (K.pour?.every ?? 0) * 0.5, pourA: 0, rings: [], tollCd: (K.toll?.every ?? 0) * 0.4, tide: undefined, tideCd: (K.tide?.every ?? 0) * 0.3 };
 }
 
 function enter(f: Priest, s: CasterState): void {
@@ -424,8 +457,8 @@ function go(f: Priest, x: number, z: number, speed: number, stop: number, world:
 export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[]): number {
   const P = f.kind.phases;
   if (!P) return act(f, p, world, dt, bolts, 1, 1) + cut(f, p, dt);
-  if (f.state === 'dead') { f.marks.length = 0; f.lines.length = 0; return 0; }
-  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova' || f.state === 'spin';
+  if (f.state === 'dead') { f.marks.length = 0; f.lines.length = 0; if (f.rings.length || f.tide) Object.assign(f, calm(f.kind)); return 0; }
+  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova' || f.state === 'spin' || f.state === 'pour';
   if (fighting) {
     f.fight += dt;
     while (f.phase < P.at.length && f.hp <= f.kind.hp * P.at[f.phase]) {
@@ -435,7 +468,59 @@ export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bol
   }
   const haste = f.phase >= P.at.length ? P.haste : 1, rage = f.fight >= P.berserk ? P.rage : 1;
   const level = Math.abs(p.y - f.y) < 2.5;
-  return (act(f, p, world, dt, bolts, haste, rage) + (P.marks ? brand(f, P, p, level, dt * haste, fighting) : 0) + cut(f, p, dt * haste)) * rage;
+  return (act(f, p, world, dt, bolts, haste, rage) + (P.marks ? brand(f, P, p, level, dt * haste, fighting) : 0) + cut(f, p, dt * haste) + toll(f, p, level, dt, fighting) + flood(f, p, level, dt, fighting)) * rage;
+}
+
+/** In the Calice's wedge, cast from (f.x, f.z) along `pourA`: within its length and half its angle (or right against the caster). */
+export function inPour(f: Priest, p: { x: number; z: number }): boolean {
+  const C = f.kind.pour!, dx = p.x - f.x, dz = p.z - f.z, d = Math.hypot(dx, dz);
+  if (d > C.length) return false;
+  if (d < f.kind.radius + 0.4) return true;
+  const a = Math.atan2(dx, dz) - f.pourA;
+  return Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) <= C.angle / 2;
+}
+
+/** A hero this close above the floor is standing on it: the bells' rings strike them. */
+export const GROUNDED = 0.35;
+
+/** The Rintocchi: rings race out and strike a hero they cross on the floor; a new peal on schedule. */
+function toll(f: Priest, p: Target, level: boolean, dt: number, fighting: boolean): number {
+  const B = f.kind.toll;
+  if (!B) return 0;
+  let dmg = 0;
+  for (let i = f.rings.length - 1; i >= 0; i--) {
+    const r = f.rings[i], R = (r.t += dt) * B.speed;
+    if (R > B.reach) { f.rings.splice(i, 1); continue; }
+    if (r.t < 0 || r.hit || !level || p.y - r.y > GROUNDED) continue;
+    if (Math.abs(Math.hypot(p.x - r.x, p.z - r.z) - R) <= B.width / 2) { r.hit = true; dmg += B.damage; }
+  }
+  if (fighting && f.phase >= B.phase && f.state !== 'pour' && (f.tollCd -= dt) <= 0) {
+    f.tollCd = B.every;
+    for (let i = 0; i < B.n; i++) f.rings.push({ x: f.x, y: f.y, z: f.z, t: -i * B.gap, hit: false });
+  }
+  return dmg;
+}
+
+/** Acqua alta: islands show, then the tide floods the floor round them; the next on schedule. */
+function flood(f: Priest, p: Target, level: boolean, dt: number, fighting: boolean): number {
+  const W = f.kind.tide;
+  if (!W) return 0;
+  const t = f.tide;
+  if (t) {
+    t.t += dt;
+    if (t.t >= W.warn + W.time) { f.tide = undefined; f.tideCd = W.every; return 0; }
+    const dry = t.isles.some((i) => Math.hypot(p.x - i.x, p.z - i.z) <= W.r);
+    return t.t >= W.warn && level && !dry ? W.dps * dt : 0;
+  }
+  if (!fighting || f.phase < W.phase || (f.tideCd -= dt) > 0) return 0;
+  const b = f.bounds, m = W.r + 0.5, clamp = (x: number, lo: number, hi: number) => Math.min(Math.max(x, lo + m), hi - m);
+  const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 2, isles = [{ x: clamp(p.x + Math.sin(a) * d, b.x0, b.x1), z: clamp(p.z + Math.cos(a) * d, b.z0, b.z1) }];
+  for (let tries = 0; isles.length < W.n && tries < 50; tries++) { // the rest scattered over the floor, apart
+    const x = b.x0 + m + Math.random() * (b.x1 - b.x0 - 2 * m), z = b.z0 + m + Math.random() * (b.z1 - b.z0 - 2 * m);
+    if (isles.every((i) => Math.hypot(i.x - x, i.z - z) > W.r * 3)) isles.push({ x, z });
+  }
+  f.tide = { t: 0, isles };
+  return 0;
 }
 
 /** The wards not yet called, two by two: pulled onto the player. */
@@ -517,6 +602,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
   f.cd = Math.max(0, f.cd - dt * haste);
   f.melee = Math.max(0, f.melee - dt * haste);
   if (K.nova && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.nova -= dt * haste;
+  if (K.pour && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.pourCd -= dt * haste;
   if (K.spin && f.phase >= K.spin.phase && f.state !== 'spin') f.spinCd -= dt * haste;
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
   const toPlayer = Math.atan2(f.x - p.x, f.z - p.z);
@@ -534,6 +620,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       f.move = 0;
       if (K.spin && f.phase >= K.spin.phase && f.spinCd <= 0 && dist < K.spin.length + 4 && level) { enter(f, 'spin'); f.spinA = Math.atan2(p.x - f.x, p.z - f.z) + Math.PI / 4; return 0; }
       if (K.nova && f.nova <= 0 && dist < K.nova.radius && level) { enter(f, 'nova'); return 0; }
+      if (K.pour && f.pourCd <= 0 && dist < K.pour.length && level) { enter(f, 'pour'); f.pourA = Math.atan2(p.x - f.x, p.z - f.z); f.yaw = toPlayer; return 0; }
       if (K.melee && dist <= reach && level) {
         if (f.melee === 0) { enter(f, 'swing'); f.melee = K.melee.cooldown; }
         else face(f, toPlayer, dt);
@@ -578,6 +665,13 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       enter(f, 'chase');
       return dist <= n.radius && level && world.sees(f, p) ? n.damage : 0; // a wall shelters from it
     }
+    case 'pour': { // the Calice: rooted, aimed where the hero stood
+      const C = K.pour!;
+      if (f.t < C.cast) return 0;
+      f.pourCd = C.every;
+      enter(f, 'chase');
+      return level && inPour(f, p) ? C.damage : 0;
+    }
     case 'spin': { // the fuso: two crossed lines turning round her; she stands and spins
       const S = K.spin!;
       f.spinA += S.speed * dt * haste;
@@ -599,6 +693,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       f.brand = K.phases?.marks?.every ?? 0;
       f.marks.length = 0;
       f.spinCd = 0;
+      Object.assign(f, calm(K));
       for (const w of f.wards ?? []) if (w.state !== 'dead' && w.state !== 'pray') { w.hp = w.kind.hp; enter(w, 'evade'); } // her girls go back to their places
       return 0;
     case 'dead': // until it rises again (`rise`, level 2's drowned), or for good
@@ -645,6 +740,7 @@ export function rise(f: Priest, p: Target, world: World, rnd: () => number = Mat
   Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: f.kind.hp, cd: 0, melee: 0, blind: 0, backoff: f.kind.backoff,
     nova: f.kind.nova?.every ?? 0, cc: control(f.kind.resist), los: { ok: false, t: 0 }, again: true, riseAt: undefined });
   f.marks.length = f.lines.length = 0;
+  Object.assign(f, calm(f.kind));
   enter(f, 'pray');
   return true;
 }

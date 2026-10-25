@@ -4,8 +4,8 @@
 // and the tracker's objective following each step. Fra' Bortolo in the serra: reachable in peace, blesses once.
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
-import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
-import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
+import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
+import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
 import { DITALE, EXVOTO, ISEPPO, LETTER_DROP, SIDE, SIDE_BY, type SideId } from '../src/quest/squero.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
@@ -27,11 +27,11 @@ const facing = feet(NPC.x - 1.2, NPC.z + 0.6);
 if (level.world.blocked(facing.x, facing.z, facing.y)) fail("no room to stand by Fra' Zuane");
 
 // Every stage has his lines and an objective; the first offers the quest.
-for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'report', 'offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'done'] as Stage[]) {
+for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'report', 'offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'offer3', 'route3', 'biblioteca', 'cenacolo', 'boss3', 'return3', 'done'] as Stage[]) {
   if (!TALK[s]?.pages.length || !OBJECTIVE[s]) fail(`stage ${s} has no lines or no objective`);
   for (const p of TALK[s].pages) if (p.length > 260) fail(`a page of ${s} is ${p.length} characters, too long for the window on a phone`);
 }
-if (!TALK.talk.offer || !TALK.report.offer || !TALK.offer.offer || Object.entries(TALK).some(([s, t]) => !['talk', 'report', 'offer'].includes(s) && t.offer)) fail('only the first conversation, the report and the re-offer offer a quest');
+if (!TALK.talk.offer || !TALK.report.offer || !TALK.offer.offer || !TALK.offer3.offer || Object.entries(TALK).some(([s, t]) => !['talk', 'report', 'offer', 'offer3'].includes(s) && t.offer)) fail('only the first conversation, the report, the re-offer and the third offer offer a quest');
 
 // Start: talk to him; the chest is sealed, and Fra' Bortolo cannot be found for a quest not yet given.
 want('talk');
@@ -92,10 +92,41 @@ quest.win2();
 if (!quest.gate('portone-zitelle').open) fail("the Governatrice's death did not open the Zitelle's portone");
 want('return');
 if (!quest.report2() || quest.report2() || quest.bonusXp !== xp0 + questXp('reverendissimo') + questXp('zitelle')) fail('the second report does not pay its reward exactly once');
+want('offer3');
+
+// Level 3: the third offer drops the chain past the Tre Oci; the gondola is boarded at the Punta, sets the hero on San
+// Giorgio, the Bibliotecario's key opens the Cenacolo, the Abate's death its garden door, and the report pays once.
+const chain3 = quest.gate('catene-punta');
+if (chain3.open || quest.ferry(feet(BERTHS.punta.x, BERTHS.punta.z))) fail('the chain past the Tre Oci or the gondola open before the third quest');
+quest.accept3();
+if (!chain3.open) fail('accepting Le nozze di San Giorgio did not drop the chain');
+want('route3');
+const out = quest.prompt(feet(BERTHS.punta.x, BERTHS.punta.z));
+if (out?.ferry !== 'out' || !out.act) fail("no gondola to San Giorgio at the Punta's berth");
+if (quest.update(feet(-400, 10))) fail('landed on San Giorgio from the Punta');
+if (!quest.update(feet(-437.5, 100))) fail("the gondola's landing on the approdo did not count");
+want('biblioteca');
+if (quest.prompt(feet(BERTHS.sangiorgio.x, BERTHS.sangiorgio.z))?.ferry !== 'back') fail('no gondola back to the Punta before the Abate falls');
+const cen = quest.gate('cenacolo'), cc = quest.centre(cen);
+const shut3 = quest.prompt({ x: cc.x, y: 0, z: cc.z + 1.2 });
+if (!shut3 || shut3.act) fail('the Cenacolo opens without the Bibliotecario\'s key');
+quest.takeKey3();
+want('cenacolo');
+const opening3 = quest.prompt({ x: cc.x, y: 0, z: cc.z + 1.2 });
+if (!opening3?.act) fail("the Bibliotecario's key does not open the Cenacolo");
+opening3?.act?.();
+want('boss3');
+if (quest.gate('cenacolo-orto').open) fail("the Cenacolo's garden door opened before the Abate fell");
+quest.win3();
+if (!quest.gate('cenacolo-orto').open) fail("the Abate's death did not open the garden door");
+want('return3');
+if (quest.prompt(feet(BERTHS.sangiorgio.x, BERTHS.sangiorgio.z))?.ferry !== 'home') fail('the gondola does not row home once the Abate is dead');
+const xp3 = quest.bonusXp;
+if (!quest.report3() || quest.report3() || quest.bonusXp !== xp3 + questXp('sangiorgio')) fail('the third report does not pay its reward exactly once');
 want('done');
-if (quest.done.join() !== 'chiave,bortolo,reverendissimo,zitelle') fail(`quests done ${quest.done}`);
+if (quest.done.join() !== 'chiave,bortolo,reverendissimo,zitelle,sangiorgio') fail(`quests done ${quest.done}`);
 // Every quest is worth most of a level where it lands, and a boss handed in more than one (player/levels.ts need: 20 × level).
-for (const [id, lv] of [['chiave', 5], ['bortolo', 5], ['teste', 7], ['relic', 8], ['reverendissimo', 10], ['zitelle', 14]] as const) {
+for (const [id, lv] of [['chiave', 5], ['bortolo', 5], ['teste', 7], ['relic', 8], ['reverendissimo', 10], ['zitelle', 14], ['sangiorgio', 17]] as const) {
   if (QUESTS[id].xp < 0.6 * 20 * lv || QUESTS[id].gold <= 0) fail(`${id} pays ${QUESTS[id].xp} XP, under most of level ${lv}`);
 }
 if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once it is over");
@@ -105,7 +136,7 @@ const bortolo = feet(SPEZIALE.x, SPEZIALE.z - 1.2);
 if (level.world.blocked(bortolo.x, bortolo.z, bortolo.y)) fail("no room to stand by Fra' Bortolo");
 if (quest.prompt(bortolo)?.talk !== 'speziale') fail("no 'talk' prompt next to Fra' Bortolo");
 for (const [x, z] of [...GROUPS, ...MORE].flat()) if (Math.hypot(x - bortolo.x, z - bortolo.z) < FRIAR.aggro + 1) fail(`a friar at (${x}, ${z}) hoes within reach of Fra' Bortolo`);
-for (const t of [SPEZIALE_HEADS, SPEZIALE_RITE, spezialeWait(11, 12), SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
+for (const t of [SPEZIALE_HEADS, SPEZIALE_RITE, spezialeWait(11, 12), SPEZIALE_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN]) for (const p of t.pages) if (p.length > 260) fail(`a page of Fra' Bortolo is ${p.length} characters, too long for the window on a phone`);
 if (quest.castMul !== 1 || quest.dmgMul !== 1) fail('blessed before talking to Fra\' Bortolo');
 if (!quest.bless() || quest.castMul !== BLESSING.cast || quest.dmgMul !== BLESSING.dmg) fail('the blessing does not quicken casts and harden blows');
 if (quest.bless()) fail('the blessing was given twice');
@@ -245,7 +276,7 @@ if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.h
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
   + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; `
-  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
+  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);
   process.exit(1);

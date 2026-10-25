@@ -3,7 +3,7 @@
 // (gear one per slot), refuses what does not fit and round-trips. Gear: the stat math, wearing from
 // the bag (swapping), taking off, selling at a quarter, buying epics, crits, and the save of what is worn; and that every
 // piece shows on the hero (player/outfit.ts), its files there.
-import { Bag, ITEM, ITEMS, RARITY, RELIC, RELIC_PRIZE, TABLES, roll, type Tier } from '../src/loot/bag.ts';
+import { BOSS3_PRIZE, Bag, ITEM, ITEMS, RARITY, RELIC, RELIC_PRIZE, TABLES, levelOfItem, roll, type Tier } from '../src/loot/bag.ts';
 import { ARMOR_K, CRIT_BASE, Equipment, GEAR, SHOP, STARTER, shop, buy, buyPrice, crit, effects, sell, sellPrice, totals, worth } from '../src/loot/gear.ts';
 import { existsSync } from 'node:fs';
 import { DIR, LOOKS, PIECES, WEAPONS, lookOf } from '../src/player/outfit.ts';
@@ -51,7 +51,7 @@ if (back.gold !== 1234 || JSON.stringify(back.encode()) !== JSON.stringify(bag.e
 back.decode({ gold: -5, items: [['from_the_future', 3], ['mozzicone', 2]] });
 if (back.gold !== 0 || back.items.length !== 1 || back.count('mozzicone') !== 2) fail('unknown ids or negative gold kept');
 // --- gear ---
-if (GEAR.some((g) => !g.slot || !g.stats || !Object.keys(g.stats).length) || shop(false).length !== 9 || shop(true).length !== 18 || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
+if (GEAR.some((g) => !g.slot || !g.stats || !Object.keys(g.stats).length) || shop(false).length !== 9 || shop(true).length !== 15 || shop(true).some((g) => g.l2) || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
 if (Object.keys(STARTER).length !== 7 || STARTER.amuleto || STARTER.anello) fail('starter set');
 const t = totals(['canapa-torso', 'saio-voto', 'nope', undefined]), hemp = ITEM.get('canapa-torso')!.stats!, torso = ITEM.get('saio-voto')!.stats!;
 if (t.vigore !== hemp.vigore! + torso.vigore! || t.armatura !== hemp.armatura! + torso.armatura! || t.potenza !== torso.potenza) fail(`totals ${JSON.stringify(t)}`);
@@ -62,7 +62,14 @@ if (buyPrice(ITEM.get('saio-voto')!) !== 480 || sellPrice(ITEM.get('saio-voto')!
 const ep = (ids: string[]) => ids.reduce((s, id) => s + worth(ITEM.get(id)!), 0);
 if (!(ep(Object.values(STARTER) as string[]) < ep(shop(false).map((g) => g.id)))) fail('epics not better than the starter set');
 if (!(ep(shop(false).map((g) => g.id)) < ep(SHOP.filter((g) => g.l2).map((g) => g.id)))) fail("level 2's epics not better than level 1's");
-for (const lv of [1, 2] as const) for (let i = 0; i < 300; i++) for (const id of roll('elite', Math.random, lv).items) if (!!ITEM.get(id)!.l2 !== (lv === 2) && ITEM.get(id)!.slot) fail(`level ${lv} dropped ${id}`);
+// Level 3's epics (six slots) each beat level 2's in the same slot; the Abate's ring is legendary, his alone.
+for (const g of SHOP.filter((x) => x.l3)) { const two = SHOP.find((x) => x.l2 && x.slot === g.slot)!; if (!(worth(g) > worth(two)) || g.ilvl! <= two.ilvl!) fail(`${g.id} not better than ${two.id}`); }
+if (ITEM.get(BOSS3_PRIZE)?.rarity !== 'leggendario' || !ITEM.get(BOSS3_PRIZE)!.l3 || !roll('boss', Math.random, 3).items.includes(BOSS3_PRIZE)) fail("the Abate's ring");
+for (const lv of [1, 2, 3] as const) for (let i = 0; i < 300; i++) for (const id of roll(lv === 3 && i % 2 ? 'boss' : 'elite', Math.random, lv).items) {
+  const it = ITEM.get(id)!;
+  if (levelOfItem(it) !== lv && it.slot) fail(`level ${lv} dropped ${id}`);
+  if (id === BOSS3_PRIZE && (lv !== 3 || i % 2 === 0)) fail('the Abate\'s ring rolled off a table');
+}
 
 const gear = new Equipment(), bag2 = new Bag();
 let changed = 0;

@@ -217,7 +217,7 @@ function bake(root: THREE.Object3D): Shape[] {
       if (i < 4) pts.push([v.x, v.z]);
     }
     if (bottom > OVERHEAD) return;
-    if (pts.every(([x, z]) => Math.abs(x) > 300 || Math.abs(z) > 300)) return; // the sea plane: that's the background
+    if (Math.hypot(pts[0][0] - pts[2][0], pts[0][1] - pts[2][1]) > 800) return; // the sea plane: that's the background (San Giorgio lies 600 m east)
     const wall = top - bottom > WALL;
     shapes.push({ pts, top, wall, color: wall ? lighten(color) : color });
   });

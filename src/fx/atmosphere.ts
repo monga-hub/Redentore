@@ -68,6 +68,7 @@ const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, h
 const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight
 const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
+const BACINO = { x0: -452, x1: -385, z0: 0, z1: 100, clear: 0.82 }; // the Punta's pier and the gondola's crossing: a clear night over the water, San Giorgio's front and campanile in sight
 /**
  * Rungs, best first: 0 everything; 1 fewer pixels (the pixel ratio x0.7, at least 1); 2 half the moon's
  * shadow map; 3 (`post`) no post chain (bloom, grade), straight to the canvas; 4 (`lite`) ultra-light: no
@@ -248,7 +249,7 @@ export class Atmosphere {
   private readonly moon = new THREE.DirectionalLight(0xa9c2f0, MOON);
   private readonly moonOffset = MOON_DIR.clone().multiplyScalar(150);
   private readonly sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), skyMaterial());
-  private readonly mist = new THREE.Mesh(new THREE.PlaneGeometry(700, 800).rotateX(-Math.PI / 2), mistMaterial());
+  private readonly mist = new THREE.Mesh(new THREE.PlaneGeometry(1100, 800).rotateX(-Math.PI / 2), mistMaterial());
   readonly torches: Torches;
   private readonly dust: THREE.Points;
   private readonly dustMat: THREE.PointsMaterial;
@@ -284,7 +285,7 @@ export class Atmosphere {
     scene.fog = this.fog;
     this.sky.renderOrder = -1;
     this.sky.frustumCulled = false;
-    this.mist.position.set(0, -0.75, -80); // over the water plane (y -1.2), under the quays (y 0)
+    this.mist.position.set(-200, -0.75, -80); // over the water plane (y -1.2), under the quays (y 0), out to San Giorgio
     this.mist.renderOrder = 1;
     scene.add(this.sky, this.mist, this.hemi, this.moon, this.moon.target, this.torches.root);
 
@@ -382,7 +383,8 @@ export class Atmosphere {
     const open = mood === DIABLO_MOOD ? 1 - Math.min(k / 0.45, 1) : 0;
     this.hemi.intensity = lerp(mood.hemi, k) + DIABLO_OPEN.hemi * open;
     this.moon.intensity = (MOON + DIABLO_OPEN.moon * open) * (this.lite ? 1 - k : 1); // without shadows no roof stops it: indoors it goes
-    this.fog.density = lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k);
+    const B = BACINO, ss = THREE.MathUtils.smoothstep, bacino = ss(focus.z, B.z0, B.z0 + 8) * (1 - ss(focus.z, B.z1 - 8, B.z1)) * ss(focus.x, B.x0, B.x0 + 6) * (1 - ss(focus.x, B.x1 - 15, B.x1));
+    this.fog.density = (lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k)) * (1 - B.clear * bacino * (1 - k));
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
     this.renderer.toneMappingExposure = (lerp(mood.exposure, k) + DIABLO_OPEN.exposure * open) * (this.low ? BARE.exposure : 1);
     u.uCool.value = lerp(mood.cool, k);

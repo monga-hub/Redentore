@@ -19,7 +19,9 @@ export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | '
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
 /** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it (the friars' heads aren't even bagged: loot/drops.ts collect). */
-export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; quest?: true }
+export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true }
+/** The level an item drops in (`l2`, `l3`). */
+export const levelOfItem = (x: Item): 1 | 2 | 3 => (x.l3 ? 3 : x.l2 ? 2 : 1);
 /** Quest items' colour, on the ground and in the tracker. */
 export const QUEST_COLOR = '#ffd84a';
 
@@ -54,6 +56,11 @@ export const ITEMS: readonly Item[] = [
   { id: 'ditale-marieta', name: 'Ditale di Marieta', rarity: 'raro', icon: 'medal', lore: 'Argento consumato fino al buco. Mastro Iseppo lo regalò a sua figlia.', quest: true, l2: true },
   { id: 'ex-voto', name: 'Gondolina di pero', rarity: 'raro', icon: 'relic', lore: 'L’ex voto dello squero, 1577: una gondola lunga un palmo, il ferro d’argento a prua. Per Mastro Iseppo.', quest: true, l2: true },
   { id: 'lettera-marieta', name: 'Lettera di Marieta', rarity: 'epico', icon: 'relic', lore: 'Ceralacca delle Zitelle, e sopra: «Al proto Iseppo, squero de la Zuecca». Mai spedita.', quest: true, l2: true },
+  // Level 3.
+  { id: 'gettone-traghetto', name: 'Gettone del traghetto', rarity: 'comune', icon: 'medal', lore: 'Un soldo forato per passare l’acqua. Nessuno l’ha mai speso.', l3: true },
+  { id: 'calamaio', name: 'Calamaio dello scriptorium', rarity: 'noncomune', icon: 'vial', lore: 'Inchiostro di seppia e di qualcos’altro. Non si secca.', l3: true },
+  { id: 'registro', name: 'Pagina del registro dei morti', rarity: 'raro', icon: 'relic', lore: 'Nomi della Giudecca in tre grafie diverse. L’ultimo è a metà.', l3: true },
+  { id: 'calice-cana', name: 'Calice di Cana', rarity: 'epico', icon: 'vial', lore: 'Ci si versava il vino delle nozze. Ora sa di sale.', l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));
@@ -74,28 +81,29 @@ export const TABLES: Record<Tier, Table> = {
 };
 export const BOSS_PRIZE = 'chiodo'; // the Reverendissimo's fall always yields the nail
 export const BOSS2_PRIZE = 'filo-oro'; // the Governatrice's, the golden thread
+export const BOSS3_PRIZE = 'anello-sensa'; // the Abate's, the ring of the Sensa (gear: loot/gear.ts)
 export const RELIC = 'corona-zuane'; // Fra' Zuane's lost rosary
 export const RELIC_PRIZE = 'medaglia-portinaio'; // what he gives for it (loot/gear.ts)
 /** Level 2's dead are richer: gold × this. */
-const GOLD2 = 1.6;
+const GOLD2 = 1.6, GOLD3 = 2.2;
 
 export interface Drop { gold: number[]; items: string[] }
 
-/** What one death drops: the gold piles and the item ids. `rnd` in [0, 1). `level` 2: level 2's gear and junk, more gold. */
-export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 = 1): Drop {
-  const t = TABLES[tier], [lo, hi] = t.gold, k = level === 2 ? GOLD2 : 1, mine = (x: Item) => !!x.l2 === (level === 2);
+/** What one death drops: the gold piles and the item ids. `rnd` in [0, 1). `level` 2, 3: that level's gear and junk, more gold. */
+export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 | 3 = 1): Drop {
+  const t = TABLES[tier], [lo, hi] = t.gold, k = level === 3 ? GOLD3 : level === 2 ? GOLD2 : 1, mine = (x: Item) => levelOfItem(x) === level;
   const gold = Array.from({ length: t.piles }, () => Math.round((lo + Math.floor(rnd() * (hi - lo + 1))) * k));
-  const prize = level === 2 ? BOSS2_PRIZE : BOSS_PRIZE;
+  const prize = level === 3 ? BOSS3_PRIZE : level === 2 ? BOSS2_PRIZE : BOSS_PRIZE;
   const items: string[] = tier === 'boss' ? [prize] : [];
   for (let i = 0; i < t.items; i++) {
     if (rnd() >= t.chance) continue;
-    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && (mine(x) || (level === 2 && !x.l2 && r === 'comune')));
+    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && (mine(x) || (level > 1 && levelOfItem(x) === 1 && r === 'comune')));
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   const g = t.gear;
   for (let i = 0; i < g.rolls; i++) {
     if (rnd() >= g.chance[Math.min(i, 1)]) continue;
-    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x));
+    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x) && x.id !== BOSS3_PRIZE);
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   return { gold, items };

@@ -459,9 +459,9 @@ src/
   enemies/bees.ts            ape gigante e operaie: un calabrone Meshy statico animato in codice (volo
                              librato, ali che battono nel vertex shader, picchiata col pungiglione,
                              sciame velenoso, sussulto ai colpi, caduta da morta); IA: caster.ts `APE`
-  enemies/priests.ts         un corpo Meshy per tipo: prete in tonaca nera e cremisi (bastone col
-                             cristallo), sacerdote corazzato viola e oro (mazza alata),
-                             Reverendissimo arcivescovo-lich gigante (pastorale); animazioni
+  enemies/priests.ts         un corpo Meshy per tipo: prete in tonaca nera con stola viola (bastone col
+                             cristallo), sacerdote templare in piastre nere e oro (mazza da guerra),
+                             Reverendissimo arcivescovo-lich gigante con l'aureola (pastorale); animazioni
                              (reazioni, colpi alternati, morti varie), dardi d'ombra con scia,
                              nova del boss e dei sacerdoti telegrafata a terra, marchi del boss
   audio/engine.ts            motore audio: bus, impostazioni, sblocco, sprite MP3, voci 3D, ducking

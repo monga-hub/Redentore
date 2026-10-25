@@ -64,52 +64,52 @@ const FLINCH = { light: { clip: 'Hit_Light', from: 0.1, stop: 0.75 }, heavy: { c
 const WALK = 1.55, RUN = 5.5;
 const LOOKS = new Map<CasterKind, Look>([
   [PRIEST, {
-    body: 'prete.glb', prop: 'bastone.glb', height: 1.85, staff: 1.2, grip: 0.4,
+    body: 'prete.glb', prop: 'bastone.glb', height: 1.95, staff: 1.5, grip: 0.4,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: DEATHS, // no melee: never used
     bolt: { core: 0xf0dcff, glow: SHADOW, size: 1 },
   }],
   [SACERDOTE, {
-    body: 'sacerdote.glb', prop: 'mazza.glb', height: 2.5, staff: 1.7, grip: 0.4,
+    body: 'sacerdote.glb', prop: 'mazza.glb', height: 2.8, staff: 2.1, grip: 0.3,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: SWINGS, deaths: DEATHS, // never backpedals
     bolt: { core: 0xfff0c8, glow: 0xb050ff, size: 1.2 },
   }],
   [REVERENDISSIMO, {
-    body: 'reverendissimo.glb', prop: 'pastorale.glb', height: 4.6, staff: 4.2, grip: 0.45,
+    body: 'reverendissimo.glb', prop: 'pastorale.glb', height: 5.6, staff: 5, grip: 0.45,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, THROW], swings: SWINGS, deaths: ['dying_backwards'],
     bolt: { core: 0xffd8ff, glow: 0x9a20ff, size: 1.7 },
   }],
   // Level 2 (enemies/zitelle.ts): the same clip names, packed from each body's Meshy animations.
-  ...([[GONDOLIERE, 1.85], [GASTALDO, 2.5]] as const).map(([kind, height]): [CasterKind, Look] => [kind, {
-    body: 'gondoliere.glb', prop: 'remo.glb', height, staff: height * 1.35, grip: 0.55,
-    clips: { pray: 'Pray', chase: 'Idle', cast: 'Idle', swing: 'Attack', nova: 'Attack_Hammer', spin: 'Idle', evade: 'Running', dead: 'dying_backwards' },
+  ...([[GONDOLIERE, 'gondoliere.glb', 'remo.glb', 1.95, 2.6, 0.6], [GASTALDO, 'gastaldo.glb', 'ferro.glb', 2.9, 3.3, 0.35]] as const).map(([kind, body, prop, height, staff, grip]): [CasterKind, Look] => [kind, {
+    body, prop, height, staff, grip,
+    clips: { pray: 'Pray', chase: 'Idle', cast: 'Idle', swing: 'Attack', nova: kind === GASTALDO ? 'Charged_Ground_Slam' : 'Attack_Hammer', spin: 'Idle', evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xffffff, glow: 0x60d0c0, size: 1 }, // never casts
   }]),
   [CODEGA, {
-    body: 'codega.glb', prop: 'lanterna.glb', height: 1.8, staff: 2, grip: 0.4,
+    body: 'codega.glb', prop: 'lanterna.glb', height: 2, staff: 2, grip: 0.15,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xf4ffc8, glow: 0x8aff3a, size: 1 }, // a will-o'-wisp out of the lantern
   }],
   ...([ZITELLA, VELO] as const).map((kind): [CasterKind, Look] => [kind, {
-    body: 'zitella.glb', prop: 'rocca.glb', height: 1.65, staff: 1.25, grip: 0.35,
+    body: 'zitella.glb', prop: 'rocca.glb', height: 1.7, staff: 1.3, grip: 0.35,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: RELEASE.clip, nova: CAST, spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [{ clip: RELEASE.clip, from: 0.6, hit: 0.9 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xffffff, glow: 0x9fd8ff, size: 0.9 }, // a skein of thread
-    ghost: [0.32, 0.55, 0.75],
+    ghost: kind === VELO ? [0.62, 0.44, 0.16] : [0.32, 0.55, 0.75], // the veil's girls glow her amber
   }]),
   [MAESTRA, {
-    body: 'maestra.glb', prop: 'forbici.glb', height: 2.3, staff: 1.4, grip: 0.82,
+    body: 'maestra.glb', prop: 'forbici.glb', height: 2.7, staff: 1.6, grip: 0.82,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: CAST, evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xfff0fa, glow: 0xd890ff, size: 1.2 },
     ghost: [0.22, 0.16, 0.3],
   }],
   [GOVERNATRICE, {
-    body: 'governatrice.glb', prop: 'scettro.glb', height: 4.3, staff: 3.4, grip: 0.42,
+    body: 'governatrice.glb', prop: 'scettro.glb', height: 5.4, staff: 4.2, grip: 0.42,
     clips: { pray: 'Pray', chase: 'Idle', cast: CAST, swing: 'Attack', nova: 'Charged_Ground_Slam', spin: 'Spin', evade: 'Running', dead: 'dying_backwards' },
     step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [RELEASE, { clip: 'Cast_Throw', from: 0.5, rate: 1.2 }], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards'],
     bolt: { core: 0xfff4d0, glow: 0xffb030, size: 1.6 },

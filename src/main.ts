@@ -139,7 +139,7 @@ const zitelle = new Priests(level.world, kit.vfx, playerStats, level.areas, l2, 
 zitelle.rising = (f) => !quest.boss2Dead && (f.kind === GONDOLIERE || f.kind === CODEGA); // the drowned and the codeghe rise again for Mastro Iseppo's quests, until the Governatrice falls
 scene.add(zitelle.root);
 /** Level 2's kinds: name, kind, height. */
-const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85, 11], ['Codega', CODEGA, 1.8, 11], ['Zitella', ZITELLA, 1.65, 12], ['Zitella del velo', VELO, 1.65, 12], ['Il Gastaldo dei gondolieri', GASTALDO, 2.5, 13, 'elite'], ['La Maestra del merletto', MAESTRA, 2.3, 14, 'elite'], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
+const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85, 11], ['Codega', CODEGA, 1.8, 11], ['Zitella', ZITELLA, 1.65, 12], ['Zitella del velo', VELO, 1.65, 12], ['Il Gastaldo dei gondolieri', GASTALDO, 2.7, 13, 'elite'], ['La Maestra del merletto', MAESTRA, 2.5, 14, 'elite'], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
 const l3 = spawnLevel3(level.world); // level 3: the Punta, the gondola, San Giorgio Maggiore, the Abate
 const sangiorgio = new Priests(level.world, kit.vfx, playerStats, level.areas, l3, true); // its bodies load with the third quest (stream)
 scene.add(sangiorgio.root);
@@ -153,7 +153,7 @@ scene.add(ferry.root);
 const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra']]);
 const ofKind = (k: typeof L2_KINDS[number][1]) => zitelle.all.filter((f) => f.kind === k);
 const kinds: Kind[] = [ // the levels are only shown, on the nameplates
-  { name: 'Frate non-morto', max: FRIAR.hp, height: 1.75, all: friars.all, ready: () => friars.root.children.length > 0, lv: 3 },
+  { name: 'Frate non-morto', max: FRIAR.hp, height: 1.95, all: friars.all, ready: () => friars.root.children.length > 0, lv: 3 },
   { name: 'Prete non-morto', max: PRIEST.hp, height: 1.85, all: priests.all.filter((f) => f.kind === PRIEST), ready: () => priests.root.children.length > 0, lv: 4 },
   { name: 'Sacerdote non-morto', max: SACERDOTE.hp, height: 2.5, all: priests.all.filter((f) => f.kind === SACERDOTE), ready: () => priests.root.children.length > 0, lv: 7, rank: 'elite' },
   { name: 'Il Reverendissimo', max: REVERENDISSIMO.hp, height: 4.6, all: [priests.boss], ready: () => priests.root.children.length > 0, ownBar: () => questView.bossShown },
@@ -291,7 +291,7 @@ const menu = new Menu({
   levelTwo: () => { saveBar(BAR); if (setPending(levelTwo)) location.reload(); },
 });
 const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so its dead don't fall again)
-  { all: friars.all, height: 1.75 },
+  { all: friars.all, height: 1.95 },
   { all: priests.all.filter((f) => f.kind === PRIEST), height: 1.85 },
   { all: priests.all.filter((f) => f.kind === SACERDOTE), height: 2.5 },
   { all: [priests.boss], height: 4.6 },

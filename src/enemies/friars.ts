@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import type { World } from '../core/physics.ts';
 import { D, T, type DecalStyle, type RibbonStyle, type Style, type Vfx } from '../abilities/vfx.ts';
@@ -10,15 +9,16 @@ import { FRIAR, hurt, rise, separate, spawnGroups, think, type Friar, type State
 import { killAll, wipe } from './caster.ts';
 import { still, type Control } from './control.ts';
 
-// Frati non-morti: a gaunt Forsaken monk in a torn brown habit, generated, rigged and animated
-// with Meshy AI (see ATTRIBUTION.md), a hoe in the right fist; it works the soil
-// while idle. A skinned clone per friar sharing geometry; the AI lives in brain.ts.
+// Frati non-morti: hulking Capuchin gravediggers in rust-brown habits, a wicker gerla of earth and
+// roots on the back, generated, rigged and animated with Meshy AI (see ATTRIBUTION.md), a Meshy
+// spade in the right fist; they work the soil while idle. A skinned clone per friar sharing
+// geometry; the AI lives in brain.ts.
 
-const HEIGHT = 1.75; // m
-const HOE = { length: 1.5, grip: 0.35 }; // m long, held this far up the handle
+const HEIGHT = 1.95; // m
+const HOE = { length: 1.7, grip: 0.35 }; // m long, held this far up the handle
 // Swings, picked in turn: each entered past its stance (`from`, s into the clip) and sped up so
 // its blow (`hit`) lands at FRIAR.windup: the overhead chop, a hammering two-handed blow, a slash.
-const SWINGS = [{ clip: 'Attack', from: 0.2, hit: 1.1 }, { clip: 'Attack_Hammer', from: 0.6, hit: 1.5 }, { clip: 'Attack_Slash', from: 0.3, hit: 0.52 }];
+const SWINGS = [{ clip: 'Attack', from: 0.2, hit: 1.1 }, { clip: 'Attack_Hammer', from: 0.6, hit: 1.5 }, { clip: 'Attack_Back', from: 0.3, hit: 0.75 }];
 const DEATHS = ['Dead', 'Dead_Knock', 'Dead_Shot'];
 // Layered on the upper body: a flinch per hit (a heavier one for big blows), a war cry on aggro (s into the clip).
 const FLINCH = { light: { clip: 'Hit_Light', from: 0.1, stop: 0.75 }, heavy: { clip: 'Hit_Heavy', from: 0.4, stop: 1.3 }, cry: { clip: 'Scream', from: 0.55, stop: 1.8 } };
@@ -181,32 +181,10 @@ export function flash(mats: THREE.MeshStandardMaterial[], k: number, cc?: Contro
   for (const m of mats) { const e = m.userData.glow as number, h = m.userData.ghost as number[] | undefined; m.emissive.setRGB((h?.[0] ?? e) + r, (h?.[1] ?? e) + g, (h?.[2] ?? e) + b); } // a ghost keeps its cold glow
 }
 
-/** Stand the friar up and give it its hoe; every friar is a clone of this. */
-function dress(scene: THREE.Group): void {
+/** Stand the friar up and give it its spade (packed blade up); every friar is a clone of this. */
+function dress(scene: THREE.Group, spade: THREE.Group): void {
   stand(scene, HEIGHT);
-  arm(scene, hoe(), HOE.length, HOE.grip).name = 'hoeBlade';
-}
-
-/**
- * The hoe, upright, 1 unit long: an ash handle, an iron blade at the top set at a right angle.
- * One mesh coloured per vertex (one draw call per friar, not three).
- * ponytail: built here, as three Meshy attempts never gave a blade across the handle.
- */
-function hoe(): THREE.Group {
-  const part = (geo: THREE.BufferGeometry, color: number, m: THREE.Matrix4) => {
-    const g = geo.applyMatrix4(m).toNonIndexed(), c = new THREE.Color(color), n = g.attributes.position.count;
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).map((_, i) => c.toArray()[i % 3]), 3));
-    return g;
-  };
-  const at = (x: number, y: number, z: number, rx = 0) => new THREE.Matrix4().makeRotationX(rx).setPosition(x, y, z);
-  const geo = mergeGeometries([
-    part(new THREE.CylinderGeometry(0.018, 0.022, 1, 6), 0x7a5534, at(0, 0.5, 0)), // ash handle
-    part(new THREE.BoxGeometry(0.16, 0.012, 0.15), 0x5e5a55, at(0, 0.97, 0.07, 0.35)), // blade, out from the handle, angled down like a hoe's
-    part(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6), 0x5e5a55, at(0, 0.97, 0)), // iron collar
-  ]);
-  const g = new THREE.Group();
-  g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.15 }))); // no environment map: a real metal would render black
-  return g;
+  arm(scene, spade, HOE.length, HOE.grip).name = 'hoeBlade';
 }
 
 /** Every friar in the orto: brains, models, combat glue. */
@@ -223,8 +201,8 @@ export class Friars {
     this.vfx = vfx;
     this.stats = stats;
     this.all = spawnGroups(world).flat();
-    loadModel('frate.glb').then((gltf) => {
-      dress(gltf.scene);
+    Promise.all([loadModel('frate.glb'), loadModel('zappa.glb')]).then(([gltf, spade]) => {
+      dress(gltf.scene, spade.scene);
       const t = { scene: gltf.scene, clips: gltf.animations };
       this.views = this.all.map(() => new View(t));
       for (const v of this.views) this.root.add(v.root);

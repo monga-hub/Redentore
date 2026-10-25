@@ -139,7 +139,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | sinistro + destro | avanti |
 | rotella | zoom |
 | Q / E | ruota la camera |
-| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
+| 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca, Tizzone per Fra' Tizian), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4), Fra' Tizian con Rogo dell'eretico (2), Cero funebre (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
 | R | la fiala di linfa tombale (la pozione), su un tasto suo fuori dagli otto |
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
@@ -162,21 +162,23 @@ anche `window.playerStats`: `takeDamage`, `heal`, `spendMana`).
 
 Una partita nuova si apre sulla scelta dell'eroe (`src/ui/select.ts`, `src/player/heroes.ts`), dorata come le altre finestre:
 il Risorto (Ossa, secondaria Ombra), il morto senza nome della Giudecca, e Bortolo (Gelo, secondaria Fulmine), il gondoliere
-annegato l'inverno in cui gelò la laguna, col remo gelato, e Suor Fosca (Peste, secondaria Sacro), la monaca del Lazzaretto
-Vecchio che curò gli appestati fino a diventarne il contagio, con lo stiletto d'osso. Ogni carta ha il concept dipinto, nome, titolo, le icone delle due
+annegato l'inverno in cui gelò la laguna, col remo gelato, Suor Fosca (Peste, secondaria Sacro), la monaca del Lazzaretto
+Vecchio che curò gli appestati fino a diventarne il contagio, con lo stiletto d'osso, e Fra' Tizian (Fuoco, secondaria Sacro),
+il frate soffiatore delle fornaci di Murano bruciato vivo al forno, con la canna da vetraio e la sua goccia di vetro fuso. Ogni carta ha il concept dipinto, nome, titolo, le icone delle due
 scuole e una riga di chi era; ←/→ e Invio anche da tastiera. La scuola va col personaggio: il Risorto parte con le Ossa,
 Bortolo col Gelo (Stiletto di ghiaccio sul tasto grande, Dardo di brina e Caligo gelato), Suor Fosca con la Peste (Spina di peste
-sul tasto grande, Nube di peste e Sputo di bile); i tomi poi sono gli stessi per tutti, le carte dei
+sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone sul tasto grande, Rogo dell'eretico e Cero
+funebre); i tomi poi sono gli stessi per tutti, le carte dei
 livelli pendono verso le scuole dell'eroe (vedi Abilità).
 La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e si
-carica solo il corpo dell'eroe scelto. Bortolo e Suor Fosca sono corpi Meshy sullo stesso scheletro del Risorto, con le sue 27
-clip riapplicate osso per osso; dei set portano solo elmi, cappelli e spallacci (misurati su ciascuno: a lui la paglietta, a
-lei il velo si ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua), non le
+carica solo il corpo dell'eroe scelto. Bortolo, Suor Fosca e Fra' Tizian sono corpi Meshy sullo stesso scheletro del Risorto, con
+le sue 27 clip riapplicate osso per osso; dei set portano solo elmi, cappelli e spallacci (misurati su ciascuno: a Bortolo la
+paglietta, a lei il velo, a Fra' Tizian il cappuccio si ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua), non le
 ridipinture del corpo, e le armi le stringono col proprio pugno.
 
 ## Abilità
 
-Si parte con l'attacco base della propria scuola, Preghiera di suffragio (la cura) e la fiala, Bortolo anche con Dardo di brina e Caligo gelato, Suor Fosca con Nube di peste e Sputo di bile.
+Si parte con l'attacco base della propria scuola, Preghiera di suffragio (la cura) e la fiala, Bortolo anche con Dardo di brina e Caligo gelato, Suor Fosca con Nube di peste e Sputo di bile, Fra' Tizian con Rogo dell'eretico e Cero funebre.
 Ogni scuola ha il suo **attacco base** (`BASE_ATTACK`), da tenere premuto: istantaneo, fuori dal recupero globale, uno ogni 0,3 s, gratis,
 e un colpo ogni tre è il terzo della combo. Ossa: Caduta d'ossa (la clava, combo a tre colpi); Gelo: Stiletto di ghiaccio (triplo su chi è
 congelato, rallenta del 25% per 2 s, schegge per un terzo entro 2 m); Peste: Spina di peste; Ombra: Strale d'ombra; Fuoco: Tizzone (braci per un terzo entro 2 m); Fulmine: Folgore; Sacro: Castigo (gli ultimi cinque, strali da 8
@@ -195,7 +197,7 @@ abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del p
 **Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), insegna subito
 tutte le abilità della scuola che non si conoscono ancora, che vanno nel Libro delle abilità pronte da equipaggiare. Costa 200 oro per
 abilità e 350 per una speciale, solo per quelle che insegna davvero (Ossa completo 1300, Ombra 1150, Peste, Fuoco, Gelo e Fulmine 1000,
-Sacro 800: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 600, Dardo di brina e Caligo gelato li ha già; a Suor Fosca la Peste 600; gli attacchi base non stanno nei tomi); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
+Sacro 800: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 600, Dardo di brina e Caligo gelato li ha già; a Suor Fosca la Peste 600; a Fra' Tizian il Fuoco 600; gli attacchi base non stanno nei tomi); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
 non escono più come carte, i loro potenziamenti sì. Nel salvataggio (`build.learned`; i vecchi si caricano senza).
 
 **Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come

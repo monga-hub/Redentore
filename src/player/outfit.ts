@@ -75,14 +75,15 @@ export const PIECES: Partial<Record<`${Look}-${Worn}`, Piece>> = {
   'broccato-spalle': { size: 0.28, at: [0.03, 0.05, 0] },
 };
 
-// --- weapons: Meshy props (the enemies' and two of the hero's own) in his right fist (`FIST`): m long, gripped `grip` of
-// the way up in a fight, the head out of the fist's thumb side leaned `lean` (rad) toward his fingertips
+// --- weapons: props (Meshy's, the enemies' and the heroes' own; Fra' Tizian's pipe built from primitives) in his right fist
+// (`FIST`): m long, gripped `grip` of the way up in a fight, the head out of the fist's thumb side leaned `lean` (rad) toward
+// his fingertips
 /**
  * `staff`: a staff, crozier, sceptre or distaff, held upright as a walking staff while he stands, walks, runs or jumps:
  * the fist this far up the shaft, the elbow bent so the fist holds it straight up. In a blow or a spell the fist slides
  * back down to `grip` and swings it as the clip swings the fist. `flip`: upside down in its file (its head at the bottom).
  */
-interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean; venom?: boolean }
+interface Weapon { file: string; length: number; grip: number; lean: number; staff?: number; flip?: boolean; ice?: boolean; venom?: boolean; ember?: boolean }
 export const WEAPONS: Record<string, Weapon> = {
   'clava-osso': { file: 'clava.glb', length: 0.95, grip: 0.12, lean: 0.35 },
   'campanaro-arma': { file: 'campanaro.glb', length: 0.9, grip: 0.12, lean: 0.35 },
@@ -93,6 +94,7 @@ export const WEAPONS: Record<string, Weapon> = {
   'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true }, // by the handle, the blade the head
   'remo-gelato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true, ice: true }, // Bortolo's, iced over
   'stiletto-osso': { file: 'stiletto.glb', length: 0.5, grip: 0.22, lean: 0.35, venom: true }, // Suor Fosca's, by its corded grip
+  'canna-vetraio': { file: 'canna.glb', length: 1.4, grip: 0.3, lean: 0.2, staff: 0.65, ember: true }, // Fra' Tizian's, by its wooden sleeve
   'fuso-ferrato': { file: 'rocca.glb', length: 1.15, grip: 0.3, lean: 0.2, staff: 0.5 },
   'scettro-governatrice': { file: 'scettro.glb', length: 1.2, grip: 0.3, lean: 0.2, staff: 0.5 },
 };
@@ -142,6 +144,17 @@ const VEILED: Body['pieces'] = {
   'merletto-testa': { size: 0.46, at: [-0.008, -0.093, -0.007] },
   'broccato-testa': { size: 0.3, at: [-0.008, -0.066, -0.027] },
 };
+/** The helms on Fra' Tizian, over his hood folded onto his skull (`skull`): measured on him, as on Bortolo. */
+const HOODED: Body['pieces'] = {
+  'becchino-testa': { size: 0.5, at: [-0.009, -0.171, -0.002] },
+  'chierico-testa': { size: 0.56, at: [-0.009, 0.032, -0.022] },
+  'arsenale-testa': { size: 0.42, at: [-0.009, -0.052, -0.022] },
+  'murano-testa': { size: 0.27, at: [-0.009, -0.009, -0.022] },
+  'voto-testa': { size: 0.36, at: [-0.009, -0.082, -0.067] },
+  'gondola-testa': { size: 0.46, at: [-0.009, -0.116, -0.022] },
+  'merletto-testa': { size: 0.46, at: [-0.009, -0.069, -0.022] },
+  'broccato-testa': { size: 0.3, at: [-0.009, -0.051, -0.042] },
+};
 const DOME = 0.08, NAPE = 0.13; // m his bald crown rises over the band where his hat sat, and the back of his head falls under it
 const BODIES: Record<Hero, Body> = {
   risorto: { hand: { fist: FIST, knuckle: new THREE.Vector3(0, 9, -1), tips: 22, curl: 1.0, thumb: -5.5 }, pieces: PIECES, paint: true },
@@ -156,6 +169,11 @@ const BODIES: Record<Hero, Body> = {
   fosca: {
     hand: { fist: new THREE.Vector3(0, 12, -3.5), knuckle: new THREE.Vector3(0, 13, -1), tips: 21, curl: 1.7, thumb: -4 }, pieces: { ...PIECES, ...VEILED }, paint: false, crown: [0.012, 0.012, 0.016],
     skull: { c: [0, 0.1, -0.005], r: [0.075, 0.1, 0.09], nape: 0.12 }, beaked: ['becchino'],
+  },
+  // his hood folds onto his skull under a helm
+  tizian: {
+    hand: { fist: new THREE.Vector3(0, 12, -2.5), knuckle: new THREE.Vector3(0, 11, -1), tips: 23, curl: 1.9, thumb: -5.5 }, pieces: { ...PIECES, ...HOODED }, paint: false, crown: [0.06, 0.035, 0.02],
+    skull: { c: [0, 0.08, 0.005], r: [0.078, 0.1, 0.085], nape: 0.06 },
   },
 };
 
@@ -666,6 +684,7 @@ function lit(sh: THREE.WebGLProgramParametersWithUniforms, glow: { value: number
 const GLOW = 1.3;
 const ICE: [number, number, number] = [1.6, 2.1, 2.6], ICE_GLOW = 0x1c4a66; // a frozen weapon's tint (over its own colours) and its cold self-glow
 const VENOM_GLOW = 0x1f3a0c; // a poisoned weapon's sickly green self-glow
+const EMBER_GLOW = 0xff6a18; // the molten glass on a glassblower's pipe
 /**
  * × the maps' metalness: the night has no environment to mirror, and full metal shows only the lights' highlights (black
  * steel reads as a hole); half keeps the paint, as WoW's painted armour does.
@@ -812,14 +831,16 @@ export class Outfit {
       const sk = this.own.skull, [up, nape] = sk ? [sk.r[1], sk.nape] : [DOME, NAPE];
       if (sk) { c.fromArray(sk.c); r.fromArray(sk.r); }
       const toBody = new THREE.Matrix3().setFromMatrix4(f.skin[head].clone().invert()).multiply(turn), d = new THREE.Vector3(), q = new THREE.Vector3();
+      const toHead = toBody.clone().invert(), normals = this.body.geometry.attributes.normal;
       for (let i = 0; i < n; i++) {
         if (!hat[i]) continue;
-        const p = at(i);
+        const p = at(i), inner = q.fromBufferAttribute(normals, i).applyMatrix3(toHead).dot(d.copy(p).sub(c)) < 0; // a lining, facing in
         const ry = p.y < c.y ? nape : up; // under the band, down the back of his head to the nape
         d.copy(p).sub(c).divide(r.setY(ry));
         d.y = Math.max(d.z < 0 ? -0.9 : 0, d.y); // the brim and what hangs off it onto the band, behind down to the nape
         d.normalize();
         q.copy(d).divide(r).applyMatrix3(toBody).normalize().toArray(normal, i * 3); // the ellipsoid's normal there
+        if (inner) d.multiplyScalar(0.95); // a hood's lining just under its cloth, not fighting it
         d.multiply(r).add(c).sub(p).applyMatrix3(toBody).toArray(out, i * 3);
       }
     }
@@ -942,6 +963,7 @@ export class Outfit {
         if (m?.isMeshStandardMaterial) dress(m, this.uniforms.uGlow, !!m.metalnessMap); // his own PBR props painted like his pieces
         if (w.ice && m?.isMeshStandardMaterial) { m.color.setRGB(...ICE); m.emissive.set(ICE_GLOW); m.roughness = 0.3; } // frozen over: the wood frosted pale
         if (w.venom && m?.isMeshStandardMaterial) m.emissive.set(VENOM_GLOW); // the plague on it
+        if (w.ember && m?.name === 'vetro') m.emissive.set(EMBER_GLOW); // the glass on it still molten
       });
       if (w.flip) prop.rotation.z = Math.PI;
       const walk = w.staff === undefined ? undefined : [shaft(prop, w.staff), shaft(prop, w.grip)], top = arm(this.root, prop, w.length, w.grip), held = top.parent!;

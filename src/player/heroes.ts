@@ -4,7 +4,7 @@
 // per body). No three.js and no DOM: `npm run check` reads it in Node.
 import type { School } from './levels.ts';
 
-export type Hero = 'risorto' | 'bortolo' | 'fosca';
+export type Hero = 'risorto' | 'bortolo' | 'fosca' | 'tizian';
 export interface HeroDef {
   name: string;
   title: string;
@@ -35,6 +35,11 @@ export const HEROES: Record<Hero, HeroDef> = {
     name: 'Suor Fosca', title: 'monaca del lazzaretto', school: ['plague', 'holy'],
     lore: 'Curò gli appestati del Lazzaretto Vecchio finché ne divenne il contagio. Ora benedice col miasma.',
     file: 'fosca.glb', portrait: 'fosca.webp', weapon: 'stiletto-osso', kit: ['plague', 'spit'],
+  },
+  tizian: {
+    name: 'Fra’ Tizian', title: 'soffiatore di Murano', school: ['fire', 'holy'],
+    lore: 'Soffiava il vetro alle fornaci di Murano finché il forno lo prese vivo. Il vetro fuso gli cola ancora nelle costole.',
+    file: 'tizian.glb', portrait: 'tizian.webp', weapon: 'canna-vetraio', kit: ['pyre', 'cero'],
   },
 };
 export const HERO_IDS = Object.keys(HEROES) as Hero[];

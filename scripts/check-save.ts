@@ -280,6 +280,11 @@ hf.levels.learned = ['plague', 'spit'];
 const hfb = boot();
 deserialize(hfb, JSON.parse(JSON.stringify(serialize(hf))));
 if (hfb.hero !== 'fosca' || hfb.levels.learned.join() !== 'plague,spit') fail(`Suor Fosca after load: ${hfb.hero} ${hfb.levels.learned}`);
+const ht = boot('tizian'); // Fra' Tizian keeps his Rogo dell'eretico and Cero funebre
+ht.levels.learned = ['pyre', 'cero'];
+const htb = boot();
+deserialize(htb, JSON.parse(JSON.stringify(serialize(ht))));
+if (htb.hero !== 'tizian' || htb.levels.learned.join() !== 'pyre,cero') fail(`Fra' Tizian after load: ${htb.hero} ${htb.levels.learned}`);
 const hgOld = boot('bortolo');
 deserialize(hgOld, (({ hero: _h, ...o }) => o)(hgs));
 if (hgOld.hero !== 'risorto' || !tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague')) fail('a save from before the choice is not the Risorto with his plague');

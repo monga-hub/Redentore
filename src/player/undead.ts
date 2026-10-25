@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import { UPPER, loadModel, over, stand } from '../core/models.ts';
-import { PLAYER } from '../core/physics.ts';
 import type { GearState } from '../loot/gear.ts';
 import { Outfit } from './outfit.ts';
 import { HEROES, type Hero } from './heroes.ts';
 
 // The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
-// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB (the other heroes, player/heroes.ts, on the same rig
-// with the Risorto's clips retargeted onto it, so every move below is the same on each), dressed in what it wears (player/outfit.ts:
-// the pieces, the dyes, the weapon in the right fist, the bone club to start). Loaded async; `root` stays empty until
-// the GLB arrives.
+// (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB (each hero, player/heroes.ts, on the same rig with
+// his own idle, walk, run, jump, roll, swings, cast, flinches and death from Meshy's library, retimed onto the clip names
+// and the moments below, so a move hits, loops and ends the same on each), dressed in what it wears (player/outfit.ts:
+// the pieces, the dyes, the weapon in the right fist, his own to start). Loaded async; `root` stays empty until the GLB
+// arrives.
 //
 // Locomotion: a hunched, heavy-breathing idle that now and then twirls the club, a crouched guard
 // for a few seconds after any fight, a walk and a charging run whose stride is matched to the
@@ -172,7 +172,7 @@ export class UndeadModel {
   constructor(hero: Hero) {
     loadModel(HEROES[hero].file).then((gltf) => {
       const model = gltf.scene;
-      stand(model, PLAYER.height);
+      stand(model, HEROES[hero].height);
       let body: THREE.SkinnedMesh | undefined;
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
       const outfit = (this.outfit = new Outfit(model, body!, hero));

@@ -179,6 +179,12 @@ const DEFS3: typeof DEFS = [
   ['anello-sensa', 'Anello della Sensa', 'anello', 'leggendario', 'critico potenza vigore', 'Il Doge lo gettava in laguna: «Ti sposiamo, mare». Questo è tornato indietro.'],
 ];
 
+// San Giorgio's side quests' rewards (quest/squero.ts): one each, no table rolls them and no merchant sells them.
+const UNIQUE3: typeof DEFS = [
+  ['remo-marieta', 'Remo di Marieta', 'arma', 'raro', 'potenza critico vigore', 'Il primo remo che Mastro Iseppo fece per sua figlia. Corto, per due mani piccole.'],
+  ['lanterna-faro', 'Lanterna del faro', 'amuleto', 'epico', 'spirito intelletto vigore', 'La lanterna da banchina del Fanalista. L’acqua alta si ferma dove arriva la sua luce.'],
+];
+
 /** The stats a budget of `points` buys, split over `focus` (best first). */
 function spend(points: number, focus: Stat[]): Stats {
   const out: Stats = {};
@@ -192,10 +198,10 @@ const make = (lvl: 1 | 2 | 3) => ([id, name, slot, rarity, focus, lore]: typeof 
   if (s.armor) stats.armatura = Math.round(ARMOR[rarity]! * k.armor * s.armor);
   return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : lvl === 3 ? { l3: true as const } : {}) };
 };
-export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3))];
+export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3)), ...UNIQUE3.map(make(3)).map((g) => ({ ...g, unique: true as const }))];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
 /** Every purple piece on sale: level 1's from Fra' Bortolo (and level 3's once the third quest is taken), level 2's from Mastro Iseppo. */
-export const SHOP = GEAR.filter((g) => g.rarity === 'epico');
+export const SHOP = GEAR.filter((g) => g.rarity === 'epico' && !g.unique);
 export const shop = (level3: boolean) => SHOP.filter((g) => !g.l2 && (level3 || !g.l3));
 /** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
 export const SHOP2 = SHOP.filter((g) => g.l2);

@@ -25,11 +25,11 @@ import { Priests } from './enemies/priests.ts';
 import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
 import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
-import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from './enemies/caster.ts';
-import { ABATE, AMANUENSE, BIBLIOTECARIO, MARINAIO, MONACO, NOSTROMO, spawnLevel3 } from './enemies/sangiorgio.ts';
+import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, pull } from './enemies/caster.ts';
+import { ABATE, AMANUENSE, BIBLIOTECARIO, DARSENA, MARINAIO, MONACO, NOSTROMO, PREPS, prepare, rouse, spawnLevel3 } from './enemies/sangiorgio.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, BLESSING, BOONS, CHEST, CROCE, HEADS, NPC, PUNTA, QUESTS, Quest, SECOND, SPEZIALE, THIRD } from './quest/progress.ts';
 import { Ferry } from './quest/ferry.ts';
-import { ISEPPO, SIDE, type Foe } from './quest/squero.ts';
+import { GIVERS, SIDE, giverOf, type Foe } from './quest/squero.ts';
 import { QuestView } from './quest/view.ts';
 import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
 import { checkVersion } from './ui/version.ts';
@@ -142,6 +142,8 @@ scene.add(zitelle.root);
 const L2_KINDS = [['Gondoliere annegato', GONDOLIERE, 1.85, 11], ['Codega', CODEGA, 1.8, 11], ['Zitella', ZITELLA, 1.65, 12], ['Zitella del velo', VELO, 1.9, 12], ['Il Gastaldo dei gondolieri', GASTALDO, 2.7, 13, 'elite'], ['La Maestra del merletto', MAESTRA, 2.5, 14, 'elite'], ['La Governatrice', GOVERNATRICE, 4.3]] as const;
 const l3 = spawnLevel3(level.world); // level 3: the Punta, the gondola, San Giorgio Maggiore, the Abate
 const sangiorgio = new Priests(level.world, kit.vfx, playerStats, level.areas, l3, true); // its bodies load with the third quest (stream)
+const sleepers = new Set(l3.hidden.flatMap((h) => h.members)); // the hidden packs (enemies/sangiorgio.ts), woken by their quests
+sangiorgio.rising = (f) => !quest.boss3Dead && f.kind === MARINAIO && quest.side.active('marinai') && !sleepers.has(f); // the drowned rise again for Mastro Iseppo's ten, until the Abate falls
 scene.add(sangiorgio.root);
 /** Level 3's kinds: name, kind, height, level, rank. */
 const L3_KINDS = [['Monaco nero', MONACO, 1.9, 16], ['Amanuense', AMANUENSE, 1.8, 16], ['Marinaio annegato', MARINAIO, 1.85, 16], ['Il Bibliotecario', BIBLIOTECARIO, 2.4, 18, 'elite'], ['Il Nostromo della darsena', NOSTROMO, 2.7, 18, 'elite'], ["L'Abate di San Giorgio", ABATE, 4.4]] as const;
@@ -149,8 +151,10 @@ const ofKind3 = (k: typeof L3_KINDS[number][1]) => sangiorgio.all.filter((f) => 
 const ferry = new Ferry(); // Mastro Iseppo's gondola between the Punta and San Giorgio
 const ISLAND_VIEW = { x: -545, z: 108 }; // between the dome and the campanile: what the crossing's camera looks at
 scene.add(ferry.root);
-/** Level 2's kinds Mastro Iseppo's quests count and loot. */
-const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra']]);
+/** The kinds the side quests count and loot (quest/squero.ts), and the elites whose token they lay at the body. */
+const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra'],
+  [MONACO, 'monaco'], [AMANUENSE, 'amanuense'], [MARINAIO, 'marinaio'], [NOSTROMO, 'nostromo'], [BIBLIOTECARIO, 'bibliotecario']]);
+const ELITE: Partial<Record<Foe, { x: number; y: number; z: number; state: string; t: number }>> = { gastaldo: l2.gastaldo, maestra: l2.maestra, nostromo: l3.nostromo, bibliotecario: l3.bibliotecario };
 const ofKind = (k: typeof L2_KINDS[number][1]) => zitelle.all.filter((f) => f.kind === k);
 const kinds: Kind[] = [ // the levels are only shown, on the nameplates
   { name: 'Frate non-morto', max: FRIAR.hp, height: 1.95, all: friars.all, ready: () => friars.root.children.length > 0, lv: 3 },
@@ -236,6 +240,21 @@ if (loaded) {
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: pending ? 'Partita caricata' : 'Partita ripresa' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
+/**
+ * Level 3's hidden packs (enemies/sangiorgio.ts): up once their side quest gets that far, on the hero; a load finds the
+ * ones it saved alive at rest. The Fanalista's wave brings the Nostromo out onto the quays after the hero.
+ */
+const woken = new Set<(typeof l3.hidden)[number]>();
+const rouseHidden = (h: (typeof l3.hidden)[number], fight: boolean, alive: (m: typeof h.members[number]) => boolean = () => true) => {
+  woken.add(h);
+  rouse(h.members.filter(alive), level.world, fight);
+  if (h.pack.hidden!.quest !== 'fari') return;
+  l3.nostromo.bounds = DARSENA;
+  if (fight && l3.nostromo.state !== 'dead') pull(l3.nostromo);
+};
+const due = (h: (typeof l3.hidden)[number]) => !woken.has(h) && !quest.boss3Dead && quest.side.reached(h.pack.hidden!.quest, h.pack.hidden!.step);
+const saved = new Set(loaded?.dead ?? []);
+for (const h of l3.hidden) if (due(h)) rouseHidden(h, false, (m) => !saved.has(mobs.indexOf(m)));
 booted = true;
 let bossAct = 0, bossRage = false, lastBoss = priests.boss, wed = false; // wed: the Abate's rite begun (his pull line said)
 /** A boss's new act, called out: the Reverendissimo's, the Governatrice's, the Abate's; and the end of its patience. */
@@ -249,7 +268,7 @@ const actsOf = (k: object) => (k === ABATE ? 2 : k === GOVERNATRICE ? 1 : 0);
 // XP is what the hero killed plus the quests' rewards. The dead of a load were counted into its saved XP (a save from
 // before the levels: the worth of its dead, short of a won fight's), and a victory's dead are worth nothing.
 const fell = mobs.map((m) => m.state === 'dead');
-let slain = loaded?.build ? loaded.build.xp - questXpIn(loaded) : quest.bossDead ? 0 : worth.reduce((s, w, i) => s + (fell[i] ? w : 0), 0);
+let slain = loaded?.build ? loaded.build.xp - questXpIn(loaded) : quest.bossDead ? 0 : worth.reduce((s, w, i) => s + (fell[i] && !sleepers.has(mobs[i] as typeof l3.boss) ? w : 0), 0); // the hidden packs lie dead asleep, worth nothing yet
 const sweep = () => mobs.forEach((m, i) => { if (m.state === 'dead') fell[i] = true; }); // after a victory: its dead count for nothing
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
 const picked = (id: string) => levels.picks.filter((p) => p === id).length;
@@ -312,7 +331,7 @@ const drops: Drops = new Drops([ // gold and items out of the dead, walked over 
   { all: [bees.queen], tier: 'elite' },
   { all: bees.all.filter((f) => f.kind === APETTA), tier: 'worker' },
 ].map((d) => ({ ...d, quiet: () => quest.bossDead }) as Dropper).concat(([[GONDOLIERE, 'friar'], [CODEGA, 'priest'], [ZITELLA, 'priest'], [VELO, 'priest'], [GASTALDO, 'elite'], [MAESTRA, 'elite'], [GOVERNATRICE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind(kind), tier, level: 2, quiet: () => quest.boss2Dead, quest: FOE.has(kind) ? () => quest.side.loot(FOE.get(kind)!, ground, quest.key2) : undefined })))
-  .concat(([[MONACO, 'priest'], [AMANUENSE, 'priest'], [MARINAIO, 'priest'], [BIBLIOTECARIO, 'elite'], [NOSTROMO, 'elite'], [ABATE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind3(kind), tier, level: 3, quiet: () => quest.boss3Dead }))), level.world, bag, cam.camera); // Mastro Iseppo's quest items, Marieta's letter
+  .concat(([[MONACO, 'priest'], [AMANUENSE, 'priest'], [MARINAIO, 'priest'], [BIBLIOTECARIO, 'elite'], [NOSTROMO, 'elite'], [ABATE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind3(kind), tier, level: 3, quiet: () => quest.boss3Dead, quest: FOE.has(kind) ? () => quest.side.loot(FOE.get(kind)!, ground, quest.key2) : undefined }))), level.world, bag, cam.camera); // the side quests' items, Marieta's letter
 scene.add(drops.root);
 drops.extra = () => (!drops.loose.some((l) => l.id === RELIC) && quest.rollRelic() ? RELIC : undefined); // Fra' Zuane's corona, once a run (one on the ground at a time)
 drops.collect = (id) => id === HEADS.item && (questView.head(), true); // Fra' Bortolo's heads are counted, not bagged
@@ -414,8 +433,8 @@ const goal = () => {
   }
 };
 /**
- * The side quests' pins: Fra' Zuane while his corona is in the bag; Mastro Iseppo with a quest to hand in, a find spot,
- * the elite a head or the shears are wanted off (or the token at its body), the nearest of the kind a collect or kill quest wants.
+ * The side quests' pins: Fra' Zuane while his corona is in the bag; the giver with a quest to hand in, a find spot or a use-point,
+ * the elite a token is wanted off (or the token at its body), the nearest of the kind a collect or kill quest wants.
  */
 const sidePins = () => {
   const pins: { x: number; z: number }[] = quest.relic && !quest.relicBack ? [NPC] : [];
@@ -423,14 +442,14 @@ const sidePins = () => {
   return pins;
 };
 const sidePin = (q: (typeof SIDE)[number]): { x: number; z: number } | undefined => {
-  const w = q.want;
-  if (quest.side.ready(q, quest.boss2Dead)) return ISEPPO;
-  if (w.kind === 'find') return w.at;
-  if (w.kind === 'token') return drops.loose.find((l) => l.id === w.item) ?? (w.from === 'gastaldo' ? l2.gastaldo : l2.maestra);
+  const w = quest.side.want(q), giver = GIVERS[giverOf(q)].at;
+  if (quest.side.ready(q)) return giver;
+  if (w.kind === 'find' || w.kind === 'use') return w.at;
+  if (w.kind === 'token') return drops.loose.find((l) => l.id === w.item) ?? ELITE[w.from];
   if (w.kind === 'collect' || w.kind === 'kill') {
-    return zitelle.all.filter((m) => FOE.get(m.kind) === w.from && m.state !== 'dead').sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
+    return [...zitelle.all, ...sangiorgio.all].filter((m) => FOE.get(m.kind) === w.from && m.state !== 'dead').sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
   }
-  return ISEPPO; // the letter: hand it in
+  return giver; // the letter: hand it in
 };
 /** The world map's quest log: the tracker's quests, each with the spot it points at (the objective, else its giver). */
 const questLog = () => questView.log().map((e) => ({
@@ -555,17 +574,25 @@ renderer.setAnimationLoop(() => {
     kit.system.notices.push({ kind: 'info', text: `Missione: ${RELIC_TITLE}. ${RELIC_OBJECTIVE}` });
   }
   const letter = quest.side.update(); // Marieta's letter picked up: its quest starts
-  if (letter) kit.system.notices.push({ kind: 'info', text: `Missione: ${QUESTS.lettera.title}. ${letter.line(0)}` });
-  for (const t of quest.side.tokens()) { // a head or the shears a quest wants: at the elite's body once it is dead, until picked up
-    const e = t.from === 'gastaldo' ? l2.gastaldo : l2.maestra;
-    if (e.state === 'dead' && e.t > 1 && !ground(t.item)) drops.spawn(e.x, e.y, e.z, 0, t.item, 1.2);
+  if (letter) kit.system.notices.push({ kind: 'info', text: `Missione: ${QUESTS.lettera.title}. ${quest.side.line(letter)}` });
+  for (const t of quest.side.tokens()) { // a head, the shears, the snuffer a quest wants: at the elite's body once it is dead, until picked up
+    const e = ELITE[t.from];
+    if (e && e.state === 'dead' && e.t > 1 && !ground(t.item)) drops.spawn(e.x, e.y, e.z, 0, t.item, 1.2);
+  }
+  for (const h of l3.hidden) if (due(h)) { // the second lamp lit: the drowned out of the basin, the Nostromo after them
+    rouseHidden(h, true);
+    kit.system.notices.push({ kind: 'error', text: 'I fari ardono: i marinai annegati salgono dal bacino, e il Nostromo carica!' });
   }
   const boss = quest.boss2Dead ? sangiorgio.boss : quest.bossDead ? zitelle.boss : priests.boss, rage = boss.fight >= boss.kind.phases!.berserk; // the boss's acts and berserk, called out as they come
   for (const text of questView.update(dt, player.pos, pressed, boss)) kit.system.notices.push({ kind: 'info', text });
   if (boss !== lastBoss) { lastBoss = boss; bossAct = boss.phase; bossRage = rage; } // the Reverendissimo's acts are not the Governatrice's
   if (boss.kind === ABATE && wed !== (boss.state !== 'pray' && boss.state !== 'dead')) { // pulled: the doge's words at the Sensa, turned on the hero
     wed = !wed;
-    if (wed) kit.system.notices.push({ kind: 'error', text: "L'Abate di San Giorgio: «Desponsamus te, mare!» Le nozze cominciano." });
+    if (wed) {
+      kit.system.notices.push({ kind: 'error', text: "L'Abate di San Giorgio: «Desponsamus te, mare!» Le nozze cominciano." });
+      prepare(quest.preps()); // the side quests' weakenings, on this fight's Abate
+      for (const id of quest.preps()) kit.system.notices.push({ kind: 'info', text: PREPS[id].text });
+    }
   }
   if (boss.phase > bossAct) kit.system.notices.push({ kind: 'error', text: ACTS[actsOf(boss.kind)][boss.phase - 1] });
   if (rage && !bossRage) kit.system.notices.push({ kind: 'error', text: RAGE[actsOf(boss.kind)] });

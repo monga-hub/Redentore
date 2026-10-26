@@ -737,12 +737,18 @@ export function rise(f: Priest, p: Target, world: World, rnd: () => number = Mat
   if (f.state !== 'dead') return false;
   f.riseAt ??= f.t + RISE.after[0] + rnd() * (RISE.after[1] - RISE.after[0]); // a loaded corpse (t past the sink) too: after, from now
   if (f.t < f.riseAt || Math.hypot(p.x - f.home.x, p.z - f.home.z) < RISE.away) return false;
+  revive(f, world);
+  f.again = true;
+  return true;
+}
+
+/** Up again at its own spot, whole, at rest (`rise`; level 3's hidden packs woken, enemies/sangiorgio.ts). */
+export function revive(f: Priest, world: World): void {
   Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: f.kind.hp, cd: 0, melee: 0, blind: 0, backoff: f.kind.backoff,
-    nova: f.kind.nova?.every ?? 0, cc: control(f.kind.resist), los: { ok: false, t: 0 }, again: true, riseAt: undefined });
+    nova: f.kind.nova?.every ?? 0, cc: control(f.kind.resist), los: { ok: false, t: 0 }, riseAt: undefined });
   f.marks.length = f.lines.length = 0;
   Object.assign(f, calm(f.kind));
   enter(f, 'pray');
-  return true;
 }
 
 /** Damage a priest. Returns true if this killed it. Evading and dead priests ignore it. */

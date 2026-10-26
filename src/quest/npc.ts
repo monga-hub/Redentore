@@ -8,6 +8,7 @@ import type { Mark } from './progress.ts';
 // on offer, its gold "?" while one is ready to hand in. Not a mob: no collider beyond his own small box (quest/progress.ts), no health, and
 // nothing in the game targets or hurts him. Fra' Bortolo in the serra is the same ghost glowing
 // green, and Mastro Iseppo in the squero a Meshy boatwright glowing like a lantern: `Npc` takes where it stands, the tint and the body.
+// A body with no talking clips (an enemy's, like the Fanalista's drowned sailor) talks with its Pray and Idle instead.
 
 const HEIGHT = 1.75;
 const FADE = 0.4; // s between idle and talking
@@ -55,7 +56,7 @@ export class Npc {
   private time = 0;
   talking = false;
 
-  /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips. */
+  /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips (else Pray and Idle). */
   constructor(at: Spot, tint = GHOST, model = 'zuane.glb') {
     this.at = at;
     this.root.position.set(at.x, 0, at.z);
@@ -72,9 +73,9 @@ export class Npc {
       });
       this.root.add(model);
       this.mixer = new THREE.AnimationMixer(model);
-      const act = (n: string) => this.mixer!.clipAction(THREE.AnimationClip.findByName(gltf.animations, n)!);
+      const act = (...names: string[]) => this.mixer!.clipAction(names.map((n) => THREE.AnimationClip.findByName(gltf.animations, n)).find((c) => c) ?? gltf.animations[0]);
       this.idle = act('Idle');
-      this.talks = ['Talk_Open', 'Talk_Right'].map(act);
+      this.talks = [act('Talk_Open', 'Pray', 'Idle'), act('Talk_Right', 'Idle')];
       this.play(this.idle);
     });
   }

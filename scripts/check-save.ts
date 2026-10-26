@@ -179,12 +179,16 @@ z.quest.side.done.push('ferri');
 z.quest.complete('ferri');
 z.quest.side.kills.lumi = 4;
 z.bag.add('ditale-marieta');
+z.quest.side.taken.push('fari'); // San Giorgio's Fanalista, a quest in steps: the west lamp lit, two ampolle left for the east
+z.quest.side.steps.fari = 2;
+z.bag.add('ampolla-faro', 2);
 const ss = JSON.parse(JSON.stringify(serialize(z))), sb = boot();
 deserialize(sb, ss);
-if (sb.quest.side.taken.join() !== 'lumi,ditale' || sb.quest.side.done.join() !== 'ferri' || sb.quest.side.kills.lumi !== 4 || !sb.bag.count('ditale-marieta')) fail(`side quests restored as ${JSON.stringify(sb.quest.side.encode())}`);
+if (sb.quest.side.taken.join() !== 'lumi,ditale,fari' || sb.quest.side.done.join() !== 'ferri' || sb.quest.side.kills.lumi !== 4 || sb.quest.side.steps.fari !== 2 || sb.bag.count('ampolla-faro') !== 2 || !sb.bag.count('ditale-marieta')) fail(`side quests restored as ${JSON.stringify(sb.quest.side.encode())}`);
 if (sb.quest.bonusXp !== z.quest.bonusXp || questXpIn(ss) !== z.quest.bonusXp) fail("a load does not count Mastro Iseppo's XP as before");
 if (old.quest.side.taken.length || old.quest.side.done.length || !valid((({ side: _s, ...o }) => o)(ss))) fail('a save from before Mastro Iseppo loads with his quests');
-if (valid({ ...ss, side: { taken: [1], done: [] } }) || valid({ ...ss, side: { taken: [], done: [], kills: { lumi: 'x' } } })) fail('side quest field validation');
+if (valid({ ...ss, side: { taken: [1], done: [] } }) || valid({ ...ss, side: { taken: [], done: [], kills: { lumi: 'x' } } }) || valid({ ...ss, side: { taken: [], done: [], steps: { fari: 'x' } } })) fail('side quest field validation');
+if (!valid({ ...ss, side: (({ steps: _st, ...o }) => o)(ss.side) })) fail('a save from before the quests in steps is refused');
 // A fog grid round-trips by its origin; one from before (no origin: level 2 at +X, x 60..300) keeps level 1's cells
 // where they were and lays level 2's on its new side, -X (level/plan.ts).
 const wide = fogOf(boot());

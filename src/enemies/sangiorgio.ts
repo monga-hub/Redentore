@@ -9,7 +9,8 @@
 // Tuned with scripts/balance.ts for a hero who walks in from the Governatrice in level 2's gear.
 import type { World } from '../core/physics.ts';
 import { CENACOLO } from '../level/zones/sangiorgio.ts';
-import { PRIEST, spawnPriests, type Bounds, type CasterKind, type Priest } from './caster.ts';
+import { PRIEST, killAll, pull, revive, spawnPriests, type Bounds, type CasterKind, type Priest } from './caster.ts';
+import { FARI_LIT, type SideId } from '../quest/squero.ts';
 import { GONDOLIERE } from './zitelle.ts';
 
 export const MONACO: CasterKind = {
@@ -73,19 +74,36 @@ export const ABATE: CasterKind = {
   resist: 0.35,
 };
 
+/**
+ * The side quests' weakenings of the Abate (quest/squero.ts `prep`), laid on ABATE as his fight starts (`prepare`, main.ts
+ * at the pull; scripts/balance.ts PREPS=). Each turns the untouched copy, so a fight only ever has the ones earned.
+ */
+export const PREPS: Record<string, { text: string; apply: (k: CasterKind) => void }> = {
+  faro: { text: "La Lanterna del faro: l'acqua alta lascia un'isola asciutta in più", apply: (k) => { k.tide = { ...k.tide!, n: k.tide!.n + 1 }; } }, // I fari della darsena
+};
+const PRISTINE = { ...ABATE };
+/** ABATE as it was written, with the weakenings `ids` on it (unknown ids are ignored). */
+export function prepare(ids: readonly string[]): void {
+  Object.assign(ABATE, PRISTINE);
+  for (const id of ids) PREPS[id]?.apply(ABATE);
+}
+
 /** Before the empty frame, facing the door from the antirefettorio (+Z). */
 export const ABATE_AT = { x: -530, z: 11 };
 /** His floor: the refectory between the monks' tables (x CENACOLO ± 1.8), the frame wall and the far door. */
 export const ABATE_BOUNDS: Bounds = { x0: CENACOLO.x0 + 3.5, x1: CENACOLO.x1 - 3.5, z0: CENACOLO.z0 + 3, z1: CENACOLO.z1 - 2.5 };
 
 type Spot = [number, number];
-interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][] }
+/** `hidden`: asleep (dead, out of sight, worth nothing) until that side quest reaches that step, then up and on the hero (`rouse`). */
+interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][]; hidden?: { quest: SideId; step: number } }
 const rect = (x0: number, x1: number, z0: number, z1: number): Bounds => ({ x0, x1, z0, z1 });
 const QUAY = rect(-376, -301, 0.5, 19.5), ALLORI = rect(-545, -515, 47, 77), CIPRESSI = rect(-501, -465, 47, 77);
+/** The darsena with both quays out to the lighthouses (zones/sangiorgio.ts darsena): the Fanalista's wave, and the Nostromo once it calls him. */
+export const DARSENA = rect(-599.5, -562.5, 124.5, 149.5);
 
 /**
- * Every pack of level 3, in the order saved games index them (appended after level 2's mobs). `at`: where the pack
- * faces at rest; `members`: kind and spot.
+ * Every pack of level 3, in the order saved games index them (appended after level 2's mobs; the hidden ones after the
+ * Abate, so new ones go at the end). `at`: where the pack faces at rest; `members`: kind and spot.
  */
 export const PACKS: Pack[] = [
   { label: 'Fondamenta San Giovanni', at: [-326, 11], bounds: QUAY, members: [[MARINAIO, -323, 9], [MARINAIO, -329, 9], [MONACO, -326, 14]] },
@@ -106,15 +124,27 @@ export const PACKS: Pack[] = [
   { label: 'Riva di San Giorgio', at: [-448, 40], bounds: rect(-451.5, -444.5, -35, 85), members: [[MARINAIO, -448, 37], [MARINAIO, -448, 43]] },
   { label: 'Giardino di San Giorgio', at: [-470, -10], bounds: rect(-547, -453, -35, 3), members: [[MONACO, -467, -8], [MONACO, -473, -8], [AMANUENSE, -470, -14]] },
   { label: 'Teatro Verde', at: [-574, -29], bounds: rect(-596, -552, -32.5, -10), members: [[MONACO, -574, -27], [AMANUENSE, -570, -30], [AMANUENSE, -578, -30]] },
+  // Hidden. I fari della darsena: the second lamp lit (the east one, by the Fanalista), the drowned climb out of the basin onto its quay.
+  { label: 'Darsena di San Giorgio', at: [-581, 141], bounds: DARSENA, members: [[MARINAIO, -569, 136.5], [MARINAIO, -569, 140.5], [MARINAIO, -564, 135.5], [MARINAIO, -563.5, 146]], hidden: { quest: 'fari', step: FARI_LIT } },
 ];
 
-export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest }
+export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest; hidden: { pack: Pack; members: Priest[] }[] }
 
-/** Level 3's casters: the packs, then the Abate, always in this order. */
+const GONE = 1e3; // s a sleeper has lain dead: past the sink, out of sight (enemies/priests.ts)
+
+/** Level 3's casters: the packs, then the Abate, then the hidden packs asleep, always in this order. */
 export function spawnLevel3(world: World): Level3 {
   const groups = PACKS.map((p) => p.members.map(([, x, z]) => [x, z, Math.atan2(x - p.at[0], z - p.at[1])] as [number, number, number]));
   const packs = spawnPriests(world, groups, PACKS.map((p) => p.bounds), PACKS.map((p) => p.members.map(([k]) => k)));
   const [[boss]] = spawnPriests(world, [[[ABATE_AT.x, ABATE_AT.z, Math.PI]]], [ABATE_BOUNDS], [[ABATE]]);
-  const all = [...packs.flat(), boss];
-  return { all, boss, bibliotecario: all.find((m) => m.kind === BIBLIOTECARIO)!, nostromo: all.find((m) => m.kind === NOSTROMO)! };
+  const hidden = PACKS.flatMap((pack, i) => (pack.hidden ? [{ pack, members: packs[i] }] : []));
+  for (const { members } of hidden) { killAll(members); for (const m of members) m.t = GONE; }
+  const all = [...packs.filter((_, i) => !PACKS[i].hidden).flat(), boss, ...hidden.flatMap((h) => h.members)];
+  return { all, boss, bibliotecario: all.find((m) => m.kind === BIBLIOTECARIO)!, nostromo: all.find((m) => m.kind === NOSTROMO)!, hidden };
+}
+
+/** A hidden pack up at its spots, whole; `fight`: and on the hero at once (else at rest, as a load finds it). */
+export function rouse(members: Priest[], world: World, fight: boolean): void {
+  for (const m of members) revive(m, world);
+  if (fight && members.length) pull(members[0]);
 }

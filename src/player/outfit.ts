@@ -95,6 +95,7 @@ export const WEAPONS: Record<string, Weapon> = {
   'turibolo-arma': { file: 'turibolo.glb', length: 0.85, grip: 0.12, lean: 0.35 },
   pastorale: { file: 'pastorale.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
   'remo-spezzato': { file: 'remo.glb', length: 1.3, grip: 0.12, lean: 0.35, flip: true }, // by the handle, the blade the head
+  'remo-marieta': { file: 'remo.glb', length: 1.15, grip: 0.12, lean: 0.35, flip: true }, // Mastro Iseppo's first oar for his girl: the same, shorter
   'remo-gelato': { file: 'arma-bortolo.glb', length: 1.7, grip: 0.1, lean: 0.35 }, // Bortolo's oar, frozen into a war oar
   'stiletto-osso': { file: 'arma-fosca.glb', length: 0.55, grip: 0.15, lean: 0.35 }, // Suor Fosca's bone stiletto, venom in its hilt, by its corded grip
   'canna-vetraio': { file: 'arma-tizian.glb', length: 1.6, grip: 0.3, lean: 0.2, staff: 0.6 }, // Fra' Tizian's blowpipe, molten glass at its top, by its wooden sleeve

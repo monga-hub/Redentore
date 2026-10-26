@@ -9,7 +9,7 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { ISEPPO, ISEPPO_DECLINE, ISEPPO_DONE, ISEPPO_FULL, SIDE, SIDE_BY, type SideQuest } from './squero.ts';
+import { FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -20,6 +20,7 @@ import { ISEPPO, ISEPPO_DECLINE, ISEPPO_DONE, ISEPPO_FULL, SIDE, SIDE_BY, type S
 // styled here so they stay out of the HUD's way.
 
 const join = (t: Talk) => t.pages.join('\n\n'); // a quest's text, whole, in the list window
+const back = (q: SideQuest) => { const g = GIVERS[giverOf(q)]; return `Torna da ${g.at.name}, ${g.where}`; }; // a side quest's line once it is ready
 const pay = (id: QuestId, item?: string) => ({ xp: QUESTS[id].xp, gold: QUESTS[id].gold, item });
 const OPEN_TIME = 1.6; // s for a gate to open
 const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1, cenacolo: -1, 'cenacolo-orto': -1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls; the Cenacolo's into the hall and out to the garden
@@ -35,6 +36,21 @@ const rueFlare: Style = { life: 0.6, size: 2.2, grow: 0.8, color: 0xeaffd8, colo
 const RUE = 0x8aff9a; // Fra' Bortolo's glow
 const riteSmoke: Style = { life: [1.4, 2.2], size: [0.4, 0.8], grow: 1.6, color: 0x9aff8a, color2: 0x0a2a10, hdr: 1.5, drag: 1.2, grav: -0.6 };
 const SQUERO = 0xffc27a; // Mastro Iseppo's, a lantern's
+const FARO = 0xffb347; // the Fanalista's, lamp oil
+/** The givers' portraits: Mastro Iseppo's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
+const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' } };
+/** A lighthouse's fire seen from across the lagoon: a soft gold halo on a canvas. */
+function halo(): THREE.SpriteMaterial {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!, grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, '#fffbe0'); grad.addColorStop(0.25, '#ffd070'); grad.addColorStop(1, 'rgba(255,140,30,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.SpriteMaterial({ map, color: new THREE.Color(1, 1, 1).multiplyScalar(3), blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+}
 const goldGlow: Style = { life: [0.6, 0.9], size: [0.5, 0.8], grow: 1.8, color: GOLD, color2: 0x803000, hdr: 2, drag: 2, grav: -1.5 };
 
 const CSS = `
@@ -104,8 +120,9 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
-  private iseppo = new Npc(ISEPPO, SQUERO, 'iseppo.glb');
-  private finds: { q: SideQuest; m: THREE.Mesh }[] = []; // a gold glint over each find spot while its quest wants it
+  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb') };
+  private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
+  private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
   private lines = ''; // Mastro Iseppo's tracker lines as drawn
   private talk = new Dialogue();
   private news: string[] = []; // notices raised outside update (the blessing, given as his window closes)
@@ -169,14 +186,23 @@ export class QuestView {
     this.key = key();
     this.key.visible = false;
     chest.add(this.lid, this.inside, this.glint, this.key);
-    this.root.add(chest, this.npc.root, this.speziale.root, this.iseppo.root);
-    for (const q of SIDE) {
-      if (q.want.kind !== 'find') continue;
+    this.root.add(chest, this.npc.root, this.speziale.root, ...Object.values(this.givers).map((n) => n.root));
+    for (const q of SIDE) for (const w of stepsOf(q)) {
+      if (w.kind !== 'find' && w.kind !== 'use') continue;
       const m = new THREE.Mesh(this.glint.geometry, this.glint.material);
-      m.position.set(q.want.at.x, q.want.at.y + 0.45, q.want.at.z);
+      m.position.set(w.at.x, w.at.y + 0.45, w.at.z);
       m.visible = false;
-      this.finds.push({ q, m });
+      this.finds.push({ q, at: w.at, m });
       this.root.add(m);
+    }
+    const fire = halo();
+    for (const at of FARI) { // over the lantern at the top of each tower (zones/sangiorgio.ts darsena: 2.5 m behind the use-point, 10 m up)
+      const s = new THREE.Sprite(fire);
+      s.position.set(at.x, 10.2, at.z + 2.5);
+      s.scale.setScalar(8);
+      s.visible = false;
+      this.fari.push(s);
+      this.root.add(s);
     }
 
     const style = document.createElement('style');
@@ -200,7 +226,7 @@ export class QuestView {
       this.npc.talking = false;
       if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted3 ? !this.quest.boss3Dead && this.quest.bless3() : this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
-      this.iseppo.talking = false;
+      for (const n of Object.values(this.givers)) n.talking = false;
     };
   }
 
@@ -263,18 +289,18 @@ export class QuestView {
     this.marks(dt, player);
   }
 
-  /** The three of them, each under his "!" or "?" (Quest.marks). */
+  /** The quest givers, each under his "!" or "?" (Quest.marks). */
   private marks(dt: number, player: THREE.Vector3): void {
     const m = this.quest.marks(this.friars());
     this.npc.update(dt, player, m.zuane);
     this.speziale.update(dt, player, m.speziale);
-    this.iseppo.update(dt, player, m.iseppo);
+    for (const [g, n] of Object.entries(this.givers) as [Giver, Npc][]) n.update(dt, player, m[g]);
   }
 
   /** The quest givers with a "!" or "?" up, for the maps: `state` is the Mark. */
   pins(): { x: number; z: number; state: string }[] {
     const m = this.quest.marks(this.friars());
-    return ([[NPC, m.zuane], [SPEZIALE, m.speziale], [ISEPPO, m.iseppo]] as const).flatMap(([at, k]) => (k ? [{ x: at.x, z: at.z, state: k }] : []));
+    return ([[NPC, m.zuane], [SPEZIALE, m.speziale], ...(Object.keys(GIVERS) as Giver[]).map((g) => [GIVERS[g].at, m[g]] as const)] as const).flatMap(([at, k]) => (k ? [{ x: at.x, z: at.z, state: k }] : []));
   }
 
   /** He has Le teste dei frati to give: not yet taken and friars still about. */
@@ -313,17 +339,17 @@ export class QuestView {
     return out;
   }
 
-  /** Mastro Iseppo's list: what is ready to hand in, then on offer, then running. */
-  private iseppoEntries(): Entry[] {
-    const s = this.quest.side, over = this.quest.boss2Dead, open = s.open(), rank = { ready: 0, offer: 1, busy: 2, talk: 3 };
-    return SIDE.flatMap((sq): Entry[] => {
-      const base = { title: QUESTS[sq.id].title, objective: sq.line(s.progress(sq)), reward: pay(sq.id, ITEM.get(sq.reward)?.name) };
-      if (s.ready(sq, over)) return [{ ...base, state: 'ready', text: sq.done.join('\n\n'), act: () => { // paid at once: its items out, the epic in (the XP, gold and banner are payout's)
-        if (!s.handIn(sq)) return ISEPPO_FULL;
+  /** A side quest giver's list: what is ready to hand in, then on offer, then running. */
+  private giverEntries(giver: Giver): Entry[] {
+    const s = this.quest.side, g = GIVERS[giver], open = s.open(giver), rank = { ready: 0, offer: 1, busy: 2, talk: 3 };
+    return SIDE.filter((sq) => giverOf(sq) === giver).flatMap((sq): Entry[] => {
+      const base = { title: QUESTS[sq.id].title, objective: s.line(sq), reward: pay(sq.id, ITEM.get(sq.reward)?.name) };
+      if (s.ready(sq)) return [{ ...base, state: 'ready', text: sq.done.join('\n\n'), act: () => { // paid at once: its items out, the reward in (the XP, gold and banner are payout's)
+        if (!s.handIn(sq)) return g.full;
         this.news.push(`Ricompensa: ${ITEM.get(sq.reward)!.name}`);
       } }];
       if (s.active(sq.id)) return [{ ...base, state: 'busy', text: sq.busy }];
-      if (open.includes(sq)) return [{ ...base, state: 'offer', text: sq.offer.join('\n\n'), decline: ISEPPO_DECLINE, act: () => {
+      if (open.includes(sq)) return [{ ...base, state: 'offer', text: sq.offer.join('\n\n'), decline: g.decline, act: () => {
         if (!s.taken.includes(sq.id)) s.taken.push(sq.id);
         playSfx('quest');
         this.news.push(`Missione accettata: ${base.title}`);
@@ -380,18 +406,18 @@ export class QuestView {
       out.push({ id: 'teste', title: QUESTS.teste.title, line: ok ? "Torna da Fra' Bortolo, nella serra" : `Teste di frate ${q.heads}/${q.headsNeed(alive)}`, ready: ok });
     }
     for (const id of q.side.taken) {
-      const sq = SIDE_BY.get(id)!, ok = q.side.ready(sq, q.boss2Dead);
-      out.push({ id, title: QUESTS[id].title, line: ok ? `Torna da ${ISEPPO.name}, nello squero` : sq.line(q.side.progress(sq)), ready: ok });
+      const sq = SIDE_BY.get(id)!, ok = q.side.ready(sq);
+      out.push({ id, title: QUESTS[id].title, line: ok ? back(sq) : q.side.line(sq), ready: ok });
     }
     return out;
   }
 
-  /** Mastro Iseppo's quests running, for the tracker: their counts, green once ready to hand in. */
+  /** The side quests running, for the tracker: their counts, green once ready to hand in. */
   private sideLines(): string {
-    const q = this.quest, s = q.side;
+    const s = this.quest.side;
     return s.taken.map((id) => {
-      const sq = SIDE_BY.get(id)!, ok = s.ready(sq, q.boss2Dead);
-      return `<b>${QUESTS[id].title}</b><span class="${ok ? 'ok' : ''}">${ok ? `Torna da ${ISEPPO.name}, nello squero` : sq.line(s.progress(sq))}</span>`;
+      const sq = SIDE_BY.get(id)!, ok = s.ready(sq);
+      return `<b>${QUESTS[id].title}</b><span class="${ok ? 'ok' : ''}">${ok ? back(sq) : s.line(sq)}</span>`;
     }).join('');
   }
 
@@ -474,10 +500,10 @@ export class QuestView {
       } else if (pr.talk === 'speziale') {
         this.speziale.talking = true;
         this.talk.show({ name: SPEZIALE.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp`, tint: 'hue-rotate(-75deg) saturate(1.3)' }, GREET.speziale, () => this.spezialeEntries(), () => this.shop?.());
-      } else if (pr.talk === 'iseppo') {
-        this.iseppo.talking = true;
-        const s = this.quest.side, all = s.done.length === SIDE.length;
-        this.talk.show({ name: ISEPPO.name, portrait: `${import.meta.env.BASE_URL}models/iseppo.webp` }, all ? ISEPPO_DONE : GREET.iseppo, () => this.iseppoEntries(), () => this.shop2?.());
+      } else if (pr.talk) {
+        const g = pr.talk, spec = GIVERS[g], face = FACES[g], s = this.quest.side, all = SIDE.every((sq) => giverOf(sq) !== g || s.done.includes(sq.id));
+        this.givers[g].talking = true;
+        this.talk.show({ name: spec.at.name, portrait: `${import.meta.env.BASE_URL}models/${face.file}.webp`, tint: face.tint }, all ? spec.bye : spec.greet, () => this.giverEntries(g), g === 'iseppo' ? () => this.shop2?.() : undefined);
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }
@@ -504,10 +530,20 @@ export class QuestView {
     this.marks(dt, player);
     const spots = this.quest.side.spots();
     for (const f of this.finds) {
-      f.m.visible = spots.some((s) => s.q === f.q);
+      f.m.visible = spots.some((s) => s.q === f.q && s.at === f.at);
       f.m.rotation.y = this.glint.rotation.y;
-      f.m.position.y = f.q.want.kind === 'find' ? f.q.want.at.y + 0.45 + Math.sin(performance.now() * 0.003) * 0.08 : 0;
+      f.m.position.y = f.at.y + 0.45 + Math.sin(performance.now() * 0.003) * 0.08;
     }
+    this.fari.forEach((s, i) => { // lit by the oil, the west lamp first: a burst of gold the moment it takes, then a flicker
+      const lit = this.quest.side.reached('fari', i + 2);
+      if (lit && !s.visible && Math.hypot(player.x - s.position.x, player.z - s.position.z) < 30) {
+        this.vfx.spawn(goldFlare, s.position.x, s.position.y, s.position.z);
+        this.vfx.burst(goldSpark, s.position.x, s.position.y, s.position.z, 40, 0.6, 3, 2);
+        playSfx('quest', null, { rate: 1.3 });
+      }
+      s.visible = lit;
+      s.scale.setScalar(8 + Math.sin(performance.now() * 0.011 + i) * 0.4);
+    });
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt); // its icon is with the hero's buffs (ui/plates.ts)
     const now = this.quest.prompt(player);
     const html = now ? (now.act ? `<kbd>F</kbd>${now.text}` : now.text) : '';

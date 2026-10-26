@@ -7,12 +7,16 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { DITALE, EXVOTO, ISEPPO, LETTER_DROP, SIDE, SIDE_BY, type SideId } from '../src/quest/squero.ts';
+import { DITALE, EXVOTO, FARI, FARI_LIT, GIVERS, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { ABATE, PACKS as PACKS3, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
+import { SHOP } from '../src/loot/gear.ts';
+import { roll } from '../src/loot/bag.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
 import { GONDOLIERE, PACKS, spawnLevel2 } from '../src/enemies/zitelle.ts';
 import { killAll, rise } from '../src/enemies/caster.ts';
 import { RISE } from '../src/enemies/brain.ts';
 
+const SIDE = ALL_SIDE.filter((q) => giverOf(q) === 'iseppo'); // Mastro Iseppo's in the squero; San Giorgio's below
 let failed = 0;
 const fail = (why: string) => { failed++; console.error(`FAIL ${why}`); };
 const level = buildLevel();
@@ -242,6 +246,66 @@ if (copy.side.done.length !== SIDE.length || copy.side.taken.length) fail("his q
 copy.side.decode({ taken: ['lumi', 'nope'], done: ['ferri', 'lumi'], kills: { lumi: 3, nope: 2 } });
 if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.keys(copy.side.kills).length) fail('a saved side state from another build is not cleaned');
 
+// San Giorgio's givers (quest/squero.ts GIVERS): Iseppo on the approdo and the Fanalista, each with room by him out of
+// every pack's pull, shown once the third quest is taken; I marinai della Riva counted to ten (and not stranded once the
+// Abate is dead), I fari della darsena in its steps (oil, two lamps that burn it, the Nostromo's snuffer), its wave asleep
+// after the Abate in the saved order, its weakening laid on the Abate, both rewards unique; all of it saved mid-step.
+{
+  const l3 = spawnLevel3(level.world), q = new Quest(level.world), s = q.side, b = new Bag();
+  s.bag = b;
+  for (const g of ['riva', 'fanalista'] as Giver[]) {
+    const at = GIVERS[g].at, by = feet(at.x + Math.sin(at.yaw) * -1.2, at.z + Math.cos(at.yaw) * -1.2); // a step in front of him
+    if (level.world.blocked(by.x, by.z, by.y) || q.prompt(by)?.talk !== g) fail(`no room to talk to ${g} in front of him`);
+    for (const pk of PACKS3) if (!pk.hidden) for (const [k, x, z] of pk.members) if (Math.hypot(x - at.x, z - at.z) < k.aggro + 0.5) fail(`a mob at (${x}, ${z}) is within its pull of ${g}`);
+    if (q.marks(0)[g]) fail(`${g} shows a marker before the third quest`);
+  }
+  for (const at of [BERTHS.sangiorgio]) if (q.prompt({ ...at, y: 0 })?.talk) fail('a giver takes the gondola\'s prompt at the San Giorgio berth');
+  const lamps = FARI.map((at) => { const f = feet(at.x, at.z); if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - at.y) > 0.5) fail(`no room by the lamp (${at.x}, ${at.z})`); return f; });
+  const hidden = l3.hidden.flatMap((h) => h.members), awake = l3.all.filter((m) => !hidden.includes(m));
+  if (!hidden.length || hidden.some((m) => m.state !== 'dead') || l3.all.indexOf(l3.boss) !== awake.length - 1 || l3.all.slice(-hidden.length).some((m) => !hidden.includes(m))) fail('the hidden packs are not asleep after the Abate, at the end of the saved order');
+  q.accepted3 = true;
+  if (q.marks(0).riva !== 'offer' || q.marks(0).fanalista !== 'offer') fail('San Giorgio\'s givers show no "!" once the third quest is taken');
+  const take = (g: Giver) => { const t = s.talk(g); if (!t.accept) fail(`${g} offers nothing`); t.accept?.(); };
+  const hand = (g: Giver, id: SideId) => { const xp = q.bonusXp, t = s.talk(g); if (t.paid?.id !== id || q.bonusXp !== xp + QUESTS[id].xp || !b.count(t.paid.reward)) fail(`${id} is not handed in to ${g} with its XP and reward`); };
+  take('riva');
+  for (let i = 0; i < 9; i++) s.killed('marinaio');
+  s.killed('monaco');
+  if (s.ready(SIDE_BY.get('marinai')!)) fail('nine marinai were enough for ten');
+  q.boss3Dead = true;
+  if (!s.ready(SIDE_BY.get('marinai')!)) fail('I marinai della Riva is stranded once the Abate is dead');
+  q.boss3Dead = false;
+  s.killed('marinaio');
+  hand('riva', 'marinai');
+  take('fanalista');
+  if (q.prompt(lamps[0])?.act) fail('the west lamp can be lit before the oil is in hand');
+  for (let i = 0; i < 100 && b.count('ampolla-faro') < 5; i++) { const it = s.loot('marinaio', () => 0, false, () => 0); if (it) b.add(it); }
+  if (b.count('ampolla-faro') !== 5 || s.loot('marinaio', () => 0, false, () => 0)) fail('the drowned do not drop exactly the five ampolle wanted');
+  s.update();
+  if (q.prompt(lamps[1])?.act) fail('the east lamp can be lit before the west one');
+  const copy = new Quest(level.world);
+  q.prompt(lamps[0])?.act?.();
+  if (b.count('ampolla-faro') !== 2 || s.reached('fari', FARI_LIT)) fail(`the west lamp burnt ${5 - b.count('ampolla-faro')} ampolle, want 3`);
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.step(SIDE_BY.get('fari')!) !== 2) fail('a quest in steps does not keep its step across a save');
+  copy.side.decode({ taken: ['fari'], done: [], steps: { fari: 9, nope: 1 } });
+  if (Object.keys(copy.side.steps).length) fail('a saved step past the last, or of a quest unknown, is kept');
+  q.prompt(lamps[1])?.act?.();
+  if (b.count('ampolla-faro') || !s.reached('fari', FARI_LIT) || s.tokens().map((t) => t.from).join() !== 'nostromo') fail("both lamps lit do not wake the wave and want the Nostromo's snuffer");
+  if (s.ready(SIDE_BY.get('fari')!)) fail('I fari della darsena is ready before the Nostromo');
+  b.add('spegnimoccolo');
+  if (q.preps().length) fail('the Abate is weakened before the Fanalista is paid');
+  hand('fanalista', 'fari');
+  if (b.count('spegnimoccolo') || q.preps().join() !== 'faro') fail('the Fanalista keeps no snuffer or gives no weakening');
+  prepare(q.preps());
+  const isles = ABATE.tide!.n;
+  prepare([]);
+  if (isles !== ABATE.tide!.n + 1) fail(`the lantern leaves ${isles} islands, ${ABATE.tide!.n} without it`);
+  if (q.marks(0).riva || q.marks(0).fanalista) fail("San Giorgio's givers still have something once their quests are done");
+  const unique = ['remo-marieta', 'lanterna-faro'];
+  if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
+  for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
+}
+
 // The drowned rise again like the orto's friars: late, out of the hero's way, at their spot, worth less.
 const l2 = spawnLevel2(level.world), g0 = l2.all.find((m) => m.kind === GONDOLIERE)!;
 // The markers (Quest.marks): "!" on offer, "?" ready to hand in, "?" over "!", none when idle.
@@ -275,7 +339,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

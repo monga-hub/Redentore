@@ -12,7 +12,11 @@
 // Diablo style: collect off the drowned gondolieri, kill the codeghe, the Gastaldo's head, a thimble under a bed
 // in the Zitelle's dormitory, the Maestra's shears, an ex voto back in the Redentore; and a seventh started by a
 // rare drop, Marieta's letter. Each pays XP, gold and one of level 2's epics; he sells the rest of them.
-import type { Bag } from '../loot/bag.ts';
+//
+// Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
+// and the Fanalista of the darsena. A quest may run in steps (`want` a list: collect, then use-points that burn what
+// was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
+import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
 import type { Talk } from './dialogue.ts';
 import { QUESTS, type QuestId } from './progress.ts';
@@ -20,32 +24,48 @@ import { QUESTS, type QuestId } from './progress.ts';
 /** In the squero's yard by the quay, on the gravel between the gondola and the shed, facing the fondamenta. */
 export const ISEPPO = { x: -191, z: 1.5, yaw: Math.PI, r: 0.35, name: 'Mastro Iseppo' } as const;
 
-/** The level-2 mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts kinds). */
-export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra';
+/** On San Giorgio, at the head of the approdo by his moored gondola, facing the berth (off the Piazzale's pull). */
+export const ISEPPO_RIVA = { x: -442.5, z: 101.2, yaw: Math.atan2(-8.1, 1.2), r: 0.35, name: 'Mastro Iseppo' } as const;
+/** The Fanalista, on the east quay of the darsena by its lighthouse, facing across the basin (out of the Nostromo's pack's pull). */
+export const FANALISTA = { x: -563, z: 141, yaw: Math.PI / 2, r: 0.35, name: 'Il Fanalista' } as const;
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera'; // their ids in QUESTS
+/** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
+export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario';
+
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari'; // their ids in QUESTS
+
+/** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
+export type Giver = 'iseppo' | 'riva' | 'fanalista';
+export interface GiverSpec { at: { x: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
 
 /**
  * What a quest wants. collect: `n` of `item`, dropped by `from` at `chance` while it is wanted; kill: `n` of
  * `from` while it runs; token: `item` off the elite `from` (laid at its body once it is dead, main.ts);
- * find: `item` picked up at `at`; letter: hand `item` in (the rare drop that starts it).
+ * find: `item` picked up at `at`; letter: hand `item` in (the rare drop that starts it); use: `needs` burnt at `at`
+ * (a step of a quest in steps: using it moves the quest on).
  */
 export type Want =
   | { kind: 'collect'; item: string; n: number; from: Foe; chance: number }
   | { kind: 'kill'; n: number; from: Foe }
   | { kind: 'token'; item: string; from: Foe }
   | { kind: 'find'; item: string; at: { x: number; y: number; z: number }; label: string }
-  | { kind: 'letter'; item: string };
+  | { kind: 'letter'; item: string }
+  | { kind: 'use'; at: { x: number; y: number; z: number }; label: string; needs: { item: string; n: number } };
 
 export interface SideQuest {
   id: SideId;
-  want: Want;
+  /** Iseppo in the squero when absent. */
+  giver?: Giver;
+  /** One want, or steps in order: each moves on once met, the last is handed in. */
+  want: Want | readonly Want[];
   /** Opens once this one is handed in (the chain); none: from the first talk. */
   after?: SideId;
   /** The epic he gives (its XP, gold and title are QUESTS', quest/progress.ts, paid through Quest.complete). */
   reward: string;
-  /** The tracker's line; `n` is the progress so far. */
-  line: (n: number) => string;
+  /** The Abate weakened once it is handed in (enemies/sangiorgio.ts PREPS). */
+  prep?: string;
+  /** The tracker's line; `n` is the progress so far, `step` the step under way. */
+  line: (n: number, step: number) => string;
   offer: string[];
   busy: string;
   done: string[];
@@ -54,6 +74,11 @@ export interface SideQuest {
 /** Where his thimble-quest and ex-voto quest send the hero: Marieta's bed by the dormitory's east wall, a chapel of the Redentore. */
 export const DITALE = { x: -277.1, y: 0, z: -34.2 };
 export const EXVOTO = { x: 10.6, y: CHURCH_FLOOR, z: -23.25 };
+
+/** The darsena's two lighthouses, where the Fanalista's oil is burnt: at the foot of each tower (zones/sangiorgio.ts darsena). */
+export const FARI = [{ x: -596, y: 0, z: 144.5 }, { x: -566, y: 0, z: 144.5 }] as const;
+/** The step of I fari della darsena that wakes the basin's drowned and the Nostromo: both lamps lit. */
+export const FARI_LIT = 3;
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -162,6 +187,44 @@ export const SIDE: readonly SideQuest[] = [
       'Tieni questo busto di broccato: era il corredo della Pia Casa, la dote che non le hanno mai dato. Io ho la lettera. Mi basta.',
     ],
   },
+  // San Giorgio (level 3).
+  {
+    id: 'marinai', giver: 'riva',
+    want: { kind: 'kill', n: 10, from: 'marinaio' },
+    reward: 'remo-marieta',
+    line: (n) => `Marinai annegati abbattuti sull'isola: ${n}/10`,
+    offer: [
+      'La gondola ti ha portato, Risorto, e la gondola ti riporta. Ma vuota, eh: non piena. Li vedi, sulla riva? I marinai della Serenissima, annegati con la flotta. Si aggrappano ai remi di chi passa.',
+      'Uno mi ha già preso il remo di poppa, stanotte: l\'ho tenuto per un pelo. Abbattine dieci, che io possa vogare in pace. Tanto si rialzano finché l\'Abate li chiama: dieci, e mi basta.',
+    ],
+    busy: 'Dieci marinai, Risorto. Stanno sulla riva, sul piazzale, lungo la fondamenta e giù alla darsena. Si rialzano, ma tu contali lo stesso.',
+    done: [
+      'Dieci. Senti che silenzio, sotto la gondola? Nessuna mano sul legno. Adesso posso aspettarti quanto vuoi.',
+      'Prendi questo remo. Era il primo che ho fatto per Marieta, quando era piccola: le insegnavo a vogare in rio. Non l\'ha mai portato fuori dallo squero. Portalo tu.',
+    ],
+  },
+  {
+    id: 'fari', giver: 'fanalista',
+    want: [
+      { kind: 'collect', item: 'ampolla-faro', n: 5, from: 'marinaio', chance: 0.5 },
+      { kind: 'use', at: FARI[0], label: 'il faro di ponente', needs: { item: 'ampolla-faro', n: 3 } },
+      { kind: 'use', at: FARI[1], label: 'il faro di levante', needs: { item: 'ampolla-faro', n: 2 } },
+      { kind: 'token', item: 'spegnimoccolo', from: 'nostromo' },
+    ],
+    reward: 'lanterna-faro',
+    prep: 'faro',
+    line: (n, step) => [`Ampolle d'olio dei fanali dai marinai annegati: ${n}/5`, 'Accendi il faro di ponente, alla bocca della darsena (3 ampolle)',
+      'Accendi il faro di levante, alla bocca della darsena (2 ampolle)', 'Abbatti il Nostromo della darsena e porta il suo spegnimoccolo al Fanalista'][step],
+    offer: [
+      'Fermo lì, che ti vedo appena. Il Fanalista della darsena, ero: due fari alla bocca, dal tempo dei francesi. Ogni sera li accendevo, ogni mattina li spegnevo. Ora li spegne un altro, e non li riaccende.',
+      'Senza luce la laguna prende chi vuole: barche, morti, l\'acqua alta dentro le chiese. Porta olio, Risorto: cinque ampolle, i marinai le hanno ancora alla cintura. Poi accendili tu, i miei fari.',
+    ],
+    busy: 'Olio e fuoco, Risorto. Tre ampolle al faro di ponente, due a quello di levante. E guarda il bacino, quando la seconda fiamma prende: chi li spegneva non sarà contento.',
+    done: [
+      'Il Nostromo. Lo sapevo. Con quel suo spegnimoccolo di ferro, ogni notte, prima uno e poi l\'altro. Voleva il buio per portare le barche sul fondo. Adesso la darsena ha di nuovo i suoi occhi.',
+      'Prendi la lanterna piccola, quella che portavo in giro per le banchine. E ascolta: quando l\'Abate chiama l\'acqua alta, la luce dei fari arriva fin là. Ci sarà un\'isola asciutta in più, per te.',
+    ],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -171,10 +234,26 @@ export const ISEPPO_DECLINE = 'Come vuoi. Il legno aspetta, l\'ho sempre detto: 
 /** Said when the bag has no room for his reward. */
 export const ISEPPO_FULL = 'Hai la borsa piena come una peata a Rialto. Fa\' spazio, Risorto, e torna: il mio regalo non lo lascio per terra.';
 
-/** Saved form: the quests taken (and not yet handed in), the ones handed in, kill counts by quest. */
-export interface SideState { taken: string[]; done: string[]; kills?: Record<string, number> }
+/** The givers, by the `talk` of their prompt (quest/progress.ts). */
+export const GIVERS: Record<Giver, GiverSpec> = {
+  iseppo: { at: ISEPPO, level: 2, where: 'nello squero', greet: 'Mastro Iseppo, proto dello squero. Parla, Risorto: il legno ascolta.', bye: ISEPPO_DONE, decline: ISEPPO_DECLINE, full: ISEPPO_FULL },
+  riva: { at: ISEPPO_RIVA, level: 3, where: "sull'approdo di San Giorgio", greet: 'Sono qui, Risorto, con la gondola. Il ferro sa la strada, ma il proto la guarda lo stesso.',
+    bye: 'La gondola aspetta. Quando l\'Abate è giù, ti porto a casa: dritto dal frate.',
+    decline: 'Va bene. Io resto a poppa, e tengo il remo stretto.',
+    full: 'Hai la borsa piena, Risorto. Fa\' spazio e torna: qui non scappa niente, nemmeno io.' },
+  fanalista: { at: FANALISTA, level: 3, where: 'alla darsena', greet: 'Il Fanalista, Risorto. Parla piano: al buio le voci vanno lontano.',
+    bye: 'I fari sono accesi. Finché bruciano, la darsena sa dov\'è il Bacino. Va\', Risorto.',
+    decline: 'Allora resta al buio anche tu. Io aspetto: i fanalisti sono abituati.',
+    full: 'La borsa è piena, Risorto. Fa\' spazio: la lanterna non te la appoggio per terra, nell\'umido.' },
+};
+export const giverOf = (q: SideQuest): Giver => q.giver ?? 'iseppo';
+/** A quest's steps, one for a single want. */
+export const stepsOf = (q: SideQuest): readonly Want[] => (Array.isArray(q.want) ? q.want : [q.want as Want]);
 
-/** What happens when the hero talks to him: the window's lines, what Accetta does, and the reward handed out as it opens. */
+/** Saved form: the quests taken (and not yet handed in), the ones handed in, kill counts by quest, the step each quest in steps is on. */
+export interface SideState { taken: string[]; done: string[]; kills?: Record<string, number>; steps?: Record<string, number> }
+
+/** What happens when the hero talks to a giver: the window's lines, what Accetta does, and the reward handed out as it opens. */
 export interface SideTalk { talk: Talk; accept?: () => void; paid?: SideQuest }
 
 const REACH = 2.6;
@@ -183,37 +262,63 @@ export class SideQuests {
   taken: SideId[] = []; // in order of taking
   done: SideId[] = [];
   kills: Partial<Record<SideId, number>> = {};
+  steps: Partial<Record<SideId, number>> = {}; // the step under way of a quest in steps (absent: the first)
   private letterKills = 0; // zitelle rolled for the letter (not saved: a load starts the ramp over)
   /** The bag the quest items go in and out of (main.ts, the checks). */
   bag?: Bag;
+  /** Its giver's level is over (its boss dead), so no more of its dead rise to be counted: set by Quest. */
+  over: (q: SideQuest) => boolean = () => false;
 
   active(id: SideId): boolean {
     return this.taken.includes(id);
   }
 
-  /** Taken and its want met: ready to hand in. `over`: the Governatrice is dead, so no more drowned rise to be counted. */
-  ready(q: SideQuest, over = false): boolean {
+  /** The step under way, and its want. */
+  step(q: SideQuest): number {
+    return this.steps[q.id] ?? 0;
+  }
+  want(q: SideQuest): Want {
+    const s = stepsOf(q);
+    return s[Math.min(this.step(q), s.length - 1)];
+  }
+
+  /** Done, or taken and at `step` or past it (a quest in steps: what it has set off, main.ts). */
+  reached(id: SideId, step: number): boolean {
+    return this.done.includes(id) || (this.active(id) && this.step(SIDE_BY.get(id)!) >= step);
+  }
+
+  /** `w` is met (a use-point never is: using it moves the quest on). */
+  private met(q: SideQuest, w: Want): boolean {
+    if (w.kind === 'kill') return (this.kills[q.id] ?? 0) >= w.n;
+    if (w.kind === 'collect') return this.have(w.item) >= w.n;
+    return w.kind !== 'use' && this.have(w.item) > 0;
+  }
+
+  /** Taken and its last step met: ready to hand in. `over`: its level's boss is dead, so it is ready whatever is left. */
+  ready(q: SideQuest, over = this.over(q)): boolean {
     if (!this.active(q.id)) return false;
-    const w = q.want;
-    if (w.kind === 'kill') return over || (this.kills[q.id] ?? 0) >= w.n;
-    if (w.kind === 'collect') return over || this.have(w.item) >= w.n;
-    return this.have(w.item) > 0;
+    return over || (this.step(q) >= stepsOf(q).length - 1 && this.met(q, this.want(q)));
   }
 
   /** Progress for the tracker line. */
   progress(q: SideQuest): number {
-    const w = q.want;
+    const w = this.want(q);
     return w.kind === 'kill' ? Math.min(w.n, this.kills[q.id] ?? 0) : w.kind === 'collect' ? Math.min(w.n, this.have(w.item)) : 0;
   }
 
-  /** Quests he would offer now: in the chain, not yet taken or done. */
-  open(): SideQuest[] {
-    return SIDE.filter((q) => q.want.kind !== 'letter' && !this.taken.includes(q.id) && !this.done.includes(q.id) && (!q.after || this.done.includes(q.after)));
+  /** The tracker's line for a quest running. */
+  line(q: SideQuest): string {
+    return q.line(this.progress(q), this.step(q));
   }
 
-  /** A quest of his is ready to hand in: his "?" is up (Quest.marks). */
-  handInReady(over = false): boolean {
-    return SIDE.some((q) => this.ready(q, over));
+  /** Quests `giver` would offer now: in the chain, not yet taken or done. */
+  open(giver: Giver = 'iseppo'): SideQuest[] {
+    return SIDE.filter((q) => giverOf(q) === giver && !stepsOf(q).some((w) => w.kind === 'letter') && !this.taken.includes(q.id) && !this.done.includes(q.id) && (!q.after || this.done.includes(q.after)));
+  }
+
+  /** A quest of `giver`'s is ready to hand in: his "?" is up (Quest.marks). */
+  handInReady(giver: Giver = 'iseppo', over?: boolean): boolean {
+    return SIDE.some((q) => giverOf(q) === giver && this.ready(q, over ?? this.over(q)));
   }
 
   /** A quest handed in: its XP, gold and banner (Quest.complete, set by Quest). */
@@ -223,9 +328,14 @@ export class SideQuests {
     return this.bag?.count(item) ?? 0;
   }
 
-  /** A level-2 mob of `foe` died: the kill quests running count it. */
+  /** The quests taken, with their want under way. */
+  private running(): { q: SideQuest; w: Want }[] {
+    return SIDE.flatMap((q) => (this.active(q.id) ? [{ q, w: this.want(q) }] : []));
+  }
+
+  /** A mob of `foe` died: the kill quests running count it. */
   killed(foe: Foe): void {
-    for (const q of SIDE) if (q.want.kind === 'kill' && q.want.from === foe && this.active(q.id)) this.kills[q.id] = (this.kills[q.id] ?? 0) + 1;
+    for (const { q, w } of this.running()) if (w.kind === 'kill' && w.from === foe) this.kills[q.id] = (this.kills[q.id] ?? 0) + 1;
   }
 
   /**
@@ -233,9 +343,8 @@ export class SideQuests {
    * loose; `key2`: the Maestra's key is taken (the letter is sure by then).
    */
   loot(foe: Foe, ground: (id: string) => number, key2: boolean, rnd: () => number = Math.random): string | undefined {
-    for (const q of SIDE) {
-      const w = q.want;
-      if (w.kind === 'collect' && w.from === foe && this.active(q.id) && this.have(w.item) + ground(w.item) < w.n && rnd() < w.chance) return w.item;
+    for (const { w } of this.running()) {
+      if (w.kind === 'collect' && w.from === foe && this.have(w.item) + ground(w.item) < w.n && rnd() < w.chance) return w.item;
     }
     const letter = SIDE_BY.get('lettera')!.want as { item: string };
     if (foe === 'zitella' && !this.active('lettera') && !this.done.includes('lettera') && !this.have(letter.item) && !ground(letter.item)
@@ -243,8 +352,12 @@ export class SideQuests {
     return undefined;
   }
 
-  /** Per frame (main.ts): the letter picked up starts its quest. Returns the quest started, if any. */
+  /**
+   * Per frame (main.ts): the letter picked up starts its quest, and a quest in steps whose step is met moves on (its
+   * items stay in the bag: the next step may burn them). Returns the quest started, if any.
+   */
   update(): SideQuest | undefined {
+    for (const { q, w } of this.running()) if (this.step(q) < stepsOf(q).length - 1 && this.met(q, w)) this.steps[q.id] = this.step(q) + 1;
     const q = SIDE_BY.get('lettera')!;
     if (this.active(q.id) || this.done.includes(q.id) || !this.have((q.want as { item: string }).item)) return undefined;
     this.taken.push(q.id);
@@ -253,63 +366,72 @@ export class SideQuests {
 
   /** The elites whose token a running quest still wants and isn't in the bag: main.ts lays it at their body once dead. */
   tokens(): { item: string; from: Foe }[] {
-    return SIDE.flatMap((q) => (q.want.kind === 'token' && this.active(q.id) && !this.have(q.want.item) ? [{ item: q.want.item, from: q.want.from }] : []));
+    return this.running().flatMap(({ w }) => (w.kind === 'token' && !this.have(w.item) ? [{ item: w.item, from: w.from }] : []));
   }
 
-  /** Find spots still to search (quest/view.ts glints them, main.ts pins them). */
+  /** Find spots still to search and use-points still to use (quest/view.ts glints them, main.ts pins them). */
   spots(): { q: SideQuest; at: { x: number; y: number; z: number } }[] {
-    return SIDE.flatMap((q) => (q.want.kind === 'find' && this.active(q.id) && !this.have(q.want.item) ? [{ q, at: q.want.at }] : []));
+    return this.running().flatMap(({ q, w }) => ((w.kind === 'find' && !this.have(w.item)) || w.kind === 'use' ? [{ q, at: w.at }] : []));
   }
 
-  /** "Raccogli ..." at a find spot under the hero's feet `p`. */
-  prompt(p: { x: number; y: number; z: number }): { text: string; act: () => string } | undefined {
+  /** "Raccogli ..." at a find spot, "Accendi ..." at a use-point, under the hero's feet `p`. */
+  prompt(p: { x: number; y: number; z: number }): { text: string; act?: () => string } | undefined {
     for (const { q, at } of this.spots()) {
       if (Math.hypot(p.x - at.x, p.z - at.z) > REACH || Math.abs(p.y - at.y) > 1.5) continue;
-      const w = q.want as { item: string; label: string };
-      return { text: `Raccogli ${w.label}`, act: () => (this.bag?.add(w.item) ? `Hai trovato ${w.label}` : 'La borsa è piena') };
+      const w = this.want(q);
+      if (w.kind === 'use') {
+        const { item, n } = w.needs, name = ITEM.get(item)?.name ?? item;
+        if (this.have(item) < n) return { text: `Per ${w.label} servono ${n} × ${name}` };
+        return { text: `Accendi ${w.label}`, act: () => { this.bag!.remove(item, n); this.steps[q.id] = this.step(q) + 1; return `Hai acceso ${w.label}`; } };
+      }
+      const f = w as { item: string; label: string };
+      return { text: `Raccogli ${f.label}`, act: () => (this.bag?.add(f.item) ? `Hai trovato ${f.label}` : 'La borsa è piena') };
     }
     return undefined;
   }
 
   /**
-   * Talking to him: hand in the first quest ready (paid at once: its items out, the reward in), else offer the
-   * next in the chain, else the line of one running, else his goodbye. `over`: the Governatrice is dead.
+   * Talking to `giver`: hand in the first quest of his ready (paid at once: its items out, the reward in), else offer
+   * the next in the chain, else the line of one running, else his goodbye.
    */
-  talk(over = false): SideTalk {
-    const ready = SIDE.find((q) => this.ready(q, over));
+  talk(giver: Giver = 'iseppo'): SideTalk {
+    const g = GIVERS[giver], mine = SIDE.filter((q) => giverOf(q) === giver);
+    const ready = mine.find((q) => this.ready(q));
     if (ready) {
-      if (!this.handIn(ready)) return { talk: { pages: [ISEPPO_FULL] } };
+      if (!this.handIn(ready)) return { talk: { pages: [g.full] } };
       return { talk: { pages: ready.done }, paid: ready };
     }
-    const next = this.open()[0];
-    if (next) return { talk: { pages: next.offer, offer: true, title: QUESTS[next.id].title, decline: ISEPPO_DECLINE }, accept: () => { if (!this.taken.includes(next.id)) this.taken.push(next.id); } };
-    const busy = SIDE.find((q) => this.active(q.id) && q.busy);
-    return { talk: { pages: [busy ? busy.busy : ISEPPO_DONE] } };
+    const next = this.open(giver)[0];
+    if (next) return { talk: { pages: next.offer, offer: true, title: QUESTS[next.id].title, decline: g.decline }, accept: () => { if (!this.taken.includes(next.id)) this.taken.push(next.id); } };
+    const busy = mine.find((q) => this.active(q.id) && q.busy);
+    return { talk: { pages: [busy ? busy.busy : g.bye] } };
   }
 
-  /** Its items out of the bag, the reward in; false (nothing changed) when the bag has no room for the reward. */
+  /** Its items out of the bag (every step's), the reward in; false (nothing changed) when the bag has no room for the reward. */
   handIn(q: SideQuest): boolean {
-    const bag = this.bag, w = q.want;
+    const bag = this.bag;
     if (!bag) return false;
-    const item = w.kind === 'kill' ? undefined : w.item, n = item ? Math.min(this.have(item), w.kind === 'collect' ? w.n : 1) : 0;
-    if (item) bag.remove(item, n);
-    if (!bag.add(q.reward)) { if (item) bag.add(item, n); return false; }
+    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs.item] : [w.item])))].map((id) => [id, this.have(id)] as const);
+    for (const [id, n] of items) if (n) bag.remove(id, n);
+    if (!bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);
     this.done.push(q.id);
     delete this.kills[q.id];
+    delete this.steps[q.id];
     this.complete(q.id);
     return true;
   }
 
   encode(): SideState {
-    return { taken: [...this.taken], done: [...this.done], kills: { ...this.kills } };
+    return { taken: [...this.taken], done: [...this.done], kills: { ...this.kills }, steps: { ...this.steps } };
   }
 
-  /** Lay a saved state over a fresh one; ids from another build are dropped. */
+  /** Lay a saved state over a fresh one; ids from another build are dropped, and steps past a quest's last. */
   decode(s: SideState): void {
     const known = (id: string): id is SideId => SIDE_BY.has(id as SideId);
     this.done = s.done.filter(known);
     this.taken = s.taken.filter(known).filter((id) => !this.done.includes(id));
     this.kills = Object.fromEntries(Object.entries(s.kills ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isFinite(n) && n > 0));
+    this.steps = Object.fromEntries(Object.entries(s.steps ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isInteger(n) && n > 0 && n < stepsOf(SIDE_BY.get(id as SideId)!).length));
   }
 }

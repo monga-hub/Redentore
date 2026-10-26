@@ -19,7 +19,7 @@ export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | '
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
 /** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it (the friars' heads aren't even bagged: loot/drops.ts collect). */
-export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true }
+export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true }
 /** The level an item drops in (`l2`, `l3`). */
 export const levelOfItem = (x: Item): 1 | 2 | 3 => (x.l3 ? 3 : x.l2 ? 2 : 1);
 /** Quest items' colour, on the ground and in the tracker. */
@@ -61,6 +61,9 @@ export const ITEMS: readonly Item[] = [
   { id: 'calamaio', name: 'Calamaio dello scriptorium', rarity: 'noncomune', icon: 'vial', lore: 'Inchiostro di seppia e di qualcos’altro. Non si secca.', l3: true },
   { id: 'registro', name: 'Pagina del registro dei morti', rarity: 'raro', icon: 'relic', lore: 'Nomi della Giudecca in tre grafie diverse. L’ultimo è a metà.', l3: true },
   { id: 'calice-cana', name: 'Calice di Cana', rarity: 'epico', icon: 'vial', lore: 'Ci si versava il vino delle nozze. Ora sa di sale.', l3: true },
+  // San Giorgio's side quests (quest/squero.ts): the Fanalista's oil off the drowned, the Nostromo's snuffer.
+  { id: 'ampolla-faro', name: 'Ampolla d’olio dei fanali', rarity: 'noncomune', icon: 'vial', lore: 'Olio di lino per i fari della darsena. I marinai la portavano alla cintura, per il Fanalista.', quest: true, l3: true },
+  { id: 'spegnimoccolo', name: 'Spegnimoccolo del Nostromo', rarity: 'raro', icon: 'candle', lore: 'Un cono di ferro su un’asta: spegneva i fari ogni notte. Per il Fanalista, alla darsena.', quest: true, l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));
@@ -103,7 +106,7 @@ export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 |
   const g = t.gear;
   for (let i = 0; i < g.rolls; i++) {
     if (rnd() >= g.chance[Math.min(i, 1)]) continue;
-    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x) && x.id !== BOSS3_PRIZE);
+    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x) && x.id !== BOSS3_PRIZE && !x.unique);
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   return { gold, items };

@@ -57,7 +57,7 @@ export interface GameState {
   build?: { xp: number; lv: number; picks: string[]; learned?: string[]; main?: string };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
   gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
-  side?: SideState; // Mastro Iseppo's quests taken, handed in and their kill counts; absent in saves from before him: none
+  side?: SideState; // the side quests taken, handed in, their kill counts and steps; absent in saves from before Mastro Iseppo: none (steps absent: the first)
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -168,7 +168,7 @@ export function valid(s: unknown): s is GameState {
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
     && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')))
     && (o.side === undefined || (!!o.side && [o.side.taken, o.side.done].every((a) => Array.isArray(a) && a.every((x) => typeof x === 'string'))
-      && (o.side.kills === undefined || (!!o.side.kills && typeof o.side.kills === 'object' && Object.values(o.side.kills).every(num)))));
+      && [o.side.kills, o.side.steps].every((r) => r === undefined || (!!r && typeof r === 'object' && Object.values(r).every(num)))));
 }
 
 export interface Slot { label: string; savedAt: number; state: GameState }

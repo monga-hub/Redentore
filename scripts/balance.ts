@@ -23,7 +23,7 @@
 //   node scripts/balance.ts boss2 plague 11 [runs] the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, side2 with Mastro Iseppo's epics, epic)
 //   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts route3 melee [runs]    one build on the route, on through level 2 into level 3 (Fra' Zuane, the Punta, the gondola, San Giorgio, the Bibliotecario, the Abate)
-//   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics)
+//   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro: the side quests' weakenings on him)
 //   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
@@ -36,7 +36,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
 import { APPRODO, BERTHS, CHEST, CHOIR_DOOR, NPC, Quest, SPEZIALE } from '../src/quest/progress.ts';
-import { ABATE, ABATE_AT, BIBLIOTECARIO, NOSTROMO, PACKS as PACKS3, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
+import { ABATE, ABATE_AT, BIBLIOTECARIO, NOSTROMO, PACKS as PACKS3, prepare, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
 import { GASTALDO, GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, PACKS, VELO, ZITELLA, spawnLevel2, type Level2 } from '../src/enemies/zitelle.ts';
 import { GROUNDED, inPour, onLine, veiled } from '../src/enemies/caster.ts';
 import { ZF } from '../src/level/zones/zitelle.ts';
@@ -49,7 +49,7 @@ import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { TOMES, levelOf, offer, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
-import { SIDE } from '../src/quest/squero.ts';
+import { SIDE, giverOf } from '../src/quest/squero.ts';
 import { HEROES, heroOf } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
@@ -383,7 +383,7 @@ class Run {
     if (kind === 'start') return;
     for (const [tier, n] of Object.entries(TYPICAL)) for (let i = 0; i < n; i++) this.loot(tier as Tier);
     if (kind === 'typical2' || kind === 'buy2' || kind === 'side2' || kind === 'typical3' || kind === 'buy3') for (const [tier, n] of Object.entries(TYPICAL2)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 2);
-    if (kind === 'side2') for (const q of SIDE) this.take(q.reward); // and Mastro Iseppo's seven epics, his quests all handed in
+    if (kind === 'side2') for (const q of SIDE) if (giverOf(q) === 'iseppo') this.take(q.reward); // and Mastro Iseppo's seven epics, his quests all handed in
     if (kind === 'typical3' || kind === 'buy3') for (const [tier, n] of Object.entries(TYPICAL3)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 3);
     if (kind === 'buy3') this.quest.accepted3 = true; // Fra' Bortolo's level-3 epics on sale
     if (kind === 'buy' || kind === 'buy2' || kind === 'buy3') this.shop();
@@ -897,6 +897,7 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear 
   const boss = third ? r.l3.boss : second ? r.l2.boss : r.boss, zone = third ? 'boss3' : second ? 'boss2' : 'boss';
   if (second || third) { r.quest.win(); r.quest.out = true; r.quest.report(); r.quest.accept2(); r.quest.takeKey2(); r.quest.open(r.quest.gate('coro-zitelle')); }
   if (third) { r.quest.win2(); r.quest.report2(); r.quest.accept3(); r.quest.landed = true; r.quest.takeKey3(); r.quest.open(r.quest.gate('cenacolo')); }
+  if (third) prepare((process.env.PREPS ?? '').split(',').filter(Boolean)); // PREPS=faro: the side quests' weakenings on the Abate (enemies/sangiorgio.ts PREPS)
   r.paths.reset();
   for (const m of r.mobs) if (m !== boss && !(second && (m as Priest).kind === VELO)) { m.state = 'dead'; m.hp = 0; }
   r.levelUp = () => {}; // the level is fixed

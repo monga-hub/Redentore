@@ -94,6 +94,14 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   obiettivo, oggetti di missione col raggio dorato; gondolieri e codeghe risorgono come i frati (lontano dall'eroe,
   un quarto dell'esperienza, bottino magro) finché la Governatrice è viva; se cade prima, le missioni di raccolta e
   di uccisione si consegnano lo stesso. Tutto nel salvataggio (i vecchi si caricano senza).
+- **Missioni secondarie di San Giorgio** (stesso motore, `GIVERS` in `src/quest/squero.ts`): *I marinai della Riva*
+  da Mastro Iseppo sull'approdo, accanto alla gondola (abbatti 10 marinai annegati, che risorgono finché la missione è
+  aperta; il Remo di Marieta); *I fari della darsena* dal Fanalista, un marinaio annegato che brilla color lanterna
+  (riusa `marinaio.glb`: senza clip `Talk_*` parla con `Pray`/`Idle`). È a passi: 5 ampolle d'olio dai marinai, il faro
+  di ponente (3 ampolle) e quello di levante (2), che sveglia un branco nascosto di 4 marinai sulla banchina e fa
+  caricare il Nostromo; il suo spegnimoccolo al Fanalista. Paga la Lanterna del faro e indebolisce l'Abate: in *Acqua
+  alta* un'isola asciutta in più (`PREPS` in `src/enemies/sangiorgio.ts`, applicate quando parte il combattimento). I
+  branchi nascosti stanno in fondo a `PACKS`, salvati dopo l'Abate; le missioni si consegnano da sole se l'Abate cade.
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

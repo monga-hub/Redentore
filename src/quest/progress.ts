@@ -22,7 +22,7 @@ import type { Box, World } from '../core/physics.ts';
 import type { Tune } from '../player/levels.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 import { ZCX, ZF } from '../level/zones/zitelle.ts';
-import { ISEPPO, SideQuests } from './squero.ts';
+import { GIVERS, SIDE, SideQuests, giverOf, type Giver } from './squero.ts';
 import { CENACOLO, LANDING, PIER } from '../level/zones/sangiorgio.ts';
 
 export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2' | 'quest3' | 'key3' | 'boss3';
@@ -140,6 +140,9 @@ export const QUESTS = {
   exvoto: { title: 'L\'ex voto del Redentore', xp: 170, gold: 70 },
   lettera: { title: 'La lettera di Marieta', xp: 160, gold: 40 }, // a rare drop off the zitelle
   sangiorgio: { title: 'Le nozze di San Giorgio', xp: 420, gold: 320 }, // handed in to Fra' Zuane, ~level 17-18
+  // San Giorgio's side quests (quest/squero.ts), ~level 15-17.
+  marinai: { title: 'I marinai della Riva', xp: 160, gold: 60 }, // Mastro Iseppo, on the approdo
+  fari: { title: 'I fari della darsena', xp: 220, gold: 90 }, // the Fanalista
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -155,7 +158,7 @@ export const RELIC_DROP = { base: 0.02, ramp: 0.01 } as const;
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | 'iseppo'; ferry?: Crossing }
+export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | Giver; ferry?: Crossing }
 /** The gondola's trips (quest/ferry.ts): the Punta to San Giorgio, back, or home to the Redentore once the Abate is dead. */
 export type Crossing = 'out' | 'back' | 'home';
 
@@ -209,8 +212,9 @@ export class Quest {
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
     world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
     world.add(SPEZIALE.x, SPEZIALE.z, SPEZIALE.r, SPEZIALE.r, 0, 1.8);
-    world.add(ISEPPO.x, ISEPPO.z, ISEPPO.r, ISEPPO.r, 0, 1.8);
+    for (const { at } of Object.values(GIVERS)) world.add(at.x, at.z, at.r, at.r, 0, 1.8);
     this.side.complete = (id) => this.complete(id);
+    this.side.over = (q) => (GIVERS[giverOf(q)].level === 3 ? this.boss3Dead : this.boss2Dead);
   }
 
   get stage(): Stage {
@@ -268,8 +272,14 @@ export class Quest {
       zuane: mark(s === 'report' || s === 'return' || s === 'return3' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer' || s === 'offer3'),
       speziale: mark((this.accepted && !this.found) || this.headsReady(alive),
         !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (this.accepted3 && !this.blessed3 && !this.boss3Dead) || (!this.asked && !this.bossDead && alive > 0)),
-      iseppo: this.accepted2 ? mark(this.side.handInReady(over), this.side.open().length > 0) : undefined, // out of sight until the chains fall: level 2 opens
+      ...Object.fromEntries((Object.keys(GIVERS) as Giver[]).map((g) => [g, // out of sight until their level opens: the chains fall
+        (GIVERS[g].level === 3 ? this.accepted3 : this.accepted2) ? mark(this.side.handInReady(g), this.side.open(g).length > 0) : undefined])) as Record<Giver, Mark>,
     };
+  }
+
+  /** The Abate's weakenings earned (enemies/sangiorgio.ts PREPS): one for each side quest handed in that has one. */
+  preps(): string[] {
+    return SIDE.flatMap((q) => (q.prep && this.side.done.includes(q.id) ? [q.prep] : []));
   }
 
   /** Fra' Bortolo is found, once Fra' Zuane has sent the hero looking. */
@@ -457,7 +467,7 @@ export class Quest {
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
     if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: 'zuane' };
     if (Math.hypot(p.x - SPEZIALE.x, p.z - SPEZIALE.z) < REACH && p.y < 1.5) return { text: `Parla con ${SPEZIALE.name}`, act: () => '', talk: 'speziale' };
-    if (Math.hypot(p.x - ISEPPO.x, p.z - ISEPPO.z) < REACH && p.y < 1.5) return { text: `Parla con ${ISEPPO.name}`, act: () => '', talk: 'iseppo' };
+    for (const [g, { at }] of Object.entries(GIVERS) as [Giver, typeof GIVERS[Giver]][]) if (Math.hypot(p.x - at.x, p.z - at.z) < REACH && p.y < 1.5) return { text: `Parla con ${at.name}`, act: () => '', talk: g };
     const find = this.side.prompt(p);
     if (find) return find;
     const ferry = this.ferry(p);

@@ -143,6 +143,7 @@ export const QUESTS = {
   // San Giorgio's side quests (quest/squero.ts), ~level 15-17.
   marinai: { title: 'I marinai della Riva', xp: 160, gold: 60 }, // Mastro Iseppo, on the approdo
   fari: { title: 'I fari della darsena', xp: 220, gold: 90 }, // the Fanalista
+  acqua: { title: 'Acqua di San Benedetto', xp: 180, gold: 70 }, // Padre Archivista
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */

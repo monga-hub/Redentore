@@ -14,7 +14,7 @@
 // rare drop, Marieta's letter. Each pays XP, gold and one of level 2's epics; he sells the rest of them.
 //
 // Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
-// and the Fanalista of the darsena. A quest may run in steps (`want` a list: collect, then use-points that burn what
+// the Fanalista of the darsena, and Padre Archivista in Longhena's passage. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
@@ -28,29 +28,32 @@ export const ISEPPO = { x: -191, z: 1.5, yaw: Math.PI, r: 0.35, name: 'Mastro Is
 export const ISEPPO_RIVA = { x: -442.5, z: 101.2, yaw: Math.atan2(-8.1, 1.2), r: 0.35, name: 'Mastro Iseppo' } as const;
 /** The Fanalista, on the east quay of the darsena by its lighthouse, facing across the basin (out of the Nostromo's pack's pull). */
 export const FANALISTA = { x: -563, z: 141, yaw: Math.PI / 2, r: 0.35, name: 'Il Fanalista' } as const;
+/** Padre Archivista, in the Passaggio del Longhena off the passage's middle, facing the chiostro degli allori (out of its packs' pull). */
+export const ARCHIVISTA = { x: -506.5, z: 63, yaw: Math.PI / 2, r: 0.35, name: 'Padre Archivista' } as const;
 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
 export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
-export type Giver = 'iseppo' | 'riva' | 'fanalista';
+export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista';
 export interface GiverSpec { at: { x: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
 
 /**
  * What a quest wants. collect: `n` of `item`, dropped by `from` at `chance` while it is wanted; kill: `n` of
- * `from` while it runs; token: `item` off the elite `from` (laid at its body once it is dead, main.ts);
- * find: `item` picked up at `at`; letter: hand `item` in (the rare drop that starts it); use: `needs` burnt at `at`
- * (a step of a quest in steps: using it moves the quest on).
+ * `from` while it runs (`woken`: only the hidden pack the quest woke, enemies/sangiorgio.ts); token: `item` off the elite `from` (laid at its body once it is dead, main.ts);
+ * find: `item` picked up at `at`; letter: hand `item` in (the rare drop that starts it); use: `needs` burnt at `at`,
+ * `gives` put in the bag (a step of a quest in steps: using it moves the quest on; `say`: its prompt and notice, else
+ * "Accendi" the label).
  */
 export type Want =
   | { kind: 'collect'; item: string; n: number; from: Foe; chance: number }
-  | { kind: 'kill'; n: number; from: Foe }
+  | { kind: 'kill'; n: number; from: Foe; woken?: true }
   | { kind: 'token'; item: string; from: Foe }
   | { kind: 'find'; item: string; at: { x: number; y: number; z: number }; label: string }
   | { kind: 'letter'; item: string }
-  | { kind: 'use'; at: { x: number; y: number; z: number }; label: string; needs: { item: string; n: number } };
+  | { kind: 'use'; at: { x: number; y: number; z: number }; label: string; needs?: { item: string; n: number }; gives?: { item: string; n: number }; say?: [string, string] };
 
 export interface SideQuest {
   id: SideId;
@@ -79,6 +82,12 @@ export const EXVOTO = { x: 10.6, y: CHURCH_FLOOR, z: -23.25 };
 export const FARI = [{ x: -596, y: 0, z: 144.5 }, { x: -566, y: 0, z: 144.5 }] as const;
 /** The step of I fari della darsena that wakes the basin's drowned and the Nostromo: both lamps lit. */
 export const FARI_LIT = 3;
+
+/** Acqua di San Benedetto: the well of the chiostro degli allori, the antirefettorio's two lavabi (zones/sangiorgio.ts). */
+export const POZZO = { x: -530, y: 0.5, z: 62 };
+export const LAVABI = [{ x: -535.2, y: 0.6, z: 40 }, { x: -524.8, y: 0.6, z: 40 }] as const;
+/** The step of Acqua di San Benedetto that wakes the cellar's monks round the well: wine drawn. */
+export const VINO = 1;
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -225,6 +234,30 @@ export const SIDE: readonly SideQuest[] = [
       'Prendi la lanterna piccola, quella che portavo in giro per le banchine. E ascolta: quando l\'Abate chiama l\'acqua alta, la luce dei fari arriva fin là. Ci sarà un\'isola asciutta in più, per te.',
     ],
   },
+  {
+    id: 'acqua', giver: 'archivista',
+    want: [
+      { kind: 'use', at: POZZO, label: 'il pozzo degli Allori', say: ['Attingi al pozzo degli Allori', 'Dal pozzo sale vino, non acqua. E qualcuno lo sta benedicendo...'] },
+      { kind: 'kill', n: 3, from: 'monaco', woken: true },
+      { kind: 'use', at: POZZO, label: 'il pozzo degli Allori', gives: { item: 'acqua-allori', n: 2 }, say: ['Attingi di nuovo al pozzo degli Allori', 'Due brocche d\'acqua chiara: il pozzo è tornato pozzo'] },
+      { kind: 'use', at: LAVABI[0], label: 'il lavabo di ponente', needs: { item: 'acqua-allori', n: 1 }, say: ['Versa l\'acqua nel lavabo di ponente', 'Il lavabo di ponente ha di nuovo acqua'] },
+      { kind: 'use', at: LAVABI[1], label: 'il lavabo di levante', needs: { item: 'acqua-allori', n: 1 }, say: ['Versa l\'acqua nel lavabo di levante', 'Il lavabo di levante ha di nuovo acqua'] },
+    ],
+    reward: 'ampolle-benedetto',
+    prep: 'calice',
+    line: (n, step) => ['Attingi al pozzo del chiostro degli Allori', `Abbatti i monaci della cantina, al pozzo degli Allori: ${n}/3`, 'Attingi di nuovo al pozzo degli Allori',
+      'Versa l\'acqua nel lavabo di ponente dell\'Antirefettorio', 'Versa l\'acqua nel lavabo di levante dell\'Antirefettorio'][step],
+    offer: [
+      'Piano, piano, figliolo: qui si sussurra. Padre Archivista, di San Giorgio. Ho scritto ogni nome che è entrato in questo monastero per trecento anni, e ogni nome che ne è uscito. Il tuo non c\'è. Strano.',
+      'Ora et labora, diceva il Padre Benedetto. Prima del refettorio ci si lavava le mani ai lavabi del Palladio, nell\'Antirefettorio. Ma il pozzo degli Allori dà vino, adesso: l\'Abate ha fatto come a Cana, e i suoi monaci lo benedicono ogni notte.',
+      'Va\' al pozzo, attingi. Poi fa\' quello che serve, e riporta l\'acqua ai due lavabi, una brocca per lavabo. Un\'abbazia che non si lava le mani non è più un\'abbazia.',
+    ],
+    busy: 'Il pozzo è in mezzo al chiostro degli Allori, qui dietro. I lavabi sono nell\'Antirefettorio, uno per parte, davanti alla porta del Cenacolo.',
+    done: [
+      'Senti? L\'acqua nei lavabi. Trecento anni che non la sentivo. Scrivo anche questo, nel registro: «la notte del Risorto, i lavabi tornarono acqua».',
+      'Prendi queste ampolle: tre, dall\'ultima acqua buona che avevo. Quando l\'Abate alza il Calice di Cana, il suo vino ci si stempera dentro. Brucerà meno, figliolo. Molto meno.',
+    ],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -245,6 +278,10 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     bye: 'I fari sono accesi. Finché bruciano, la darsena sa dov\'è il Bacino. Va\', Risorto.',
     decline: 'Allora resta al buio anche tu. Io aspetto: i fanalisti sono abituati.',
     full: 'La borsa è piena, Risorto. Fa\' spazio: la lanterna non te la appoggio per terra, nell\'umido.' },
+  archivista: { at: ARCHIVISTA, level: 3, where: 'nel Passaggio del Longhena', greet: 'Figliolo. Parla piano: i nomi dormono, qui intorno.',
+    bye: 'I lavabi hanno acqua, e il registro una riga in più. Va\', figliolo: l\'Abate ti aspetta, e io scrivo.',
+    decline: 'Come vuoi. Annoto anche questo: «ripassò più tardi».',
+    full: 'Hai la borsa piena, figliolo. Fa\' spazio e torna: le ampolle sono fragili.' },
 };
 export const giverOf = (q: SideQuest): Giver => q.giver ?? 'iseppo';
 /** A quest's steps, one for a single want. */
@@ -297,7 +334,8 @@ export class SideQuests {
   /** Taken and its last step met: ready to hand in. `over`: its level's boss is dead, so it is ready whatever is left. */
   ready(q: SideQuest, over = this.over(q)): boolean {
     if (!this.active(q.id)) return false;
-    return over || (this.step(q) >= stepsOf(q).length - 1 && this.met(q, this.want(q)));
+    const n = stepsOf(q).length;
+    return over || this.step(q) >= n || (this.step(q) === n - 1 && this.met(q, this.want(q))); // past a last use-point, or the last want met
   }
 
   /** Progress for the tracker line. */
@@ -328,14 +366,14 @@ export class SideQuests {
     return this.bag?.count(item) ?? 0;
   }
 
-  /** The quests taken, with their want under way. */
+  /** The quests taken, with their want under way (none once past the last). */
   private running(): { q: SideQuest; w: Want }[] {
-    return SIDE.flatMap((q) => (this.active(q.id) ? [{ q, w: this.want(q) }] : []));
+    return SIDE.flatMap((q) => (this.active(q.id) && this.step(q) < stepsOf(q).length ? [{ q, w: this.want(q) }] : []));
   }
 
-  /** A mob of `foe` died: the kill quests running count it. */
-  killed(foe: Foe): void {
-    for (const { q, w } of this.running()) if (w.kind === 'kill' && w.from === foe) this.kills[q.id] = (this.kills[q.id] ?? 0) + 1;
+  /** A mob of `foe` died (`woke`: the quest whose hidden pack it was in): the kill quests running count it. */
+  killed(foe: Foe, woke?: SideId): void {
+    for (const { q, w } of this.running()) if (w.kind === 'kill' && w.from === foe && (!w.woken || woke === q.id)) this.kills[q.id] = (this.kills[q.id] ?? 0) + 1;
   }
 
   /**
@@ -380,9 +418,14 @@ export class SideQuests {
       if (Math.hypot(p.x - at.x, p.z - at.z) > REACH || Math.abs(p.y - at.y) > 1.5) continue;
       const w = this.want(q);
       if (w.kind === 'use') {
-        const { item, n } = w.needs, name = ITEM.get(item)?.name ?? item;
-        if (this.have(item) < n) return { text: `Per ${w.label} servono ${n} × ${name}` };
-        return { text: `Accendi ${w.label}`, act: () => { this.bag!.remove(item, n); this.steps[q.id] = this.step(q) + 1; return `Hai acceso ${w.label}`; } };
+        const [text, did] = w.say ?? [`Accendi ${w.label}`, `Hai acceso ${w.label}`], need = w.needs, give = w.gives;
+        if (need && this.have(need.item) < need.n) return { text: `Per ${w.label} servono ${need.n} × ${ITEM.get(need.item)?.name ?? need.item}` };
+        return { text, act: () => {
+          if (give && !this.bag?.add(give.item, give.n)) return 'La borsa è piena';
+          if (need) this.bag!.remove(need.item, need.n);
+          this.steps[q.id] = this.step(q) + 1;
+          return did;
+        } };
       }
       const f = w as { item: string; label: string };
       return { text: `Raccogli ${f.label}`, act: () => (this.bag?.add(f.item) ? `Hai trovato ${f.label}` : 'La borsa è piena') };
@@ -411,7 +454,7 @@ export class SideQuests {
   handIn(q: SideQuest): boolean {
     const bag = this.bag;
     if (!bag) return false;
-    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs.item] : [w.item])))].map((id) => [id, this.have(id)] as const);
+    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : [w.item])))].map((id) => [id, this.have(id)] as const);
     for (const [id, n] of items) if (n) bag.remove(id, n);
     if (!bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);
@@ -422,16 +465,22 @@ export class SideQuests {
     return true;
   }
 
+  /** One past the last step a quest can be on: past its last use-point, else on its last want. */
+  private ends(q: SideQuest): number {
+    const s = stepsOf(q);
+    return s.length + (s[s.length - 1].kind === 'use' ? 1 : 0);
+  }
+
   encode(): SideState {
     return { taken: [...this.taken], done: [...this.done], kills: { ...this.kills }, steps: { ...this.steps } };
   }
 
-  /** Lay a saved state over a fresh one; ids from another build are dropped, and steps past a quest's last. */
+  /** Lay a saved state over a fresh one; ids from another build are dropped, and steps past a quest's last (one past a last use-point is kept: ready). */
   decode(s: SideState): void {
     const known = (id: string): id is SideId => SIDE_BY.has(id as SideId);
     this.done = s.done.filter(known);
     this.taken = s.taken.filter(known).filter((id) => !this.done.includes(id));
     this.kills = Object.fromEntries(Object.entries(s.kills ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isFinite(n) && n > 0));
-    this.steps = Object.fromEntries(Object.entries(s.steps ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isInteger(n) && n > 0 && n < stepsOf(SIDE_BY.get(id as SideId)!).length));
+    this.steps = Object.fromEntries(Object.entries(s.steps ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isInteger(n) && n > 0 && n < this.ends(SIDE_BY.get(id as SideId)!)));
   }
 }

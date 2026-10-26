@@ -7,7 +7,7 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { DITALE, EXVOTO, FARI, FARI_LIT, GIVERS, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { DITALE, EXVOTO, FARI, FARI_LIT, GIVERS, LAVABI, POZZO, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
 import { ABATE, PACKS as PACKS3, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
@@ -249,11 +249,13 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
 // San Giorgio's givers (quest/squero.ts GIVERS): Iseppo on the approdo and the Fanalista, each with room by him out of
 // every pack's pull, shown once the third quest is taken; I marinai della Riva counted to ten (and not stranded once the
 // Abate is dead), I fari della darsena in its steps (oil, two lamps that burn it, the Nostromo's snuffer), its wave asleep
-// after the Abate in the saved order, its weakening laid on the Abate, both rewards unique; all of it saved mid-step.
+// after the Abate in the saved order, its weakening laid on the Abate, both rewards unique; all of it saved mid-step. Padre
+// Archivista's Acqua di San Benedetto: wine at the well wakes the cellar's monks (only they count), water drawn again, one
+// jug a lavabo in order, ready once poured (saved past the last step), the Calice weakened.
 {
   const l3 = spawnLevel3(level.world), q = new Quest(level.world), s = q.side, b = new Bag();
   s.bag = b;
-  for (const g of ['riva', 'fanalista'] as Giver[]) {
+  for (const g of ['riva', 'fanalista', 'archivista'] as Giver[]) {
     const at = GIVERS[g].at, by = feet(at.x + Math.sin(at.yaw) * -1.2, at.z + Math.cos(at.yaw) * -1.2); // a step in front of him
     if (level.world.blocked(by.x, by.z, by.y) || q.prompt(by)?.talk !== g) fail(`no room to talk to ${g} in front of him`);
     for (const pk of PACKS3) if (!pk.hidden) for (const [k, x, z] of pk.members) if (Math.hypot(x - at.x, z - at.z) < k.aggro + 0.5) fail(`a mob at (${x}, ${z}) is within its pull of ${g}`);
@@ -261,6 +263,8 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   }
   for (const at of [BERTHS.sangiorgio]) if (q.prompt({ ...at, y: 0 })?.talk) fail('a giver takes the gondola\'s prompt at the San Giorgio berth');
   const lamps = FARI.map((at) => { const f = feet(at.x, at.z); if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - at.y) > 0.5) fail(`no room by the lamp (${at.x}, ${at.z})`); return f; });
+  const well = feet(POZZO.x + 1.6, POZZO.z), basins = LAVABI.map((at) => feet(at.x + Math.sign(-530 - at.x) * 1.6, at.z)); // by the well's rim, before each basin
+  for (const f of [well, ...basins]) if (level.world.blocked(f.x, f.z, f.y)) fail(`no room by the well or a lavabo (${f.x}, ${f.z})`);
   const hidden = l3.hidden.flatMap((h) => h.members), awake = l3.all.filter((m) => !hidden.includes(m));
   if (!hidden.length || hidden.some((m) => m.state !== 'dead') || l3.all.indexOf(l3.boss) !== awake.length - 1 || l3.all.slice(-hidden.length).some((m) => !hidden.includes(m))) fail('the hidden packs are not asleep after the Abate, at the end of the saved order');
   q.accepted3 = true;
@@ -301,7 +305,35 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   prepare([]);
   if (isles !== ABATE.tide!.n + 1) fail(`the lantern leaves ${isles} islands, ${ABATE.tide!.n} without it`);
   if (q.marks(0).riva || q.marks(0).fanalista) fail("San Giorgio's givers still have something once their quests are done");
-  const unique = ['remo-marieta', 'lanterna-faro'];
+  take('archivista');
+  if (q.prompt(basins[0])?.act) fail('a lavabo takes water before the well is drawn');
+  q.prompt(well)?.act?.();
+  if (!s.reached('acqua', VINO) || !l3.hidden.some((h) => h.pack.hidden!.quest === 'acqua' && h.pack.hidden!.step === VINO && h.members.length === 3)) fail('wine drawn does not wake the three cellar monks');
+  for (let i = 0; i < 3; i++) s.killed('monaco');
+  s.update();
+  if (s.step(SIDE_BY.get('acqua')!) !== VINO) fail('monks off other packs count for the cellar three');
+  for (let i = 0; i < 3; i++) s.killed('monaco', 'acqua');
+  s.update();
+  if (q.prompt(basins[0])?.act) fail('a lavabo takes water before the well is drawn again');
+  q.prompt(well)?.act?.();
+  if (b.count('acqua-allori') !== 2) fail(`the well gave ${b.count('acqua-allori')} jugs, want 2`);
+  if (q.prompt(basins[1])?.act) fail('the east lavabo takes water before the west one');
+  q.prompt(basins[0])?.act?.();
+  q.prompt(basins[1])?.act?.();
+  const acqua = SIDE_BY.get('acqua')!;
+  if (b.count('acqua-allori') || !s.ready(acqua) || s.spots().length) fail('both lavabi filled do not make Acqua di San Benedetto ready');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (!copy.side.ready(acqua)) fail('Acqua di San Benedetto is not ready after a save past its last lavabo');
+  copy.side.decode({ taken: ['acqua'], done: [], steps: { acqua: 6 } });
+  if (Object.keys(copy.side.steps).length) fail('a saved step past Acqua di San Benedetto\'s end is kept');
+  hand('archivista', 'acqua');
+  if (q.preps().join() !== 'faro,calice') fail(`the weakenings earned are ${q.preps()}, want faro,calice`);
+  prepare(['calice']);
+  const cup = ABATE.pour!.damage;
+  prepare([]);
+  if (cup !== Math.round(ABATE.pour!.damage * 0.6)) fail(`the Calice pours ${cup} with the ampolle, ${ABATE.pour!.damage} without`);
+  if (q.marks(0).archivista) fail('Padre Archivista still has something once his quest is done');
+  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
 }
@@ -339,7 +371,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

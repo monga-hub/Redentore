@@ -9,7 +9,7 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { ARCHIVISTA, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -37,8 +37,9 @@ const RUE = 0x8aff9a; // Fra' Bortolo's glow
 const riteSmoke: Style = { life: [1.4, 2.2], size: [0.4, 0.8], grow: 1.6, color: 0x9aff8a, color2: 0x0a2a10, hdr: 1.5, drag: 1.2, grav: -0.6 };
 const SQUERO = 0xffc27a; // Mastro Iseppo's, a lantern's
 const FARO = 0xffb347; // the Fanalista's, lamp oil
-/** The givers' portraits: Mastro Iseppo's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
-const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' } };
+const ARCHIVIO = 0x9fc8ff; // Padre Archivista's, his lantern's pale flame
+/** The givers' portraits: Mastro Iseppo's and Padre Archivista's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
+const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' } };
 /** A lighthouse's fire seen from across the lagoon: a soft gold halo on a canvas. */
 function halo(): THREE.SpriteMaterial {
   const c = document.createElement('canvas');
@@ -120,7 +121,7 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
-  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb') };
+  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb') };
   private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
   private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
   private lines = ''; // Mastro Iseppo's tracker lines as drawn
@@ -188,7 +189,7 @@ export class QuestView {
     chest.add(this.lid, this.inside, this.glint, this.key);
     this.root.add(chest, this.npc.root, this.speziale.root, ...Object.values(this.givers).map((n) => n.root));
     for (const q of SIDE) for (const w of stepsOf(q)) {
-      if (w.kind !== 'find' && w.kind !== 'use') continue;
+      if ((w.kind !== 'find' && w.kind !== 'use') || this.finds.some((f) => f.q === q && f.at === w.at)) continue; // one glint a spot (the well is drawn from twice)
       const m = new THREE.Mesh(this.glint.geometry, this.glint.material);
       m.position.set(w.at.x, w.at.y + 0.45, w.at.z);
       m.visible = false;

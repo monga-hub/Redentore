@@ -102,6 +102,11 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   caricare il Nostromo; il suo spegnimoccolo al Fanalista. Paga la Lanterna del faro e indebolisce l'Abate: in *Acqua
   alta* un'isola asciutta in più (`PREPS` in `src/enemies/sangiorgio.ts`, applicate quando parte il combattimento). I
   branchi nascosti stanno in fondo a `PACKS`, salvati dopo l'Abate; le missioni si consegnano da sole se l'Abate cade.
+- *Acqua di San Benedetto* da Padre Archivista, fantasma benedettino nel Passaggio del Longhena (corpo Meshy
+  `archivista.glb`, Idle e Talk): al pozzo del chiostro degli Allori si attinge vino e salgono 3 monaci della cantina
+  (branco nascosto: contano solo loro), poi si riattinge acqua (2 brocche) e se ne versa una per lavabo
+  nell'Antirefettorio, ponente poi levante. Paga le Ampolle di San Benedetto e indebolisce l'Abate: il Calice di Cana
+  fa il 40% di danno in meno (`PREPS=calice`).
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

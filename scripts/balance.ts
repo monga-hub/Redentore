@@ -23,7 +23,7 @@
 //   node scripts/balance.ts boss2 plague 11 [runs] the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, side2 with Mastro Iseppo's epics, epic)
 //   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts route3 melee [runs]    one build on the route, on through level 2 into level 3 (Fra' Zuane, the Punta, the gondola, San Giorgio, the Bibliotecario, the Abate)
-//   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro: the side quests' weakenings on him)
+//   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
 //   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
@@ -897,7 +897,7 @@ export function playBoss(build: string, lv: number, dodge: boolean, s = 1, gear 
   const boss = third ? r.l3.boss : second ? r.l2.boss : r.boss, zone = third ? 'boss3' : second ? 'boss2' : 'boss';
   if (second || third) { r.quest.win(); r.quest.out = true; r.quest.report(); r.quest.accept2(); r.quest.takeKey2(); r.quest.open(r.quest.gate('coro-zitelle')); }
   if (third) { r.quest.win2(); r.quest.report2(); r.quest.accept3(); r.quest.landed = true; r.quest.takeKey3(); r.quest.open(r.quest.gate('cenacolo')); }
-  if (third) prepare((process.env.PREPS ?? '').split(',').filter(Boolean)); // PREPS=faro: the side quests' weakenings on the Abate (enemies/sangiorgio.ts PREPS)
+  if (third) prepare((process.env.PREPS ?? '').split(',').filter(Boolean)); // PREPS=faro,calice: the side quests' weakenings on the Abate (enemies/sangiorgio.ts PREPS)
   r.paths.reset();
   for (const m of r.mobs) if (m !== boss && !(second && (m as Priest).kind === VELO)) { m.state = 'dead'; m.hp = 0; }
   r.levelUp = () => {}; // the level is fixed

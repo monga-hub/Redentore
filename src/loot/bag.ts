@@ -64,6 +64,9 @@ export const ITEMS: readonly Item[] = [
   // San Giorgio's side quests (quest/squero.ts): the Fanalista's oil off the drowned, the Nostromo's snuffer.
   { id: 'ampolla-faro', name: 'Ampolla d’olio dei fanali', rarity: 'noncomune', icon: 'vial', lore: 'Olio di lino per i fari della darsena. I marinai la portavano alla cintura, per il Fanalista.', quest: true, l3: true },
   { id: 'spegnimoccolo', name: 'Spegnimoccolo del Nostromo', rarity: 'raro', icon: 'candle', lore: 'Un cono di ferro su un’asta: spegneva i fari ogni notte. Per il Fanalista, alla darsena.', quest: true, l3: true },
+  // Padre Archivista's: the well's water for the lavabi, and his flasks (a reward: no table rolls them).
+  { id: 'acqua-allori', name: 'Brocca d’acqua degli Allori', rarity: 'noncomune', icon: 'vial', lore: 'Acqua del pozzo del chiostro, di nuovo acqua. Per i lavabi dell’Antirefettorio, una per lavabo.', quest: true, l3: true },
+  { id: 'ampolle-benedetto', name: 'Ampolle di San Benedetto', rarity: 'epico', icon: 'vial', lore: 'Tre ampolle dell’ultima acqua buona di Padre Archivista. Il vino del Calice di Cana ci si stempera.', l3: true, unique: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));
@@ -100,7 +103,7 @@ export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 |
   const items: string[] = tier === 'boss' ? [prize] : [];
   for (let i = 0; i < t.items; i++) {
     if (rnd() >= t.chance) continue;
-    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && (mine(x) || (level > 1 && levelOfItem(x) === 1 && r === 'comune')));
+    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && !x.unique && (mine(x) || (level > 1 && levelOfItem(x) === 1 && r === 'comune')));
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   const g = t.gear;

@@ -15,8 +15,9 @@
 //
 // Level 3 (Le nozze di San Giorgio): Fra' Zuane's third quest drops the chain past the Tre Oci; the hero walks the
 // Fondamenta San Giovanni to the Punta della Giudecca, where Mastro Iseppo's gondola rows itself across to San Giorgio
-// Maggiore (quest/ferry.ts); takes the key of the Cenacolo off the Bibliotecario in Longhena's library, opens the
-// refectory from the antirefettorio and kills the Abate under the empty frame of the Nozze di Cana; the refectory's
+// Maggiore (quest/ferry.ts); takes the key of the Cenacolo off the Bibliotecario in Longhena's library and, for the ghost of
+// Paolo Veronese, brings the musicians' instruments and the Nozze di Cana's canvas back (quest/squero.ts `musici`, `tela`:
+// the wedding wants its witnesses, and the door opens on nothing less), opens the refectory from the antirefettorio and kills the Abate under the empty frame of the Nozze di Cana; the refectory's
 // garden door opens, and the gondola rows the hero home to Fra' Zuane.
 import type { Box, World } from '../core/physics.ts';
 import type { Tune } from '../player/levels.ts';
@@ -29,11 +30,11 @@ export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2' | 'quest3' | 'ke
 
 /** Where the quests stand, in order; derived from the flags, never stored. */
 export type Stage = 'talk' | 'key' | 'grate' | 'boss' | 'leave' | 'report' | 'offer' | 'route' | 'ospizio' | 'church' | 'boss2' | 'return'
-  | 'offer3' | 'route3' | 'biblioteca' | 'cenacolo' | 'boss3' | 'return3' | 'done';
+  | 'offer3' | 'route3' | 'biblioteca' | 'veronese' | 'cenacolo' | 'boss3' | 'return3' | 'done';
 /** The stages of the second quest, La dote delle Zitelle (from Zuane's offer on). */
 export const SECOND: readonly Stage[] = ['offer', 'route', 'ospizio', 'church', 'boss2', 'return'];
 /** The third's, Le nozze di San Giorgio (from his third offer on); 'done' is the end of all three. */
-export const THIRD: readonly Stage[] = ['offer3', 'route3', 'biblioteca', 'cenacolo', 'boss3', 'return3', 'done'];
+export const THIRD: readonly Stage[] = ['offer3', 'route3', 'biblioteca', 'veronese', 'cenacolo', 'boss3', 'return3', 'done'];
 
 export interface Gate {
   id: string;
@@ -44,7 +45,7 @@ export interface Gate {
   at: number; // centre along the wall
   c: number; // the wall's line (z for an 'x' wall, x for a 'z' wall)
   w: number; t: number; y0: number; h: number;
-  needs: Need; // 'key', 'key2', 'key3': opened by the player holding that key; 'boss', 'boss2', 'boss3': swings open when that boss dies; 'quest2', 'quest3': falls when that quest is taken
+  needs: Need; // 'key', 'key2', 'key3': opened by the player holding that key (the Cenacolo's also wants the Nozze back, Quest.canvas); 'boss', 'boss2', 'boss3': swings open when that boss dies; 'quest2', 'quest3': falls when that quest is taken
   open: boolean;
   box: Box; // its collider while shut
 }
@@ -144,6 +145,8 @@ export const QUESTS = {
   marinai: { title: 'I marinai della Riva', xp: 160, gold: 60 }, // Mastro Iseppo, on the approdo
   fari: { title: 'I fari della darsena', xp: 220, gold: 90 }, // the Fanalista
   acqua: { title: 'Acqua di San Benedetto', xp: 180, gold: 70 }, // Padre Archivista
+  musici: { title: 'I musici di Cana', xp: 200, gold: 80 }, // the Veronese, the first of his two: the main quest's way into the Cenacolo
+  tela: { title: 'La tela tagliata', xp: 320, gold: 140 }, // the Veronese's second: the Commissario delle Arti
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -234,7 +237,7 @@ export class Quest {
     if (!this.accepted3) return 'offer3';
     if (!this.landed) return 'route3';
     if (!this.key3) return 'biblioteca';
-    if (!this.gate('cenacolo').open) return 'cenacolo';
+    if (!this.gate('cenacolo').open) return this.canvas ? 'cenacolo' : 'veronese'; // a door opened before the Veronese's chain (an older save) stays open
     if (!this.boss3Dead) return 'boss3';
     return this.reported3 ? 'done' : 'return3';
   }
@@ -321,6 +324,11 @@ export class Quest {
     this.report2();
     this.accepted3 = true;
     for (const g of this.gates) if (g.needs === 'quest3') this.open(g);
+  }
+
+  /** The Nozze di Cana hang in the Cenacolo's frame again: the Veronese's La tela tagliata handed in. The Cenacolo's door wants it with its key. */
+  get canvas(): boolean {
+    return this.side.done.includes('tela');
   }
 
   /** The Bibliotecario is dead: the key of the Cenacolo is the hero's. */
@@ -484,6 +492,7 @@ export class Quest {
       if (g.needs === 'boss3') return { text: `${cap(g.label)} è sbarrata` };
       if (g.needs === 'quest2' || g.needs === 'quest3') return { text: `${cap(g.label)} sbarrano la fondamenta` };
       if (!(g.needs === 'key3' ? this.key3 : g.needs === 'key2' ? this.key2 : this.key)) return { text: `${cap(g.label)} è chiusa a chiave` };
+      if (g.id === 'cenacolo' && !this.canvas) return { text: 'La chiave gira, ma la porta non cede: le nozze non hanno testimoni' };
       return { text: `Apri ${g.label}`, act: () => { this.open(g); return ''; } };
     }
     return undefined;

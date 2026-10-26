@@ -67,6 +67,12 @@ export const ITEMS: readonly Item[] = [
   // Padre Archivista's: the well's water for the lavabi, and his flasks (a reward: no table rolls them).
   { id: 'acqua-allori', name: 'Brocca d’acqua degli Allori', rarity: 'noncomune', icon: 'vial', lore: 'Acqua del pozzo del chiostro, di nuovo acqua. Per i lavabi dell’Antirefettorio, una per lavabo.', quest: true, l3: true },
   { id: 'ampolle-benedetto', name: 'Ampolle di San Benedetto', rarity: 'epico', icon: 'vial', lore: 'Tre ampolle dell’ultima acqua buona di Padre Archivista. Il vino del Calice di Cana ci si stempera.', l3: true, unique: true },
+  // The Veronese's: the four musicians' instruments out of the Nozze, and the canvas itself off the Commissario delle Arti.
+  { id: 'viola-gamba', name: 'Viola da gamba del Veronese', rarity: 'raro', icon: 'relic', lore: 'Bianca, come la suona il pittore in primo piano nelle Nozze. Le corde vibrano da sole.', quest: true, l3: true },
+  { id: 'violino-tintoretto', name: 'Violino del Tintoretto', rarity: 'raro', icon: 'relic', lore: 'Il Tintoretto lo suona nelle Nozze, accanto al Veronese. Odora di trementina.', quest: true, l3: true },
+  { id: 'violone-tiziano', name: 'Violone di Tiziano', rarity: 'raro', icon: 'relic', lore: 'Il vecchio Tiziano, in rosso, al violone. Pesa quanto un uomo, e non si lamenta.', quest: true, l3: true },
+  { id: 'flauto-bassano', name: 'Flauto del Bassano', rarity: 'raro', icon: 'relic', lore: 'Jacopo Bassano al flauto, dietro i suonatori. Ha ancora il fiato dentro.', quest: true, l3: true },
+  { id: 'tela-arrotolata', name: 'Tela arrotolata delle Nozze di Cana', rarity: 'epico', icon: 'relic', lore: 'Sessantasei metri quadri di tela, tagliati dalla cornice l’11 settembre 1797 e arrotolati col colore all’infuori. Per il Veronese.', quest: true, l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

@@ -14,10 +14,12 @@
 // rare drop, Marieta's letter. Each pays XP, gold and one of level 2's epics; he sells the rest of them.
 //
 // Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
-// the Fanalista of the darsena, and Padre Archivista in Longhena's passage. A quest may run in steps (`want` a list: collect, then use-points that burn what
+// the Fanalista of the darsena, Padre Archivista in Longhena's passage, and the ghost of Paolo Veronese in the antirefettorio, whose
+// two quests (the musicians' instruments, then the canvas back off the Commissario delle Arti) open the Cenacolo. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
+import { LIB_F } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
 import { QUESTS, type QuestId } from './progress.ts';
 
@@ -30,20 +32,22 @@ export const ISEPPO_RIVA = { x: -442.5, z: 101.2, yaw: Math.atan2(-8.1, 1.2), r:
 export const FANALISTA = { x: -563, z: 141, yaw: Math.PI / 2, r: 0.35, name: 'Il Fanalista' } as const;
 /** Padre Archivista, in the Passaggio del Longhena off the passage's middle, facing the chiostro degli allori (out of its packs' pull). */
 export const ARCHIVISTA = { x: -506.5, z: 63, yaw: Math.PI / 2, r: 0.35, name: 'Padre Archivista' } as const;
+/** Paolo Veronese's ghost, in the antirefettorio's north-east corner, facing into it (out of the arch from the allori, out of reach of the lavabi and the Cenacolo's door). */
+export const VERONESE = { x: -525, z: 43.2, yaw: Math.PI / 2, r: 0.35, name: 'Paolo Veronese' } as const;
 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
-export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario';
+export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
-export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista';
+export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese';
 export interface GiverSpec { at: { x: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
 
 /**
  * What a quest wants. collect: `n` of `item`, dropped by `from` at `chance` while it is wanted; kill: `n` of
  * `from` while it runs (`woken`: only the hidden pack the quest woke, enemies/sangiorgio.ts); token: `item` off the elite `from` (laid at its body once it is dead, main.ts);
- * find: `item` picked up at `at`; letter: hand `item` in (the rare drop that starts it); use: `needs` burnt at `at`,
+ * find: `item` picked up at `at`; finds: each of `finds` picked up at its spot, in any order; letter: hand `item` in (the rare drop that starts it); use: `needs` burnt at `at`,
  * `gives` put in the bag (a step of a quest in steps: using it moves the quest on; `say`: its prompt and notice, else
  * "Accendi" the label).
  */
@@ -52,8 +56,12 @@ export type Want =
   | { kind: 'kill'; n: number; from: Foe; woken?: true }
   | { kind: 'token'; item: string; from: Foe }
   | { kind: 'find'; item: string; at: { x: number; y: number; z: number }; label: string }
+  | { kind: 'finds'; finds: readonly Find[] }
   | { kind: 'letter'; item: string }
   | { kind: 'use'; at: { x: number; y: number; z: number }; label: string; needs?: { item: string; n: number }; gives?: { item: string; n: number }; say?: [string, string] };
+
+/** One thing to pick up at a spot (a `finds` want). */
+export interface Find { item: string; at: { x: number; y: number; z: number }; label: string }
 
 export interface SideQuest {
   id: SideId;
@@ -88,6 +96,20 @@ export const POZZO = { x: -530, y: 0.5, z: 62 };
 export const LAVABI = [{ x: -535.2, y: 0.6, z: 40 }, { x: -524.8, y: 0.6, z: 40 }] as const;
 /** The step of Acqua di San Benedetto that wakes the cellar's monks round the well: wine drawn. */
 export const VINO = 1;
+
+/**
+ * I musici di Cana: the four instruments of the musicians in the Nozze's foreground (Veronese, Tiziano, Tintoretto, Bassano), each
+ * by a pack: the viola in Longhena's library, the violin in the presbytery under Tintoretto's canvas, the violone among the monks'
+ * stalls, the flute on the Teatro Verde's stage (zones/sangiorgio.ts).
+ */
+export const STRUMENTI: readonly Find[] = [
+  { item: 'viola-gamba', at: { x: -491, y: LIB_F, z: 9.5 }, label: 'la viola da gamba' },
+  { item: 'violino-tintoretto', at: { x: -547, y: 0.6, z: 108.6 }, label: 'il violino' },
+  { item: 'violone-tiziano', at: { x: -564.5, y: 0.6, z: 106 }, label: 'il violone' },
+  { item: 'flauto-bassano', at: { x: -574, y: 0.5, z: -36.5 }, label: 'il flauto' },
+];
+/** La tela tagliata: the rolled canvas, off the Commissario delle Arti; handed in, the Nozze hang in the Cenacolo's frame again (quest/view.ts). */
+export const TELA = 'tela-arrotolata';
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -258,6 +280,38 @@ export const SIDE: readonly SideQuest[] = [
       'Prendi queste ampolle: tre, dall\'ultima acqua buona che avevo. Quando l\'Abate alza il Calice di Cana, il suo vino ci si stempera dentro. Brucerà meno, figliolo. Molto meno.',
     ],
   },
+  {
+    id: 'musici', giver: 'veronese',
+    want: { kind: 'finds', finds: STRUMENTI },
+    reward: 'mantello-caliari',
+    line: (n) => `Strumenti di Cana: ${n}/4 (Biblioteca, Presbiterio, Coro, Teatro Verde)`,
+    offer: [
+      'Non spaventarti, ragazzo: sono solo un pittore. Paolo Caliari, da Verona. In Venezia mi chiamano il Veronese. Quella porta l\'ho varcata ogni mattina per quindici mesi, con i pennelli: là dentro ho dipinto le Nozze di Cana, sessanta metri quadri di tela.',
+      'Ora la porta non mi vuole, e la cornice è vuota. I monaci sanno che le nozze non finiscono senza testimoni, e i testimoni erano miei: in primo piano, a suonare, ho messo me stesso con la viola, Tiziano al violone, il Tintoretto al violino, il Bassano al flauto.',
+      'Gli strumenti sono scappati dal quadro quando l\'hanno tagliato, e i morti dell\'Abate li tengono come reliquie. La viola in Biblioteca, il violino nel Presbiterio, il violone nel Coro dei monaci, il flauto sul palco del Teatro Verde. Riportameli, tutti e quattro.',
+    ],
+    busy: 'Quattro strumenti, ragazzo: viola, violino, violone, flauto. Senza musica, una festa di nozze è solo gente seduta che mangia. E sulla tavola c\'è una clessidra: il tempo corre.',
+    done: [
+      'La viola! L\'ho accordata io, nel sessantadue. E il violone di Tiziano, che pesava più di lui. Senti? Suonano da soli, appena si toccano. Le nozze hanno di nuovo la loro musica.',
+      'Prendi questo mantello: è il mio, quello che porto nel quadro, bianco e oro. Ma la musica non basta, ragazzo. Manca la tela.',
+    ],
+  },
+  {
+    id: 'tela', giver: 'veronese', after: 'musici',
+    want: { kind: 'token', item: TELA, from: 'commissario' },
+    reward: 'sciabola-commissario',
+    line: () => 'Sconfiggi il Commissario delle Arti nel chiostro dei cipressi e riporta la tela al Veronese',
+    offer: [
+      'L\'undici settembre del novantasette vennero i commissari della Repubblica francese, con un inventario e un paio di forbici da sarto. Tagliarono le Nozze dalla cornice, le arrotolarono come un tappeto, le caricarono su una nave per Parigi.',
+      'Uno di loro non è mai partito. Il Commissario delle Arti: il convento diventò caserma, e lui è rimasto con la tela sotto il braccio, a contare quadri che non ci sono più. Ora sta nel chiostro dei cipressi, dove dormivano le truppe.',
+      'Riportami la tela, ragazzo. Attento alla sciabola: taglia in lungo, come ha tagliato me. E segna il pavimento come segnava i quadri, con il gesso rosso. Quando lo metti alle strette chiama i suoi granatieri.',
+    ],
+    busy: 'Il chiostro dei cipressi, dietro il passaggio del Longhena. Il Commissario ha la tela, e la tela ha le mie nozze. Senza di lei la porta del Cenacolo non si apre.',
+    done: [
+      'È lei. Arrotolata male, con il colore all\'infuori, come un sacco di grano... Ma è lei. Il Cristo, la sposa, i servi con le giare, il mio cane. Vieni, la riappendiamo.',
+      'Ecco: la cornice ha di nuovo le sue nozze, e le nozze i loro testimoni. La porta del Cenacolo ora ti lascerà passare. Tieni la sua sciabola: ha tagliato abbastanza tele, che tagli qualcos\'altro.',
+    ],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -282,6 +336,10 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     bye: 'I lavabi hanno acqua, e il registro una riga in più. Va\', figliolo: l\'Abate ti aspetta, e io scrivo.',
     decline: 'Come vuoi. Annoto anche questo: «ripassò più tardi».',
     full: 'Hai la borsa piena, figliolo. Fa\' spazio e torna: le ampolle sono fragili.' },
+  veronese: { at: VERONESE, level: 3, where: "nell'Antirefettorio", greet: 'Ragazzo. Guarda quella porta: dietro c\'è il mio quadro più grande, e non posso entrare.',
+    bye: 'Le nozze sono di nuovo al loro posto. Va\', ragazzo: io resto a guardarle. Un pittore non si stanca mai del suo quadro.',
+    decline: 'Va bene. Io aspetto qui. Sono quattrocento anni che aspetto davanti a questa porta.',
+    full: 'Hai la borsa piena, ragazzo. Fa\' spazio e torna: questo non si appoggia per terra.' },
 };
 export const giverOf = (q: SideQuest): Giver => q.giver ?? 'iseppo';
 /** A quest's steps, one for a single want. */
@@ -328,6 +386,7 @@ export class SideQuests {
   private met(q: SideQuest, w: Want): boolean {
     if (w.kind === 'kill') return (this.kills[q.id] ?? 0) >= w.n;
     if (w.kind === 'collect') return this.have(w.item) >= w.n;
+    if (w.kind === 'finds') return w.finds.every((f) => this.have(f.item) > 0);
     return w.kind !== 'use' && this.have(w.item) > 0;
   }
 
@@ -341,7 +400,7 @@ export class SideQuests {
   /** Progress for the tracker line. */
   progress(q: SideQuest): number {
     const w = this.want(q);
-    return w.kind === 'kill' ? Math.min(w.n, this.kills[q.id] ?? 0) : w.kind === 'collect' ? Math.min(w.n, this.have(w.item)) : 0;
+    return w.kind === 'kill' ? Math.min(w.n, this.kills[q.id] ?? 0) : w.kind === 'collect' ? Math.min(w.n, this.have(w.item)) : w.kind === 'finds' ? w.finds.filter((f) => this.have(f.item) > 0).length : 0;
   }
 
   /** The tracker's line for a quest running. */
@@ -407,14 +466,15 @@ export class SideQuests {
     return this.running().flatMap(({ w }) => (w.kind === 'token' && !this.have(w.item) ? [{ item: w.item, from: w.from }] : []));
   }
 
-  /** Find spots still to search and use-points still to use (quest/view.ts glints them, main.ts pins them). */
-  spots(): { q: SideQuest; at: { x: number; y: number; z: number } }[] {
-    return this.running().flatMap(({ q, w }) => ((w.kind === 'find' && !this.have(w.item)) || w.kind === 'use' ? [{ q, at: w.at }] : []));
+  /** Find spots still to search and use-points still to use (quest/view.ts glints them, main.ts pins them); `find`: what lies there. */
+  spots(): { q: SideQuest; at: { x: number; y: number; z: number }; find?: Find }[] {
+    return this.running().flatMap(({ q, w }) => (w.kind === 'finds' ? w.finds.filter((f) => !this.have(f.item)).map((f) => ({ q, at: f.at, find: f }))
+      : (w.kind === 'find' && !this.have(w.item)) || w.kind === 'use' ? [{ q, at: w.at }] : []));
   }
 
   /** "Raccogli ..." at a find spot, "Accendi ..." at a use-point, under the hero's feet `p`. */
   prompt(p: { x: number; y: number; z: number }): { text: string; act?: () => string } | undefined {
-    for (const { q, at } of this.spots()) {
+    for (const { q, at, find } of this.spots()) {
       if (Math.hypot(p.x - at.x, p.z - at.z) > REACH || Math.abs(p.y - at.y) > 1.5) continue;
       const w = this.want(q);
       if (w.kind === 'use') {
@@ -427,7 +487,7 @@ export class SideQuests {
           return did;
         } };
       }
-      const f = w as { item: string; label: string };
+      const f = find ?? (w as Find);
       return { text: `Raccogli ${f.label}`, act: () => (this.bag?.add(f.item) ? `Hai trovato ${f.label}` : 'La borsa è piena') };
     }
     return undefined;
@@ -454,7 +514,7 @@ export class SideQuests {
   handIn(q: SideQuest): boolean {
     const bag = this.bag;
     if (!bag) return false;
-    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : [w.item])))].map((id) => [id, this.have(id)] as const);
+    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item])))].map((id) => [id, this.have(id)] as const);
     for (const [id, n] of items) if (n) bag.remove(id, n);
     if (!bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);

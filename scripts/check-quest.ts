@@ -7,8 +7,8 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { DITALE, EXVOTO, FARI, FARI_LIT, GIVERS, LAVABI, POZZO, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
-import { ABATE, PACKS as PACKS3, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
+import { DITALE, EXVOTO, FARI, FARI_LIT, GIVERS, LAVABI, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { ABATE, COMMISSARIO, GRANATIERE, PACKS as PACKS3, due, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
@@ -31,7 +31,7 @@ const facing = feet(NPC.x - 1.2, NPC.z + 0.6);
 if (level.world.blocked(facing.x, facing.z, facing.y)) fail("no room to stand by Fra' Zuane");
 
 // Every stage has his lines and an objective; the first offers the quest.
-for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'report', 'offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'offer3', 'route3', 'biblioteca', 'cenacolo', 'boss3', 'return3', 'done'] as Stage[]) {
+for (const s of ['talk', 'key', 'grate', 'boss', 'leave', 'report', 'offer', 'route', 'ospizio', 'church', 'boss2', 'return', 'offer3', 'route3', 'biblioteca', 'veronese', 'cenacolo', 'boss3', 'return3', 'done'] as Stage[]) {
   if (!TALK[s]?.pages.length || !OBJECTIVE[s]) fail(`stage ${s} has no lines or no objective`);
   for (const p of TALK[s].pages) if (p.length > 260) fail(`a page of ${s} is ${p.length} characters, too long for the window on a phone`);
 }
@@ -99,7 +99,8 @@ if (!quest.report2() || quest.report2() || quest.bonusXp !== xp0 + questXp('reve
 want('offer3');
 
 // Level 3: the third offer drops the chain past the Tre Oci; the gondola is boarded at the Punta, sets the hero on San
-// Giorgio, the Bibliotecario's key opens the Cenacolo, the Abate's death its garden door, and the report pays once.
+// Giorgio, the Bibliotecario's key and the Nozze back from the Veronese open the Cenacolo (neither alone does), the Abate's
+// death its garden door, and the report pays once.
 const chain3 = quest.gate('catene-punta');
 if (chain3.open || quest.ferry(feet(BERTHS.punta.x, BERTHS.punta.z))) fail('the chain past the Tre Oci or the gondola open before the third quest');
 quest.accept3();
@@ -115,6 +116,10 @@ const cen = quest.gate('cenacolo'), cc = quest.centre(cen);
 const shut3 = quest.prompt({ x: cc.x, y: 0, z: cc.z + 1.2 });
 if (!shut3 || shut3.act) fail('the Cenacolo opens without the Bibliotecario\'s key');
 quest.takeKey3();
+want('veronese');
+const keyed3 = quest.prompt({ x: cc.x, y: 0, z: cc.z + 1.2 });
+if (!keyed3 || keyed3.act) fail('the Cenacolo opens with the key but without the Nozze di Cana back');
+quest.side.done.push('tela'); // La tela tagliata handed in (played below, on its own Quest)
 want('cenacolo');
 const opening3 = quest.prompt({ x: cc.x, y: 0, z: cc.z + 1.2 });
 if (!opening3?.act) fail("the Bibliotecario's key does not open the Cenacolo");
@@ -129,6 +134,15 @@ const xp3 = quest.bonusXp;
 if (!quest.report3() || quest.report3() || quest.bonusXp !== xp3 + questXp('sangiorgio')) fail('the third report does not pay its reward exactly once');
 want('done');
 if (quest.done.join() !== 'chiave,bortolo,reverendissimo,zitelle,sangiorgio') fail(`quests done ${quest.done}`);
+{ // A game saved past the Cenacolo's door before the Veronese's chain existed: its door stays open, the Abate is next.
+  const old = new Quest(level.world);
+  old.accepted = old.key = old.bossDead = old.out = old.reported = old.accepted2 = old.arrived = old.key2 = old.boss2Dead = old.reported2 = old.accepted3 = old.landed = old.key3 = true;
+  for (const g of old.gates) if (g.needs !== 'boss3') old.open(g);
+  if (old.stage !== 'boss3' || old.checkpoint() !== quest.checkpoint()) fail(`a save past the Cenacolo's door without the canvas is at ${old.stage}`);
+  const fresh = new Quest(level.world);
+  fresh.side.done.push('tela');
+  if (fresh.canvas !== true || new Quest(level.world).canvas) fail('the Nozze are not back exactly when La tela tagliata is handed in');
+}
 // Every quest is worth most of a level where it lands, and a boss handed in more than one (player/levels.ts need: 20 × level).
 for (const [id, lv] of [['chiave', 5], ['bortolo', 5], ['teste', 7], ['relic', 8], ['reverendissimo', 10], ['zitelle', 14], ['sangiorgio', 17]] as const) {
   if (QUESTS[id].xp < 0.6 * 20 * lv || QUESTS[id].gold <= 0) fail(`${id} pays ${QUESTS[id].xp} XP, under most of level ${lv}`);
@@ -251,11 +265,13 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
 // Abate is dead), I fari della darsena in its steps (oil, two lamps that burn it, the Nostromo's snuffer), its wave asleep
 // after the Abate in the saved order, its weakening laid on the Abate, both rewards unique; all of it saved mid-step. Padre
 // Archivista's Acqua di San Benedetto: wine at the well wakes the cellar's monks (only they count), water drawn again, one
-// jug a lavabo in order, ready once poured (saved past the last step), the Calice weakened.
+// jug a lavabo in order, ready once poured (saved past the last step), the Calice weakened. The Veronese's chain: the four
+// instruments in any order, each by its pack, then the Commissario woken at rest by La tela tagliata and his granatieri at
+// half his health, the canvas off his body, the Nozze back.
 {
   const l3 = spawnLevel3(level.world), q = new Quest(level.world), s = q.side, b = new Bag();
   s.bag = b;
-  for (const g of ['riva', 'fanalista', 'archivista'] as Giver[]) {
+  for (const g of ['riva', 'fanalista', 'archivista', 'veronese'] as Giver[]) {
     const at = GIVERS[g].at, by = feet(at.x + Math.sin(at.yaw) * -1.2, at.z + Math.cos(at.yaw) * -1.2); // a step in front of him
     if (level.world.blocked(by.x, by.z, by.y) || q.prompt(by)?.talk !== g) fail(`no room to talk to ${g} in front of him`);
     for (const pk of PACKS3) if (!pk.hidden) for (const [k, x, z] of pk.members) if (Math.hypot(x - at.x, z - at.z) < k.aggro + 0.5) fail(`a mob at (${x}, ${z}) is within its pull of ${g}`);
@@ -333,7 +349,44 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   prepare([]);
   if (cup !== Math.round(ABATE.pour!.damage * 0.6)) fail(`the Calice pours ${cup} with the ampolle, ${ABATE.pour!.damage} without`);
   if (q.marks(0).archivista) fail('Padre Archivista still has something once his quest is done');
-  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto'];
+  // I musici di Cana: four spots, each standable, each within a pack's pull, picked up in any order, not before the quest.
+  const by = STRUMENTI.map((f) => { const at = feet(f.at.x + 1, f.at.z); if (level.world.blocked(at.x, at.z, at.y) || Math.abs(at.y - f.at.y) > 0.5) fail(`no room by ${f.label} (${f.at.x}, ${f.at.z})`); return at; });
+  STRUMENTI.forEach((f) => { if (!PACKS3.some((pk) => !pk.hidden && pk.members.some(([k, x, z]) => Math.hypot(x - f.at.x, z - f.at.z) < k.aggro))) fail(`no pack guards ${f.label}`); if (!ITEM.get(f.item)?.quest) fail(`${f.item} is not a quest item`); });
+  if (q.prompt(by[0])?.act) fail('an instrument can be picked up before I musici di Cana');
+  if (q.marks(0).veronese !== 'offer') fail('the Veronese shows no "!" with his first quest to give');
+  take('veronese');
+  if (s.open('veronese').length) fail('La tela tagliata is offered before I musici di Cana is done');
+  const musici = SIDE_BY.get('musici')!;
+  for (const i of [3, 1, 0]) q.prompt(by[i])?.act?.();
+  if (s.progress(musici) !== 3 || s.ready(musici) || s.spots().length !== 1 || s.spots()[0].at !== STRUMENTI[2].at) fail(`three instruments out of order leave ${s.spots().length} spots, progress ${s.progress(musici)}`);
+  copy.side.bag = b;
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.progress(musici) !== 3) fail('the instruments found do not survive a save');
+  q.prompt(by[2])?.act?.();
+  if (!s.ready(musici) || q.marks(0).veronese !== 'ready') fail('the four instruments do not make I musici di Cana ready');
+  hand('veronese', 'musici');
+  if (STRUMENTI.some((f) => b.count(f.item))) fail('the instruments stay in the bag once handed in');
+  // La tela tagliata: the Commissario asleep after the Abate until it is taken, then at rest; his granatieri only at his half.
+  const [com, gra] = ['tela', 'tela'].map((id, i) => l3.hidden.filter((h) => h.pack.hidden!.quest === id)[i]);
+  if (!com || !gra || com.members[0] !== l3.commissario || com.members[0].kind !== COMMISSARIO || !com.pack.hidden!.rest || gra.members.length !== 3 || gra.members.some((m) => m.kind !== GRANATIERE) || gra.pack.hidden!.under !== 0.5) fail('the Commissario and his three granatieri are not hidden packs of La tela tagliata');
+  const reach = (id: SideId, step: number) => s.reached(id, step);
+  if (due(com!, l3, reach, false)) fail('the Commissario wakes before La tela tagliata is taken');
+  take('veronese');
+  if (!due(com!, l3, reach, false) || due(com!, l3, reach, true)) fail('the Commissario does not wake with La tela tagliata, or wakes after the Abate');
+  const c = l3.commissario;
+  c.state = 'pray'; c.hp = COMMISSARIO.hp;
+  if (due(gra!, l3, reach, false)) fail('the granatieri wake with the Commissario at rest');
+  c.state = 'chase'; c.hp = COMMISSARIO.hp * 0.6;
+  if (due(gra!, l3, reach, false)) fail('the granatieri wake above his half');
+  c.hp = COMMISSARIO.hp * 0.45;
+  if (!due(gra!, l3, reach, false)) fail('the granatieri do not wake under his half');
+  if (COMMISSARIO.resist !== 0.5 || COMMISSARIO.hp < 6000 || COMMISSARIO.hp > 8000 || !COMMISSARIO.pour || !COMMISSARIO.phases?.marks) fail('the Commissario is not the miniboss of the plan (about 7000, resist 0.5, Squarcio, Inventario)');
+  if (s.tokens().map((t) => `${t.from}:${t.item}`).join() !== `commissario:${TELA}`) fail('the canvas is not wanted off the Commissario');
+  if (q.canvas) fail('the Nozze are back before the canvas is handed in');
+  b.add(TELA);
+  hand('veronese', 'tela');
+  if (b.count(TELA) || !q.canvas || q.marks(0).veronese) fail('the canvas handed in does not hang the Nozze, or the Veronese still has something');
+  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
 }
@@ -371,8 +424,8 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5); `
-  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, I musici di Cana in any order, La tela tagliata); `
+  + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);
   process.exit(1);

@@ -107,6 +107,16 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   (branco nascosto: contano solo loro), poi si riattinge acqua (2 brocche) e se ne versa una per lavabo
   nell'Antirefettorio, ponente poi levante. Paga le Ampolle di San Benedetto e indebolisce l'Abate: il Calice di Cana
   fa il 40% di danno in meno (`PREPS=calice`).
+- **La catena del Veronese**, obbligatoria prima del Cenacolo: il fantasma di Paolo Veronese aspetta
+  nell'Antirefettorio (corpo Meshy `veronese.glb`, Idle e Talk). *I musici di Cana*: la viola in Biblioteca, il violino
+  nel Presbiterio, il violone nel Coro e il flauto sul palco del Teatro Verde, in qualunque ordine, ognuno vicino al suo
+  branco; paga il Mantello di Caliari. *La tela tagliata*: sveglia il Commissario delle Arti nel chiostro dei Cipressi
+  (corpo Meshy `commissario.glb`, ~7000 PV, resistenza 0.5; lo Squarcio, un fendente lungo e stretto a terra;
+  l'Inventario, croci di gesso che esplodono; a metà vita chiama 3 granatieri, branco nascosto che torna a dormire se
+  lui torna a riposo). Dal suo corpo la tela arrotolata: consegnata, paga la Sciabola del Commissario (`sciabola.glb`)
+  e *Le nozze di Cana* tornano nella cornice del Cenacolo (`nozze.webp`). La porta del Cenacolo si apre solo con la
+  chiave del Bibliotecario **e** la tela riportata; i salvataggi con la porta già aperta restano come sono.
+  `node scripts/balance.ts commissario` lo prova da solo.
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

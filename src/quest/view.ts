@@ -9,12 +9,13 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { ARCHIVISTA, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { ARCHIVISTA, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { CENACOLO } from '../level/zones/sangiorgio.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
 // open on a burst of gold, the key rising out of it; a gold glint over it while the quest wants
-// it), Fra' Zuane and his dialogue window, Fra' Bortolo in the serra, his blessing and his shop (a green
+// it), Fra' Zuane and his dialogue window, the side quests' givers and the Nozze di Cana back in the Cenacolo's frame, Fra' Bortolo in the serra, his blessing and his shop (a green
 // rush of rue round the hero; its icon is with the hero's buffs, ui/plates.ts), the quest tracker, the "F" interaction prompt (also a
 // tap target on phones), the boss's health bar and the victory banner. Its few DOM pieces are
 // styled here so they stay out of the HUD's way.
@@ -38,8 +39,11 @@ const riteSmoke: Style = { life: [1.4, 2.2], size: [0.4, 0.8], grow: 1.6, color:
 const SQUERO = 0xffc27a; // Mastro Iseppo's, a lantern's
 const FARO = 0xffb347; // the Fanalista's, lamp oil
 const ARCHIVIO = 0x9fc8ff; // Padre Archivista's, his lantern's pale flame
-/** The givers' portraits: Mastro Iseppo's and Padre Archivista's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
-const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' } };
+const BIACCA = 0xffe2a8; // the Veronese's, lead white and gold
+/** The givers' portraits: Mastro Iseppo's, Padre Archivista's and the Veronese's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
+const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' } };
+/** The Nozze di Cana's canvas on the Cenacolo's end wall, over the garden door (zones/sangiorgio.ts cenacolo: inside the gilt frame, before the cut edge). */
+const NOZZE = { x0: -540.4, x1: -519.6, y0: 4.8, y1: 10.6, z: CENACOLO.z0 + 0.7 };
 /** A lighthouse's fire seen from across the lagoon: a soft gold halo on a canvas. */
 function halo(): THREE.SpriteMaterial {
   const c = document.createElement('canvas');
@@ -121,9 +125,10 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
-  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb') };
+  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb') };
   private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
   private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
+  private nozze?: THREE.Mesh; // the painting back in its frame, once the Veronese has the canvas (loaded then)
   private lines = ''; // Mastro Iseppo's tracker lines as drawn
   private talk = new Dialogue();
   private news: string[] = []; // notices raised outside update (the blessing, given as his window closes)
@@ -188,12 +193,12 @@ export class QuestView {
     this.key.visible = false;
     chest.add(this.lid, this.inside, this.glint, this.key);
     this.root.add(chest, this.npc.root, this.speziale.root, ...Object.values(this.givers).map((n) => n.root));
-    for (const q of SIDE) for (const w of stepsOf(q)) {
-      if ((w.kind !== 'find' && w.kind !== 'use') || this.finds.some((f) => f.q === q && f.at === w.at)) continue; // one glint a spot (the well is drawn from twice)
+    for (const q of SIDE) for (const w of stepsOf(q)) for (const at of w.kind === 'finds' ? w.finds.map((f) => f.at) : w.kind === 'find' || w.kind === 'use' ? [w.at] : []) {
+      if (this.finds.some((f) => f.q === q && f.at === at)) continue; // one glint a spot (the well is drawn from twice)
       const m = new THREE.Mesh(this.glint.geometry, this.glint.material);
-      m.position.set(w.at.x, w.at.y + 0.45, w.at.z);
+      m.position.set(at.x, at.y + 0.45, at.z);
       m.visible = false;
-      this.finds.push({ q, at: w.at, m });
+      this.finds.push({ q, at, m });
       this.root.add(m);
     }
     const fire = halo();
@@ -545,6 +550,7 @@ export class QuestView {
       s.visible = lit;
       s.scale.setScalar(8 + Math.sin(performance.now() * 0.011 + i) * 0.4);
     });
+    if (this.quest.canvas && !this.nozze) this.hang();
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt); // its icon is with the hero's buffs (ui/plates.ts)
     const now = this.quest.prompt(player);
     const html = now ? (now.act ? `<kbd>F</kbd>${now.text}` : now.text) : '';
@@ -581,6 +587,26 @@ export class QuestView {
       this.bossText.textContent = `${Math.ceil(boss.hp)} / ${boss.kind.hp}`;
     }
     return notices;
+  }
+
+  /**
+   * The Nozze di Cana back in the Cenacolo's frame (public/models/nozze.webp: the band of the table and the musicians, Paolo
+   * Veronese 1563, public domain, from Wikimedia Commons): lit by the hall, glowing a little of its own colour.
+   */
+  private hang(): void {
+    const { x0, x1, y0, y1, z } = NOZZE;
+    const mat = new THREE.MeshStandardMaterial({ roughness: 0.85, emissive: 0xffffff, emissiveIntensity: 0.3 });
+    new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}models/nozze.webp`, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      mat.map = mat.emissiveMap = t;
+      mat.needsUpdate = true;
+      nozze.visible = true;
+    });
+    const nozze = (this.nozze = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, y1 - y0), mat)); // faces +Z, into the hall
+    nozze.position.set((x0 + x1) / 2, (y0 + y1) / 2, z);
+    nozze.visible = false; // until the canvas is in
+    this.root.add(nozze);
   }
 
   /** The lid is thrown open: a flash and a fountain of gold out of the chest. */

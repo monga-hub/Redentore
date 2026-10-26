@@ -106,6 +106,7 @@ export const WEAPONS: Record<string, Weapon> = {
   'croce-astile': { file: 'croce.glb', length: 1.3, grip: 0.3, lean: 0.2, staff: 0.55 },
   mezzomarinaio: { file: 'mezzomarinaio.glb', length: 1.6, grip: 0.3, lean: 0.2, staff: 0.6 },
   'baculo-abate': { file: 'baculo.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
+  'sciabola-commissario': { file: 'sciabola.glb', length: 1.0, grip: 0.12, lean: 0.35 }, // the Commissario delle Arti's sabre (the Veronese's La tela tagliata)
 };
 /**
  * `fist`, in RightHand's own coordinates (cm): the channel in front of the palm (-Z), across it, the thumb side -X. A shaft

@@ -24,6 +24,7 @@
 //   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts route3 melee [runs]    one build on the route, on through level 2 into level 3 (Fra' Zuane, the Punta, the gondola, San Giorgio, the Bibliotecario, the Abate)
 //   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
+//   node scripts/balance.ts commissario [runs]     the Commissario delle Arti alone in the cipressi, his granatieri at his half, every build at 16, 17, 18, dodging and not, one life (GEAR default typical3)
 //   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
@@ -36,7 +37,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
 import { APPRODO, BERTHS, CHEST, CHOIR_DOOR, NPC, Quest, SPEZIALE } from '../src/quest/progress.ts';
-import { ABATE, ABATE_AT, BIBLIOTECARIO, NOSTROMO, PACKS as PACKS3, prepare, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
+import { ABATE, ABATE_AT, BIBLIOTECARIO, COMMISSARIO, NOSTROMO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
 import { GASTALDO, GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, PACKS, VELO, ZITELLA, spawnLevel2, type Level2 } from '../src/enemies/zitelle.ts';
 import { GROUNDED, inPour, onLine, veiled } from '../src/enemies/caster.ts';
 import { ZF } from '../src/level/zones/zitelle.ts';
@@ -49,7 +50,7 @@ import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { TOMES, levelOf, offer, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
-import { SIDE, giverOf } from '../src/quest/squero.ts';
+import { GIVERS, SIDE, STRUMENTI, TELA, giverOf } from '../src/quest/squero.ts';
 import { HEROES, heroOf } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
@@ -337,6 +338,8 @@ class Run {
     this.bees = a.all;
     this.mobs = [...this.friars, ...this.casters];
     for (const m of this.mobs) this.worth.set(m, isCaster(m) ? m.kind.xp : FRIAR.xp);
+    for (const h of this.l3.hidden) for (const m of h.members) this.free.add(m); // asleep: dead, worth nothing until woken
+    this.quest.side.bag = this.bag;
     this.system = new AbilitySystem<Forsaken>(ABILITIES, [MAIN, ...BAR.slice(1)], this as unknown as Forsaken, START);
     const s = this.stats; // counts what is spent
     this.system.pool = { get mana() { return s.mana; }, spendMana: (n) => s.spendMana(n) && ((this.spent += n), true) };
@@ -347,7 +350,7 @@ class Run {
   tierOf(m: Mob): Tier {
     if (!isCaster(m)) return 'friar';
     const k = m.kind;
-    return k === REVERENDISSIMO || k === GOVERNATRICE || k === ABATE ? 'boss' : k === SACERDOTE || k === APE || k === GASTALDO || k === MAESTRA || k === BIBLIOTECARIO || k === NOSTROMO ? 'elite' : k === APETTA ? 'worker' : k === GONDOLIERE ? 'friar' : 'priest';
+    return k === REVERENDISSIMO || k === GOVERNATRICE || k === ABATE ? 'boss' : k === SACERDOTE || k === APE || k === GASTALDO || k === MAESTRA || k === BIBLIOTECARIO || k === NOSTROMO || k === COMMISSARIO ? 'elite' : k === APETTA ? 'worker' : k === GONDOLIERE ? 'friar' : 'priest';
   }
   levelOf(m: Mob): 1 | 2 | 3 { return isCaster(m) && this.l3.all.includes(m) ? 3 : isCaster(m) && this.l2.all.includes(m) ? 2 : 1; }
   /** A kill's loot: gold banked, a better piece worn (the old one sold), everything else sold. */
@@ -511,6 +514,7 @@ class Run {
     if (m.kind === GOVERNATRICE || m.kind === VELO) return 'boss2';
     if (m.kind === ABATE) return 'boss3';
     if (m.kind === BIBLIOTECARIO || m.mates.some((x) => x.kind === BIBLIOTECARIO)) return 'biblio';
+    if (this.l3.hidden.some((h) => h.pack.hidden!.quest === 'tela' && h.members.includes(m))) return 'commiss.';
     if (this.l3.all.includes(m)) return m.home.x > -425 ? 'fond.3' : 'isola';
     if (m.kind === MAESTRA || m.mates.some((x) => x.kind === MAESTRA)) return 'maestra';
     if (m.kind === GASTALDO || m.mates.some((x) => x.kind === GASTALDO)) return 'gastaldo';
@@ -615,7 +619,7 @@ class Run {
     } else if (t) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
-      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO || t.kind === ABATE || t.kind === BIBLIOTECARIO || t.kind === NOSTROMO);
+      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO || t.kind === ABATE || t.kind === BIBLIOTECARIO || t.kind === NOSTROMO || t.kind === COMMISSARIO);
       if (!this.system.casting) {
         // the heal: a long cast, pushed back by every hit taken, so only worth it below 55%
         if (low < 0.55 && this.ready('mend')) { if (this.cast('mend') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
@@ -696,7 +700,7 @@ class Run {
     p.y += lift;
     for (const c of this.casters) {
       const was = c.state, d = casterThink(c, p, this.world, dt, this.bolts);
-      if ((c === this.boss || c === this.l2.boss || c === this.l3.boss) && d > 0) { const k = was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : was === 'pour' && c.state !== 'pour' ? 'calice' : c.tide && c.tide.t >= c.kind.tide!.warn ? 'acqua' : c.rings.length ? 'campane' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
+      if ((c === this.boss || c === this.l2.boss || c === this.l3.boss || c === this.l3.commissario) && d > 0) { const k = was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : was === 'pour' && c.state !== 'pour' ? 'calice' : c.tide && c.tide.t >= c.kind.tide!.warn ? 'acqua' : c.rings.length ? 'campane' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
       dmg += d;
     }
     p.y -= lift;
@@ -706,6 +710,7 @@ class Run {
     if (this.looting) for (const m of this.mobs) if (m.state === 'dead' && !this.looted.has(m) && !this.free.has(m)) { this.looted.add(m); this.loot(this.tierOf(m), this.levelOf(m)); }
     if (!this.quest.key2 && this.l2.maestra.state === 'dead') this.quest.takeKey2();
     if (!this.quest.key3 && this.l3.bibliotecario.state === 'dead') this.quest.takeKey3();
+    this.sleepers();
     this.zone(t ? this.zoneOf(t) : 'viaggio').mana += this.spent;
     this.spent = 0;
     if (t) {
@@ -717,6 +722,23 @@ class Run {
     }
     this.levelUp();
     if (s.dead) this.die(t);
+  }
+
+  /** Level 3's hidden packs as main.ts wakes them: the Commissario at rest once La tela tagliata is taken, his granatieri on the hero at his half and back under when he is at rest again. */
+  readonly woken = new Set<Level3['hidden'][number]>();
+  private sleepers(): void {
+    for (const h of this.l3.hidden) {
+      if (!this.woken.has(h) && due(h, this.l3, (q, step) => this.quest.side.reached(q, step), this.quest.boss3Dead)) {
+        rouse(h.members, this.world, !h.pack.hidden!.rest);
+        this.woken.add(h);
+        for (const m of h.members) this.free.delete(m);
+      } else if (h.pack.hidden!.under && this.woken.has(h) && this.l3.commissario.state === 'pray') {
+        for (const m of h.members) if (m.state !== 'dead') this.free.add(m); // gone back under: no kill
+        lull(h.members);
+        this.woken.delete(h);
+      }
+    }
+    if (this.l3.commissario.state === 'dead' && this.quest.side.tokens().some((t) => t.from === 'commissario')) this.quest.side.bag!.add(TELA); // the canvas off his body
   }
 
   deaths = 0;
@@ -781,10 +803,23 @@ function route2(r: Run): Goal[] {
 /**
  * Level 3: report to Fra' Zuane and take Le nozze di San Giorgio, east past the Tre Oci through the fondamenta's packs and
  * the Punta's to Mastro Iseppo's gondola; across (the grid switches to the island); the piazzale, the cloisters, the
- * Scalone and the Biblioteca, the Bibliotecario and his key; the Cenacolo's door from the antirefettorio; the Abate.
+ * Scalone and the Biblioteca, the Bibliotecario and his key; the Veronese's chain (I musici di Cana from him in the
+ * antirefettorio on the way through the allori, the viola by the Bibliotecario, then the Presbiterio's, the Coro's and the
+ * Teatro Verde's instruments, each past its pack; La tela tagliata, the Commissario in the cipressi); the Cenacolo's door
+ * from the antirefettorio; the Abate.
  */
 const ON_THE_WAY3 = ['Fondamenta San Giovanni', 'Punta della Giudecca'], ISLAND_WAY = [3, 10, 8, 9, 11, 12]; // PACKS3: the piazzale's south pack, the cipressi, the allori, the Scalone, the Biblioteca
-const CENACOLO_DOOR = { x: -530, z: 37 };
+const CENACOLO_DOOR = { x: -530, z: 37 }, COMMISSARIO_AT = { x: -483, z: 54 };
+/** At the Veronese: hand in what is ready, then take `next` (his next quest) if named. */
+function veronese(next?: 'musici' | 'tela'): Goal {
+  const at = GIVERS.veronese.at;
+  return { name: `veronese${next ? `:${next}` : ''}`, x: at.x - 1.2, z: at.z, r: 1, done: (r) => {
+    let t = r.quest.side.talk('veronese');
+    if (t.paid) { r.bag.remove(t.paid.reward); r.take(t.paid.reward); t = r.quest.side.talk('veronese'); }
+    if (next) t.accept?.();
+    if (next && !r.quest.side.active(next)) throw new Error(`the Veronese does not give ${next}: ${t.talk.pages[0]}`);
+  } };
+}
 function route3(r: Run): Goal[] {
   const pack = (i: number): Goal => {
     const p = PACKS3[i], ms = r.l3.all.filter((m) => p.members.some(([k, x, z]) => m.kind === k && m.home.x === x && m.home.z === z));
@@ -800,8 +835,18 @@ function route3(r: Run): Goal[] {
       region(ISLAND);
       r.paths.reset();
     } },
-    ...ISLAND_WAY.map(pack),
-    { name: 'cenacolo', x: CENACOLO_DOOR.x, z: CENACOLO_DOOR.z, r: 1.6, done: (r) => { r.quest.open(r.quest.gate('cenacolo')); r.paths.reset(); } },
+    ...ISLAND_WAY.slice(0, 3).map(pack),
+    veronese('musici'),
+    ...ISLAND_WAY.slice(3).map(pack),
+    ...STRUMENTI.map((f): Goal => ({ name: f.item, x: f.at.x + 1, z: f.at.z, y: f.at.y, r: 1, done: (r) => { r.quest.side.prompt(r.player.pos)?.act?.(); } })),
+    veronese('tela'),
+    { name: 'commissario', x: COMMISSARIO_AT.x, z: COMMISSARIO_AT.z, r: 2.5, until: (r) => r.bag.count(TELA) > 0 && !r.target }, // asleep he lies dead: the canvas off his body is the kill
+    veronese(),
+    { name: 'cenacolo', x: CENACOLO_DOOR.x, z: CENACOLO_DOOR.z, r: 1.6, done: (r) => {
+      if (!r.quest.canvas) throw new Error(`the Cenacolo reached without the canvas: ${r.quest.side.taken} taken, ${r.quest.side.done} done`);
+      r.quest.open(r.quest.gate('cenacolo'));
+      r.paths.reset();
+    } },
     { name: 'boss3', x: ABATE_AT.x, z: ABATE_AT.z, r: 3, boss: true, until: (r) => r.l3.boss.state === 'dead' },
   ];
 }
@@ -958,6 +1003,40 @@ export function playElite(build: string, lv: number, elite: 'sacerdote' | 'ape' 
   return { build, lv, elite, dodge, won: !r.deaths && group.every((m) => m.state === 'dead'), time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
 }
 
+/** The Commissario delle Arti alone, at rest in the cipressi once La tela tagliata is taken; his granatieri come at his half. One life, everything else dead. */
+export function playCommissario(build: string, lv: number, dodge: boolean, s = 1): EliteResult {
+  swings.clear();
+  region(ISLAND);
+  const r = new Run(build, dodge);
+  seed = s * 7919;
+  r.dress(process.env.GEAR ?? 'typical3');
+  r.picks = picksTo(build, lv);
+  r.apply();
+  r.stats.revive();
+  r.quest.accepted = r.quest.accepted3 = r.quest.landed = true;
+  r.quest.takeKey3();
+  r.quest.side.done.push('musici');
+  r.quest.side.taken.push('tela');
+  for (const m of r.mobs) if (!r.l3.hidden.some((h) => h.members.includes(m as Priest))) { m.state = 'dead'; m.hp = 0; }
+  r.levelUp = () => {};
+  r.paths.reset();
+  const at = { x: COMMISSARIO_AT.x, z: COMMISSARIO_AT.z + 14 }; // from the cipressi's south walk
+  Object.assign(r.player.pos, { x: at.x, y: r.world.standHeight(at.x, at.z), z: at.z });
+  const c = r.l3.commissario, goal = { ...COMMISSARIO_AT, r: 2 }, group = () => r.l3.hidden.filter((h) => h.pack.hidden!.quest === 'tela').flatMap((h) => h.members);
+  let t0 = -1, pots = 0, lost = 0;
+  r.step(goal); // the first frame wakes him, at rest
+  while (r.time < 15 * 60 && !r.deaths && c.state !== 'dead') {
+    if (t0 < 0 && FIGHTING.has(c.state)) t0 = r.time;
+    const z = r.zone('commiss.'), p0 = z.potions, h0 = r.stats.hp;
+    r.step(goal);
+    if (t0 >= 0) lost += Math.max(0, h0 - r.stats.hp) / r.stats.hpMax;
+    pots += z.potions - p0;
+  }
+  while (r.time < 15 * 60 && !r.deaths && group().some((m) => m.state !== 'dead')) r.step(goal); // the granatieri left standing
+  region(MAINLAND);
+  return { build, lv, elite: 'commiss.', dodge, won: !r.deaths && c.state === 'dead', time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
+}
+
 export interface PackResult { build: string; lv: number; dodge: boolean; won: boolean; time: number; potions: number; lost: number; contact: number; kills: number; casts: Map<string, number> }
 
 /** A caster's nightmare: four friars of one pull, set 16 m up the orto's open path and charging, the hero standing his ground at level `lv`, one life. */
@@ -1025,7 +1104,7 @@ export function playPack3(build: string, lv: number, dodge: boolean, s = 1): Pac
 }
 
 // --- reports ---
-const ZONES = ['orto', 'apiario', 'laguna', 'chiostri', 'chiesa', 'boss', 'fond.2', 'gastaldo', 'ospizio', 'maestra', 'boss2', 'fond.3', 'isola', 'biblio', 'boss3', 'viaggio'];
+const ZONES = ['orto', 'apiario', 'laguna', 'chiostri', 'chiesa', 'boss', 'fond.2', 'gastaldo', 'ospizio', 'maestra', 'boss2', 'fond.3', 'isola', 'biblio', 'commiss.', 'boss3', 'viaggio'];
 const pad = (s: string | number, n: number) => String(s).padStart(n);
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(xs.length, 1);
 const f1 = (x: number) => (Math.round(x * 10) / 10).toString();
@@ -1102,6 +1181,10 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     const rs: BossResult[] = [], two = mode === 'boss2', three = mode === 'boss3';
     for (const d of [true, false]) runs(Number(seeds ?? 3), (s) => rs.push(playBoss(build ?? 'mixed', Number(n ?? (three ? 17 : two ? 11 : 9)), d, s, process.env.GEAR ?? (three ? 'typical3' : two ? 'typical2' : 'typical'), two, three)));
     console.log(bossTable(rs));
+  } else if (mode === 'commissario') {
+    const rs: EliteResult[] = [];
+    for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [16, 17, 18]) runs(Number(build ?? 3), (s) => rs.push(playCommissario(b, lv, d, s)));
+    console.log(eliteTable(rs));
   } else if (mode === 'pack3') {
     const rs: PackResult[] = [];
     for (const d of [true, false]) for (const lv of [15, 16, 17]) runs(Number(n ?? 6), (s) => rs.push(playPack3(build ?? 'arcane', lv, d, s)));

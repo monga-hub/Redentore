@@ -6,6 +6,8 @@
 // whirled round him). The boss, l'Abate di San Giorgio, in the Cenacolo under the empty frame of the Nozze di Cana:
 // the Calice poured in a wedge before him, from 70% the campanile's bells in rings to jump, from 40% the tide over the
 // floor but for islands of light, haste under 20%, and a wedding that will not wait past six minutes.
+// The Veronese's chain (quest/squero.ts) wakes the Commissario delle Arti in the chiostro dei cipressi, a miniboss off the way,
+// and at half his health his three granatieri.
 // Tuned with scripts/balance.ts for a hero who walks in from the Governatrice in level 2's gear.
 import type { World } from '../core/physics.ts';
 import { CENACOLO } from '../level/zones/sangiorgio.ts';
@@ -56,6 +58,28 @@ export const NOSTROMO: CasterKind = {
 };
 
 /**
+ * Il Commissario delle Arti, who cut the Nozze di Cana from their frame in 1797 and never left with them (the Veronese's La
+ * tela tagliata). Asleep until that quest is taken, then at rest in the chiostro dei cipressi. The sabre in melee and a
+ * pistol's ice-blue shot at range; the Squarcio, a long narrow slash along the floor where the hero stood (the Calice's
+ * wedge, cut thin); from the first blow the Inventario, red chalk crosses round the hero that burst; at half his health his
+ * three granatieri climb into the cloister (main.ts) and he quickens. A miniboss for a hero at about level 17.
+ */
+export const COMMISSARIO: CasterKind = {
+  ...PRIEST,
+  name: 'Il Commissario delle Arti',
+  hp: 7000, xp: 300,
+  aggro: 9, leash: 40, blind: 12,
+  range: 16, keep: 0, speed: 3.6, walk: 6, cast: 1.5, cooldown: 3.6, bolt: 16, damage: 150,
+  radius: 0.6, margin: 1,
+  melee: { reach: 1.8, hit: 3, windup: 0.7, swing: 1.3, cooldown: 2.6, damage: 190 },
+  pour: { every: 10, cast: 1.3, angle: Math.PI / 7, length: 12, damage: 400 }, // the Squarcio
+  phases: { at: [1, 0.5], marks: { every: 8, n: 3, cast: 1.6, radius: 2, spread: 3.4, damage: 340 }, haste: 1.2, berserk: 240, rage: 2.5 }, // the Inventario
+  resist: 0.5,
+};
+/** His granatieri, drowned grenadiers of the Armée d'Italie (the marinai's bodies in blue): a hidden pack he calls at half health. */
+export const GRANATIERE: CasterKind = { ...MARINAIO, hp: 420, xp: 24, aggro: 14, melee: { ...MARINAIO.melee!, damage: 100 } };
+
+/**
  * L'Abate di San Giorgio. Below 70% the Rintocchi, below 40% Acqua alta (caster.ts), haste under 20%, berserk at 6 minutes.
  * No nova: up close the Calice is the thing to step out of.
  */
@@ -95,8 +119,12 @@ export const ABATE_AT = { x: -530, z: 11 };
 export const ABATE_BOUNDS: Bounds = { x0: CENACOLO.x0 + 3.5, x1: CENACOLO.x1 - 3.5, z0: CENACOLO.z0 + 3, z1: CENACOLO.z1 - 2.5 };
 
 type Spot = [number, number];
-/** `hidden`: asleep (dead, out of sight, worth nothing) until that side quest reaches that step, then up and on the hero (`rouse`), `say` called out. */
-interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][]; hidden?: { quest: SideId; step: number; say: string } }
+/**
+ * `hidden`: asleep (dead, out of sight, worth nothing) until that side quest reaches that step, then up and on the hero (`rouse`),
+ * `say` called out; `rest`: up at its spots instead, waiting; `under`: and only once the Commissario, fighting, is under that
+ * share of his health (main.ts puts them back to sleep when he is back at rest).
+ */
+export interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][]; hidden?: { quest: SideId; step: number; say: string; rest?: true; under?: number } }
 const rect = (x0: number, x1: number, z0: number, z1: number): Bounds => ({ x0, x1, z0, z1 });
 const QUAY = rect(-376, -301, 0.5, 19.5), ALLORI = rect(-545, -515, 47, 77), CIPRESSI = rect(-501, -465, 47, 77);
 /** The darsena with both quays out to the lighthouses (zones/sangiorgio.ts darsena): the Fanalista's wave, and the Nostromo once it calls him. */
@@ -129,9 +157,12 @@ export const PACKS: Pack[] = [
   { label: 'Darsena di San Giorgio', at: [-581, 141], bounds: DARSENA, members: [[MARINAIO, -569, 136.5], [MARINAIO, -569, 140.5], [MARINAIO, -564, 135.5], [MARINAIO, -563.5, 146]], hidden: { quest: 'fari', step: FARI_LIT, say: 'I fari ardono: i marinai annegati salgono dal bacino, e il Nostromo carica!' } },
   // Hidden. Acqua di San Benedetto: wine drawn from the well, the cellar's monks who bless it come up round it.
   { label: 'Chiostro degli allori', at: [-530, 62], bounds: ALLORI, members: [[MONACO, -532.5, 64.5], [MONACO, -527.5, 64.5], [MONACO, -530, 58.5]], hidden: { quest: 'acqua', step: VINO, say: 'I monaci della cantina salgono al pozzo a benedire il loro vino!' } },
+  // Hidden. La tela tagliata taken: the Commissario delle Arti back in the chiostro dei cipressi, where the troops slept; at half his health his granatieri.
+  { label: 'Chiostro dei cipressi', at: [-483, 62], bounds: CIPRESSI, members: [[COMMISSARIO, -483, 54]], hidden: { quest: 'tela', step: 0, say: 'Nel chiostro dei cipressi qualcuno conta i quadri ad alta voce, in francese...', rest: true } },
+  { label: 'Chiostro dei cipressi', at: [-483, 58], bounds: CIPRESSI, members: [[GRANATIERE, -497, 50], [GRANATIERE, -469, 50], [GRANATIERE, -483, 74]], hidden: { quest: 'tela', step: 0, say: 'Il Commissario delle Arti chiama i granatieri: «À moi, la garde!»', under: 0.5 } },
 ];
 
-export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest; hidden: { pack: Pack; members: Priest[] }[] }
+export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest; commissario: Priest; hidden: { pack: Pack; members: Priest[] }[] }
 
 const GONE = 1e3; // s a sleeper has lain dead: past the sink, out of sight (enemies/priests.ts)
 
@@ -141,13 +172,28 @@ export function spawnLevel3(world: World): Level3 {
   const packs = spawnPriests(world, groups, PACKS.map((p) => p.bounds), PACKS.map((p) => p.members.map(([k]) => k)));
   const [[boss]] = spawnPriests(world, [[[ABATE_AT.x, ABATE_AT.z, Math.PI]]], [ABATE_BOUNDS], [[ABATE]]);
   const hidden = PACKS.flatMap((pack, i) => (pack.hidden ? [{ pack, members: packs[i] }] : []));
-  for (const { members } of hidden) { killAll(members); for (const m of members) m.t = GONE; }
+  for (const { members } of hidden) lull(members);
   const all = [...packs.filter((_, i) => !PACKS[i].hidden).flat(), boss, ...hidden.flatMap((h) => h.members)];
-  return { all, boss, bibliotecario: all.find((m) => m.kind === BIBLIOTECARIO)!, nostromo: all.find((m) => m.kind === NOSTROMO)!, hidden };
+  return { all, boss, bibliotecario: all.find((m) => m.kind === BIBLIOTECARIO)!, nostromo: all.find((m) => m.kind === NOSTROMO)!, commissario: all.find((m) => m.kind === COMMISSARIO)!, hidden };
+}
+
+/**
+ * A hidden pack is due to wake: its quest that far, the Abate standing, and an `under` pack only while the Commissario,
+ * fighting, is under that share of his health.
+ */
+export function due(h: Level3['hidden'][number], l3: Level3, reached: (q: SideId, step: number) => boolean, boss3Dead: boolean): boolean {
+  const H = h.pack.hidden!, c = l3.commissario;
+  return !boss3Dead && reached(H.quest, H.step) && (!H.under || (c.state !== 'pray' && c.state !== 'dead' && c.state !== 'evade' && c.hp <= c.kind.hp * H.under));
 }
 
 /** A hidden pack up at its spots, whole; `fight`: and on the hero at once (else at rest, as a load finds it). */
 export function rouse(members: Priest[], world: World, fight: boolean): void {
   for (const m of members) revive(m, world);
   if (fight && members.length) pull(members[0]);
+}
+
+/** A woken pack back to sleep (the granatieri, once their Commissario is back at rest): dead, out of sight, as spawned. */
+export function lull(members: Priest[]): void {
+  killAll(members);
+  for (const m of members) m.t = GONE;
 }

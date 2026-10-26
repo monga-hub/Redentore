@@ -33,6 +33,7 @@ export const OBJECTIVE: Record<Stage, string> = {
   offer3: "Parla con Fra' Zuane",
   route3: 'Raggiungi la punta della Giudecca e sali sulla gondola di Mastro Iseppo',
   biblioteca: 'Prendi la chiave del Cenacolo al Bibliotecario, in cima allo scalone del Longhena',
+  veronese: "Riporta le Nozze di Cana nel Cenacolo: aiuta il Veronese, nell'Antirefettorio",
   cenacolo: "Apri la porta del Cenacolo dall'antirefettorio",
   boss3: "Sconfiggi l'Abate di San Giorgio nel Cenacolo",
   return3: "Torna da Fra' Zuane, al Redentore",
@@ -114,6 +115,7 @@ export const TALK: Record<Stage, Talk> = {
   },
   route3: { pages: ['La fondamenta continua oltre i Tre Oci, fino alla punta. Là c\'è il pontile, e la gondola di Iseppo. Non serve remare: il ferro sa la strada. E non guardare giù, Risorto: in quell\'acqua c\'è gente che aspetta un passaggio.'] },
   biblioteca: { pages: ['La biblioteca è in cima allo scalone del Longhena. Dalla basilica passi al chiostro degli allori, poi a quello dei cipressi. Il Bibliotecario copia i nomi dei morti in un registro che non finisce mai: prendigli la chiave del Cenacolo.'] },
+  veronese: { pages: ['Hai la chiave, ma la porta del Cenacolo non cede. Le nozze dell\'Abate non possono finire senza testimoni, Risorto, e i testimoni erano nel quadro che i francesi tagliarono via.', 'Nell\'antirefettorio c\'è un pittore che aspetta davanti a quella porta: aiutalo, e la porta ti aiuterà.'] },
   cenacolo: { pages: ['Hai la chiave. Il Cenacolo si apre dall\'antirefettorio, sul lato sud del chiostro degli allori. Dentro i monaci apparecchiano ancora la tavola. Non bere niente, Risorto.'] },
   boss3: { pages: ['L\'Abate è nel Cenacolo, sotto la cornice vuota. Quando versa il calice, fatti da parte. Quando suonano le campane, salta. E quando sale l\'acqua... cerca la luce.'] },
   return3: {

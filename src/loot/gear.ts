@@ -183,6 +183,8 @@ const DEFS3: typeof DEFS = [
 const UNIQUE3: typeof DEFS = [
   ['remo-marieta', 'Remo di Marieta', 'arma', 'raro', 'potenza critico vigore', 'Il primo remo che Mastro Iseppo fece per sua figlia. Corto, per due mani piccole.'],
   ['lanterna-faro', 'Lanterna del faro', 'amuleto', 'epico', 'spirito intelletto vigore', 'La lanterna da banchina del Fanalista. L’acqua alta si ferma dove arriva la sua luce.'],
+  ['mantello-caliari', 'Mantello di Caliari', 'spalle', 'epico', 'vigore celerita critico', 'Il mantello che Paolo Caliari porta nelle Nozze, suonando la viola. Macchiato di biacca e d’oltremare.'],
+  ['sciabola-commissario', 'Sciabola del Commissario', 'arma', 'epico', 'potenza critico celerita', 'Ha tagliato le Nozze di Cana dalla cornice, l’11 settembre 1797. Ora taglia altro.'],
 ];
 
 /** The stats a budget of `points` buys, split over `focus` (best first). */

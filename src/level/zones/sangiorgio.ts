@@ -460,6 +460,7 @@ function garden(b: LevelBuilder, p: Props): void {
     }
   }
   b.box(cx - 7, cx + 7, 0, 0.5, -39.6, cz + 1, 'stone', { camera: false });
+  b.box(cx - 2, cx + 2, 0, 0.25, cz + 1, cz + 1.9, 'stone', { camera: false }); // a step up to it, in the middle
   for (const x of [cx - 9, cx + 9]) cypress(p, x, -37, 8);
   // Cypresses and laurels round the lawns, a little labyrinth of box after Borges, benches.
   for (const [x, z] of [[-546, -30], [-546, -14], [-546, 0], [-500, -32], [-480, -32], [-460, -32], [-458, -14], [-458, -2]]) cypress(p, x, z, p.rand(6.5, 8.5));

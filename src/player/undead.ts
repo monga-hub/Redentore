@@ -63,6 +63,33 @@ export type Hold = keyof typeof HOLDS;
 const SPIN = 13; // rad/s the whirl turns the body
 const DEATH = 'Death';
 const HEAVY = 50; // damage that doubles the hero over instead of a flinch
+/**
+ * Clips stood up, each bone turned by a world rotation vector (rad; +X tips him back, +Y swings his left shoulder back):
+ * the Risorto's breath bowed his head into his ribs and rolled his shoulders in, and the helm and the pauldrons went with
+ * them. His walk and run keep their shamble.
+ */
+export const UPRIGHT: Partial<Record<Hero, { clips: string[]; bones: Record<string, [number, number, number]> }>> = {
+  risorto: {
+    clips: ['Idle_Breathe', 'Idle_Combat'],
+    bones: { Spine01: [0.09, 0, 0], Spine: [0.05, 0, 0], neck: [0.12, 0, 0], Head: [0.14, 0, 0], LeftShoulder: [0, 0.25, -0.1], RightShoulder: [0, -0.25, 0.1] },
+  },
+};
+
+/** `up`'s bones turned through its clips: each world rotation in the bone's parent's frame at rest. */
+function upright(model: THREE.Object3D, clips: THREE.AnimationClip[], up: NonNullable<(typeof UPRIGHT)[Hero]>): void {
+  model.updateMatrixWorld(true);
+  const pq = new THREE.Quaternion(), turn = new THREE.Quaternion(), q = new THREE.Quaternion();
+  for (const [name, rot] of Object.entries(up.bones)) {
+    const bone = model.getObjectByName(name), axis = new THREE.Vector3(...rot), rad = axis.length();
+    if (!bone?.parent || !rad) continue;
+    turn.setFromAxisAngle(axis.divideScalar(rad).applyQuaternion(bone.parent.getWorldQuaternion(pq).invert()), rad);
+    for (const c of clips) {
+      if (!up.clips.includes(c.name)) continue;
+      const v = c.tracks.find((t) => t.name === `${name}.quaternion`)?.values;
+      for (let i = 0; v && i < v.length; i += 4) q.fromArray(v, i).premultiply(turn).toArray(v, i);
+    }
+  }
+}
 
 interface Layer { upper: THREE.AnimationAction; lower: THREE.AnimationAction }
 interface Shot { layer: Layer; move: Move; t: number; end: number; rate: number; hitAt: number; flinch: boolean }
@@ -177,6 +204,8 @@ export class UndeadModel {
       if (head) head.userData.crown = HEROES[hero].height - head.getWorldPosition(new THREE.Vector3()).y; // m from the joint to his crown (ui/figure.ts)
       let body: THREE.SkinnedMesh | undefined;
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
+      const up = UPRIGHT[hero];
+      if (up) upright(model, gltf.animations, up);
       const outfit = (this.outfit = new Outfit(model, body!, hero));
       this.aura.material.uniforms.uHat = outfit.uniforms.uHat;
       this.aura.material.uniforms.uBeak = outfit.uniforms.uBeak;

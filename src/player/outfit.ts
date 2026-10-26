@@ -331,6 +331,12 @@ function hatOf(body: THREE.SkinnedMesh): Uint8Array | undefined {
 /** A texel's RGBA bytes as one little-endian word. */
 const rgba = (r: number, g: number, b: number, a = 255) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
 const FLAT = rgba(128, 128, 255); // a normal map's "no bump"
+/** Texel `a` toward `b` by `k`/255, channel by channel. */
+function mixed(a: number, b: number, k: number): number {
+  let out = 0;
+  for (let c = 0; c < 32; c += 8) out |= Math.round(((a >>> c) & 255) + ((((b >>> c) & 255) - ((a >>> c) & 255)) * k) / 255) << c;
+  return out >>> 0;
+}
 interface Maps { base: Uint32Array; normal: Uint32Array; orm: Uint32Array }
 
 /** An image's texels at `n`×`n`, as they are in the file (no colour management: normals and masks stay numbers). */
@@ -454,7 +460,12 @@ class Paint {
       if (this.again) continue; // changed meanwhile: paint the latest
       const out = this.maps.map((t) => new Uint32Array((t.image.data as Uint8Array).buffer)), texel = this.texel, own = this.own;
       const by = src.map((s) => s ?? own);
-      for (let i = 0; i < texel.length; i++) { const s = by[texel[i]]; out[0][i] = s.base[i]; out[1][i] = s.normal[i]; out[2][i] = s.orm[i]; }
+      for (let i = 0; i < texel.length; i++) {
+        const s = by[texel[i]], g = own.orm[i] & 255; // his own glow (the soul fire in his ribs and eyes) burns through every look
+        out[0][i] = g && s !== own ? mixed(s.base[i], own.base[i], g) : s.base[i];
+        out[1][i] = s.normal[i];
+        out[2][i] = g > (s.orm[i] & 255) ? (s.orm[i] & ~255) | g : s.orm[i];
+      }
       for (const t of this.maps) t.needsUpdate = true;
     } while (this.again);
   }

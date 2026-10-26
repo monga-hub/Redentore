@@ -9,6 +9,8 @@ import type { Mark } from './progress.ts';
 // nothing in the game targets or hurts him. Fra' Bortolo in the serra is the same ghost glowing
 // green, and Mastro Iseppo in the squero a Meshy boatwright glowing like a lantern: `Npc` takes where it stands, the tint and the body.
 // A body with no talking clips (an enemy's, like the Fanalista's drowned sailor) talks with its Pray and Idle instead.
+// He stands wherever his spot is (the Cardinale's moves with his procession, quest/escort.ts), and `cheer` has him gesture
+// to the world a while, facing his own way (the Cardinale crowned on the Bacino).
 
 const HEIGHT = 1.75;
 const FADE = 0.4; // s between idle and talking
@@ -55,6 +57,8 @@ export class Npc {
   private marks = { offer: marker('!'), ready: marker('?') };
   private time = 0;
   talking = false;
+  /** s left of gesturing to the world, not to the hero. */
+  cheer = 0;
 
   /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips (else Pray and Idle). */
   constructor(at: Spot, tint = GHOST, model = 'zuane.glb') {
@@ -91,6 +95,8 @@ export class Npc {
   update(dt: number, player: THREE.Vector3, mark: Mark): void {
     const at = this.at;
     this.time += dt;
+    this.cheer = Math.max(0, this.cheer - dt);
+    this.root.position.set(at.x, at.y ?? 0, at.z);
     for (const [k, m] of Object.entries(this.marks)) {
       m.visible = k === mark && !this.talking;
       m.position.y = HEIGHT + 0.85 + Math.sin(this.time * 2.5) * 0.06;
@@ -100,9 +106,10 @@ export class Npc {
     this.root.rotation.y += Math.sign(d) * Math.min(Math.abs(d), TURN * dt);
     if (!this.mixer || !this.idle) return;
     // Talking: one gesture clip after another, alternating, until the window closes.
-    if (this.talking && (this.current === this.idle || this.current!.time > this.current!.getClip().duration - FADE)) {
+    const busy = this.talking || this.cheer > 0;
+    if (busy && (this.current === this.idle || this.current!.time > this.current!.getClip().duration - FADE)) {
       this.play(this.talks[this.current === this.talks[0] ? 1 : 0]);
-    } else if (!this.talking) this.play(this.idle);
+    } else if (!busy) this.play(this.idle);
     this.mixer.update(dt);
   }
 }

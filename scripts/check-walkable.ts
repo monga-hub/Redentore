@@ -17,6 +17,8 @@ import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, CHEST, CHOIR_DOOR, CROCE, PUNTA, Quest, SPEZIALE } from '../src/quest/progress.ts';
 import { BELFRY, BELLS, CAMPANILE, CENACOLO, SG } from '../src/level/zones/sangiorgio.ts';
 import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
+import { PROCESSION } from '../src/quest/squero.ts';
+import { PACKS as PACKS3 } from '../src/enemies/sangiorgio.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
 {
@@ -172,6 +174,13 @@ for (const a of level.areas) {
   else console.log(`ok   ${a.zone.padEnd(11)} ${a.label} (${shut ? 'locked' : `${hit} cells`})`);
 }
 for (const [name, b] of Object.entries(BERTHS)) if (!at(isle, b.x, b.z)) fail(`quest      the gondola's ${name} berth is out of reach`);
+// L'incoronazione: the hero can walk at the Cardinale's side the whole way (past the altar where he stands), and reach every monaco of its waves.
+{
+  const walk = PROCESSION.slice(1), waves = PACKS3.filter((p) => p.hidden?.quest === 'incoronazione').flatMap((p) => p.members.map(([, x, z]) => ({ x, z })));
+  const off = [...walk, ...waves].filter((p) => !at(isle, p.x, p.z));
+  if (off.length || waves.length !== 11) fail(`sangiorgio  the procession is out of the hero's reach at ${off.map((p) => `(${p.x}, ${p.z})`).join(' ')}`);
+  else console.log(`ok   sangiorgio  la processione: ${walk.length} points from the altar to the Bacino, ${waves.length} monaci of its waves`);
+}
 if (quest.checkpoint() !== PUNTA || !at(isle, PUNTA.x, PUNTA.z)) fail('quest      past the chain a death should wake on the Punta, on open ground');
 quest.landed = true;
 if (quest.checkpoint() !== APPRODO || !at(isle, APPRODO.x, APPRODO.z)) fail("quest      once ashore a death should wake on San Giorgio's approdo, on open ground");

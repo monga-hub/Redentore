@@ -21,6 +21,8 @@ export interface CasterKind {
   phases?: Phases;
   /** Share of crowd control that sticks (control.ts): durations and slows ×; default 1. */
   resist?: number;
+  /** Damage it takes ×: the Abate under the Cardinale's Benedizione apostolica (sangiorgio.ts PREPS); default 1. */
+  frail?: number;
   /**
    * Lace lines (level 2): every `every` s of fighting, `n` lines `length` m long and `width` m wide laid through
    * the player's feet from the caster (the first straight at them, the others `spread` rad either side), cutting
@@ -754,6 +756,7 @@ export function revive(f: Priest, world: World): void {
 /** Damage a priest. Returns true if this killed it. Evading and dead priests ignore it. */
 export function hurt(f: Priest, n: number): boolean {
   if (f.state === 'dead' || f.state === 'evade' || n <= 0) return false;
+  n *= f.kind.frail ?? 1;
   if (veiled(f)) n *= 1 - f.kind.veil!.cut; // the Governatrice's veil
   f.hp -= exposed(f.cc, n); // Febbre di palude
   if (f.hp > 0) { pull(f); return false; }

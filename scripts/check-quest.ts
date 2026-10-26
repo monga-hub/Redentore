@@ -7,14 +7,15 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { CARDINALE, DITALE, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
-import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, PACKS as PACKS3, due, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
+import { CARDINALE, CROWNED, DITALE, ONDATE, PROCESSION, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, MONACO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { BELFRY, BELLS, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
 import { GONDOLIERE, PACKS, spawnLevel2 } from '../src/enemies/zitelle.ts';
-import { killAll, rise } from '../src/enemies/caster.ts';
+import { hurt as casterHurt, killAll, rise, sees, think, type Bolt } from '../src/enemies/caster.ts';
+import { ESCORT } from '../src/quest/escort.ts';
 import { RISE } from '../src/enemies/brain.ts';
 
 const SIDE = ALL_SIDE.filter((q) => giverOf(q) === 'iseppo'); // Mastro Iseppo's in the squero; San Giorgio's below
@@ -338,7 +339,7 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   q.prompt(basins[0])?.act?.();
   q.prompt(basins[1])?.act?.();
   const acqua = SIDE_BY.get('acqua')!;
-  if (b.count('acqua-allori') || !s.ready(acqua) || s.spots().length) fail('both lavabi filled do not make Acqua di San Benedetto ready');
+  if (b.count('acqua-allori') || !s.ready(acqua) || s.spots().length || !s.line(acqua).includes('levante')) fail('both lavabi filled do not make Acqua di San Benedetto ready, its line the last lavabo\'s');
   copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
   if (!copy.side.ready(acqua)) fail('Acqua di San Benedetto is not ready after a save past its last lavabo');
   copy.side.decode({ taken: ['acqua'], done: [], steps: { acqua: 6 } });
@@ -451,8 +452,91 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   s.update();
   if (!s.ready(tiara) || q.marks(0).cardinale !== 'ready') fail('the three jewels, the brooch before the emerald, do not make the tiara ready');
   const xp7 = q.bonusXp;
-  if (s.talk('cardinale').paid?.id !== 'tiara' || b.count(SPILLA) || GEMME.some((f) => b.count(f.item)) || q.bonusXp !== xp7 + 180 || q.marks(0).cardinale) fail('the jewels are not handed in for 180 XP, or the Cardinale still has something');
-  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario', 'batacchio-sangiorgio'];
+  if (s.talk('cardinale').paid?.id !== 'tiara' || b.count(SPILLA) || GEMME.some((f) => b.count(f.item)) || q.bonusXp !== xp7 + 180 || q.marks(0).cardinale !== 'offer') fail('the jewels are not handed in for 180 XP, or the Cardinale has not the procession to give');
+  // L'incoronazione: the procession's way walkable on the carpet's line, each wave standable round its stop, in sight and in pull of it;
+  // he sets off with the hero by him and waits for one who lags; each stop wakes its wave (and only it), which goes for him and not the
+  // hero; a fall sends him back to the altar for another try, a load starts the walk over; on the Bacino crowned (saved), handed in there
+  // for 350 XP, 150 gold and the Tiara, and the Benedizione apostolica on the Abate.
+  const inc = SIDE_BY.get('incoronazione')!, e = s.escort, waves = l3.hidden.filter((h) => h.pack.hidden!.quest === 'incoronazione');
+  for (let i = 1; i < PROCESSION.length; i++) {
+    const a = PROCESSION[i - 1], c = PROCESSION[i], n = Math.ceil(Math.hypot(c.x - a.x, c.z - a.z) / 0.25);
+    for (let k = 0; k <= n; k++) {
+      const x = a.x + ((c.x - a.x) * k) / n, z = a.z + ((c.z - a.z) * k) / n, y = a.y + ((c.y - a.y) * k) / n;
+      const g = level.world.groundAt(x, z, y); // his feet are drawn at y: the floor (a stair's step) within reach of it
+      if ((Math.hypot(x - CARDINALE.x, z - CARDINALE.z) > 0.8 && level.world.blocked(x, z, g, 0.3)) || Math.abs(g - y) > 0.3) { fail(`the procession is blocked at (${x.toFixed(1)}, ${z.toFixed(1)}), or off its floor`); break; }
+    }
+    if (Math.abs(level.world.standHeight(c.x, c.z) - c.y) > 0.1) fail(`the procession's point (${c.x}, ${c.z}) is not on the floor`);
+  }
+  const wavesN = waves.map((h) => h.members.length), kills = ONDATE.map((st) => (stepsOf(inc)[st] as { n: number }).n);
+  if (waves.length !== 3 || wavesN.join() !== kills.join() || waves.some((h, i) => h.pack.hidden!.step !== ONDATE[i] || h.members.some((m) => m.kind !== MONACO))) fail(`the procession's waves are not three of monaci neri, one per stop, as many as its kills (${wavesN} for ${kills})`);
+  waves.forEach((h, i) => {
+    const stop = PROCESSION[(stepsOf(inc)[ONDATE[i] - 1] as { to: number }).to], b0 = h.pack.bounds;
+    if (stop.x < b0.x0 || stop.x > b0.x1 || stop.z < b0.z0 || stop.z > b0.z1) fail(`the wave ${i + 1}'s floor does not take in its stop`);
+    for (const [k, x, z] of h.pack.members) {
+      const f = feet(x, z);
+      if (level.world.blocked(x, z, f.y) || Math.hypot(x - stop.x, z - stop.z) > k.aggro || !sees(level.world, { x, y: f.y, z }, stop)) fail(`a monaco of wave ${i + 1} at (${x}, ${z}) has no room, or is out of sight or pull of his stop`);
+    }
+  });
+  if (QUESTS.incoronazione.xp !== 350 || QUESTS.incoronazione.gold !== 150 || inc.after !== 'tiara' || inc.prep !== 'benedizione' || ITEM.get(inc.reward!)?.slot !== 'testa' || ITEM.get(inc.reward!)?.rarity !== 'epico') fail('L\'incoronazione is not the plan\'s: after the tiara, 350 XP, 150 gold, an epic head piece, the Benedizione');
+  const got = (id: SideId, step: number) => s.reached(id, step), woke = () => waves.filter((h) => due(h, l3, got, false)).length;
+  const lead = (to: number, lag = 2) => { for (let t = 0; t < 200 && e.at < to; t += 0.1) { const p = e.pose; s.march(0.1, { x: p.x - lag, z: p.z }); s.update(); } };
+  lead(3);
+  if (e.at) fail('the Cardinale walks before the procession is taken');
+  take('cardinale');
+  if (!s.line(inc).startsWith('Scorta') || !s.line(inc).endsWith('salute 100%')) fail('the procession\'s line does not show the Cardinale\'s health');
+  s.march(1, { x: e.pose.x + 20, z: e.pose.z });
+  if (e.at || e.on) fail('the Cardinale sets off with the hero far from him');
+  lead(3);
+  if (s.step(inc) !== 1 || Math.hypot(e.pose.x - PROCESSION[3].x, e.pose.z - PROCESSION[3].z) > 0.01 || woke() !== 1 || !due(waves[0], l3, got, false)) fail('under the dome the Cardinale does not stop, or not with the first wave due');
+  // the first wave, thinking with him as its target (main.ts aims them at him the same way), closes on him and strikes, short of felling him at once
+  const bolts: Bolt[] = [];
+  rouse(waves[0].members, level.world, true);
+  for (let t = 0; t < 8; t += 1 / 30) for (const m of waves[0].members) e.hurt(think(m, e.pose, level.world, 1 / 30, bolts));
+  const bit = ESCORT.hp - e.hp;
+  if (bit <= 0 || e.hp <= 0 || waves[0].members.some((m) => Math.hypot(m.x - e.pose.x, m.z - e.pose.z) > 3)) fail(`the first wave does not close on the Cardinale and strike him (${bit} in 8 s)`);
+  if (s.progress(inc) !== 0 || !s.line(inc).includes('cupola')) fail('the first wave\'s line does not count its monaci');
+  s.killed('monaco', 'incoronazione'); s.killed('monaco', 'acqua'); s.killed('monaco');
+  if (s.progress(inc) !== 1) fail('a monaco not of the procession counts for it');
+  copy.side.bag = b;
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.step(inc) !== 0 || copy.side.escort.at !== 0 || copy.side.escort.pose.x !== CARDINALE.x || !copy.side.active('incoronazione')) fail('a load mid-procession does not start it over from the altar');
+  if (!e.hurt(e.hp)) fail('the Cardinale does not fall at no health');
+  s.fall();
+  lull(waves[0].members);
+  if (s.step(inc) !== 0 || e.at !== 0 || e.hp !== ESCORT.hp || e.pose.x !== CARDINALE.x || e.pose.y !== CARDINALE.y || woke() || !s.active('incoronazione')) fail('a fall does not send the Cardinale back to the altar, whole, for another try');
+  lead(3);
+  for (const [i, h] of waves.entries()) {
+    if (s.step(inc) !== ONDATE[i] || woke() !== i + 1 || waves.some((w, j) => j > i && due(w, l3, got, false))) fail(`the wave ${i + 1} is not the only new one due at its stop`);
+    if (s.progress(inc) !== 0) fail(`the wave ${i + 1}'s count does not start from nothing (${s.progress(inc)})`);
+    for (const _ of h.members) s.killed('monaco', 'incoronazione');
+    s.update();
+    if (!s.line(inc).startsWith('Scorta')) fail(`after wave ${i + 1} the procession does not walk on`);
+    const at = e.at, x0 = e.pose.x;
+    for (let t = 0; t < 5; t += 0.1) s.march(0.1, { x: e.pose.x - 20, z: e.pose.z });
+    if (e.pose.x !== x0) fail('the Cardinale walks on while the hero lags behind');
+    lead(i < 2 ? at + 1 : PROCESSION.length - 1);
+  }
+  if (s.step(inc) !== CROWNED || !s.ready(inc) || s.line(inc).includes('undefined') || q.marks(0).cardinale !== 'ready' || Math.hypot(e.pose.x - PROCESSION[6].x, e.pose.z - PROCESSION[6].z) > 0.01) fail('on the Bacino the procession is not over and ready to hand in');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (!copy.side.ready(inc) || copy.side.escort.pose.x !== PROCESSION[6].x) fail('the coronation does not survive a save, with the Cardinale on the Bacino');
+  const bacino = feet(e.pose.x + 1.2, e.pose.z);
+  q.update(bacino);
+  if (q.prompt(bacino)?.talk !== 'cardinale' || q.prompt(feet(CARDINALE.x + 1.2, CARDINALE.z))?.talk === 'cardinale') fail('the Cardinale is not to be talked to on the Bacino, or still at the altar');
+  if (level.world.blocked(e.pose.x, e.pose.z, 0, 0.1) !== true) fail('the Cardinale\'s collider does not follow him to the Bacino');
+  hand('cardinale', 'incoronazione');
+  if (b.count('tiara-cartapesta') !== 1 || q.marks(0).cardinale || !q.preps().includes('benedizione') || s.escort.pose.x !== PROCESSION[6].x) fail('the procession is not handed in for the Tiara and the Benedizione, the Cardinale staying on the Bacino');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.escort.pose.x !== PROCESSION[6].x) fail('a load after the coronation does not find the Cardinale on the Bacino');
+  const ab = l3.boss, hp0 = ab.hp;
+  prepare(['benedizione']);
+  casterHurt(ab, 1000);
+  const blessed = hp0 - ab.hp;
+  prepare([]);
+  ab.hp = hp0;
+  casterHurt(ab, 1000);
+  if (Math.round(blessed) !== 1100 || hp0 - ab.hp !== 1000) fail(`the Benedizione apostolica does not make the hero's blows on the Abate 10% heavier (${blessed}, then ${hp0 - ab.hp})`);
+  ab.hp = hp0; ab.state = 'pray';
+  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario', 'batacchio-sangiorgio', 'tiara-cartapesta'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
 }
@@ -490,7 +574,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order, L'incoronazione escorted through 3 waves); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

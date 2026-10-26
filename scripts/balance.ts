@@ -26,6 +26,7 @@
 //   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
 //   node scripts/balance.ts commissario [runs]     the Commissario delle Arti alone in the cipressi, his granatieri at his half, every build at 16, 17, 18, dodging and not, one life (GEAR default typical3)
 //   node scripts/balance.ts campanaro [runs]       the Campanaro di San Giorgio alone in the bell chamber, 44 m up, likewise
+//   node scripts/balance.ts incoronazione [runs]   the Cardinale's procession from the altar to the Bacino, its three waves of monaci on him, the bot at his side, every build at 16, 17, 18, three tries (he falls: back to the altar)
 //   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
@@ -51,7 +52,9 @@ import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { TOMES, levelOf, offer, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
-import { GIVERS, MUTE, SIDE, STRUMENTI, TELA, giverOf } from '../src/quest/squero.ts';
+import { CARDINALE, GIVERS, MUTE, SIDE, SIDE_BY, STRUMENTI, TELA, giverOf } from '../src/quest/squero.ts';
+import { ESCORT } from '../src/quest/escort.ts';
+import type { Target } from '../src/enemies/brain.ts';
 import { BELFRY, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { HEROES, heroOf } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
@@ -286,7 +289,7 @@ class Run {
   readonly l2: Level2; // the second level's casters
   readonly l3: Level3; // the third's
   readonly mobs: Mob[];
-  private free = new Set<Mob>(); // killed by a victory: worth nothing
+  free = new Set<Mob>(); // killed by a victory: worth nothing
   bolts: Bolt[] = [];
   picks: string[] = [];
   time = 0;
@@ -324,6 +327,9 @@ class Run {
   };
   aimed = () => this.target;
   foes = () => this.mobs;
+  /** Who goes for someone other than the hero, and whom (the Cardinale's procession, as main.ts aims it); their blows go to `struck`. */
+  aim: (c: Priest) => Target | undefined = () => undefined;
+  struck: (n: number) => void = () => {};
   get comboStep(): number { return this.combo; }
 
   readonly build: string;
@@ -704,6 +710,8 @@ class Run {
     separate(this.friars, this.world);
     p.y += lift;
     for (const c of this.casters) {
+      const at = this.aim(c);
+      if (at) { this.struck(casterThink(c, at, this.world, dt, this.bolts)); continue; }
       const was = c.state, d = casterThink(c, p, this.world, dt, this.bolts);
       if ((c === this.boss || c === this.l2.boss || c === this.l3.boss || c === this.l3.commissario) && d > 0) { const k = was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : was === 'pour' && c.state !== 'pour' ? 'calice' : c.tide && c.tide.t >= c.kind.tide!.warn ? 'acqua' : c.rings.length ? 'campane' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
       dmg += d;
@@ -759,7 +767,7 @@ class Run {
     // lie there FALLEN s while the world plays on, then wake at the checkpoint
     for (let k = 0; k < 2.6 / DT; k++) {
       for (const f of this.friars) friarThink(f, this.player.pos, this.world, DT);
-      for (const c of this.casters) casterThink(c, this.player.pos, this.world, DT, this.bolts);
+      for (const c of this.casters) { const at = this.aim(c), d = casterThink(c, at ?? this.player.pos, this.world, DT, this.bolts); if (at) this.struck(d); }
       this.bolts.length = 0;
       this.time += DT;
     }
@@ -1075,6 +1083,65 @@ export function playCampanaro(build: string, lv: number, dodge: boolean, s = 1):
   return { build, lv, elite: 'campan.', dodge, won: !r.deaths && c.state === 'dead', time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
 }
 
+export interface EscortResult { build: string; lv: number; dodge: boolean; won: boolean; tries: number; time: number; low: number; deaths: number }
+
+/**
+ * L'incoronazione: the Cardinale walked from the high altar to the Bacino, the bot at his side (it fights whatever is up, else
+ * follows him), its three waves of monaci woken at his stops and aimed at him as main.ts does. He falls: the waves back under,
+ * he back to the altar, another try (three at most). Everything else on the island dead.
+ */
+export function playIncoronazione(build: string, lv: number, dodge: boolean, s = 1): EscortResult {
+  swings.clear();
+  region(ISLAND);
+  const r = new Run(build, dodge), q = r.quest, side = q.side, inc = SIDE_BY.get('incoronazione')!, e = side.escort;
+  seed = s * 7919;
+  r.dress(process.env.GEAR ?? 'typical3');
+  r.picks = picksTo(build, lv);
+  r.apply();
+  r.stats.revive();
+  q.accepted = q.accepted3 = q.landed = true;
+  side.done.push('schede', 'tiara');
+  side.taken.push('incoronazione');
+  const waves = r.l3.hidden.filter((h) => h.pack.hidden!.quest === 'incoronazione'), walkers = new Set<Mob>(waves.flatMap((h) => h.members));
+  for (const m of r.mobs) if (!walkers.has(m)) { m.state = 'dead'; m.hp = 0; }
+  r.aim = (c) => (walkers.has(c) ? e.pose : undefined);
+  r.struck = (n) => { e.hurt(n); };
+  r.levelUp = () => {};
+  r.paths.reset();
+  Object.assign(r.player.pos, { x: CARDINALE.x + 1.6, y: CARDINALE.y, z: CARDINALE.z });
+  let tries = 1, low = 1;
+  const counted = new Set<Mob>(walkers); // asleep: dead, not a kill
+  while (r.time < 15 * 60 && !side.ready(inc) && tries <= 3) {
+    side.march(DT, r.player.pos);
+    side.update();
+    r.step({ x: e.pose.x + 1.5, z: e.pose.z + 1.5, r: 1.5 }); // a step ahead and aside of him
+    for (const m of walkers) { // its kills, as main.ts counts them
+      if (m.state !== 'dead') counted.delete(m);
+      else if (!counted.has(m)) { counted.add(m); side.killed('monaco', 'incoronazione'); }
+    }
+    low = Math.min(low, e.hp / ESCORT.hp);
+    if (e.hp > 0) continue;
+    for (const h of waves) { for (const m of h.members) r.free.add(m); lull(h.members); r.woken.delete(h); }
+    side.fall();
+    tries++;
+  }
+  region(MAINLAND);
+  return { build, lv, dodge, won: side.ready(inc), tries: Math.min(tries, 3), time: r.time, low, deaths: r.deaths };
+}
+
+/** The procession: per build, level and bot, runs won (in three tries), first-try wins, the run's length, the Cardinale's lowest health, the hero's deaths. */
+export function escortTable(rs: EscortResult[]): string {
+  const out = [`${'build'.padEnd(8)}${pad('level', 6)} ${'bot'.padEnd(9)}${pad('wins', 6)}${pad('1st try', 8)}${pad('run s', 7)}${pad('his low', 8)}${pad('deaths', 7)}`];
+  const key = (r: EscortResult) => `${r.build}|${r.lv}|${r.dodge}`;
+  for (const k of [...new Set(rs.map(key))]) {
+    const g = rs.filter((r) => key(r) === k), r0 = g[0], won = g.filter((r) => r.won);
+    out.push(`${r0.build.padEnd(8)}${pad(r0.lv, 6)} ${(r0.dodge ? 'dodge' : 'no dodge').padEnd(9)}${pad(`${won.length}/${g.length}`, 6)}${pad(`${won.filter((r) => r.tries === 1).length}/${g.length}`, 8)}` +
+      `${pad(won.length ? mean(won.map((r) => r.time)).toFixed(0) : '-', 7)}${pad(`${Math.round(mean(g.map((r) => r.low)) * 100)}%`, 8)}${pad(f1(mean(g.map((r) => r.deaths))), 7)}`);
+  }
+  out.push(`procession: ${rs.filter((r) => r.won).length}/${rs.length} won, ${rs.filter((r) => r.won && r.tries === 1).length} at the first try`);
+  return out.join('\n');
+}
+
 export interface PackResult { build: string; lv: number; dodge: boolean; won: boolean; time: number; potions: number; lost: number; contact: number; kills: number; casts: Map<string, number> }
 
 /** A caster's nightmare: four friars of one pull, set 16 m up the orto's open path and charging, the hero standing his ground at level `lv`, one life. */
@@ -1227,6 +1294,10 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     const rs: EliteResult[] = [];
     for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [16, 17, 18]) runs(Number(build ?? 3), (s) => rs.push(playCampanaro(b, lv, d, s)));
     console.log(eliteTable(rs));
+  } else if (mode === 'incoronazione') {
+    const rs: EscortResult[] = [];
+    for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [16, 17, 18]) runs(Number(build ?? 3), (s) => rs.push(playIncoronazione(b, lv, d, s)));
+    console.log(escortTable(rs));
   } else if (mode === 'pack3') {
     const rs: PackResult[] = [];
     for (const d of [true, false]) for (const lv of [15, 16, 17]) runs(Number(n ?? 6), (s) => rs.push(playPack3(build ?? 'arcane', lv, d, s)));

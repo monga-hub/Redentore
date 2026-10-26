@@ -518,6 +518,10 @@ export class Priests {
   /** Which of the dead get up again (caster.ts `rise`): main.ts, level 2's drowned until the Governatrice falls. */
   rising: (f: Priest) => boolean = () => false;
 
+  /** Who goes for someone other than the hero, and whom (main.ts: the Cardinale's procession's monaci, on him); their blows go to `strike`. */
+  aim: (f: Priest) => Target | undefined = () => undefined;
+  strike: (n: number) => void = () => {};
+
   update(dt: number, player: Target): void {
     if (!this.views.length) return;
     for (const f of this.all) if (f.state === 'dead' && this.rising(f)) rise(f, player, this.world);
@@ -525,8 +529,9 @@ export class Priests {
     const v = this.vfx;
     this.all.forEach((f, i) => {
       const n = this.bolts.length, was = f.state;
-      const hit = think(f, player, this.world, dt, this.bolts);
-      dmg += hit;
+      const at = this.aim(f), hit = think(f, at ?? player, this.world, dt, this.bolts);
+      if (!at) dmg += hit;
+      else if (hit > 0) this.strike(hit);
       if (was === 'nova' && f.state !== 'nova') this.nova(f, hit > 0);
       if (was === 'pour' && f.state !== 'pour') this.poured(f, hit > 0);
       if (this.bolts.length === n) return;

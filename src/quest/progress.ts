@@ -150,6 +150,7 @@ export const QUESTS = {
   tela: { title: 'La tela tagliata', xp: 320, gold: 140 }, // the Veronese's second: the Commissario delle Arti
   schede: { title: 'Le schede del conclave', xp: 150, gold: 50 }, // the Cardinale benedettino, the first of his three
   tiara: { title: 'La tiara di cartapesta', xp: 180, gold: 70 }, // his second: the ladies' three jewels
+  incoronazione: { title: "L'incoronazione", xp: 350, gold: 150 }, // his third: walked from the altar to the Bacino through three waves, and crowned
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -207,6 +208,8 @@ export class Quest {
   done: QuestId[] = [];
   readonly gates: Gate[];
   private world: World;
+  /** The Cardinale's collider, kept on him as his procession walks (`update`). */
+  private held: Box;
 
   /** Adds the shut gates' and the chest's colliders to `world`. */
   constructor(world: World) {
@@ -219,7 +222,8 @@ export class Quest {
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
     world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
     world.add(SPEZIALE.x, SPEZIALE.z, SPEZIALE.r, SPEZIALE.r, 0, 1.8);
-    for (const { at } of Object.values(GIVERS)) world.add(at.x, at.z, at.r, at.r, at.y ?? 0, (at.y ?? 0) + 1.8);
+    const held = (Object.keys(GIVERS) as Giver[]).map((g) => { const at = GIVERS[g].at; return world.add(at.x, at.z, at.r, at.r, at.y ?? 0, (at.y ?? 0) + 1.8); });
+    this.held = held[Object.keys(GIVERS).indexOf('cardinale')];
     this.side.complete = (id) => this.complete(id);
     this.side.over = (q) => (GIVERS[giverOf(q)].level === 3 ? this.boss3Dead : this.boss2Dead);
   }
@@ -249,8 +253,10 @@ export class Quest {
     return this.gates.find((g) => g.id === id)!;
   }
 
-  /** Per frame with the player's feet: walking out of the open portone ends the first quest's fight, reaching the Zitelle the second's walk. */
+  /** Per frame with the player's feet: walking out of the open portone ends the first quest's fight, reaching the Zitelle the second's walk (and the Cardinale's collider is kept on him). */
   update(p: { x: number; z: number }): boolean {
+    const e = this.side.escort.pose;
+    Object.assign(this.held, { cx: e.x, cz: e.z, y0: e.y, y1: e.y + 1.8 });
     const s = this.stage;
     if (s === 'leave' && p.z >= OUTSIDE) return (this.out = true);
     if (s === 'route' && p.x <= ZITELLE) return (this.arrived = true);
@@ -488,7 +494,7 @@ export class Quest {
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
     if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: 'zuane' };
     if (Math.hypot(p.x - SPEZIALE.x, p.z - SPEZIALE.z) < REACH && p.y < 1.5) return { text: `Parla con ${SPEZIALE.name}`, act: () => '', talk: 'speziale' };
-    for (const [g, { at }] of Object.entries(GIVERS) as [Giver, typeof GIVERS[Giver]][]) if (Math.hypot(p.x - at.x, p.z - at.z) < REACH && p.y < 1.5) return { text: `Parla con ${at.name}`, act: () => '', talk: g };
+    for (const g of Object.keys(GIVERS) as Giver[]) { const at = this.side.where(g); if (Math.hypot(p.x - at.x, p.z - at.z) < REACH && p.y < 1.5) return { text: `Parla con ${at.name}`, act: () => '', talk: g }; }
     const find = this.side.prompt(p);
     if (find) return find;
     const ferry = this.ferry(p) ?? this.climb(p);

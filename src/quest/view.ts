@@ -9,7 +9,7 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { ARCHIVISTA, CARDINALE, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { ARCHIVISTA, CROWNED, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
 import { BELLS, BELL_MOUTH, CENACOLO } from '../level/zones/sangiorgio.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
@@ -21,7 +21,7 @@ import { BELLS, BELL_MOUTH, CENACOLO } from '../level/zones/sangiorgio.ts';
 // styled here so they stay out of the HUD's way.
 
 const join = (t: Talk) => t.pages.join('\n\n'); // a quest's text, whole, in the list window
-const back = (q: SideQuest) => { const g = GIVERS[giverOf(q)]; return `Torna da ${g.at.name}, ${g.where}`; }; // a side quest's line once it is ready
+const back = (q: SideQuest) => { const g = GIVERS[giverOf(q)]; return q.back ?? `Torna da ${g.at.name}, ${g.where}`; }; // a side quest's line once it is ready
 const pay = (id: QuestId, item?: string) => ({ xp: QUESTS[id].xp, gold: QUESTS[id].gold, item });
 const OPEN_TIME = 1.6; // s for a gate to open
 const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1, cenacolo: -1, 'cenacolo-orto': -1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls; the Cenacolo's into the hall and out to the garden
@@ -126,7 +126,9 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
-  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(CARDINALE, PORPORA, 'cardinale.glb') };
+  private givers: Record<Giver, Npc>; // the Cardinale on his procession's spot (quest/escort.ts), set with the quest
+  private tiara = tiara(); // on the Cardinale's head once he is crowned on the Bacino, until he gives it to the hero
+  private crowned?: boolean; // as last drawn (undefined: not yet, so a load finds him crowned without the flash)
   private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
   private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
   private clappers: THREE.Mesh[] = []; // the campanile's bells' clappers, until Rintocchi muti pulls them
@@ -173,6 +175,8 @@ export class QuestView {
   constructor(quest: Quest, vfx: Vfx) {
     this.quest = quest;
     this.vfx = vfx;
+    this.givers = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(quest.side.escort.pose, PORPORA, 'cardinale.glb') };
+    this.givers.cardinale.root.add(this.tiara);
     const iron = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.55, metalness: 0.75 });
     this.gates = quest.gates.map((g) => this.gate(g, iron));
 
@@ -317,7 +321,7 @@ export class QuestView {
   /** The quest givers with a "!" or "?" up, for the maps: `state` is the Mark. */
   pins(): { x: number; z: number; state: string }[] {
     const m = this.quest.marks(this.friars());
-    return ([[NPC, m.zuane], [SPEZIALE, m.speziale], ...(Object.keys(GIVERS) as Giver[]).map((g) => [GIVERS[g].at, m[g]] as const)] as const).flatMap(([at, k]) => (k ? [{ x: at.x, z: at.z, state: k }] : []));
+    return ([[NPC, m.zuane], [SPEZIALE, m.speziale], ...(Object.keys(GIVERS) as Giver[]).map((g) => [this.quest.side.where(g), m[g]] as const)] as const).flatMap(([at, k]) => (k ? [{ x: at.x, z: at.z, state: k }] : []));
   }
 
   /** He has Le teste dei frati to give: not yet taken and friars still about. */
@@ -570,6 +574,16 @@ export class QuestView {
       }
       m.visible = !out;
     });
+    const s = this.quest.side, crowned = s.active('incoronazione') && s.reached('incoronazione', CROWNED), c = s.escort.pose;
+    if (crowned && this.crowned === false) { // on the Bacino: the tiara raised and set on his head, a burst of gold, Venezia sees it
+      this.vfx.spawn(goldFlare, c.x, c.y + 2.2, c.z);
+      this.vfx.burst(goldSpark, c.x, c.y + 2, c.z, 80, 0.5, 4, 3);
+      this.vfx.pulse(c.x, c.y + 2.5, c.z, GOLD, 40);
+      playSfx('quest', null, { rate: 0.8 });
+      this.givers.cardinale.cheer = 5;
+      notices.push('Davanti al Bacino il Cardinale si posa la tiara sul capo: Pio VII è incoronato');
+    }
+    this.tiara.visible = this.crowned = crowned;
     if (this.quest.canvas && !this.nozze) this.hang();
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt); // its icon is with the hero's buffs (ui/plates.ts)
     const now = this.quest.prompt(player);
@@ -713,5 +727,37 @@ function key(): THREE.Group {
   const bit = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.014), gold);
   bit.position.set(0.035, -0.09, 0);
   g.add(bow, cross, bar, shank, bit);
+  return g;
+}
+
+/**
+ * The tiara di cartapesta on the Cardinale's head (L'incoronazione): a beehive of gilded papier-mâché, the three crowns of the
+ * triregno round it and a cross on top, the ladies' emerald, pearl and rubies sewn on the lowest; glowing like the key.
+ */
+function tiara(): THREE.Group {
+  const gold = new THREE.MeshBasicMaterial({ color: new THREE.Color(GOLD).multiplyScalar(1.4), fog: false });
+  const paper = new THREE.MeshBasicMaterial({ color: 0xf4ecd8, fog: false });
+  const g = new THREE.Group();
+  const hive = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.115, 0.28, 16), paper);
+  hive.position.y = 0.14;
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), paper);
+  cap.position.y = 0.28;
+  g.add(hive, cap);
+  for (const [y, r] of [[0.03, 0.118], [0.12, 0.103], [0.21, 0.088]]) {
+    const crown = new THREE.Mesh(new THREE.TorusGeometry(r, 0.016, 6, 24).rotateX(Math.PI / 2), gold);
+    crown.position.y = y;
+    g.add(crown);
+  }
+  const cross = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.08, 0.014), gold), bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.014, 0.014), gold);
+  cross.position.y = 0.38;
+  bar.position.y = 0.39;
+  g.add(cross, bar);
+  ([[0x22c070, 0], [0xf0f0ff, (Math.PI * 2) / 3], [0xd01830, (Math.PI * 4) / 3]] as const).forEach(([c, a]) => { // the emerald, the pearl, the rubies
+    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(1.5), fog: false }));
+    gem.position.set(Math.sin(a) * 0.12, 0.07, -Math.cos(a) * 0.12);
+    g.add(gem);
+  });
+  g.position.y = 1.64; // on the head of a 1.75 m body (quest/npc.ts)
+  g.visible = false;
   return g;
 }

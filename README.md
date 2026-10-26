@@ -132,7 +132,15 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
 - **La tiara di cartapesta**: dopo le schede il Cardinale vuole i tre gioielli che le dame veneziane cucirono sulla
   tiara di cartapesta del 1800: lo smeraldo su uno scrittoio della Biblioteca, la perla sul palco del Teatro Verde
   (in qualsiasi ordine) e la spilla di rubini del Bibliotecario, che cade dal suo corpo anche se è già morto. Paga
-  180 PE e 70 oro, nessun oggetto. Il Cardinale annuncia la processione fino al sagrato (l'incoronazione, non ancora).
+  180 PE e 70 oro, nessun oggetto. Il Cardinale annuncia la processione fino al sagrato.
+- **L'incoronazione**, la terza del Cardinale, una scorta (`src/quest/escort.ts`): appena l'eroe gli è vicino il
+  Cardinale scende dal presbiterio e cammina, piano, sul tappeto della navata fino al sagrato sul Bacino. Ha 10000 PV
+  (barra nel tracker) e si ferma tre volte: sotto la cupola, a metà navata e sul sagrato, dove si svegliano tre branchi
+  nascosti di monaci neri (3, 4 e 4) che attaccano lui, non l'eroe. Aspetta l'eroe che resta indietro e, mentre cammina,
+  recupera salute pregando. Se cade si rialza davanti all'altare e la processione ricomincia (anche dopo un
+  caricamento). Sul Bacino si posa sul capo la tiara (un lampo d'oro); la consegna è lì e paga 350 PE, 150 oro, la
+  Tiara di cartapesta (testa, epico unico) e la *Benedizione apostolica*: i colpi dell'eroe sull'Abate fanno il 10% in
+  più (`PREPS=benedizione`). `node scripts/balance.ts incoronazione` la gioca con il bot.
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

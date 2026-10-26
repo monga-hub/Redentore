@@ -16,13 +16,15 @@
 // Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
 // the Fanalista of the darsena, Padre Archivista in Longhena's passage, and the ghost of Paolo Veronese in the antirefettorio, whose
 // two quests (the musicians' instruments, then the canvas back off the Commissario delle Arti) open the Cenacolo, and the
-// Cardinale benedettino before the high altar, who wants the conclave's voting slips counted. Padre Archivista's second sends the hero
+// Cardinale benedettino before the high altar, who wants the conclave's voting slips counted, the tiara's jewels found, and then to be
+// walked out of his church to be crowned (an escort, quest/escort.ts). Padre Archivista's second sends the hero
 // up the campanile, to the bell chamber 44 m over the lagoon. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
 import { BELLS, LIB_F } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
+import { ESCORT, Escort } from './escort.ts';
 import { QUESTS, type QuestId } from './progress.ts';
 
 /** In the squero's yard by the quay, on the gravel between the gondola and the shed, facing the fondamenta. */
@@ -42,7 +44,7 @@ export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
 export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
 export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale';
@@ -53,7 +55,7 @@ export interface GiverSpec { at: { x: number; y?: number; z: number; yaw: number
  * `from` while it runs (`woken`: only the hidden pack the quest woke, enemies/sangiorgio.ts); token: `item` off the elite `from` (laid at its body once it is dead, main.ts);
  * find: `item` picked up at `at`; finds: each of `finds` picked up at its spot, in any order; letter: hand `item` in (the rare drop that starts it); use: `needs` burnt at `at`,
  * `gives` put in the bag (a step of a quest in steps: using it moves the quest on; `say`: its prompt and notice, else
- * "Accendi" the label).
+ * "Accendi" the label); escort: the quest's escort (quest/escort.ts) on to point `to` of its path, which moves the quest on.
  */
 export type Want =
   | { kind: 'collect'; item: string; n: number; from: Foe; chance: number }
@@ -62,7 +64,8 @@ export type Want =
   | { kind: 'find'; item: string; at: { x: number; y: number; z: number }; label: string }
   | { kind: 'finds'; finds: readonly Find[] }
   | { kind: 'letter'; item: string }
-  | { kind: 'use'; at: { x: number; y: number; z: number }; label: string; needs?: { item: string; n: number }; gives?: { item: string; n: number }; say?: [string, string] };
+  | { kind: 'use'; at: { x: number; y: number; z: number }; label: string; needs?: { item: string; n: number }; gives?: { item: string; n: number }; say?: [string, string] }
+  | { kind: 'escort'; to: number };
 
 /** One thing to pick up at a spot (a `finds` want). */
 export interface Find { item: string; at: { x: number; y: number; z: number }; label: string }
@@ -79,7 +82,9 @@ export interface SideQuest {
   reward?: string;
   /** The Abate weakened once it is handed in (enemies/sangiorgio.ts PREPS). */
   prep?: string;
-  /** The tracker's line; `n` is the progress so far, `step` the step under way. */
+  /** The tracker's line once it is ready to hand in, if not "Torna da" the giver where he waits. */
+  back?: string;
+  /** The tracker's line; `n` is the progress so far, `step` the step under way (an escort's health is put after it). */
   line: (n: number, step: number) => string;
   offer: string[];
   busy: string;
@@ -124,6 +129,22 @@ export const GEMME: readonly Find[] = [
   { item: 'perla-dama', at: { x: -579, y: 0.5, z: -37.5 }, label: 'la perla sul palco' },
 ];
 export const SPILLA = 'spilla-dama';
+/**
+ * L'incoronazione: the procession's way, from the high altar down the presbytery's steps, under the dome, up the nave and out of
+ * the portal across the sagrato to the Bacino, all on the carpet's line (zones/sangiorgio.ts basilica). The monaci neri come for
+ * him three times (ONDATE: the quest's steps that wake them, enemies/sangiorgio.ts PACKS): under the dome, mid-nave, on the sagrato.
+ */
+export const PROCESSION = [
+  { x: CARDINALE.x, y: CARDINALE.y, z: CARDINALE.z }, // the altar
+  { x: -541.8, y: 0.6, z: 102 }, { x: -539.4, y: 0, z: 102 }, // the presbytery's steps
+  { x: -530, y: 0, z: 102 }, // under the dome
+  { x: -499, y: 0, z: 102 }, // mid-nave
+  { x: -468, y: 0, z: 102 }, // the sagrato, out of the portal
+  { x: -452, y: 0, z: 102 }, // the Bacino
+] as const;
+export const ONDATE = [1, 3, 5] as const;
+/** The step past the procession's last: on the Bacino, crowned (quest/view.ts), ready to hand in. */
+export const CROWNED = 7;
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -346,7 +367,7 @@ export const SIDE: readonly SideQuest[] = [
       'Tienilo tu. Quando l\'Abate fa suonare le sue campane, una lingua gli mancherà: due rintocchi, non tre. E dalla cella si vede tutta la laguna, vero? Io non ci sono mai salito.',
     ],
   },
-  // The Cardinale's conclave, three in a chain: the slips, the tiara, then the coronation (to follow the tiara with `after`).
+  // The Cardinale's conclave, three in a chain: the slips, the tiara, then the coronation, walked from the altar to the Bacino (an escort).
   {
     id: 'schede', giver: 'cardinale',
     want: { kind: 'collect', item: SCHEDA, n: 8, from: 'amanuense', chance: 0.5 },
@@ -375,6 +396,30 @@ export const SIDE: readonly SideQuest[] = [
     done: [
       'Lo smeraldo, la perla, i rubini... Le conoscevo tutte, le dame che li portavano: venivano a confessarsi qui, sull\'isola. Guarda: la cartapesta si tiene dritta, adesso.',
       'Prendi queste monete per la strada. Ma una tiara si porta in processione, figlio, non in tasca: dall\'altare fino al sagrato, sul Bacino, come il ventuno marzo del milleottocento. E i monaci neri non mi lasceranno passare da solo.',
+    ],
+  },
+  {
+    id: 'incoronazione', giver: 'cardinale', after: 'tiara',
+    want: [
+      { kind: 'escort', to: 3 }, { kind: 'kill', n: 3, from: 'monaco', woken: true },
+      { kind: 'escort', to: 4 }, { kind: 'kill', n: 4, from: 'monaco', woken: true },
+      { kind: 'escort', to: 5 }, { kind: 'kill', n: 4, from: 'monaco', woken: true },
+      { kind: 'escort', to: 6 },
+    ],
+    reward: 'tiara-cartapesta',
+    prep: 'benedizione',
+    back: 'Parla con il Cardinale benedettino: la tiara è sul suo capo',
+    line: (n, step) => ['Scorta il Cardinale sotto la cupola', `Difendi il Cardinale sotto la cupola: ${n}/3`, 'Scorta il Cardinale lungo la navata', `Difendi il Cardinale nella navata: ${n}/4`,
+      'Scorta il Cardinale fuori dal portale', `Difendi il Cardinale sul sagrato: ${n}/4`, 'Scorta il Cardinale fino al Bacino'][step],
+    offer: [
+      'Figlio, la tiara ha le sue pietre. Il ventuno marzo del milleottocento mi incoronarono qui, in questa chiesa, a porte chiuse: gli austriaci non vollero San Marco, e Venezia restò fuori, sul sagrato, a guardare la porta.',
+      'Questa volta esco io. Dall\'altare, sotto la cupola, lungo la navata, fino al sagrato sul Bacino, dove la laguna possa vedere. Un papa che nessuno vede non è incoronato: è nascosto.',
+      'I monaci neri dell\'Abate vogliono un conclave che non finisca mai. Verranno per me, non per te: tre volte, credo. Stammi vicino, io cammino piano. E se cado, mi rialzo davanti all\'altare e ricominciamo: i morti hanno pazienza.',
+    ],
+    busy: 'Cammina con me, figlio. Se resti indietro ti aspetto: una processione non lascia indietro nessuno. Ma i monaci neri non aspettano.',
+    done: [
+      'Il Bacino. San Marco là in fondo, la Salute, la Giudecca. Duecento anni fa li ho sentiti suonare da dietro una porta chiusa. Adesso le campane le sento da qui, e la laguna mi vede.',
+      'Tieni la tiara, figlio: la cartapesta l\'ho portata io, le pietre le hai portate tu. E prendi la mia benedizione. Quando l\'Abate alza il pastorale, ogni tuo colpo peserà di più: urbi et orbi, e un poco anche alla laguna.',
     ],
   },
 ];
@@ -406,7 +451,7 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     decline: 'Va bene. Io aspetto qui. Sono quattrocento anni che aspetto davanti a questa porta.',
     full: 'Hai la borsa piena, ragazzo. Fa\' spazio e torna: questo non si appoggia per terra.' },
   cardinale: { at: CARDINALE, level: 3, where: "davanti all'altar maggiore", greet: 'Figlio. Parla piano: il conclave è ancora riunito.',
-    bye: 'Le schede sono contate e la tiara ha le sue pietre. Va\' in pace, figlio: io resto davanti all\'altare, ad aspettare la processione.',
+    bye: 'Le schede sono contate, la tiara è sul capo giusto, e la laguna l\'ha vista. Va\' in pace, figlio: io resto qui sul sagrato, a guardare il Bacino.',
     decline: 'Va bene. Abbiamo aspettato centoquattro giorni, allora: possiamo aspettare ancora.',
     full: 'Hai la borsa piena, figlio. Fa\' spazio e torna.' },
 };
@@ -432,6 +477,13 @@ export class SideQuests {
   bag?: Bag;
   /** Its giver's level is over (its boss dead), so no more of its dead rise to be counted: set by Quest. */
   over: (q: SideQuest) => boolean = () => false;
+  /** The Cardinale on his way to be crowned (L'incoronazione's `escort` wants), at the altar until then. */
+  readonly escort = new Escort(CARDINALE, PROCESSION);
+
+  /** Where `giver` stands now: his own spot, or for the Cardinale wherever his procession has got to. */
+  where(giver: Giver): GiverSpec['at'] {
+    return giver === 'cardinale' ? this.escort.pose : GIVERS[giver].at;
+  }
 
   active(id: SideId): boolean {
     return this.taken.includes(id);
@@ -456,6 +508,7 @@ export class SideQuests {
     if (w.kind === 'kill') return (this.kills[q.id] ?? 0) >= w.n;
     if (w.kind === 'collect') return this.have(w.item) >= w.n;
     if (w.kind === 'finds') return w.finds.every((f) => this.have(f.item) > 0);
+    if (w.kind === 'escort') return this.escort.at >= w.to;
     return w.kind !== 'use' && this.have(w.item) > 0;
   }
 
@@ -472,9 +525,10 @@ export class SideQuests {
     return w.kind === 'kill' ? Math.min(w.n, this.kills[q.id] ?? 0) : w.kind === 'collect' ? Math.min(w.n, this.have(w.item)) : w.kind === 'finds' ? w.finds.filter((f) => this.have(f.item) > 0).length : 0;
   }
 
-  /** The tracker's line for a quest running. */
+  /** The tracker's line for a quest running (past its last step: the last's); an escort's with his health after it, walking or beset. */
   line(q: SideQuest): string {
-    return q.line(this.progress(q), this.step(q));
+    const l = q.line(this.progress(q), Math.min(this.step(q), stepsOf(q).length - 1));
+    return stepsOf(q).some((w) => w.kind === 'escort') ? `${l} · salute ${Math.ceil((this.escort.hp / ESCORT.hp) * 100)}%` : l;
   }
 
   /** Quests `giver` would offer now: in the chain, not yet taken or done. */
@@ -520,14 +574,28 @@ export class SideQuests {
 
   /**
    * Per frame (main.ts): the letter picked up starts its quest, and a quest in steps whose step is met moves on (its
-   * items stay in the bag: the next step may burn them). Returns the quest started, if any.
+   * items stay in the bag: the next step may burn them; a kill step's count starts again), an escort's last step past
+   * itself (he is there: ready). Returns the quest started, if any.
    */
   update(): SideQuest | undefined {
-    for (const { q, w } of this.running()) if (this.step(q) < stepsOf(q).length - 1 && this.met(q, w)) this.steps[q.id] = this.step(q) + 1;
+    for (const { q, w } of this.running()) if ((this.step(q) < stepsOf(q).length - 1 || w.kind === 'escort') && this.met(q, w)) { this.steps[q.id] = this.step(q) + 1; delete this.kills[q.id]; }
     const q = SIDE_BY.get('lettera')!;
     if (this.active(q.id) || this.done.includes(q.id) || !this.have((q.want as { item: string }).item)) return undefined;
     this.taken.push(q.id);
     return q;
+  }
+
+  /** Per frame (main.ts): the escort on toward the point his quest's step wants, standing while a wave is on him. */
+  march(dt: number, hero: { x: number; z: number }): void {
+    const q = SIDE_BY.get('incoronazione')!, w = this.want(q);
+    if (this.active(q.id) && this.step(q) < stepsOf(q).length && w.kind === 'escort') this.escort.update(dt, hero, w.to);
+  }
+
+  /** The escort has fallen: his quest back to its first step, he back at the altar, whole, for another try (main.ts puts the waves back under). */
+  fall(): void {
+    delete this.steps.incoronazione;
+    delete this.kills.incoronazione;
+    this.escort.reset();
   }
 
   /** The elites whose token a running quest still wants (at its step or a later one) and isn't in the bag: main.ts lays it at their body once dead. */
@@ -583,7 +651,7 @@ export class SideQuests {
   handIn(q: SideQuest): boolean {
     const bag = this.bag;
     if (!bag) return false;
-    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item])))].map((id) => [id, this.have(id)] as const);
+    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' || w.kind === 'escort' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item])))].map((id) => [id, this.have(id)] as const);
     for (const [id, n] of items) if (n) bag.remove(id, n);
     if (q.reward && !bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);
@@ -594,22 +662,27 @@ export class SideQuests {
     return true;
   }
 
-  /** One past the last step a quest can be on: past its last use-point, else on its last want. */
+  /** One past the last step a quest can be on: past its last use-point or escort, else on its last want. */
   private ends(q: SideQuest): number {
-    const s = stepsOf(q);
-    return s.length + (s[s.length - 1].kind === 'use' ? 1 : 0);
+    const s = stepsOf(q), last = s[s.length - 1].kind;
+    return s.length + (last === 'use' || last === 'escort' ? 1 : 0);
   }
 
   encode(): SideState {
     return { taken: [...this.taken], done: [...this.done], kills: { ...this.kills }, steps: { ...this.steps } };
   }
 
-  /** Lay a saved state over a fresh one; ids from another build are dropped, and steps past a quest's last (one past a last use-point is kept: ready). */
+  /**
+   * Lay a saved state over a fresh one; ids from another build are dropped, and steps past a quest's last (one past a last
+   * use-point is kept: ready). An escort under way starts over from the altar; one done, or there, stands at the path's end.
+   */
   decode(s: SideState): void {
     const known = (id: string): id is SideId => SIDE_BY.has(id as SideId);
     this.done = s.done.filter(known);
     this.taken = s.taken.filter(known).filter((id) => !this.done.includes(id));
     this.kills = Object.fromEntries(Object.entries(s.kills ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isFinite(n) && n > 0));
     this.steps = Object.fromEntries(Object.entries(s.steps ?? {}).filter(([id, n]) => this.taken.includes(id as SideId) && Number.isInteger(n) && n > 0 && n < this.ends(SIDE_BY.get(id as SideId)!)));
+    if (!this.reached('incoronazione', CROWNED)) delete this.steps.incoronazione;
+    this.escort.reset(this.reached('incoronazione', CROWNED));
   }
 }

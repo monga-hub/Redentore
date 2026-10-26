@@ -146,6 +146,9 @@ const sangiorgio = new Priests(level.world, kit.vfx, playerStats, level.areas, l
 const sleepers = new Set(l3.hidden.flatMap((h) => h.members)); // the hidden packs (enemies/sangiorgio.ts), woken by their quests
 const wokeBy = new Map<object, SideId>(l3.hidden.flatMap((h) => h.members.map((m) => [m, h.pack.hidden!.quest] as const))); // a sleeper's quest, for its kill quests
 sangiorgio.rising = (f) => !quest.boss3Dead && !sleepers.has(f) && ((f.kind === MARINAIO && quest.side.active('marinai')) || (f.kind === AMANUENSE && quest.side.active('schede'))); // the drowned rise again for Mastro Iseppo's ten, the scribes for the Cardinale's slips, until the Abate falls
+const procession = l3.hidden.filter((h) => h.pack.hidden!.quest === 'incoronazione'), walkers = new Set(procession.flatMap((h) => h.members)); // L'incoronazione's three waves
+sangiorgio.aim = (f) => (walkers.has(f) ? quest.side.escort.pose : undefined); // they go for the Cardinale, not the hero
+sangiorgio.strike = (n) => { quest.side.escort.hurt(n); };
 scene.add(sangiorgio.root);
 /** Level 3's kinds: name, kind, height, level, rank. */
 const L3_KINDS = [['Monaco nero', MONACO, 1.9, 16], ['Amanuense', AMANUENSE, 1.8, 16], ['Marinaio annegato', MARINAIO, 1.85, 16], ['Il Bibliotecario', BIBLIOTECARIO, 2.4, 18, 'elite'], ['Il Nostromo della darsena', NOSTROMO, 2.7, 18, 'elite'],
@@ -456,7 +459,7 @@ const sidePins = () => {
   return pins;
 };
 const sidePin = (q: (typeof SIDE)[number]): { x: number; z: number } | undefined => {
-  const w = quest.side.want(q), giver = GIVERS[giverOf(q)].at;
+  const w = quest.side.want(q), giver = quest.side.where(giverOf(q)); // the Cardinale wherever his procession is
   if (quest.side.ready(q)) return giver;
   if (w.kind === 'find' || w.kind === 'use') return w.at;
   if (w.kind === 'finds') return quest.side.spots().filter((s) => s.q === q).map((s) => s.at).sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0] ?? giver; // the nearest still to find
@@ -588,6 +591,12 @@ renderer.setAnimationLoop(() => {
   bees.update(dt, player.pos);
   zitelle.update(dt, player.pos);
   sangiorgio.update(dt, player.pos);
+  quest.side.march(dt, player.pos); // the Cardinale's procession, with the hero at his side
+  if (quest.side.escort.hp === 0) { // he fell: his waves go back under (no kills), he gets up at the altar, and the procession is to start again
+    for (const h of procession) { for (const m of h.members) fell[mobs.indexOf(m)] = true; lull(h.members); woken.delete(h); }
+    quest.side.fall();
+    kit.system.notices.push({ kind: 'error', text: "Il Cardinale è caduto. Si rialza davanti all'altare: torna da lui per ricominciare la processione" });
+  }
   dfx.update(dt, quest.accepted && !quest.key);
   for (const text of drops.update(dt, player.pos)) kit.system.notices.push({ kind: 'error', text }); // before the victory: the boss drops, those he takes with him don't
   bagPanel.update();

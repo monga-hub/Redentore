@@ -8,12 +8,13 @@
 // floor but for islands of light, haste under 20%, and a wedding that will not wait past six minutes.
 // The Veronese's chain (quest/squero.ts) wakes the Commissario delle Arti in the chiostro dei cipressi, a miniboss off the way,
 // and at half his health his three granatieri. Padre Archivista's Rintocchi muti brings the Campanaro di San Giorgio up to the bell
-// chamber once its three clappers are out: bells' rings and a hammer's boom in eight metres of floor, 44 m over the lagoon.
+// chamber once its three clappers are out: bells' rings and a hammer's boom in eight metres of floor, 44 m over the lagoon. The
+// Cardinale's L'incoronazione walks him from the high altar to the Bacino, and three waves of monaci neri come for him on the way.
 // Tuned with scripts/balance.ts for a hero who walks in from the Governatrice in level 2's gear.
 import type { World } from '../core/physics.ts';
 import { BELFRY, CENACOLO } from '../level/zones/sangiorgio.ts';
 import { PRIEST, killAll, pull, revive, spawnPriests, type Bounds, type CasterKind, type Priest } from './caster.ts';
-import { FARI_LIT, MUTE, VINO, type SideId } from '../quest/squero.ts';
+import { FARI_LIT, MUTE, ONDATE, VINO, type SideId } from '../quest/squero.ts';
 import { GONDOLIERE } from './zitelle.ts';
 
 export const MONACO: CasterKind = {
@@ -126,8 +127,9 @@ export const PREPS: Record<string, { text: string; apply: (k: CasterKind) => voi
   faro: { text: "La Lanterna del faro: l'acqua alta lascia un'isola asciutta in più", apply: (k) => { k.tide = { ...k.tide!, n: k.tide!.n + 1 }; } }, // I fari della darsena
   calice: { text: 'Le Ampolle di San Benedetto: il Calice di Cana brucia il 40% in meno', apply: (k) => { k.pour = { ...k.pour!, damage: Math.round(k.pour!.damage * 0.6) }; } }, // Acqua di San Benedetto
   rintocchi: { text: 'Il Batacchio di San Giorgio: le campane dell\'Abate suonano due rintocchi, non tre', apply: (k) => { k.toll = { ...k.toll!, n: k.toll!.n - 1 }; } }, // Rintocchi muti
+  benedizione: { text: 'La Benedizione apostolica: ogni tuo colpo sull\'Abate pesa il 10% in più', apply: (k) => { k.frail = (k.frail ?? 1) * 1.1; } }, // L'incoronazione
 };
-const PRISTINE = { ...ABATE };
+const PRISTINE = { ...ABATE, frail: 1 }; // every key a weakening may set, so a fight without it is rid of it
 /** ABATE as it was written, with the weakenings `ids` on it (unknown ids are ignored). */
 export function prepare(ids: readonly string[]): void {
   Object.assign(ABATE, PRISTINE);
@@ -148,6 +150,8 @@ type Spot = [number, number];
 export interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][]; hidden?: { quest: SideId; step: number; say: string; rest?: true; under?: number } }
 const rect = (x0: number, x1: number, z0: number, z1: number): Bounds => ({ x0, x1, z0, z1 });
 const QUAY = rect(-376, -301, 0.5, 19.5), ALLORI = rect(-545, -515, 47, 77), CIPRESSI = rect(-501, -465, 47, 77);
+/** The procession's floors: the crossing with its transepts, the nave with its aisles, the piazzale before the portal. */
+const CROCIERA = rect(-539, -521, 81, 123), NAVATA = rect(-519, -479, 87, 117), PIAZZALE = rect(-477.5, -444.5, 86.5, 133.5);
 /** The darsena with both quays out to the lighthouses (zones/sangiorgio.ts darsena): the Fanalista's wave, and the Nostromo once it calls him. */
 export const DARSENA = rect(-599.5, -562.5, 124.5, 149.5);
 /** The bell chamber's floor inside its parapet (zones/sangiorgio.ts BELFRY). */
@@ -161,10 +165,10 @@ export const PACKS: Pack[] = [
   { label: 'Fondamenta San Giovanni', at: [-326, 11], bounds: QUAY, members: [[MARINAIO, -323, 9], [MARINAIO, -329, 9], [MONACO, -326, 14]] },
   { label: 'Fondamenta San Giovanni', at: [-358, 10], bounds: QUAY, members: [[MONACO, -355, 8], [MONACO, -361, 8], [AMANUENSE, -358, 14]] },
   { label: 'Punta della Giudecca', at: [-388, -7], bounds: rect(-403.5, -376, -13.5, 19.5), members: [[MONACO, -388, -4], [AMANUENSE, -385, -9], [AMANUENSE, -391, -9]] },
-  { label: 'Piazzale di San Giorgio', at: [-462, 92], bounds: rect(-477.5, -444.5, 86.5, 133.5), members: [[MARINAIO, -459, 90], [MARINAIO, -465, 90], [AMANUENSE, -462, 95]] },
-  { label: 'Piazzale di San Giorgio', at: [-462, 121], bounds: rect(-477.5, -444.5, 86.5, 133.5), members: [[MONACO, -459, 119], [MONACO, -465, 119], [MARINAIO, -462, 124]] },
+  { label: 'Piazzale di San Giorgio', at: [-462, 92], bounds: PIAZZALE, members: [[MARINAIO, -459, 90], [MARINAIO, -465, 90], [AMANUENSE, -462, 95]] },
+  { label: 'Piazzale di San Giorgio', at: [-462, 121], bounds: PIAZZALE, members: [[MONACO, -459, 119], [MONACO, -465, 119], [MARINAIO, -462, 124]] },
   { label: 'Basilica di San Giorgio Maggiore', at: [-500, 102], bounds: rect(-519, -479, 95.5, 108.5), members: [[MONACO, -497, 100], [MONACO, -497, 104], [AMANUENSE, -503, 102]] },
-  { label: 'Crociera sotto la cupola', at: [-530, 108], bounds: rect(-539, -521, 81, 123), members: [[AMANUENSE, -527, 113], [AMANUENSE, -533, 113], [MONACO, -530, 106]] },
+  { label: 'Crociera sotto la cupola', at: [-530, 108], bounds: CROCIERA, members: [[AMANUENSE, -527, 113], [AMANUENSE, -533, 113], [MONACO, -530, 106]] },
   { label: 'Coro dei monaci', at: [-561, 102], bounds: rect(-567, -555, 93, 111), members: [[AMANUENSE, -559, 99], [AMANUENSE, -559, 105], [AMANUENSE, -564, 102]] },
   { label: 'Chiostro degli allori', at: [-537, 56], bounds: ALLORI, members: [[MONACO, -535, 54], [MONACO, -539, 58], [AMANUENSE, -540, 53]] },
   { label: 'Chiostro degli allori', at: [-523, 70], bounds: ALLORI, members: [[MONACO, -521, 72], [AMANUENSE, -525, 67], [AMANUENSE, -520, 67]] },
@@ -185,6 +189,10 @@ export const PACKS: Pack[] = [
   { label: 'Chiostro dei cipressi', at: [-483, 58], bounds: CIPRESSI, members: [[GRANATIERE, -497, 50], [GRANATIERE, -469, 50], [GRANATIERE, -483, 74]], hidden: { quest: 'tela', step: 0, say: 'Il Commissario delle Arti chiama i granatieri: «À moi, la garde!»', under: 0.5 } },
   // Hidden. Rintocchi muti: the third clapper out, the Campanaro comes up the stair into the bell chamber, his floor between the parapets.
   { label: 'Cella campanaria', at: [-574, 116], bounds: BELL_FLOOR, members: [[CAMPANARO, -573.4, 113.6]], hidden: { quest: 'rintocchi', step: MUTE, say: 'Le campane mute tremano: il Campanaro di San Giorgio sale dalla scala a riprendersi i batacchi!' } },
+  // Hidden. L'incoronazione: as the Cardinale stops under the dome, mid-nave and on the sagrato, monaci neri close on him (main.ts aims them at him, not the hero).
+  { label: 'Crociera sotto la cupola', at: [-530, 102], bounds: CROCIERA, members: [[MONACO, -526, 93], [MONACO, -534, 93], [MONACO, -534, 111]], hidden: { quest: 'incoronazione', step: ONDATE[0], say: 'Dai transetti escono i monaci neri: «Nessun papa uscirà da San Giorgio!»' } },
+  { label: 'Basilica di San Giorgio Maggiore', at: [-499, 102], bounds: NAVATA, members: [[MONACO, -492, 97], [MONACO, -506, 97], [MONACO, -492, 107], [MONACO, -506, 107]], hidden: { quest: 'incoronazione', step: ONDATE[1], say: 'Dalle navate laterali altri monaci neri si gettano sul Cardinale!' } },
+  { label: 'Piazzale di San Giorgio', at: [-468, 102], bounds: PIAZZALE, members: [[MONACO, -461, 95], [MONACO, -461, 109], [MONACO, -470, 93], [MONACO, -470, 111]], hidden: { quest: 'incoronazione', step: ONDATE[2], say: 'Sul sagrato i monaci neri sbarrano la via al Bacino: difendi il Cardinale!' } },
 ];
 
 export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest; commissario: Priest; campanaro: Priest; hidden: { pack: Pack; members: Priest[] }[] }

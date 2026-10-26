@@ -129,6 +129,10 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   Presbiterio, davanti all'altar maggiore (corpo Meshy `cardinale.glb`, Idle e Talk). Vuole 8 schede del conclave del
   1800, che cadono dagli amanuensi (50%) finché la missione è aperta; gli amanuensi intanto si rialzano, come i
   marinai per Mastro Iseppo. Paga 150 PE e 50 oro, nessun oggetto. È la prima delle tre missioni del Cardinale.
+- **La tiara di cartapesta**: dopo le schede il Cardinale vuole i tre gioielli che le dame veneziane cucirono sulla
+  tiara di cartapesta del 1800: lo smeraldo su uno scrittoio della Biblioteca, la perla sul palco del Teatro Verde
+  (in qualsiasi ordine) e la spilla di rubini del Bibliotecario, che cade dal suo corpo anche se è già morto. Paga
+  180 PE e 70 oro, nessun oggetto. Il Cardinale annuncia la processione fino al sagrato (l'incoronazione, non ancora).
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

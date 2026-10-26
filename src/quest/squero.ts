@@ -42,7 +42,7 @@ export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
 export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
 export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale';
@@ -118,6 +118,12 @@ export const TELA = 'tela-arrotolata';
 export const MUTE = 3;
 /** Le schede del conclave: the voting slips of 1800 the amanuensi still copy, off them while it runs (they rise again for it, main.ts). */
 export const SCHEDA = 'scheda-conclave';
+/** La tiara di cartapesta: two of the Venetian ladies' jewels lying about (a Biblioteca desk, the Teatro Verde's stage), the third pinned on the Bibliotecario. */
+export const GEMME: readonly Find[] = [
+  { item: 'smeraldo-dama', at: { x: -498, y: LIB_F + 0.85, z: 2.2 }, label: "lo smeraldo sullo scrittoio" },
+  { item: 'perla-dama', at: { x: -579, y: 0.5, z: -37.5 }, label: 'la perla sul palco' },
+];
+export const SPILLA = 'spilla-dama';
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -340,7 +346,7 @@ export const SIDE: readonly SideQuest[] = [
       'Tienilo tu. Quando l\'Abate fa suonare le sue campane, una lingua gli mancherà: due rintocchi, non tre. E dalla cella si vede tutta la laguna, vero? Io non ci sono mai salito.',
     ],
   },
-  // The Cardinale's conclave, the first of three (the tiara, then the coronation, follow it with `after`).
+  // The Cardinale's conclave, three in a chain: the slips, the tiara, then the coronation (to follow the tiara with `after`).
   {
     id: 'schede', giver: 'cardinale',
     want: { kind: 'collect', item: SCHEDA, n: 8, from: 'amanuense', chance: 0.5 },
@@ -354,6 +360,21 @@ export const SIDE: readonly SideQuest[] = [
     done: [
       'Chiaramonti. Chiaramonti. Chiaramonti... Le ho contate otto volte, come allora. Il quattordici marzo del milleottocento mi chiamarono per nome, e io dissi: accetto. Pio VII.',
       'Prendi questo, per la fatica. Ma un papa senza tiara non si incorona, figlio: Napoleone si è portato via quella vera. Torna da me, quando avrai tempo.',
+    ],
+  },
+  {
+    id: 'tiara', giver: 'cardinale', after: 'schede',
+    want: [{ kind: 'finds', finds: GEMME }, { kind: 'token', item: SPILLA, from: 'bibliotecario' }],
+    line: (n, step) => [`Gioielli delle dame in Biblioteca e al Teatro Verde: ${n}/2`, 'Prendi la spilla di rubini al Bibliotecario e portala al Cardinale'][step],
+    offer: [
+      'Figlio. Napoleone si è portato a Parigi la tiara di Pio VI, e Roma non ce ne ha mandata un\'altra. Allora le dame di Venezia fecero quello che fanno le dame: una tiara di cartapesta, dorata a foglia, e ci cucirono sopra i loro gioielli.',
+      'Il conclave dei morti se li è divisi, come un bottino. Uno smeraldo è rimasto su uno scrittoio della Biblioteca, una perla è rotolata sul palco del Teatro Verde. E la spilla di rubini se l\'è appuntata al collo il Bibliotecario, sopra la chiave.',
+      'Riportameli, tutti e tre. La cartapesta l\'ho tenuta io, sotto la mozzetta: senza le pietre è solo carta.',
+    ],
+    busy: 'Tre gioielli, figlio: lo smeraldo in Biblioteca, la perla al Teatro Verde, la spilla del Bibliotecario. Se lui è già caduto, la spilla è ancora lì per terra, accanto a lui.',
+    done: [
+      'Lo smeraldo, la perla, i rubini... Le conoscevo tutte, le dame che li portavano: venivano a confessarsi qui, sull\'isola. Guarda: la cartapesta si tiene dritta, adesso.',
+      'Prendi queste monete per la strada. Ma una tiara si porta in processione, figlio, non in tasca: dall\'altare fino al sagrato, sul Bacino, come il ventuno marzo del milleottocento. E i monaci neri non mi lasceranno passare da solo.',
     ],
   },
 ];
@@ -385,7 +406,7 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     decline: 'Va bene. Io aspetto qui. Sono quattrocento anni che aspetto davanti a questa porta.',
     full: 'Hai la borsa piena, ragazzo. Fa\' spazio e torna: questo non si appoggia per terra.' },
   cardinale: { at: CARDINALE, level: 3, where: "davanti all'altar maggiore", greet: 'Figlio. Parla piano: il conclave è ancora riunito.',
-    bye: 'Le schede sono contate. Va\' in pace, figlio: io resto davanti all\'altare, ad aspettare la mia tiara.',
+    bye: 'Le schede sono contate e la tiara ha le sue pietre. Va\' in pace, figlio: io resto davanti all\'altare, ad aspettare la processione.',
     decline: 'Va bene. Abbiamo aspettato centoquattro giorni, allora: possiamo aspettare ancora.',
     full: 'Hai la borsa piena, figlio. Fa\' spazio e torna.' },
 };
@@ -509,9 +530,9 @@ export class SideQuests {
     return q;
   }
 
-  /** The elites whose token a running quest still wants and isn't in the bag: main.ts lays it at their body once dead. */
+  /** The elites whose token a running quest still wants (at its step or a later one) and isn't in the bag: main.ts lays it at their body once dead. */
   tokens(): { item: string; from: Foe }[] {
-    return this.running().flatMap(({ w }) => (w.kind === 'token' && !this.have(w.item) ? [{ item: w.item, from: w.from }] : []));
+    return SIDE.flatMap((q) => (this.active(q.id) ? stepsOf(q).slice(this.step(q)).flatMap((w) => (w.kind === 'token' && !this.have(w.item) ? [{ item: w.item, from: w.from }] : [])) : []));
   }
 
   /** Find spots still to search and use-points still to use (quest/view.ts glints them, main.ts pins them); `find`: what lies there. */

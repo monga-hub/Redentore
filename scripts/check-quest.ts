@@ -7,7 +7,7 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { CARDINALE, DITALE, EXVOTO, SCHEDA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { CARDINALE, DITALE, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
 import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, PACKS as PACKS3, due, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { BELFRY, BELLS, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { SHOP } from '../src/loot/gear.ts';
@@ -433,7 +433,25 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   if (copy.side.progress(schede) !== 4 || s.ready(schede)) fail('four slips are not saved as half of eight');
   for (let i = 0; i < 4; i++) b.add(s.loot('amanuense', () => 0, false, () => 0)!);
   if (b.count(SCHEDA) !== 8 || s.loot('amanuense', () => 0, false, () => 0) || q.marks(0).cardinale !== 'ready') fail('the amanuensi do not drop exactly the eight slips wanted');
-  if (s.talk('cardinale').paid?.id !== 'schede' || b.count(SCHEDA) || q.bonusXp !== xp + 150 || q.marks(0).cardinale) fail('the slips are not handed in for 150 XP, or the Cardinale still has something');
+  if (s.talk('cardinale').paid?.id !== 'schede' || b.count(SCHEDA) || q.bonusXp !== xp + 150 || q.marks(0).cardinale !== 'offer') fail('the slips are not handed in for 150 XP, or the Cardinale has not the tiara to give');
+  // La tiara di cartapesta: two jewels found in any order, each standable and guarded, not before it is taken; the brooch wanted off the
+  // Bibliotecario from the start (dead already: laid at his body), saved, its gold and XP with no epic, and his marker gone after.
+  const tiara = SIDE_BY.get('tiara')!, gem = GEMME.map((f) => { const at = feet(f.at.x, f.at.z - 1.6); if (level.world.blocked(at.x, at.z, at.y) || Math.abs(at.y - f.at.y) > 1.5) fail(`no room by ${f.label}`); return at; });
+  GEMME.forEach((f) => { if (!PACKS3.some((pk) => !pk.hidden && pk.members.some(([k, x, z]) => Math.hypot(x - f.at.x, z - f.at.z) < k.aggro))) fail(`no pack guards ${f.label}`); if (!ITEM.get(f.item)?.quest) fail(`${f.item} is not a quest item`); });
+  if (!ITEM.get(SPILLA)?.quest || tiara.after !== 'schede' || tiara.reward || QUESTS.tiara.xp !== 180 || QUESTS.tiara.gold !== 70) fail('La tiara di cartapesta is not the plan\'s: after the slips, 180 XP and 70 gold, no epic, a quest brooch');
+  if (q.prompt(gem[0])?.act || s.tokens().length) fail('a jewel can be had before La tiara di cartapesta');
+  take('cardinale');
+  if (s.tokens().map((t) => `${t.from}:${t.item}`).join() !== `bibliotecario:${SPILLA}`) fail('the brooch is not wanted off the Bibliotecario while the jewels are searched for');
+  q.prompt(gem[1])?.act?.();
+  if (s.progress(tiara) !== 1 || s.spots().filter((x) => x.q === tiara).length !== 1) fail('the pearl first does not leave the emerald to find');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.progress(tiara) !== 1) fail('a jewel found does not survive a save');
+  b.add(SPILLA);
+  q.prompt(gem[0])?.act?.();
+  s.update();
+  if (!s.ready(tiara) || q.marks(0).cardinale !== 'ready') fail('the three jewels, the brooch before the emerald, do not make the tiara ready');
+  const xp7 = q.bonusXp;
+  if (s.talk('cardinale').paid?.id !== 'tiara' || b.count(SPILLA) || GEMME.some((f) => b.count(f.item)) || q.bonusXp !== xp7 + 180 || q.marks(0).cardinale) fail('the jewels are not handed in for 180 XP, or the Cardinale still has something');
   const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario', 'batacchio-sangiorgio'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
@@ -472,7 +490,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

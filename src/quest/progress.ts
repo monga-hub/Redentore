@@ -149,6 +149,7 @@ export const QUESTS = {
   musici: { title: 'I musici di Cana', xp: 200, gold: 80 }, // the Veronese, the first of his two: the main quest's way into the Cenacolo
   tela: { title: 'La tela tagliata', xp: 320, gold: 140 }, // the Veronese's second: the Commissario delle Arti
   schede: { title: 'Le schede del conclave', xp: 150, gold: 50 }, // the Cardinale benedettino, the first of his three
+  tiara: { title: 'La tiara di cartapesta', xp: 180, gold: 70 }, // his second: the ladies' three jewels
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */

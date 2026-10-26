@@ -75,6 +75,10 @@ export const ITEMS: readonly Item[] = [
   { id: 'tela-arrotolata', name: 'Tela arrotolata delle Nozze di Cana', rarity: 'epico', icon: 'relic', lore: 'Sessantasei metri quadri di tela, tagliati dalla cornice l’11 settembre 1797 e arrotolati col colore all’infuori. Per il Veronese.', quest: true, l3: true },
   // The Cardinale's: the conclave's voting slips, still copied by the amanuensi.
   { id: 'scheda-conclave', name: 'Scheda del conclave', rarity: 'noncomune', icon: 'relic', lore: 'Eligo in Summum Pontificem... Il nome è sempre lo stesso, ricopiato da due secoli. Per il Cardinale, davanti all’altar maggiore.', quest: true, l3: true },
+  // His tiara's: the jewels the Venetian ladies sewed on the papier-mâché in 1800.
+  { id: 'smeraldo-dama', name: 'Smeraldo delle dame', rarity: 'raro', icon: 'ring', lore: 'Era a un anello, poi su una tiara di cartapesta, poi su uno scrittoio della Biblioteca. Per il Cardinale.', quest: true, l3: true },
+  { id: 'perla-dama', name: 'Perla delle dame', rarity: 'raro', icon: 'ring', lore: 'Una perla di Murano... no, vera. È rotolata fino al palco del Teatro Verde. Per il Cardinale.', quest: true, l3: true },
+  { id: 'spilla-dama', name: 'Spilla di rubini delle dame', rarity: 'raro', icon: 'amulet', lore: 'Il Bibliotecario la portava sopra la chiave, come un ordine cavalleresco. Per il Cardinale.', quest: true, l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

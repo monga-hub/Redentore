@@ -9,7 +9,7 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { ARCHIVISTA, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { ARCHIVISTA, CARDINALE, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
 import { CENACOLO } from '../level/zones/sangiorgio.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
@@ -40,8 +40,9 @@ const SQUERO = 0xffc27a; // Mastro Iseppo's, a lantern's
 const FARO = 0xffb347; // the Fanalista's, lamp oil
 const ARCHIVIO = 0x9fc8ff; // Padre Archivista's, his lantern's pale flame
 const BIACCA = 0xffe2a8; // the Veronese's, lead white and gold
-/** The givers' portraits: Mastro Iseppo's, Padre Archivista's and the Veronese's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
-const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' } };
+const PORPORA = 0xffb0a0; // the Cardinale's, candlelight on scarlet
+/** The givers' portraits: Mastro Iseppo's, Padre Archivista's, the Veronese's and the Cardinale's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
+const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' }, cardinale: { file: 'cardinale' } };
 /** The Nozze di Cana's canvas on the Cenacolo's end wall, over the garden door (zones/sangiorgio.ts cenacolo: inside the gilt frame, before the cut edge). */
 const NOZZE = { x0: -540.4, x1: -519.6, y0: 4.8, y1: 10.6, z: CENACOLO.z0 + 0.7 };
 /** A lighthouse's fire seen from across the lagoon: a soft gold halo on a canvas. */
@@ -125,7 +126,7 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
-  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb') };
+  private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(CARDINALE, PORPORA, 'cardinale.glb') };
   private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
   private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
   private nozze?: THREE.Mesh; // the painting back in its frame, once the Veronese has the canvas (loaded then)
@@ -349,10 +350,10 @@ export class QuestView {
   private giverEntries(giver: Giver): Entry[] {
     const s = this.quest.side, g = GIVERS[giver], open = s.open(giver), rank = { ready: 0, offer: 1, busy: 2, talk: 3 };
     return SIDE.filter((sq) => giverOf(sq) === giver).flatMap((sq): Entry[] => {
-      const base = { title: QUESTS[sq.id].title, objective: s.line(sq), reward: pay(sq.id, ITEM.get(sq.reward)?.name) };
+      const base = { title: QUESTS[sq.id].title, objective: s.line(sq), reward: pay(sq.id, sq.reward && ITEM.get(sq.reward)?.name) };
       if (s.ready(sq)) return [{ ...base, state: 'ready', text: sq.done.join('\n\n'), act: () => { // paid at once: its items out, the reward in (the XP, gold and banner are payout's)
         if (!s.handIn(sq)) return g.full;
-        this.news.push(`Ricompensa: ${ITEM.get(sq.reward)!.name}`);
+        if (sq.reward) this.news.push(`Ricompensa: ${ITEM.get(sq.reward)!.name}`);
       } }];
       if (s.active(sq.id)) return [{ ...base, state: 'busy', text: sq.busy }];
       if (open.includes(sq)) return [{ ...base, state: 'offer', text: sq.offer.join('\n\n'), decline: g.decline, act: () => {

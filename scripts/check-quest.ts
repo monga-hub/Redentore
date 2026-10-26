@@ -7,7 +7,7 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { DITALE, EXVOTO, FARI, FARI_LIT, GIVERS, LAVABI, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { CARDINALE, DITALE, EXVOTO, SCHEDA, FARI, FARI_LIT, GIVERS, LAVABI, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
 import { ABATE, COMMISSARIO, GRANATIERE, PACKS as PACKS3, due, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
@@ -207,7 +207,7 @@ if (sq.prompt(iseppo)?.talk !== 'iseppo') fail("no 'talk' prompt next to Mastro 
 for (const q of SIDE) {
   for (const p of [...q.offer, q.busy, ...q.done]) if (p.length > 260) fail(`a page of ${q.id} is ${p.length} characters, too long for the window on a phone`);
   if (QUESTS[q.id].xp < 0.6 * 20 * 11) fail(`${q.id} pays ${QUESTS[q.id].xp} XP, under most of level 11`);
-  if (!ITEM.get(q.reward)?.slot || ITEM.get(q.reward)!.rarity !== 'epico' || !ITEM.get(q.reward)!.l2 || !QUESTS[q.id]) fail(`${q.id} does not reward one of level 2's epics`);
+  if (!ITEM.get(q.reward!)?.slot || ITEM.get(q.reward!)!.rarity !== 'epico' || !ITEM.get(q.reward!)!.l2 || !QUESTS[q.id]) fail(`${q.id} does not reward one of level 2's epics`);
   if ('item' in q.want && !ITEM.get(q.want.item)?.quest) fail(`${q.id} wants ${q.want.item}, not a quest item`);
 }
 if (new Set(SIDE.map((q) => q.reward)).size !== SIDE.length) fail('two of his quests give the same epic');
@@ -215,7 +215,7 @@ const spot = (at: { x: number; y: number; z: number }, dx = -1) => { const f = {
 const ditale = spot(DITALE, 1), exvoto = spot(EXVOTO); // the thimble under a bed by the dormitory's -X wall, from the room's side
 if (sq.prompt(ditale)?.act) fail("Marieta's thimble can be picked up before its quest");
 const take = () => { const t = side.talk(); if (!t.accept) fail(`he offers nothing: ${t.talk.pages[0].slice(0, 40)}`); t.accept?.(); return t.talk.title; };
-const hand = (id: SideId) => { const xp = sq.bonusXp, t = side.talk(); if (t.paid?.id !== id) fail(`${id} is not handed in (${t.paid?.id})`); else if (sq.bonusXp !== xp + QUESTS[id].xp || !sq.done.includes(id) || !bag.count(t.paid.reward)) fail(`${id} does not pay its XP and its epic through Quest.complete`); };
+const hand = (id: SideId) => { const xp = sq.bonusXp, t = side.talk(); if (t.paid?.id !== id) fail(`${id} is not handed in (${t.paid?.id})`); else if (sq.bonusXp !== xp + QUESTS[id].xp || !sq.done.includes(id) || !bag.count(t.paid.reward!)) fail(`${id} does not pay its XP and its epic through Quest.complete`); };
 const order: string[] = [];
 order.push(take()!, take()!); // the two openers at once
 if (side.open().length) fail('a quest further down the chain is offered before its first step is done');
@@ -271,7 +271,7 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
 {
   const l3 = spawnLevel3(level.world), q = new Quest(level.world), s = q.side, b = new Bag();
   s.bag = b;
-  for (const g of ['riva', 'fanalista', 'archivista', 'veronese'] as Giver[]) {
+  for (const g of ['riva', 'fanalista', 'archivista', 'veronese', 'cardinale'] as Giver[]) {
     const at = GIVERS[g].at, by = feet(at.x + Math.sin(at.yaw) * -1.2, at.z + Math.cos(at.yaw) * -1.2); // a step in front of him
     if (level.world.blocked(by.x, by.z, by.y) || q.prompt(by)?.talk !== g) fail(`no room to talk to ${g} in front of him`);
     for (const pk of PACKS3) if (!pk.hidden) for (const [k, x, z] of pk.members) if (Math.hypot(x - at.x, z - at.z) < k.aggro + 0.5) fail(`a mob at (${x}, ${z}) is within its pull of ${g}`);
@@ -286,7 +286,7 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   q.accepted3 = true;
   if (q.marks(0).riva !== 'offer' || q.marks(0).fanalista !== 'offer') fail('San Giorgio\'s givers show no "!" once the third quest is taken');
   const take = (g: Giver) => { const t = s.talk(g); if (!t.accept) fail(`${g} offers nothing`); t.accept?.(); };
-  const hand = (g: Giver, id: SideId) => { const xp = q.bonusXp, t = s.talk(g); if (t.paid?.id !== id || q.bonusXp !== xp + QUESTS[id].xp || !b.count(t.paid.reward)) fail(`${id} is not handed in to ${g} with its XP and reward`); };
+  const hand = (g: Giver, id: SideId) => { const xp = q.bonusXp, t = s.talk(g); if (t.paid?.id !== id || q.bonusXp !== xp + QUESTS[id].xp || (t.paid.reward && !b.count(t.paid.reward))) fail(`${id} is not handed in to ${g} with its XP and reward`); };
   take('riva');
   for (let i = 0; i < 9; i++) s.killed('marinaio');
   s.killed('monaco');
@@ -386,6 +386,21 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   b.add(TELA);
   hand('veronese', 'tela');
   if (b.count(TELA) || !q.canvas || q.marks(0).veronese) fail('the canvas handed in does not hang the Nozze, or the Veronese still has something');
+  // Le schede del conclave: the Cardinale on the presbytery's floor, eight slips off the amanuensi only while it runs, its gold and XP with no
+  // epic, saved half counted, and his "!" gone once it is handed in (until the tiara follows it).
+  if (Math.abs(level.world.standHeight(CARDINALE.x + 0.6, CARDINALE.z) - CARDINALE.y) > 0.05) fail('the Cardinale does not stand on the presbytery floor');
+  if (s.loot('amanuense', () => 0, false, () => 0) === SCHEDA) fail('a slip drops before Le schede del conclave is taken');
+  if (q.marks(0).cardinale !== 'offer') fail('the Cardinale shows no "!" with his quest to give');
+  take('cardinale');
+  const schede = SIDE_BY.get('schede')!, xp = q.bonusXp;
+  if (QUESTS.schede.xp !== 150 || QUESTS.schede.gold !== 50 || schede.reward) fail('Le schede del conclave does not pay 150 XP and 50 gold, with no epic');
+  if (s.loot('monaco', () => 0, false, () => 0)) fail('a monk drops a slip');
+  for (let i = 0; i < 4; i++) b.add(s.loot('amanuense', () => 0, false, () => 0)!);
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.progress(schede) !== 4 || s.ready(schede)) fail('four slips are not saved as half of eight');
+  for (let i = 0; i < 4; i++) b.add(s.loot('amanuense', () => 0, false, () => 0)!);
+  if (b.count(SCHEDA) !== 8 || s.loot('amanuense', () => 0, false, () => 0) || q.marks(0).cardinale !== 'ready') fail('the amanuensi do not drop exactly the eight slips wanted');
+  if (s.talk('cardinale').paid?.id !== 'schede' || b.count(SCHEDA) || q.bonusXp !== xp + 150 || q.marks(0).cardinale) fail('the slips are not handed in for 150 XP, or the Cardinale still has something');
   const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
@@ -424,7 +439,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, I musici di Cana in any order, La tela tagliata); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, I musici di Cana in any order, La tela tagliata, Le schede del conclave); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

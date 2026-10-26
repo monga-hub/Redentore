@@ -42,8 +42,8 @@ function marker(ch: string): THREE.Sprite {
   return s;
 }
 
-/** Where an NPC stands and faces at rest. */
-export interface Spot { x: number; z: number; yaw: number }
+/** Where an NPC stands and faces at rest (`y`: his floor, when raised). */
+export interface Spot { x: number; y?: number; z: number; yaw: number }
 
 export class Npc {
   readonly root = new THREE.Group();
@@ -59,7 +59,7 @@ export class Npc {
   /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips (else Pray and Idle). */
   constructor(at: Spot, tint = GHOST, model = 'zuane.glb') {
     this.at = at;
-    this.root.position.set(at.x, 0, at.z);
+    this.root.position.set(at.x, at.y ?? 0, at.z);
     this.root.rotation.y = at.yaw;
     for (const m of Object.values(this.marks)) this.root.add(m);
     loadModel(model).then((gltf) => {

@@ -15,7 +15,8 @@
 //
 // Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
 // the Fanalista of the darsena, Padre Archivista in Longhena's passage, and the ghost of Paolo Veronese in the antirefettorio, whose
-// two quests (the musicians' instruments, then the canvas back off the Commissario delle Arti) open the Cenacolo. A quest may run in steps (`want` a list: collect, then use-points that burn what
+// two quests (the musicians' instruments, then the canvas back off the Commissario delle Arti) open the Cenacolo, and the
+// Cardinale benedettino before the high altar, who wants the conclave's voting slips counted. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
@@ -34,15 +35,17 @@ export const FANALISTA = { x: -563, z: 141, yaw: Math.PI / 2, r: 0.35, name: 'Il
 export const ARCHIVISTA = { x: -506.5, z: 63, yaw: Math.PI / 2, r: 0.35, name: 'Padre Archivista' } as const;
 /** Paolo Veronese's ghost, in the antirefettorio's north-east corner, facing into it (out of the arch from the allori, out of reach of the lavabi and the Cenacolo's door). */
 export const VERONESE = { x: -525, z: 43.2, yaw: Math.PI / 2, r: 0.35, name: 'Paolo Veronese' } as const;
+/** The Cardinale benedettino, on the presbytery before the high altar, facing the crossing (2 m toward it from the altar: out of the choir's pull). */
+export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, name: 'Il Cardinale benedettino' } as const;
 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
 export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
-export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese';
-export interface GiverSpec { at: { x: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
+export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale';
+export interface GiverSpec { at: { x: number; y?: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
 
 /**
  * What a quest wants. collect: `n` of `item`, dropped by `from` at `chance` while it is wanted; kill: `n` of
@@ -71,8 +74,8 @@ export interface SideQuest {
   want: Want | readonly Want[];
   /** Opens once this one is handed in (the chain); none: from the first talk. */
   after?: SideId;
-  /** The epic he gives (its XP, gold and title are QUESTS', quest/progress.ts, paid through Quest.complete). */
-  reward: string;
+  /** The epic he gives, if any (its XP, gold and title are QUESTS', quest/progress.ts, paid through Quest.complete). */
+  reward?: string;
   /** The Abate weakened once it is handed in (enemies/sangiorgio.ts PREPS). */
   prep?: string;
   /** The tracker's line; `n` is the progress so far, `step` the step under way. */
@@ -110,6 +113,8 @@ export const STRUMENTI: readonly Find[] = [
 ];
 /** La tela tagliata: the rolled canvas, off the Commissario delle Arti; handed in, the Nozze hang in the Cenacolo's frame again (quest/view.ts). */
 export const TELA = 'tela-arrotolata';
+/** Le schede del conclave: the voting slips of 1800 the amanuensi still copy, off them while it runs (they rise again for it, main.ts). */
+export const SCHEDA = 'scheda-conclave';
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -312,6 +317,22 @@ export const SIDE: readonly SideQuest[] = [
       'Ecco: la cornice ha di nuovo le sue nozze, e le nozze i loro testimoni. La porta del Cenacolo ora ti lascerà passare. Tieni la sua sciabola: ha tagliato abbastanza tele, che tagli qualcos\'altro.',
     ],
   },
+  // The Cardinale's conclave, the first of three (the tiara, then the coronation, follow it with `after`).
+  {
+    id: 'schede', giver: 'cardinale',
+    want: { kind: 'collect', item: SCHEDA, n: 8, from: 'amanuense', chance: 0.5 },
+    line: (n) => `Schede del conclave dagli amanuensi: ${n}/8`,
+    offer: [
+      'Pace a te, figlio. Non inginocchiarti, non sono ancora nessuno. Barnaba Chiaramonti, monaco di San Benedetto, cardinale di Imola. Il primo dicembre del novantanove ci chiusero qui dentro, trentaquattro cardinali, a eleggere un papa.',
+      'Pio VI era morto in esilio, Roma era dei francesi, e l\'Austria ci prestò quest\'isola. Centoquattro giorni di schede, di fumo, di freddo. Le ricopiavano gli amanuensi del monastero, una per una, per l\'archivio.',
+      'Le ricopiano ancora, figlio. Da due secoli. Il conclave non si chiude finché le schede non sono contate, e loro non smettono di scrivere. Portamene otto: le conterò io, e forse potranno posare la penna.',
+    ],
+    busy: 'Otto schede, figlio. Gli amanuensi le tengono nelle maniche: in Biblioteca, nel Coro, nei chiostri. Si rialzano a scrivere finché il conclave è aperto.',
+    done: [
+      'Chiaramonti. Chiaramonti. Chiaramonti... Le ho contate otto volte, come allora. Il quattordici marzo del milleottocento mi chiamarono per nome, e io dissi: accetto. Pio VII.',
+      'Prendi questo, per la fatica. Ma un papa senza tiara non si incorona, figlio: Napoleone si è portato via quella vera. Torna da me, quando avrai tempo.',
+    ],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -340,6 +361,10 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     bye: 'Le nozze sono di nuovo al loro posto. Va\', ragazzo: io resto a guardarle. Un pittore non si stanca mai del suo quadro.',
     decline: 'Va bene. Io aspetto qui. Sono quattrocento anni che aspetto davanti a questa porta.',
     full: 'Hai la borsa piena, ragazzo. Fa\' spazio e torna: questo non si appoggia per terra.' },
+  cardinale: { at: CARDINALE, level: 3, where: "davanti all'altar maggiore", greet: 'Figlio. Parla piano: il conclave è ancora riunito.',
+    bye: 'Le schede sono contate. Va\' in pace, figlio: io resto davanti all\'altare, ad aspettare la mia tiara.',
+    decline: 'Va bene. Abbiamo aspettato centoquattro giorni, allora: possiamo aspettare ancora.',
+    full: 'Hai la borsa piena, figlio. Fa\' spazio e torna.' },
 };
 export const giverOf = (q: SideQuest): Giver => q.giver ?? 'iseppo';
 /** A quest's steps, one for a single want. */
@@ -516,7 +541,7 @@ export class SideQuests {
     if (!bag) return false;
     const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item])))].map((id) => [id, this.have(id)] as const);
     for (const [id, n] of items) if (n) bag.remove(id, n);
-    if (!bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
+    if (q.reward && !bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);
     this.done.push(q.id);
     delete this.kills[q.id];

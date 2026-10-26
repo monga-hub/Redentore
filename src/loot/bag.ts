@@ -73,6 +73,8 @@ export const ITEMS: readonly Item[] = [
   { id: 'violone-tiziano', name: 'Violone di Tiziano', rarity: 'raro', icon: 'relic', lore: 'Il vecchio Tiziano, in rosso, al violone. Pesa quanto un uomo, e non si lamenta.', quest: true, l3: true },
   { id: 'flauto-bassano', name: 'Flauto del Bassano', rarity: 'raro', icon: 'relic', lore: 'Jacopo Bassano al flauto, dietro i suonatori. Ha ancora il fiato dentro.', quest: true, l3: true },
   { id: 'tela-arrotolata', name: 'Tela arrotolata delle Nozze di Cana', rarity: 'epico', icon: 'relic', lore: 'Sessantasei metri quadri di tela, tagliati dalla cornice l’11 settembre 1797 e arrotolati col colore all’infuori. Per il Veronese.', quest: true, l3: true },
+  // The Cardinale's: the conclave's voting slips, still copied by the amanuensi.
+  { id: 'scheda-conclave', name: 'Scheda del conclave', rarity: 'noncomune', icon: 'relic', lore: 'Eligo in Summum Pontificem... Il nome è sempre lo stesso, ricopiato da due secoli. Per il Cardinale, davanti all’altar maggiore.', quest: true, l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

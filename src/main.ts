@@ -144,7 +144,7 @@ const l3 = spawnLevel3(level.world); // level 3: the Punta, the gondola, San Gio
 const sangiorgio = new Priests(level.world, kit.vfx, playerStats, level.areas, l3, true); // its bodies load with the third quest (stream)
 const sleepers = new Set(l3.hidden.flatMap((h) => h.members)); // the hidden packs (enemies/sangiorgio.ts), woken by their quests
 const wokeBy = new Map<object, SideId>(l3.hidden.flatMap((h) => h.members.map((m) => [m, h.pack.hidden!.quest] as const))); // a sleeper's quest, for its kill quests
-sangiorgio.rising = (f) => !quest.boss3Dead && f.kind === MARINAIO && quest.side.active('marinai') && !sleepers.has(f); // the drowned rise again for Mastro Iseppo's ten, until the Abate falls
+sangiorgio.rising = (f) => !quest.boss3Dead && !sleepers.has(f) && ((f.kind === MARINAIO && quest.side.active('marinai')) || (f.kind === AMANUENSE && quest.side.active('schede'))); // the drowned rise again for Mastro Iseppo's ten, the scribes for the Cardinale's slips, until the Abate falls
 scene.add(sangiorgio.root);
 /** Level 3's kinds: name, kind, height, level, rank. */
 const L3_KINDS = [['Monaco nero', MONACO, 1.9, 16], ['Amanuense', AMANUENSE, 1.8, 16], ['Marinaio annegato', MARINAIO, 1.85, 16], ['Il Bibliotecario', BIBLIOTECARIO, 2.4, 18, 'elite'], ['Il Nostromo della darsena', NOSTROMO, 2.7, 18, 'elite'],

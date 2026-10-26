@@ -386,7 +386,7 @@ class Run {
     if (kind === 'start') return;
     for (const [tier, n] of Object.entries(TYPICAL)) for (let i = 0; i < n; i++) this.loot(tier as Tier);
     if (kind === 'typical2' || kind === 'buy2' || kind === 'side2' || kind === 'typical3' || kind === 'buy3') for (const [tier, n] of Object.entries(TYPICAL2)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 2);
-    if (kind === 'side2') for (const q of SIDE) if (giverOf(q) === 'iseppo') this.take(q.reward); // and Mastro Iseppo's seven epics, his quests all handed in
+    if (kind === 'side2') for (const q of SIDE) if (giverOf(q) === 'iseppo') this.take(q.reward!); // and Mastro Iseppo's seven epics, his quests all handed in
     if (kind === 'typical3' || kind === 'buy3') for (const [tier, n] of Object.entries(TYPICAL3)) for (let i = 0; i < n; i++) this.loot(tier as Tier, 3);
     if (kind === 'buy3') this.quest.accepted3 = true; // Fra' Bortolo's level-3 epics on sale
     if (kind === 'buy' || kind === 'buy2' || kind === 'buy3') this.shop();
@@ -815,7 +815,7 @@ function veronese(next?: 'musici' | 'tela'): Goal {
   const at = GIVERS.veronese.at;
   return { name: `veronese${next ? `:${next}` : ''}`, x: at.x - 1.2, z: at.z, r: 1, done: (r) => {
     let t = r.quest.side.talk('veronese');
-    if (t.paid) { r.bag.remove(t.paid.reward); r.take(t.paid.reward); t = r.quest.side.talk('veronese'); }
+    if (t.paid) { r.bag.remove(t.paid.reward!); r.take(t.paid.reward!); t = r.quest.side.talk('veronese'); }
     if (next) t.accept?.();
     if (next && !r.quest.side.active(next)) throw new Error(`the Veronese does not give ${next}: ${t.talk.pages[0]}`);
   } };

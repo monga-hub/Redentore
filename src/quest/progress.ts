@@ -147,6 +147,7 @@ export const QUESTS = {
   acqua: { title: 'Acqua di San Benedetto', xp: 180, gold: 70 }, // Padre Archivista
   musici: { title: 'I musici di Cana', xp: 200, gold: 80 }, // the Veronese, the first of his two: the main quest's way into the Cenacolo
   tela: { title: 'La tela tagliata', xp: 320, gold: 140 }, // the Veronese's second: the Commissario delle Arti
+  schede: { title: 'Le schede del conclave', xp: 150, gold: 50 }, // the Cardinale benedettino, the first of his three
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -216,7 +217,7 @@ export class Quest {
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
     world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
     world.add(SPEZIALE.x, SPEZIALE.z, SPEZIALE.r, SPEZIALE.r, 0, 1.8);
-    for (const { at } of Object.values(GIVERS)) world.add(at.x, at.z, at.r, at.r, 0, 1.8);
+    for (const { at } of Object.values(GIVERS)) world.add(at.x, at.z, at.r, at.r, at.y ?? 0, (at.y ?? 0) + 1.8);
     this.side.complete = (id) => this.complete(id);
     this.side.over = (q) => (GIVERS[giverOf(q)].level === 3 ? this.boss3Dead : this.boss2Dead);
   }

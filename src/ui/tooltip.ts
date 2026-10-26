@@ -33,6 +33,8 @@ const coin = (n: number) => `${n.toLocaleString('it-IT')} oro`;
 const KEYS: (Stat | 'armatura')[] = ['armatura', 'vigore', 'intelletto', 'spirito', 'potenza', 'critico', 'celerita'];
 const label = (k: Stat | 'armatura', v: number) => (k === 'armatura' ? `${v} Armatura` : STAT[k].green ? `${v}% ${STAT[k].name}` : `${v} ${STAT[k].name}`);
 
+let leaf = 0; // Il libro di sabbia's page last shown: the next opening turns another
+
 /** One item's box. `n`: how many in the stack. */
 function box(it: Item, n = 1, head = ''): string {
   const r = RARITY[it.rarity], s: Stats = it.stats ?? {};
@@ -45,7 +47,8 @@ function box(it: Item, n = 1, head = ''): string {
       const g = k !== 'armatura' && STAT[k].green;
       html += g ? `<span class="g">Equipaggiato: ${g.replace('#', String(v))}</span>` : `<span class="w">${k === 'armatura' ? '' : '+'}${label(k, v)}</span>`;
     }
-    if (it.lore) html += `<p class="lore">«${it.lore}»</p>`;
+    const lore = it.pages ? it.pages[leaf++ % it.pages.length] : it.lore;
+    if (lore) html += `<p class="lore">«${lore}»</p>`;
   } else html += `<small><span>${r.name}${n > 1 ? ` · ${n} pezzi` : ''}</span></small><p>${it.lore}</p>`;
   return html + `<small class="price"><span>Prezzo di vendita: ${coin(sellPrice(it) * n)}</span></small>`;
 }

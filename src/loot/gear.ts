@@ -187,6 +187,18 @@ const UNIQUE3: typeof DEFS = [
   ['sciabola-commissario', 'Sciabola del Commissario', 'arma', 'epico', 'potenza critico celerita', 'Ha tagliato le Nozze di Cana dalla cornice, l’11 settembre 1797. Ora taglia altro.'],
   ['batacchio-sangiorgio', 'Batacchio di San Giorgio', 'arma', 'epico', 'potenza vigore critico', 'La lingua della campana maggiore. Suonò per Pio VII, nel 1800; ora suona dove la porti.'],
   ['tiara-cartapesta', 'Tiara di cartapesta', 'testa', 'epico', 'intelletto spirito critico', 'Cartapesta dorata e i gioielli delle dame di Venezia. Incoronò Pio VII a San Giorgio, il 21 marzo 1800; la seconda volta, davanti alla laguna.'],
+  ['libro-di-sabbia', 'Il libro di sabbia', 'amuleto', 'epico', 'intelletto spirito critico', 'Riposto nella sesta scansia, tornato nella tua borsa.'],
+];
+/** Il libro di sabbia's: never the same page twice running (ui/tooltip.ts turns one at each opening). */
+const SABBIA: readonly string[] = [
+  'Pagina 40.514. Un’ancora disegnata a penna, e sotto: “non si ritrova”.',
+  'Pagina 999. Il nome di un frate della Giudecca, poi il tuo, nella stessa mano.',
+  'Pagina 7. Una mappa della laguna con un’isola in più, che nessuno ha costruito.',
+  'Pagina 27. Il campanile di San Giorgio, visto dall’alto; le campane tacciono.',
+  'Pagina ∞. Bianca. Ma se la guardi, qualcuno ti guarda dall’altra parte.',
+  'Pagina 1800. Un conclave che non finisce mai, scheda dopo scheda.',
+  'Pagina 112. Un labirinto di siepi, e al centro un uomo che legge questa pagina.',
+  'Pagina 0. “Il numero di pagine di questo libro è esattamente infinito”.',
 ];
 
 /** The stats a budget of `points` buys, split over `focus` (best first). */
@@ -202,7 +214,7 @@ const make = (lvl: 1 | 2 | 3) => ([id, name, slot, rarity, focus, lore]: typeof 
   if (s.armor) stats.armatura = Math.round(ARMOR[rarity]! * k.armor * s.armor);
   return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : lvl === 3 ? { l3: true as const } : {}) };
 };
-export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3)), ...UNIQUE3.map(make(3)).map((g) => ({ ...g, unique: true as const }))];
+export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3)), ...UNIQUE3.map(make(3)).map((g) => ({ ...g, unique: true as const, ...(g.id === 'libro-di-sabbia' ? { pages: SABBIA } : {}) }))];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
 /** Every purple piece on sale: level 1's from Fra' Bortolo (and level 3's once the third quest is taken), level 2's from Mastro Iseppo. */
 export const SHOP = GEAR.filter((g) => g.rarity === 'epico' && !g.unique);

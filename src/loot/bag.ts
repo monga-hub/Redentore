@@ -19,7 +19,7 @@ export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | '
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
 /** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it (the friars' heads aren't even bagged: loot/drops.ts collect). */
-export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true }
+export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true; pages?: readonly string[] }
 /** The level an item drops in (`l2`, `l3`). */
 export const levelOfItem = (x: Item): 1 | 2 | 3 => (x.l3 ? 3 : x.l2 ? 2 : 1);
 /** Quest items' colour, on the ground and in the tracker. */
@@ -79,6 +79,9 @@ export const ITEMS: readonly Item[] = [
   { id: 'smeraldo-dama', name: 'Smeraldo delle dame', rarity: 'raro', icon: 'ring', lore: 'Era a un anello, poi su una tiara di cartapesta, poi su uno scrittoio della Biblioteca. Per il Cardinale.', quest: true, l3: true },
   { id: 'perla-dama', name: 'Perla delle dame', rarity: 'raro', icon: 'ring', lore: 'Una perla di Murano... no, vera. È rotolata fino al palco del Teatro Verde. Per il Cardinale.', quest: true, l3: true },
   { id: 'spilla-dama', name: 'Spilla di rubini delle dame', rarity: 'raro', icon: 'amulet', lore: 'Il Bibliotecario la portava sopra la chiave, come un ordine cavalleresco. Per il Cardinale.', quest: true, l3: true },
+  // Il libro di sabbia's, the secret one: the page off an amanuense, and the book found in the Borges labyrinth.
+  { id: 'pagina-sabbia', name: 'Una pagina senza numero', rarity: 'epico', icon: 'relic', lore: 'Né recto né verso: una riga sola, a inchiostro di seppia. «Al centro del giardino dei sentieri che si biforcano».', quest: true, l3: true },
+  { id: 'libro-sabbia', name: 'Libro senza titolo', rarity: 'epico', icon: 'relic', lore: 'Sul dorso, a matita: «VI, a sinistra di chi entra». Le pagine non si contano: fra due ce n’è sempre un’altra.', quest: true, l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

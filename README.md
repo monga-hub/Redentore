@@ -141,6 +141,12 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   caricamento). Sul Bacino si posa sul capo la tiara (un lampo d'oro); la consegna è lì e paga 350 PE, 150 oro, la
   Tiara di cartapesta (testa, epico unico) e la *Benedizione apostolica*: i colpi dell'eroe sull'Abate fanno il 10% in
   più (`PREPS=benedizione`). `node scripts/balance.ts incoronazione` la gioca con il bot.
+- **Il libro di sabbia**, la missione segreta: nessun "!" e nessun segnalino. La avvia una drop rara da un amanuense
+  qualunque, *una pagina senza numero* (3% che sale dell'1% a uccisione), che manda «al centro del giardino dei sentieri
+  che si biforcano»: al centro del labirinto Borges, sul tamburo di pietra, c'è il libro. Va riposto nella sesta
+  scansia di noce a sinistra entrando in Biblioteca: le due pareti lunghe hanno otto scansie ciascuna, tutte con lo
+  stesso «Riponi il libro», e solo quella giusta lo prende. Paga 200 PE e *Il libro di sabbia* (collo, epico unico), che
+  a ogni apertura del tooltip mostra una pagina diversa.
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

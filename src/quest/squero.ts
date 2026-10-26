@@ -22,7 +22,7 @@
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
-import { BELLS, LIB_F } from '../level/zones/sangiorgio.ts';
+import { BELLS, LABIRINTO, LIB_F, SCANSIE } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
 import { ESCORT, Escort } from './escort.ts';
 import { QUESTS, type QuestId } from './progress.ts';
@@ -44,7 +44,7 @@ export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
 export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione' | 'sabbia'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
 export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale';
@@ -74,6 +74,11 @@ export interface SideQuest {
   id: SideId;
   /** Iseppo in the squero when absent. */
   giver?: Giver;
+  /**
+   * No giver: started by `drop` picked up, never marked, pinned or glinted; handed in as its last use-point is used, which
+   * `decoys` look just like (they do nothing).
+   */
+  secret?: { drop: string; from: Foe; decoys: readonly { x: number; y: number; z: number }[] };
   /** One want, or steps in order: each moves on once met, the last is handed in. */
   want: Want | readonly Want[];
   /** Opens once this one is handed in (the chain); none: from the first talk. */
@@ -148,6 +153,10 @@ export const CROWNED = 7;
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
+/** Il libro di sabbia's page, off an amanuense: rarer, the same ramp's way (sure by the 98th roll). */
+export const PAGE_DROP = { base: 0.03, ramp: 0.01 } as const;
+/** Il libro di sabbia: the bay the book wants, the sixth on the left of one coming in (zones/sangiorgio.ts SCANSIE). */
+export const SCANSIA = SCANSIE[5];
 
 export const SIDE: readonly SideQuest[] = [
   {
@@ -422,6 +431,20 @@ export const SIDE: readonly SideQuest[] = [
       'Tieni la tiara, figlio: la cartapesta l\'ho portata io, le pietre le hai portate tu. E prendi la mia benedizione. Quando l\'Abate alza il pastorale, ogni tuo colpo peserà di più: urbi et orbi, e un poco anche alla laguna.',
     ],
   },
+  // The secret one, Borges's: a page off an amanuense sends the hero to the labyrinth's middle, the book found there goes on its shelf.
+  {
+    id: 'sabbia',
+    secret: { drop: 'pagina-sabbia', from: 'amanuense', decoys: SCANSIE.filter((b) => b !== SCANSIA) },
+    want: [
+      { kind: 'find', item: 'libro-sabbia', at: LABIRINTO, label: 'il libro' },
+      { kind: 'use', at: SCANSIA, label: 'il libro', needs: { item: 'libro-sabbia', n: 1 }, say: ['Riponi il libro', 'Hai riposto il libro. Quando ti volti, è di nuovo nella tua borsa'] },
+    ],
+    reward: 'libro-di-sabbia',
+    line: (_, step) => (step ? 'Riponi il libro nella sesta scansia di noce a sinistra, entrando nella Biblioteca del Longhena' : 'Al centro del giardino dei sentieri che si biforcano'),
+    offer: [],
+    busy: '',
+    done: [],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -455,7 +478,7 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     decline: 'Va bene. Abbiamo aspettato centoquattro giorni, allora: possiamo aspettare ancora.',
     full: 'Hai la borsa piena, figlio. Fa\' spazio e torna.' },
 };
-export const giverOf = (q: SideQuest): Giver => q.giver ?? 'iseppo';
+export const giverOf = (q: SideQuest): Giver | undefined => (q.secret ? undefined : q.giver ?? 'iseppo');
 /** A quest's steps, one for a single want. */
 export const stepsOf = (q: SideQuest): readonly Want[] => (Array.isArray(q.want) ? q.want : [q.want as Want]);
 
@@ -473,6 +496,7 @@ export class SideQuests {
   kills: Partial<Record<SideId, number>> = {};
   steps: Partial<Record<SideId, number>> = {}; // the step under way of a quest in steps (absent: the first)
   private letterKills = 0; // zitelle rolled for the letter (not saved: a load starts the ramp over)
+  private pageKills = 0; // amanuensi rolled for the page, the same way
   /** The bag the quest items go in and out of (main.ts, the checks). */
   bag?: Bag;
   /** Its giver's level is over (its boss dead), so no more of its dead rise to be counted: set by Quest. */
@@ -569,19 +593,22 @@ export class SideQuests {
     const letter = SIDE_BY.get('lettera')!.want as { item: string };
     if (foe === 'zitella' && !this.active('lettera') && !this.done.includes('lettera') && !this.have(letter.item) && !ground(letter.item)
       && (key2 || rnd() < LETTER_DROP.base + LETTER_DROP.ramp * this.letterKills++)) return letter.item;
+    const page = SIDE_BY.get('sabbia')!.secret!;
+    if (foe === page.from && !this.active('sabbia') && !this.done.includes('sabbia') && !this.have(page.drop) && !ground(page.drop)
+      && rnd() < PAGE_DROP.base + PAGE_DROP.ramp * this.pageKills++) return page.drop;
     return undefined;
   }
 
   /**
-   * Per frame (main.ts): the letter picked up starts its quest, and a quest in steps whose step is met moves on (its
+   * Per frame (main.ts): the letter or a secret quest's drop picked up starts its quest, and a quest in steps whose step is met moves on (its
    * items stay in the bag: the next step may burn them; a kill step's count starts again), an escort's last step past
    * itself (he is there: ready). Returns the quest started, if any.
    */
   update(): SideQuest | undefined {
     for (const { q, w } of this.running()) if ((this.step(q) < stepsOf(q).length - 1 || w.kind === 'escort') && this.met(q, w)) { this.steps[q.id] = this.step(q) + 1; delete this.kills[q.id]; }
-    const q = SIDE_BY.get('lettera')!;
-    if (this.active(q.id) || this.done.includes(q.id) || !this.have((q.want as { item: string }).item)) return undefined;
-    this.taken.push(q.id);
+    const drop = (sq: SideQuest) => { const w = stepsOf(sq)[0]; return sq.secret?.drop ?? (w.kind === 'letter' ? w.item : undefined); };
+    const q = SIDE.find((sq) => !this.active(sq.id) && !this.done.includes(sq.id) && drop(sq) && this.have(drop(sq)!));
+    if (q) this.taken.push(q.id);
     return q;
   }
 
@@ -611,8 +638,13 @@ export class SideQuests {
 
   /** "Raccogli ..." at a find spot, "Accendi ..." at a use-point, under the hero's feet `p`. */
   prompt(p: { x: number; y: number; z: number }): { text: string; act?: () => string } | undefined {
+    const near = (at: { x: number; y: number; z: number }) => (Math.abs(p.y - at.y) > 1.5 ? Infinity : Math.hypot(p.x - at.x, p.z - at.z));
+    for (const { q, w } of this.running()) { // a secret's look-alike nearer than the right one, said just the same, does nothing
+      if (w.kind !== 'use' || !q.secret || !q.secret.decoys.some((d) => near(d) <= REACH && near(d) < near(w.at))) continue;
+      return { text: w.say![0], act: () => 'Il libro non entra: le pagine si gonfiano, come sabbia' };
+    }
     for (const { q, at, find } of this.spots()) {
-      if (Math.hypot(p.x - at.x, p.z - at.z) > REACH || Math.abs(p.y - at.y) > 1.5) continue;
+      if (near(at) > REACH) continue;
       const w = this.want(q);
       if (w.kind === 'use') {
         const [text, did] = w.say ?? [`Accendi ${w.label}`, `Hai acceso ${w.label}`], need = w.needs, give = w.gives;
@@ -621,6 +653,7 @@ export class SideQuests {
           if (give && !this.bag?.add(give.item, give.n)) return 'La borsa è piena';
           if (need) this.bag!.remove(need.item, need.n);
           this.steps[q.id] = this.step(q) + 1;
+          if (q.secret && this.ready(q) && this.handIn(q)) return `${did}: è ${ITEM.get(q.reward!)!.name}`; // no one to hand it to: done here (the book out leaves room for it)
           return did;
         } };
       }
@@ -651,7 +684,7 @@ export class SideQuests {
   handIn(q: SideQuest): boolean {
     const bag = this.bag;
     if (!bag) return false;
-    const items = [...new Set(stepsOf(q).flatMap((w) => (w.kind === 'kill' || w.kind === 'escort' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item])))].map((id) => [id, this.have(id)] as const);
+    const items = [...new Set([...(q.secret ? [q.secret.drop] : []), ...stepsOf(q).flatMap((w) => (w.kind === 'kill' || w.kind === 'escort' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item]))])].map((id) => [id, this.have(id)] as const);
     for (const [id, n] of items) if (n) bag.remove(id, n);
     if (q.reward && !bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);

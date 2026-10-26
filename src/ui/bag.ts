@@ -133,7 +133,7 @@ export class BagPanel {
       if (c === this.sel) this.use(c); // the shown one: hovered with a mouse, tapped once on touch
       else this.select(c, true);
     });
-    this.el.addEventListener('pointerover', (e) => { if (e.pointerType === 'mouse') this.select((e.target as HTMLElement).closest<HTMLElement>('.cell[data-k]')); });
+    this.el.addEventListener('pointerover', (e) => { const c = (e.target as HTMLElement).closest<HTMLElement>('.cell[data-k]'); if (e.pointerType === 'mouse' && (c !== this.sel || this.tip.hidden)) this.select(c); }); // into the icon of the cell shown: the same opening
     this.kind('b', {
       tip: (what, tap) => {
         const s = this.bag.items[Number(what)], it = ITEM.get(s.id)!;

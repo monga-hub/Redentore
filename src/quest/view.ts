@@ -21,7 +21,7 @@ import { BELLS, BELL_MOUTH, CENACOLO } from '../level/zones/sangiorgio.ts';
 // styled here so they stay out of the HUD's way.
 
 const join = (t: Talk) => t.pages.join('\n\n'); // a quest's text, whole, in the list window
-const back = (q: SideQuest) => { const g = GIVERS[giverOf(q)]; return q.back ?? `Torna da ${g.at.name}, ${g.where}`; }; // a side quest's line once it is ready
+const back = (q: SideQuest) => { const g = GIVERS[giverOf(q)!]; return q.back ?? `Torna da ${g.at.name}, ${g.where}`; }; // a side quest's line once it is ready
 const pay = (id: QuestId, item?: string) => ({ xp: QUESTS[id].xp, gold: QUESTS[id].gold, item });
 const OPEN_TIME = 1.6; // s for a gate to open
 const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1, cenacolo: -1, 'cenacolo-orto': -1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls; the Cenacolo's into the hall and out to the garden
@@ -129,7 +129,7 @@ export class QuestView {
   private givers: Record<Giver, Npc>; // the Cardinale on his procession's spot (quest/escort.ts), set with the quest
   private tiara = tiara(); // on the Cardinale's head once he is crowned on the Bacino, until he gives it to the hero
   private crowned?: boolean; // as last drawn (undefined: not yet, so a load finds him crowned without the flash)
-  private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
+  private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Object3D }[] = []; // a gold glint over each find spot and use-point while its quest wants it (a secret's: the book itself, lying there)
   private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
   private clappers: THREE.Mesh[] = []; // the campanile's bells' clappers, until Rintocchi muti pulls them
   private nozze?: THREE.Mesh; // the painting back in its frame, once the Veronese has the canvas (loaded then)
@@ -202,9 +202,9 @@ export class QuestView {
     chest.add(this.lid, this.inside, this.glint, this.key);
     this.root.add(chest, this.npc.root, this.speziale.root, ...Object.values(this.givers).map((n) => n.root));
     for (const q of SIDE) for (const w of stepsOf(q)) for (const at of w.kind === 'finds' ? w.finds.map((f) => f.at) : w.kind === 'find' || w.kind === 'use' ? [w.at] : []) {
-      if (this.finds.some((f) => f.q === q && f.at === at)) continue; // one glint a spot (the well is drawn from twice)
-      const m = new THREE.Mesh(this.glint.geometry, this.glint.material);
-      m.position.set(at.x, at.y + 0.45, at.z);
+      if (this.finds.some((f) => f.q === q && f.at === at) || (q.secret && w.kind === 'use')) continue; // one glint a spot (the well is drawn from twice); a secret's shelf is like the others
+      const m = q.secret ? book() : new THREE.Mesh(this.glint.geometry, this.glint.material);
+      m.position.set(at.x, q.secret ? at.y + 0.9 : at.y + 0.45, at.z); // the book on the labyrinth's stone drum
       m.visible = false;
       this.finds.push({ q, at, m });
       this.root.add(m);
@@ -553,6 +553,7 @@ export class QuestView {
     const spots = this.quest.side.spots();
     for (const f of this.finds) {
       f.m.visible = spots.some((s) => s.q === f.q && s.at === f.at);
+      if (f.q.secret) continue;
       f.m.rotation.y = this.glint.rotation.y;
       f.m.position.y = f.at.y + 0.45 + Math.sin(performance.now() * 0.003) * 0.08;
     }
@@ -715,6 +716,19 @@ export class QuestView {
 }
 
 /** The key of the chiostro grande: old gold, a ring bow with a cross in it, a long shank, a toothed bit; glowing. */
+/** Il libro di sabbia, shut on the labyrinth's drum: worn calf over sand-coloured leaves, a little askew; the leaves glow faintly, found by night. */
+function book(): THREE.Group {
+  const g = new THREE.Group();
+  const cover = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.09, 0.25), new THREE.MeshStandardMaterial({ color: 0x5a2e16, roughness: 0.9 }));
+  const leaves = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.07, 0.235), new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: 1, emissive: 0x8a6a30, emissiveIntensity: 1 }));
+  cover.position.y = 0.045;
+  leaves.position.set(0.012, 0.045, 0);
+  g.add(cover, leaves);
+  g.rotation.y = 0.5;
+  g.scale.setScalar(1.5); // a big book, the size of a breviary on a lectern
+  return g;
+}
+
 function key(): THREE.Group {
   const gold = new THREE.MeshBasicMaterial({ color: new THREE.Color(GOLD).multiplyScalar(1.6), fog: false });
   const g = new THREE.Group();

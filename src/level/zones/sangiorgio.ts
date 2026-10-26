@@ -33,6 +33,13 @@ export const CROSSING: [number, number][] = [[FERRY_A.x, FERRY_A.z], [-418, 26],
 export const SG = { x0: -600, x1: -444, z0: -40, z1: 134 };
 export const FAC = -478; // the basilica's front
 export const LIB_F = 4.8; // the library's floor
+/**
+ * The library's long walnut cases, west then east, each split into eight bays counted from the door's end (z 18.8 down to
+ * -4.8): where one stands to shelve a book, a metre off the case (Il libro di sabbia, quest/squero.ts).
+ */
+export const SCANSIE = [-505.8, -472.2].flatMap((x) => Array.from({ length: 8 }, (_, i) => ({ x, y: LIB_F, z: 18.8 - (i + 0.5) * 2.95 })));
+/** The Borges labyrinth's middle, in the garden: its stone drum. */
+export const LABIRINTO = { x: -496, y: 0, z: -14 };
 export const CENACOLO = { x0: -548, x1: -512, z0: 4, z1: 36 };
 const SGX = -530, SGZ = 102; // the crossing, under the dome
 const DOME = 9.5, RING = 20; // dome radius, top of the crossing's walls
@@ -477,6 +484,7 @@ function library(b: LevelBuilder, p: Props): void {
     }
   };
   shelf(-507.6, -506.8, -5.6, 19.6); shelf(-471.2, -470.4, -5.6, 19.6);
+  for (const x of [-506.8, -471.2]) for (let i = 0; i <= 8; i++) { const z = 18.8 - i * 2.95; p.box(x - 0.12, x + 0.12, LIB_F, LIB_F + 4.4, z - 0.08, z + 0.08, 'wood', 0, 0x9a6a38); } // the uprights between bays, paler than the books: there to be counted
   shelf(-506.8, -495, -5.6, -4.8); shelf(-487, -471.2, -5.6, -4.8);
   shelf(-506.8, -494, 18.8, 19.6); shelf(-488, -471.2, 18.8, 19.6);
   for (const x of [-499, -483]) for (const z of [2, 11]) {
@@ -490,6 +498,7 @@ function library(b: LevelBuilder, p: Props): void {
     b.world.add(x, z, 0.5, 0.5, LIB_F, LIB_F + 1.9);
   }
   for (const [x, z] of [[-499, -1], [-483, -1], [-499, 15], [-483, 15]]) b.lights.push({ x, y: LIB_F + 5, z, kind: 'lamp' });
+  for (const [x, z] of [[-505.5, 1], [-505.5, 13], [-472.5, 1], [-472.5, 13]]) b.lights.push({ x, y: LIB_F + 4.6, z, kind: 'lamp' }); // over the long cases: their bays are counted by eye
 }
 
 function cenacolo(b: LevelBuilder, p: Props): void {
@@ -538,9 +547,9 @@ function garden(b: LevelBuilder, p: Props): void {
   for (const x of [cx - 9, cx + 9]) cypress(p, x, -37, 8);
   // Cypresses and laurels round the lawns, a little labyrinth of box after Borges, benches.
   for (const [x, z] of [[-546, -30], [-546, -14], [-546, 0], [-500, -32], [-480, -32], [-460, -32], [-458, -14], [-458, -2]]) cypress(p, x, z, p.rand(6.5, 8.5));
-  for (const [x, z] of [[-540, -6], [-516, -12], [-490, -14], [-476, -14]]) fruitTree(p, x, z, 0xf0d040, 0.9);
+  for (const [x, z] of [[-540, -6], [-516, -12], [-484, -18], [-476, -14]]) fruitTree(p, x, z, 0xf0d040, 0.9); // none in the labyrinth: its middle is walked to (Il libro di sabbia)
   const hedge = (x0: number, x1: number, z0: number, z1: number) => b.box(x0, x1, 0, 1.3, z0, z1, 'hedge', { camera: false });
-  const lx = -496, lz = -14; // the labyrinth's middle
+  const { x: lx, z: lz } = LABIRINTO;
   for (const [r, gap] of [[2.5, 1], [5, -1], [7.5, 1]] as const) {
     hedge(lx - r, lx + r, lz - r - 0.35, lz - r + 0.35);
     hedge(lx - r, lx + r, lz + r - 0.35, lz + r + 0.35);

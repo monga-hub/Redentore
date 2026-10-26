@@ -15,7 +15,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, CHEST, CHOIR_DOOR, CROCE, PUNTA, Quest, SPEZIALE } from '../src/quest/progress.ts';
-import { BELFRY, BELLS, CAMPANILE, CENACOLO, SG } from '../src/level/zones/sangiorgio.ts';
+import { BELFRY, BELLS, CAMPANILE, CENACOLO, LABIRINTO, SCANSIE, SG } from '../src/level/zones/sangiorgio.ts';
 import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
 import { PROCESSION } from '../src/quest/squero.ts';
 import { PACKS as PACKS3 } from '../src/enemies/sangiorgio.ts';
@@ -180,6 +180,12 @@ for (const [name, b] of Object.entries(BERTHS)) if (!at(isle, b.x, b.z)) fail(`q
   const off = [...walk, ...waves].filter((p) => !at(isle, p.x, p.z));
   if (off.length || waves.length !== 11) fail(`sangiorgio  the procession is out of the hero's reach at ${off.map((p) => `(${p.x}, ${p.z})`).join(' ')}`);
   else console.log(`ok   sangiorgio  la processione: ${walk.length} points from the altar to the Bacino, ${waves.length} monaci of its waves`);
+}
+// Il libro di sabbia: the labyrinth's middle through its hedges, and every bay of the library's long cases.
+{
+  const off = [LABIRINTO, ...SCANSIE].filter((p) => !at(isle, p.x, p.z));
+  if (off.length) fail(`sangiorgio  il libro di sabbia is out of the hero's reach at ${off.map((p) => `(${p.x}, ${p.z})`).join(' ')}`);
+  else console.log(`ok   sangiorgio  il libro di sabbia: the labyrinth's middle, ${SCANSIE.length} bays of walnut`);
 }
 if (quest.checkpoint() !== PUNTA || !at(isle, PUNTA.x, PUNTA.z)) fail('quest      past the chain a death should wake on the Punta, on open ground');
 quest.landed = true;

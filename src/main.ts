@@ -459,7 +459,9 @@ const sidePins = () => {
   return pins;
 };
 const sidePin = (q: (typeof SIDE)[number]): { x: number; z: number } | undefined => {
-  const w = quest.side.want(q), giver = quest.side.where(giverOf(q)); // the Cardinale wherever his procession is
+  const g = giverOf(q);
+  if (!g) return undefined; // a secret: nothing points at it
+  const w = quest.side.want(q), giver = quest.side.where(g); // the Cardinale wherever his procession is
   if (quest.side.ready(q)) return giver;
   if (w.kind === 'find' || w.kind === 'use') return w.at;
   if (w.kind === 'finds') return quest.side.spots().filter((s) => s.q === q).map((s) => s.at).sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0] ?? giver; // the nearest still to find
@@ -604,8 +606,8 @@ renderer.setAnimationLoop(() => {
     quest.relic = true;
     kit.system.notices.push({ kind: 'info', text: `Missione: ${RELIC_TITLE}. ${RELIC_OBJECTIVE}` });
   }
-  const letter = quest.side.update(); // Marieta's letter picked up: its quest starts
-  if (letter) kit.system.notices.push({ kind: 'info', text: `Missione: ${QUESTS.lettera.title}. ${quest.side.line(letter)}` });
+  const letter = quest.side.update(); // Marieta's letter, or Il libro di sabbia's page, picked up: its quest starts
+  if (letter) kit.system.notices.push({ kind: 'info', text: `Missione: ${QUESTS[letter.id].title}. ${quest.side.line(letter)}` });
   for (const t of quest.side.tokens()) { // a head, the shears, the snuffer a quest wants: at the elite's body once it is dead, until picked up
     const e = ELITE[t.from];
     if (e && e.state === 'dead' && e.t > 1 && !ground(t.item)) drops.spawn(e.x, e.y, e.z, 0, t.item, 1.2);

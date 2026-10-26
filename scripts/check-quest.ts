@@ -7,9 +7,10 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { CARDINALE, CROWNED, DITALE, ONDATE, PROCESSION, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { PAGE_DROP, SCANSIA, CARDINALE, CROWNED, DITALE, ONDATE, PROCESSION, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideId } from '../src/quest/squero.ts';
 import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, MONACO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
-import { BELFRY, BELLS, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
+import { BELFRY, BELLS, CAMPANILE, LABIRINTO, LIB_F, SCANSIE } from '../src/level/zones/sangiorgio.ts';
+import { itemTip } from '../src/ui/tooltip.ts';
 import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
@@ -433,7 +434,7 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
   if (copy.side.progress(schede) !== 4 || s.ready(schede)) fail('four slips are not saved as half of eight');
   for (let i = 0; i < 4; i++) b.add(s.loot('amanuense', () => 0, false, () => 0)!);
-  if (b.count(SCHEDA) !== 8 || s.loot('amanuense', () => 0, false, () => 0) || q.marks(0).cardinale !== 'ready') fail('the amanuensi do not drop exactly the eight slips wanted');
+  if (b.count(SCHEDA) !== 8 || s.loot('amanuense', () => 0, false, () => 0) === SCHEDA || q.marks(0).cardinale !== 'ready') fail('the amanuensi do not drop exactly the eight slips wanted');
   if (s.talk('cardinale').paid?.id !== 'schede' || b.count(SCHEDA) || q.bonusXp !== xp + 150 || q.marks(0).cardinale !== 'offer') fail('the slips are not handed in for 150 XP, or the Cardinale has not the tiara to give');
   // La tiara di cartapesta: two jewels found in any order, each standable and guarded, not before it is taken; the brooch wanted off the
   // Bibliotecario from the start (dead already: laid at his body), saved, its gold and XP with no epic, and his marker gone after.
@@ -536,9 +537,60 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   casterHurt(ab, 1000);
   if (Math.round(blessed) !== 1100 || hp0 - ab.hp !== 1000) fail(`the Benedizione apostolica does not make the hero's blows on the Abate 10% heavier (${blessed}, then ${hp0 - ab.hp})`);
   ab.hp = hp0; ab.state = 'pray';
-  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario', 'batacchio-sangiorgio', 'tiara-cartapesta'];
+  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario', 'batacchio-sangiorgio', 'tiara-cartapesta', 'libro-di-sabbia'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
+}
+
+// Il libro di sabbia, the secret one: no giver, no "!" or "?", no pin; a page off an amanuense (rare, on a ramp) starts it, the
+// book lies in the labyrinth's middle, and only the sixth bay on the left takes it, every other bay saying the same and doing
+// nothing; shelved, it is done on the spot for 200 XP and the amulet whose page turns at each opening. Saved mid-way.
+{
+  const q = new Quest(level.world), s = q.side, b = new Bag(), sb = SIDE_BY.get('sabbia')!;
+  s.bag = b;
+  q.accepted2 = q.accepted3 = true;
+  const marks = () => (Object.keys(GIVERS) as Giver[]).filter((g) => q.marks(0)[g]);
+  const was = marks().join();
+  if (giverOf(sb) || (Object.keys(GIVERS) as Giver[]).some((g) => s.open(g).includes(sb))) fail('Il libro di sabbia has a giver, or is offered');
+  let k = 0;
+  while (!s.loot('amanuense', () => 0, false, never) && k < 1000) k++;
+  if (k !== Math.ceil((1 - PAGE_DROP.base) / PAGE_DROP.ramp) || PAGE_DROP.base >= LETTER_DROP.base) fail(`the page's bad-luck ramp ends after ${k} kills, or it is no rarer than the letter`);
+  if (s.loot('amanuense', () => 1, false, () => 0) || s.loot('monaco', () => 0, false, () => 0) === 'pagina-sabbia') fail('a second page falls while one lies on the ground, or a monaco drops it');
+  b.add('pagina-sabbia');
+  if (s.update()?.id !== 'sabbia' || s.update() || !s.line(sb).includes('sentieri che si biforcano')) fail('picking up the page does not start Il libro di sabbia once, pointing at the garden');
+  if (marks().join() !== was || s.handInReady('iseppo') || s.talk('iseppo').talk.pages.some((p) => !p)) fail('Il libro di sabbia shows a marker, or speaks through a giver');
+  q.boss3Dead = true;
+  if (s.ready(sb)) fail('Il libro di sabbia is ready with the Abate dead, with no one to hand it to');
+  q.boss3Dead = false;
+  const mid = feet(LABIRINTO.x + 0.6, LABIRINTO.z);
+  if (q.prompt(feet(SCANSIA.x, SCANSIA.z))) fail('the shelf says something before the book is found');
+  if (q.prompt(mid)?.text !== 'Raccogli il libro') fail(`no prompt for the book in the labyrinth's middle (${q.prompt(mid)?.text})`);
+  q.prompt(mid)?.act?.();
+  s.update();
+  if (s.step(sb) !== 1 || !b.count('libro-sabbia') || !s.line(sb).includes('sesta scansia') || !ITEM.get('libro-sabbia')!.lore.includes('VI, a sinistra')) fail('the book found does not send the hero to the sixth bay on the left');
+  if (SCANSIA.x > -490 || SCANSIE.indexOf(SCANSIA) !== 5 || SCANSIE.slice(0, 8).some((c, i) => i && c.z >= SCANSIE[i - 1].z)) fail('the right bay is not the sixth of the left case counted from the door');
+  for (const c of SCANSIE) { const f = feet(c.x, c.z); if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - LIB_F) > 0.1) fail(`no room to stand at the bay (${c.x}, ${c.z})`); }
+  const copy = new Quest(level.world);
+  copy.side.bag = b;
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.step(sb) !== 1 || !copy.side.active('sabbia')) fail('Il libro di sabbia does not survive a save mid-way');
+  for (const c of SCANSIE) if (c !== SCANSIA) {
+    const p = q.prompt(feet(c.x, c.z));
+    if (p?.text !== 'Riponi il libro' || !p.act) { fail(`the bay (${c.x}, ${c.z}) does not look like the right one (${p?.text})`); continue; }
+    p.act();
+    if (s.step(sb) !== 1 || !b.count('libro-sabbia') || s.done.includes('sabbia')) fail(`the wrong bay (${c.x}, ${c.z}) takes the book`);
+  }
+  const xp = q.bonusXp, put = q.prompt(feet(SCANSIA.x, SCANSIA.z));
+  if (put?.text !== 'Riponi il libro') fail('the right bay does not look like the others');
+  put?.act?.();
+  if (!s.done.includes('sabbia') || s.active('sabbia') || q.bonusXp !== xp + 200 || QUESTS.sabbia.xp !== 200 || b.count('libro-sabbia') || b.count('pagina-sabbia') || b.count('libro-di-sabbia') !== 1) fail('the right bay does not end Il libro di sabbia for 200 XP and the amulet, the book and page out of the bag');
+  const amu = ITEM.get('libro-di-sabbia')!;
+  if (amu.slot !== 'amuleto' || amu.rarity !== 'epico' || !amu.unique || (amu.pages?.length ?? 0) < 2) fail('Il libro di sabbia is not a unique epic amulet with pages');
+  const lore = () => itemTip(amu).match(/class="lore">«(.*?)»/)?.[1];
+  const l1 = lore(), l2 = lore();
+  if (!l1 || !l2 || l1 === l2) fail(`the amulet's description does not change at each opening (${l1} / ${l2})`);
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (!copy.side.done.includes('sabbia') || s.loot('amanuense', () => 0, false, () => 0) || (b.add('pagina-sabbia'), s.update())) fail('Il libro di sabbia starts again once done');
 }
 
 // The drowned rise again like the orto's friars: late, out of the hero's way, at their spot, worth less.
@@ -574,7 +626,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order, L'incoronazione escorted through 3 waves); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order, L'incoronazione escorted through 3 waves, Il libro di sabbia unmarked); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

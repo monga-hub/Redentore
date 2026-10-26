@@ -8,12 +8,14 @@
 // taken; then everything there but the Zitelle's church is open, the key of the church opens it from the
 // court, and the Governatrice's death opens its portone on the sagrato. Level 3: the chain past the Tre Oci keeps the
 // Punta shut until the third quest is taken; San Giorgio is reached only by Mastro Iseppo's gondola (a link between the
-// two berths, quest/ferry.ts); its Cenacolo opens with the Bibliotecario's key, its garden door with the Abate's death.
+// two berths, quest/ferry.ts); its Cenacolo opens with the Bibliotecario's key, its garden door with the Abate's death. The
+// campanile's bell chamber is reached only by its stair (a link between the door at its foot and the floor up top, quest/progress.ts
+// climb), and walled in: nobody walks off it.
 import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, CHEST, CHOIR_DOOR, CROCE, PUNTA, Quest, SPEZIALE } from '../src/quest/progress.ts';
-import { CENACOLO, SG } from '../src/level/zones/sangiorgio.ts';
+import { BELFRY, BELLS, CAMPANILE, CENACOLO, SG } from '../src/level/zones/sangiorgio.ts';
 import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
@@ -37,10 +39,11 @@ const idx = (i: number, j: number) => j * nx + i;
 const toI = (x: number) => Math.round((x - X0) / STEP), toJ = (z: number) => Math.round((z - Z0) / STEP);
 
 /**
- * Flood-fill from the spawn with the player's step and radius: feet height per reached cell, NaN elsewhere. Once the
- * third quest is taken the gondola joins its two berths: either reached, the fill goes on from the other.
+ * Flood-fill from `from` (the spawn) with the player's step and radius: feet height per reached cell, NaN elsewhere. Once the
+ * third quest is taken the gondola joins its two berths and the campanile's stair its door and its top: either end reached, the
+ * fill goes on from the other.
  */
-function flood(): Float32Array {
+function flood(from: { x: number; z: number } = SPAWN, links = true): Float32Array {
   const feet = new Float32Array(nx * nz).fill(NaN);
   const queue: number[] = [];
   const seed = (x: number, z: number) => {
@@ -50,13 +53,14 @@ function flood(): Float32Array {
     queue.push(c);
     return true;
   };
-  seed(SPAWN.x, SPAWN.z);
-  const { punta, sangiorgio } = BERTHS;
+  seed(from.x, from.z);
+  const pairs = [[BERTHS.punta, BERTHS.sangiorgio], [CAMPANILE.door, CAMPANILE.top]];
   for (;;) {
     fill(feet, queue);
-    if (!quest.accepted3) break;
-    const a = at(feet, punta.x, punta.z), b = at(feet, sangiorgio.x, sangiorgio.z);
-    if (!(a && seed(sangiorgio.x, sangiorgio.z)) && !(b && seed(punta.x, punta.z))) break;
+    if (!quest.accepted3 || !links) break;
+    let more = false;
+    for (const [a, b] of pairs) more = (at(feet, a.x, a.z) && seed(b.x, b.z)) || (at(feet, b.x, b.z) && seed(a.x, a.z)) || more;
+    if (!more) break;
   }
   return feet;
 }
@@ -179,6 +183,21 @@ for (let n = 0; n < isle.length; n++) if (!Number.isNaN(isle[n])) {
   if (x < -300 && !sg && !punta && leaks++ < 5) console.log('  level 3 leak at', x, z);
 }
 if (leaks) fail(`level 3 leaks: ${leaks} cells walkable off the island and the Punta`);
+// The bell chamber on its own, from where the stair lands: all of it at the chamber's floor and inside the shaft's top, under every
+// bell and by the hatch, and nothing off it (a gap in the parapet would drop the fill 44 m onto the campo).
+{
+  const top = flood(CAMPANILE.top, false), { x0, x1, z0, z1, y } = BELFRY;
+  let n = 0, off = 0;
+  for (let c = 0; c < top.length; c++) if (!Number.isNaN(top[c])) {
+    const i = c % nx, j = (c - i) / nx, x = X0 + i * STEP, z = Z0 + j * STEP;
+    n++;
+    if (x < x0 || x > x1 || z < z0 || z > z1 || Math.abs(top[c] - y) > 0.05) { if (off++ < 5) console.log('  off the bell chamber at', x, z, top[c]); }
+  }
+  if (off) fail(`sangiorgio  the bell chamber leaks: ${off} cells off its floor`);
+  for (const { at: b, label } of [...BELLS, { at: CAMPANILE.hatch, label: 'the hatch' }]) if (!at(top, b.x, b.z)) fail(`sangiorgio  no floor under ${label} in the bell chamber`);
+  if (n < 120) fail(`sangiorgio  the bell chamber has only ${n} cells of floor`);
+  else console.log(`ok   sangiorgio  Cella campanaria: ${n} cells at ${y} m, walled in`);
+}
 quest.takeKey3();
 quest.open(quest.gate('cenacolo'));
 const hall = flood();

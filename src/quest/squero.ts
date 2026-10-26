@@ -16,11 +16,12 @@
 // Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
 // the Fanalista of the darsena, Padre Archivista in Longhena's passage, and the ghost of Paolo Veronese in the antirefettorio, whose
 // two quests (the musicians' instruments, then the canvas back off the Commissario delle Arti) open the Cenacolo, and the
-// Cardinale benedettino before the high altar, who wants the conclave's voting slips counted. A quest may run in steps (`want` a list: collect, then use-points that burn what
+// Cardinale benedettino before the high altar, who wants the conclave's voting slips counted. Padre Archivista's second sends the hero
+// up the campanile, to the bell chamber 44 m over the lagoon. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
-import { LIB_F } from '../level/zones/sangiorgio.ts';
+import { BELLS, LIB_F } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
 import { QUESTS, type QuestId } from './progress.ts';
 
@@ -39,9 +40,9 @@ export const VERONESE = { x: -525, z: 43.2, yaw: Math.PI / 2, r: 0.35, name: 'Pa
 export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, name: 'Il Cardinale benedettino' } as const;
 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
-export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario';
+export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
 export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale';
@@ -113,6 +114,8 @@ export const STRUMENTI: readonly Find[] = [
 ];
 /** La tela tagliata: the rolled canvas, off the Commissario delle Arti; handed in, the Nozze hang in the Cenacolo's frame again (quest/view.ts). */
 export const TELA = 'tela-arrotolata';
+/** The step of Rintocchi muti that wakes the Campanaro in the bell chamber: the three clappers out. */
+export const MUTE = 3;
 /** Le schede del conclave: the voting slips of 1800 the amanuensi still copy, off them while it runs (they rise again for it, main.ts). */
 export const SCHEDA = 'scheda-conclave';
 
@@ -317,6 +320,26 @@ export const SIDE: readonly SideQuest[] = [
       'Ecco: la cornice ha di nuovo le sue nozze, e le nozze i loro testimoni. La porta del Cenacolo ora ti lascerà passare. Tieni la sua sciabola: ha tagliato abbastanza tele, che tagli qualcos\'altro.',
     ],
   },
+  {
+    id: 'rintocchi', giver: 'archivista', after: 'acqua',
+    want: [
+      ...BELLS.map((b): Want => ({ kind: 'use', at: b.at, label: b.label, say: [`Togli il batacchio ${b.of}`, `Hai tolto il batacchio ${b.of}: tace`] })),
+      { kind: 'kill', n: 1, from: 'campanaro', woken: true },
+    ],
+    reward: 'batacchio-sangiorgio',
+    prep: 'rintocchi',
+    line: (_n, step) => [...BELLS.map((b) => `Sali sul campanile e togli il batacchio ${b.of}`), 'Abbatti il Campanaro di San Giorgio nella cella campanaria'][step],
+    offer: [
+      'Figliolo. Ho scritto un\'altra riga, nel registro, e non mi piace: «le campane suonano da sole». Ogni notte, alle tre, quando l\'Abate chiama la marea. Nessuno sale più sul campanile dal settantaquattro, quando crollò.',
+      'Lo rifece il Buratti, nel novantuno, con l\'angelo in cima. Nel milleottocento le campane suonarono per il papa nuovo, e il campanaro tirò le corde finché le mani gli sanguinarono. Non è più sceso.',
+      'Sali, figliolo. La porta è alla base, verso il campo. Lassù ci sono tre campane: togli i batacchi, tutti e tre. Una campana senza lingua non chiama nessuno, nemmeno il mare.',
+    ],
+    busy: 'Tre batacchi, figliolo: la maggiore, la mezzana, la piccola. E se il campanaro sale a riprenderseli, ricordati che lassù non c\'è dove scappare.',
+    done: [
+      'Il batacchio della maggiore. Pesa come un peccato. Stanotte alle tre ho sentito il silenzio, figliolo: per la prima volta in duecento anni il registro non ha niente da scrivere.',
+      'Tienilo tu. Quando l\'Abate fa suonare le sue campane, una lingua gli mancherà: due rintocchi, non tre. E dalla cella si vede tutta la laguna, vero? Io non ci sono mai salito.',
+    ],
+  },
   // The Cardinale's conclave, the first of three (the tiara, then the coronation, follow it with `after`).
   {
     id: 'schede', giver: 'cardinale',
@@ -354,9 +377,9 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     decline: 'Allora resta al buio anche tu. Io aspetto: i fanalisti sono abituati.',
     full: 'La borsa è piena, Risorto. Fa\' spazio: la lanterna non te la appoggio per terra, nell\'umido.' },
   archivista: { at: ARCHIVISTA, level: 3, where: 'nel Passaggio del Longhena', greet: 'Figliolo. Parla piano: i nomi dormono, qui intorno.',
-    bye: 'I lavabi hanno acqua, e il registro una riga in più. Va\', figliolo: l\'Abate ti aspetta, e io scrivo.',
+    bye: 'I lavabi hanno acqua, le campane tacciono, e il registro ha due righe in più. Va\', figliolo: l\'Abate ti aspetta, e io scrivo.',
     decline: 'Come vuoi. Annoto anche questo: «ripassò più tardi».',
-    full: 'Hai la borsa piena, figliolo. Fa\' spazio e torna: le ampolle sono fragili.' },
+    full: 'Hai la borsa piena, figliolo. Fa\' spazio e torna: quello che ho per te non si appoggia per terra.' },
   veronese: { at: VERONESE, level: 3, where: "nell'Antirefettorio", greet: 'Ragazzo. Guarda quella porta: dietro c\'è il mio quadro più grande, e non posso entrare.',
     bye: 'Le nozze sono di nuovo al loro posto. Va\', ragazzo: io resto a guardarle. Un pittore non si stanca mai del suo quadro.',
     decline: 'Va bene. Io aspetto qui. Sono quattrocento anni che aspetto davanti a questa porta.',

@@ -26,7 +26,7 @@ import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
 import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, pull } from './enemies/caster.ts';
-import { ABATE, AMANUENSE, BIBLIOTECARIO, COMMISSARIO, DARSENA, GRANATIERE, MARINAIO, MONACO, NOSTROMO, PREPS, due as wakes, lull, prepare, rouse, spawnLevel3 } from './enemies/sangiorgio.ts';
+import { ABATE, AMANUENSE, BIBLIOTECARIO, CAMPANARO, COMMISSARIO, DARSENA, GRANATIERE, MARINAIO, MONACO, NOSTROMO, PREPS, due as wakes, lull, prepare, rouse, spawnLevel3 } from './enemies/sangiorgio.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, BLESSING, BOONS, CHEST, CROCE, HEADS, NPC, PUNTA, QUESTS, Quest, SECOND, SPEZIALE, THIRD } from './quest/progress.ts';
 import { Ferry } from './quest/ferry.ts';
 import { GIVERS, SIDE, giverOf, type Foe, type SideId } from './quest/squero.ts';
@@ -42,6 +42,7 @@ import { autosave, deserialize, questXpIn, serialize, setPending, startup, upcom
 import { BAR, install, migration, prepared } from './core/prepared.ts';
 import { isDiablo, onQuality, onStyle } from './core/style.ts';
 import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
+import { BELFRY } from './level/zones/sangiorgio.ts';
 import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
 import { DiabloFx } from './fx/diabloFx.ts';
@@ -148,14 +149,14 @@ sangiorgio.rising = (f) => !quest.boss3Dead && !sleepers.has(f) && ((f.kind === 
 scene.add(sangiorgio.root);
 /** Level 3's kinds: name, kind, height, level, rank. */
 const L3_KINDS = [['Monaco nero', MONACO, 1.9, 16], ['Amanuense', AMANUENSE, 1.8, 16], ['Marinaio annegato', MARINAIO, 1.85, 16], ['Il Bibliotecario', BIBLIOTECARIO, 2.4, 18, 'elite'], ['Il Nostromo della darsena', NOSTROMO, 2.7, 18, 'elite'],
-  ['Il Commissario delle Arti', COMMISSARIO, 2.7, 18, 'elite'], ['Granatiere annegato', GRANATIERE, 1.95, 17], ["L'Abate di San Giorgio", ABATE, 4.4]] as const;
+  ['Il Commissario delle Arti', COMMISSARIO, 2.7, 18, 'elite'], ['Granatiere annegato', GRANATIERE, 1.95, 17], ['Il Campanaro di San Giorgio', CAMPANARO, 2.8, 18, 'elite'], ["L'Abate di San Giorgio", ABATE, 4.4]] as const;
 const ofKind3 = (k: typeof L3_KINDS[number][1]) => sangiorgio.all.filter((f) => f.kind === k);
 const ferry = new Ferry(); // Mastro Iseppo's gondola between the Punta and San Giorgio
 const ISLAND_VIEW = { x: -545, z: 108 }; // between the dome and the campanile: what the crossing's camera looks at
 scene.add(ferry.root);
 /** The kinds the side quests count and loot (quest/squero.ts), and the elites whose token they lay at the body. */
 const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra'],
-  [MONACO, 'monaco'], [AMANUENSE, 'amanuense'], [MARINAIO, 'marinaio'], [NOSTROMO, 'nostromo'], [BIBLIOTECARIO, 'bibliotecario'], [COMMISSARIO, 'commissario']]);
+  [MONACO, 'monaco'], [AMANUENSE, 'amanuense'], [MARINAIO, 'marinaio'], [NOSTROMO, 'nostromo'], [BIBLIOTECARIO, 'bibliotecario'], [COMMISSARIO, 'commissario'], [CAMPANARO, 'campanaro']]);
 const ELITE: Partial<Record<Foe, { x: number; y: number; z: number; state: string; t: number }>> = { gastaldo: l2.gastaldo, maestra: l2.maestra, nostromo: l3.nostromo, bibliotecario: l3.bibliotecario, commissario: l3.commissario };
 const ofKind = (k: typeof L2_KINDS[number][1]) => zitelle.all.filter((f) => f.kind === k);
 const kinds: Kind[] = [ // the levels are only shown, on the nameplates
@@ -334,7 +335,7 @@ const drops: Drops = new Drops([ // gold and items out of the dead, walked over 
   { all: [bees.queen], tier: 'elite' },
   { all: bees.all.filter((f) => f.kind === APETTA), tier: 'worker' },
 ].map((d) => ({ ...d, quiet: () => quest.bossDead }) as Dropper).concat(([[GONDOLIERE, 'friar'], [CODEGA, 'priest'], [ZITELLA, 'priest'], [VELO, 'priest'], [GASTALDO, 'elite'], [MAESTRA, 'elite'], [GOVERNATRICE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind(kind), tier, level: 2, quiet: () => quest.boss2Dead, quest: FOE.has(kind) ? () => quest.side.loot(FOE.get(kind)!, ground, quest.key2) : undefined })))
-  .concat(([[MONACO, 'priest'], [AMANUENSE, 'priest'], [MARINAIO, 'priest'], [BIBLIOTECARIO, 'elite'], [NOSTROMO, 'elite'], [COMMISSARIO, 'elite'], [GRANATIERE, 'priest'], [ABATE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind3(kind), tier, level: 3, quiet: () => quest.boss3Dead, quest: FOE.has(kind) ? () => quest.side.loot(FOE.get(kind)!, ground, quest.key2) : undefined }))), level.world, bag, cam.camera); // the side quests' items, Marieta's letter
+  .concat(([[MONACO, 'priest'], [AMANUENSE, 'priest'], [MARINAIO, 'priest'], [BIBLIOTECARIO, 'elite'], [NOSTROMO, 'elite'], [COMMISSARIO, 'elite'], [GRANATIERE, 'priest'], [CAMPANARO, 'elite'], [ABATE, 'boss']] as const).map(([kind, tier]) => ({ all: ofKind3(kind), tier, level: 3, quiet: () => quest.boss3Dead, quest: FOE.has(kind) ? () => quest.side.loot(FOE.get(kind)!, ground, quest.key2) : undefined }))), level.world, bag, cam.camera); // the side quests' items, Marieta's letter
 scene.add(drops.root);
 drops.extra = () => (!drops.loose.some((l) => l.id === RELIC) && quest.rollRelic() ? RELIC : undefined); // Fra' Zuane's corona, once a run (one on the ground at a time)
 drops.collect = (id) => id === HEADS.item && (questView.head(), true); // Fra' Bortolo's heads are counted, not bagged
@@ -363,6 +364,15 @@ book.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dc
 bagPanel.keys.KeyK = () => book.show();
 questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(quest.accepted3) }); // San Giorgio's purple pieces once the third quest is taken
 questView.board = (c) => { kit.system.cancel(); dctl.stop(); ferry.board(c, player); };
+/** San Giorgio's campanile (quest/progress.ts `climb`): a fade to black, the hero up in the bell chamber or down at the door, a fade back. */
+const veil = document.createElement('div');
+veil.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40';
+document.body.append(veil);
+const CLIMB = 0.5, DARK = 0.25; // s each way, s held black
+let climbing: { to: { x: number; z: number; yaw: number }; t: number } | undefined;
+questView.climb = (to) => { if (!climbing) { kit.system.cancel(); dctl.stop(); climbing = { to, t: 0 }; } };
+/** Up in the bell chamber: the follow camera held short of its piers and cornice, the view over the lagoon opened (stream, fx/atmosphere.ts). */
+const aloft = () => player.pos.y > BELFRY.y - 2 && player.pos.x > BELFRY.x0 - 1 && player.pos.x < BELFRY.x1 + 1 && player.pos.z > BELFRY.z0 - 1 && player.pos.z < BELFRY.z1 + 1;
 questView.shop2 = () => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => SHOP2 });
 questView.reward = (gold) => { bag.gold += gold; };
 questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
@@ -476,11 +486,11 @@ const pressed = (code: string) => input.pressed(code);
  */
 const LEVEL1 = ['chiesa', 'convento', 'orto', 'corpo-nord', 'giardini', 'laguna', 'calle'].map((z) => level.zones.get(z)!), LEVEL2 = ['giudecca', 'zitelle'].map((z) => level.zones.get(z)!);
 const LEVEL3 = ['punta', 'sangiorgio'].map((z) => level.zones.get(z)!);
-function stream(x: number): void {
+function stream(x: number, high = false): void {
   const one = x > -100, two = x < -50 && x > -430, three = x < -250;
-  for (const g of LEVEL1) g.visible = one;
+  for (const g of LEVEL1) g.visible = one || high; // from the bell chamber the Redentore and the Giudecca are in view, not their dead
   friars.root.visible = priests.root.visible = bees.root.visible = one;
-  for (const g of LEVEL2) g.visible = two;
+  for (const g of LEVEL2) g.visible = two || high;
   zitelle.root.visible = two;
   for (const g of LEVEL3) g.visible = three;
   sangiorgio.root.visible = three;
@@ -559,7 +569,14 @@ renderer.setAnimationLoop(() => {
   game.time += dt;
   playerStats.update(dt);
   if (dying > 0 && (dying -= real) <= 0) wake();
-  player.frozen = dying > 0;
+  if (climbing) { // the campanile's stair: dark, the hero moved, light again
+    const was = climbing.t, to = climbing.to;
+    climbing.t += real;
+    if (was < CLIMB && climbing.t >= CLIMB) { player.respawn(to); cam.yaw = to.yaw; dcam.snap(); }
+    veil.style.opacity = THREE.MathUtils.clamp(Math.min(climbing.t, 2 * CLIMB + DARK - climbing.t) / CLIMB, 0, 1).toFixed(3);
+    if (climbing.t >= 2 * CLIMB + DARK) climbing = undefined;
+  }
+  player.frozen = dying > 0 || !!climbing;
   const diablo = isDiablo(), afloat = !!ferry.trip; // in the gondola: no steering, no casts
   if (!player.frozen && !afloat) dctl.update(dt, input); // click-to-move steering, click-attack swings
   kit.system.castMul = quest.castMul / worn.haste; // Fra' Bortolo's blessing, while it lasts, and Celerità
@@ -661,6 +678,7 @@ renderer.setAnimationLoop(() => {
     cam.yaw += Math.atan2(Math.sin(want - cam.yaw), Math.cos(want - cam.yaw)) * k;
     cam.pitch += ((ferry.trip === 'out' ? 0.08 : 0.25) - cam.pitch) * k;
   }
+  cam.cap = aloft() ? 3.6 : Infinity; // 6 m of headroom between piers 6.4 m apart
   if (diablo) dcam.update(dt, input, player.pos);
   else cam.update(dt, input, player.pos);
   blend.apply(cam.camera, dt);
@@ -669,7 +687,7 @@ renderer.setAnimationLoop(() => {
   targeting.update(dt, player.pos);
   plates.update(dt, player.pos, lv.lv);
   heroBuffs.update(dt, buffs);
-  stream(player.pos.x);
+  stream(player.pos.x, aloft());
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);

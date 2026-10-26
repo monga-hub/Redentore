@@ -24,7 +24,7 @@ import type { Tune } from '../player/levels.ts';
 import { CHURCH_FLOOR as F, SPAWN } from '../level/plan.ts';
 import { ZCX, ZF } from '../level/zones/zitelle.ts';
 import { GIVERS, SIDE, SideQuests, giverOf, type Giver } from './squero.ts';
-import { CENACOLO, LANDING, PIER } from '../level/zones/sangiorgio.ts';
+import { BELFRY, CAMPANILE, CENACOLO, LANDING, PIER } from '../level/zones/sangiorgio.ts';
 
 export type Need = 'key' | 'boss' | 'quest2' | 'key2' | 'boss2' | 'quest3' | 'key3' | 'boss3';
 
@@ -145,6 +145,7 @@ export const QUESTS = {
   marinai: { title: 'I marinai della Riva', xp: 160, gold: 60 }, // Mastro Iseppo, on the approdo
   fari: { title: 'I fari della darsena', xp: 220, gold: 90 }, // the Fanalista
   acqua: { title: 'Acqua di San Benedetto', xp: 180, gold: 70 }, // Padre Archivista
+  rintocchi: { title: 'Rintocchi muti', xp: 300, gold: 120 }, // his second, up the campanile: the Campanaro di San Giorgio
   musici: { title: 'I musici di Cana', xp: 200, gold: 80 }, // the Veronese, the first of his two: the main quest's way into the Cenacolo
   tela: { title: 'La tela tagliata', xp: 320, gold: 140 }, // the Veronese's second: the Commissario delle Arti
   schede: { title: 'Le schede del conclave', xp: 150, gold: 50 }, // the Cardinale benedettino, the first of his three
@@ -163,7 +164,7 @@ export const RELIC_DROP = { base: 0.02, ramp: 0.01 } as const;
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | Giver; ferry?: Crossing }
+export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | Giver; ferry?: Crossing; climb?: { x: number; z: number; yaw: number } }
 /** The gondola's trips (quest/ferry.ts): the Punta to San Giorgio, back, or home to the Redentore once the Abate is dead. */
 export type Crossing = 'out' | 'back' | 'home';
 
@@ -473,6 +474,15 @@ export class Quest {
     return undefined;
   }
 
+  /** San Giorgio's campanile: up by the door at its foot to the bell chamber, down again by the stair's hatch (main.ts fades the way). */
+  climb(p: { x: number; y: number; z: number }): Prompt | undefined {
+    if (!this.accepted3) return undefined;
+    const { door, hatch, top } = CAMPANILE;
+    if (Math.hypot(p.x - door.x, p.z - door.z) < REACH && p.y < 1.5) return { text: 'Sali sul campanile', act: () => '', climb: top };
+    if (Math.hypot(p.x - hatch.x, p.z - hatch.z) < REACH * 0.6 && Math.abs(p.y - BELFRY.y) < 1.5) return { text: 'Scendi dal campanile', act: () => '', climb: door };
+    return undefined;
+  }
+
   /** The nearest thing to interact with around the player's feet `p`, if any. */
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
     if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: 'zuane' };
@@ -480,7 +490,7 @@ export class Quest {
     for (const [g, { at }] of Object.entries(GIVERS) as [Giver, typeof GIVERS[Giver]][]) if (Math.hypot(p.x - at.x, p.z - at.z) < REACH && p.y < 1.5) return { text: `Parla con ${at.name}`, act: () => '', talk: g };
     const find = this.side.prompt(p);
     if (find) return find;
-    const ferry = this.ferry(p);
+    const ferry = this.ferry(p) ?? this.climb(p);
     if (ferry) return ferry;
     if (!this.chestOpen && Math.hypot(p.x - CHEST.x, p.z - CHEST.z) < REACH && Math.abs(p.y - CHEST.y) < 1.5) {
       if (!this.accepted) return { text: 'Un sigillo spettrale chiude il baule' };

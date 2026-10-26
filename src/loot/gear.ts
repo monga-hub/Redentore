@@ -185,6 +185,7 @@ const UNIQUE3: typeof DEFS = [
   ['lanterna-faro', 'Lanterna del faro', 'amuleto', 'epico', 'spirito intelletto vigore', 'La lanterna da banchina del Fanalista. L’acqua alta si ferma dove arriva la sua luce.'],
   ['mantello-caliari', 'Mantello di Caliari', 'spalle', 'epico', 'vigore celerita critico', 'Il mantello che Paolo Caliari porta nelle Nozze, suonando la viola. Macchiato di biacca e d’oltremare.'],
   ['sciabola-commissario', 'Sciabola del Commissario', 'arma', 'epico', 'potenza critico celerita', 'Ha tagliato le Nozze di Cana dalla cornice, l’11 settembre 1797. Ora taglia altro.'],
+  ['batacchio-sangiorgio', 'Batacchio di San Giorgio', 'arma', 'epico', 'potenza vigore critico', 'La lingua della campana maggiore. Suonò per Pio VII, nel 1800; ora suona dove la porti.'],
 ];
 
 /** The stats a budget of `points` buys, split over `focus` (best first). */

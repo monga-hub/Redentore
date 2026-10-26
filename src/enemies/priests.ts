@@ -6,7 +6,7 @@ import type { PlayerStats } from '../player/stats.ts';
 import type { Area } from '../level/builder.ts';
 import { separate, type Target } from './brain.ts';
 import { PRIEST, REVERENDISSIMO, SACERDOTE, SPIN_DRAW, fly, hurt, killAll, rise, spawnCasters, think, wipe, type Bolt, type CasterKind, type CasterState, type Line, type Mark, type Priest, type Ring } from './caster.ts';
-import { ABATE, AMANUENSE, BIBLIOTECARIO, COMMISSARIO, GRANATIERE, MARINAIO, MONACO, NOSTROMO } from './sangiorgio.ts';
+import { ABATE, AMANUENSE, BIBLIOTECARIO, CAMPANARO, COMMISSARIO, GRANATIERE, MARINAIO, MONACO, NOSTROMO } from './sangiorgio.ts';
 import { playSfx } from '../audio/engine.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA } from './zitelle.ts';
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
@@ -54,6 +54,8 @@ interface Look {
   sheen?: [number, number, number];
   /** Its `pour` is a blade's cut, steel and ice blue, not the Calice's wine: the Commissario's Squarcio. */
   steel?: boolean;
+  /** Cast in bronze, this colour: the body's paint gone for the metal, a faint warmth kept through the hit flash (the Campanaro). */
+  bronze?: number;
 }
 const Y = new THREE.Vector3(0, 1, 0), Q = new THREE.Quaternion(), UP = new THREE.Quaternion();
 const CAST = 'mage_soell_cast', RELEASE = { clip: 'mage_soell_cast_3', from: 0.75, rate: 1.4 }, THROW = { clip: 'Cast_Throw', from: 0.66, rate: 1.2 };
@@ -143,6 +145,13 @@ const LOOKS = new Map<CasterKind, Look>([
     step: { [-1]: 'Walking', 1: 'Running' }, pace: { 1: RUN, [-1]: -WALK, run: RUN }, shoots: [RELEASE], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
     bolt: { core: 0xeefaff, glow: 0x3ec8ff, size: 1.2 }, // a pistol's shot, gone cold
     steel: true,
+  }],
+  [CAMPANARO, { // a monk gone to bronze, the bell hammer (a hero's Mazza del campanaro) in his fist
+    body: 'monaco.glb', prop: 'campanaro.glb', height: 2.8, staff: 1.4, grip: 0.12,
+    clips: { pray: 'Pray', chase: 'Idle', cast: 'Scream', swing: 'Attack', nova: 'Attack_Hammer', spin: 'Idle', evade: 'Running', dead: 'dying_backwards' },
+    step: { [-1]: 'Walking', 1: 'Walking' }, pace: { 1: WALK, [-1]: -WALK, run: RUN }, shoots: [], swings: [SWINGS[0], SWINGS[1], { clip: 'Attack_Back', from: 0.3, hit: 0.75 }], deaths: ['dying_backwards', 'Dead_Knock'],
+    bolt: { core: 0xffffff, glow: 0xd8a040, size: 1 }, // never casts
+    bronze: 0xc58035,
   }],
   [ABATE, {
     body: 'abate.glb', prop: 'baculo.glb', height: 5.4, staff: 4.9, grip: 0.45,
@@ -399,6 +408,18 @@ function dress(scene: THREE.Group, prop: THREE.Group, look: Look): void {
     m.userData.ghost = g;
     m.transparent = true;
     m.opacity = 0.88;
+  });
+  const br = look.bronze;
+  if (br) scene.traverse((o) => { // the monk's dark robe would swallow any tint: the bronze replaces it
+    if (!(o instanceof THREE.Mesh) || o.material === glow || o.parent?.name === 'held') return;
+    const m = o.material as THREE.MeshStandardMaterial;
+    m.map = m.emissiveMap = null;
+    m.color.setHex(br);
+    m.metalness = 0.45;
+    m.roughness = 0.42;
+    m.emissive.setRGB(0.1, 0.06, 0.015);
+    m.userData.ghost = [0.1, 0.06, 0.015];
+    m.needsUpdate = true;
   });
 }
 
@@ -722,9 +743,9 @@ export class Priests {
     }
     for (; k < this.wine.length; k++) this.wine[k].on = false;
     if (!K) return;
-    const B = K.toll;
+    const ringer = this.all.find((c) => c.kind.toll && c.rings.length) ?? f, B = ringer.kind.toll; // the Abate's bells, or the Campanaro's up the campanile
     this.bells.forEach((c, i) => {
-      const r: Ring | undefined = f.rings[i];
+      const r: Ring | undefined = ringer.rings[i];
       c.on = !!B && !!r && r.t >= 0;
       if (!c.on) return;
       const R = r.t * B!.speed;

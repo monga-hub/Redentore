@@ -68,6 +68,7 @@ const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, h
 const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight
 const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
+const ALOFT = { y0: 20, y1: 40, clear: 0.9 }; // m: up San Giorgio's campanile the haze thins to show the lagoon (zones/sangiorgio.ts lagoon)
 const BACINO = { x0: -452, x1: -385, z0: 0, z1: 100, clear: 0.82 }; // the Punta's pier and the gondola's crossing: a clear night over the water, San Giorgio's front and campanile in sight
 /**
  * Rungs, best first: 0 everything; 1 fewer pixels (the pixel ratio x0.7, at least 1); 2 half the moon's
@@ -384,7 +385,7 @@ export class Atmosphere {
     this.hemi.intensity = lerp(mood.hemi, k) + DIABLO_OPEN.hemi * open;
     this.moon.intensity = (MOON + DIABLO_OPEN.moon * open) * (this.lite ? 1 - k : 1); // without shadows no roof stops it: indoors it goes
     const B = BACINO, ss = THREE.MathUtils.smoothstep, bacino = ss(focus.z, B.z0, B.z0 + 8) * (1 - ss(focus.z, B.z1 - 8, B.z1)) * ss(focus.x, B.x0, B.x0 + 6) * (1 - ss(focus.x, B.x1 - 15, B.x1));
-    this.fog.density = (lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k)) * (1 - B.clear * bacino * (1 - k));
+    this.fog.density = (lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k)) * (1 - B.clear * bacino * (1 - k)) * (1 - ALOFT.clear * ss(focus.y, ALOFT.y0, ALOFT.y1));
     this.fog.color.lerpColors(FOG_OUT, FOG_IN, k);
     this.renderer.toneMappingExposure = (lerp(mood.exposure, k) + DIABLO_OPEN.exposure * open) * (this.low ? BARE.exposure : 1);
     u.uCool.value = lerp(mood.cool, k);

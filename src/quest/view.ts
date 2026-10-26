@@ -10,7 +10,7 @@ import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
 import { ARCHIVISTA, CARDINALE, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
-import { CENACOLO } from '../level/zones/sangiorgio.ts';
+import { BELLS, BELL_MOUTH, CENACOLO } from '../level/zones/sangiorgio.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -129,6 +129,7 @@ export class QuestView {
   private givers: Record<Giver, Npc> = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(CARDINALE, PORPORA, 'cardinale.glb') };
   private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Mesh }[] = []; // a gold glint over each find spot and use-point while its quest wants it
   private fari: THREE.Sprite[] = []; // the darsena's lighthouses' fires, once the Fanalista's oil is in them
+  private clappers: THREE.Mesh[] = []; // the campanile's bells' clappers, until Rintocchi muti pulls them
   private nozze?: THREE.Mesh; // the painting back in its frame, once the Veronese has the canvas (loaded then)
   private lines = ''; // Mastro Iseppo's tracker lines as drawn
   private talk = new Dialogue();
@@ -164,6 +165,8 @@ export class QuestView {
   boonTaken?: () => void;
   /** The gondola is boarded at a landing stage: main.ts rows the crossing (quest/ferry.ts). */
   board?: (c: Crossing) => void;
+  /** The campanile's door or hatch: main.ts fades the hero up or down. */
+  climb?: (to: { x: number; z: number; yaw: number }) => void;
   private shown = '';
   private tapped = false;
 
@@ -210,6 +213,13 @@ export class QuestView {
       s.visible = false;
       this.fari.push(s);
       this.root.add(s);
+    }
+    for (const { at, r } of BELLS) { // a rod down the bell's throat and its ball just under the lip (zones/sangiorgio.ts campanile)
+      const rod = new THREE.CylinderGeometry(0.05, 0.05, r * 1.1).translate(0, r * 0.55, 0), ball = new THREE.SphereGeometry(r * 0.22, 10, 6);
+      const m = new THREE.Mesh(mergeGeometries([rod, ball]), iron);
+      m.position.set(at.x, at.y + BELL_MOUTH - r * 0.15, at.z);
+      this.clappers.push(m);
+      this.root.add(m);
     }
 
     const style = document.createElement('style');
@@ -501,6 +511,7 @@ export class QuestView {
       const n = pr.act();
       if (n) notices.push(n);
       if (pr.ferry) this.board?.(pr.ferry);
+      if (pr.climb) this.climb?.(pr.climb);
       if (pr.talk === 'zuane') {
         this.npc.talking = true;
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, GREET.zuane, () => this.zuaneEntries());
@@ -550,6 +561,14 @@ export class QuestView {
       }
       s.visible = lit;
       s.scale.setScalar(8 + Math.sin(performance.now() * 0.011 + i) * 0.4);
+    });
+    this.clappers.forEach((m, i) => { // pulled: a shower of bronze, and the bell's last stroke
+      const out = this.quest.side.reached('rintocchi', i + 1);
+      if (out && m.visible && Math.hypot(player.x - m.position.x, player.z - m.position.z) < 10) {
+        this.vfx.burst(goldSpark, m.position.x, m.position.y, m.position.z, 30, 0.5, 2.5, 2);
+        playSfx('toll_bell', { x: m.position.x, y: m.position.y, z: m.position.z }, { rate: 0.7 });
+      }
+      m.visible = !out;
     });
     if (this.quest.canvas && !this.nozze) this.hang();
     this.quest.blessLeft = Math.max(0, this.quest.blessLeft - dt); // its icon is with the hero's buffs (ui/plates.ts)

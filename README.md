@@ -107,6 +107,14 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   (branco nascosto: contano solo loro), poi si riattinge acqua (2 brocche) e se ne versa una per lavabo
   nell'Antirefettorio, ponente poi levante. Paga le Ampolle di San Benedetto e indebolisce l'Abate: il Calice di Cana
   fa il 40% di danno in meno (`PREPS=calice`).
+- *Rintocchi muti*, la seconda dell'Archivista: la porta alla base del campanile porta con una dissolvenza alla cella
+  campanaria, a 44 m (un pavimento tra i quattro pilastri, chiuso dal parapetto; la botola riporta giù). Lassù la
+  telecamera resta corta e la foschia si apre sulla laguna: la cupola sotto, la Giudecca, la Salute, San Marco con la
+  Riva degli Schiavoni, il Lido. Si tolgono i batacchi delle tre campane (maggiore, mezzana, piccola) e dalla scala sale
+  il Campanaro di San Giorgio (branco nascosto: `monaco.glb` in bronzo, 2,8 m, con `campanaro.glb` in mano; ~5000 PV,
+  i Rintocchi da saltare e il Rimbombo, una nova in uno spazio stretto). Paga il Batacchio di San Giorgio (arma epica,
+  `campanaro.glb`) e indebolisce l'Abate: i suoi Rintocchi scendono da 3 a 2 anelli (`PREPS=rintocchi`).
+  `node scripts/balance.ts campanaro` lo prova da solo.
 - **La catena del Veronese**, obbligatoria prima del Cenacolo: il fantasma di Paolo Veronese aspetta
   nell'Antirefettorio (corpo Meshy `veronese.glb`, Idle e Talk). *I musici di Cana*: la viola in Biblioteca, il violino
   nel Presbiterio, il violone nel Coro e il flauto sul palco del Teatro Verde, in qualunque ordine, ognuno vicino al suo

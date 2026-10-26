@@ -7,8 +7,9 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { CARDINALE, DITALE, EXVOTO, SCHEDA, FARI, FARI_LIT, GIVERS, LAVABI, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
-import { ABATE, COMMISSARIO, GRANATIERE, PACKS as PACKS3, due, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
+import { CARDINALE, DITALE, EXVOTO, SCHEDA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, PACKS as PACKS3, due, prepare, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
+import { BELFRY, BELLS, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
@@ -348,7 +349,39 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   const cup = ABATE.pour!.damage;
   prepare([]);
   if (cup !== Math.round(ABATE.pour!.damage * 0.6)) fail(`the Calice pours ${cup} with the ampolle, ${ABATE.pour!.damage} without`);
-  if (q.marks(0).archivista) fail('Padre Archivista still has something once his quest is done');
+  if (q.marks(0).archivista !== 'offer') fail('Padre Archivista offers nothing once Acqua di San Benedetto is done (Rintocchi muti follows it)');
+  // Rintocchi muti: the stair up and down, the three clappers in order (saved mid-way), then the Campanaro woken on the chamber's
+  // floor (only he counts), the Abate's bells a ring short once it is handed in.
+  const door = feet(CAMPANILE.door.x, CAMPANILE.door.z), hatch = feet(CAMPANILE.hatch.x, CAMPANILE.hatch.z), up = feet(CAMPANILE.top.x, CAMPANILE.top.z);
+  if (new Quest(level.world).prompt(door)?.climb) fail('the campanile opens before the third quest is taken');
+  if (Math.abs(up.y - BELFRY.y) > 0.05 || Math.abs(hatch.y - BELFRY.y) > 0.05 || door.y > 0.5) fail(`the stair lands at ${up.y} m up and ${door.y} m down, want ${BELFRY.y} and the campo`);
+  if (q.prompt(door)?.climb !== CAMPANILE.top || q.prompt(hatch)?.climb !== CAMPANILE.door || q.prompt(up)?.climb) fail('the campanile\'s door does not lead up and its hatch down (or the landing is on the hatch)');
+  const bells = BELLS.map((bl) => { const f = feet(bl.at.x, bl.at.z); if (level.world.blocked(f.x, f.z, f.y) || Math.abs(f.y - BELFRY.y) > 0.05) fail(`no room under ${bl.label}`); return f; });
+  const rintocchi = SIDE_BY.get('rintocchi')!, ring = l3.hidden.find((h) => h.pack.hidden!.quest === 'rintocchi');
+  if (!ring || ring.members.length !== 1 || ring.members[0] !== l3.campanaro || l3.campanaro.kind !== CAMPANARO || ring.pack.hidden!.step !== MUTE || ring.pack.hidden!.rest) fail('the Campanaro is not the hidden pack of Rintocchi muti, on the hero at its third clapper');
+  if (Math.abs(l3.campanaro.y - BELFRY.y) > 0.05 || [l3.campanaro.bounds.x0, l3.campanaro.bounds.x1].some((x) => x < BELFRY.x0 || x > BELFRY.x1) || [l3.campanaro.bounds.z0, l3.campanaro.bounds.z1].some((z) => z < BELFRY.z0 || z > BELFRY.z1)) fail('the Campanaro does not keep to the bell chamber\'s floor');
+  if (CAMPANARO.hp < 4500 || CAMPANARO.hp > 5500 || !CAMPANARO.toll || !CAMPANARO.nova || CAMPANARO.nova.radius > 4) fail('the Campanaro is not the miniboss of the plan (about 5000, the Rintocchi, a nova a tight floor can be left)');
+  if (q.prompt(bells[0])?.act) fail('a clapper can be pulled before Rintocchi muti is taken');
+  take('archivista');
+  const rung = (id: SideId, st: number) => s.reached(id, st);
+  if (q.prompt(bells[1])?.act || due(ring!, l3, rung, false)) fail('the mezzana gives up its clapper before the maggiore, or the Campanaro is up at once');
+  q.prompt(bells[0])?.act?.();
+  q.prompt(bells[1])?.act?.();
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.step(rintocchi) !== 2 || due(ring!, l3, rung, false)) fail('two clappers out are not saved, or wake the Campanaro');
+  q.prompt(bells[2])?.act?.();
+  if (!due(ring!, l3, rung, false) || due(ring!, l3, rung, true)) fail('the third clapper does not wake the Campanaro, or he wakes after the Abate');
+  s.killed('campanaro');
+  if (s.ready(rintocchi)) fail('a Campanaro off his pack counts for Rintocchi muti');
+  s.killed('campanaro', 'rintocchi');
+  if (!s.ready(rintocchi) || q.marks(0).archivista !== 'ready') fail('the Campanaro dead does not make Rintocchi muti ready');
+  if (QUESTS.rintocchi.xp !== 300 || QUESTS.rintocchi.gold !== 120 || rintocchi.reward !== 'batacchio-sangiorgio') fail('Rintocchi muti does not pay 300 XP, 120 gold and the Batacchio di San Giorgio');
+  hand('archivista', 'rintocchi');
+  prepare(['rintocchi']);
+  const peal = ABATE.toll!.n;
+  prepare([]);
+  if (!q.preps().includes('rintocchi') || peal !== 2 || ABATE.toll!.n !== 3) fail(`the Batacchio leaves the Abate ${peal} rings, ${ABATE.toll!.n} without it, want 2 and 3`);
+  if (q.marks(0).archivista) fail('Padre Archivista still has something once his quests are done');
   // I musici di Cana: four spots, each standable, each within a pack's pull, picked up in any order, not before the quest.
   const by = STRUMENTI.map((f) => { const at = feet(f.at.x + 1, f.at.z); if (level.world.blocked(at.x, at.z, at.y) || Math.abs(at.y - f.at.y) > 0.5) fail(`no room by ${f.label} (${f.at.x}, ${f.at.z})`); return at; });
   STRUMENTI.forEach((f) => { if (!PACKS3.some((pk) => !pk.hidden && pk.members.some(([k, x, z]) => Math.hypot(x - f.at.x, z - f.at.z) < k.aggro))) fail(`no pack guards ${f.label}`); if (!ITEM.get(f.item)?.quest) fail(`${f.item} is not a quest item`); });
@@ -401,7 +434,7 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   for (let i = 0; i < 4; i++) b.add(s.loot('amanuense', () => 0, false, () => 0)!);
   if (b.count(SCHEDA) !== 8 || s.loot('amanuense', () => 0, false, () => 0) || q.marks(0).cardinale !== 'ready') fail('the amanuensi do not drop exactly the eight slips wanted');
   if (s.talk('cardinale').paid?.id !== 'schede' || b.count(SCHEDA) || q.bonusXp !== xp + 150 || q.marks(0).cardinale) fail('the slips are not handed in for 150 XP, or the Cardinale still has something');
-  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario'];
+  const unique = ['remo-marieta', 'lanterna-faro', 'ampolle-benedetto', 'mantello-caliari', 'sciabola-commissario', 'batacchio-sangiorgio'];
   if (SHOP.some((g) => unique.includes(g.id))) fail('a side quest reward is on sale');
   for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.some((id) => unique.includes(id))) { fail('a side quest reward dropped off the dead'); break; }
 }
@@ -439,7 +472,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, I musici di Cana in any order, La tela tagliata, Le schede del conclave); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

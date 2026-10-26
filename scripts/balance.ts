@@ -25,6 +25,7 @@
 //   node scripts/balance.ts route3 melee [runs]    one build on the route, on through level 2 into level 3 (Fra' Zuane, the Punta, the gondola, San Giorgio, the Bibliotecario, the Abate)
 //   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
 //   node scripts/balance.ts commissario [runs]     the Commissario delle Arti alone in the cipressi, his granatieri at his half, every build at 16, 17, 18, dodging and not, one life (GEAR default typical3)
+//   node scripts/balance.ts campanaro [runs]       the Campanaro di San Giorgio alone in the bell chamber, 44 m up, likewise
 //   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
@@ -37,7 +38,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
 import { APPRODO, BERTHS, CHEST, CHOIR_DOOR, NPC, Quest, SPEZIALE } from '../src/quest/progress.ts';
-import { ABATE, ABATE_AT, BIBLIOTECARIO, COMMISSARIO, NOSTROMO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
+import { ABATE, ABATE_AT, BIBLIOTECARIO, CAMPANARO, COMMISSARIO, NOSTROMO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
 import { GASTALDO, GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, PACKS, VELO, ZITELLA, spawnLevel2, type Level2 } from '../src/enemies/zitelle.ts';
 import { GROUNDED, inPour, onLine, veiled } from '../src/enemies/caster.ts';
 import { ZF } from '../src/level/zones/zitelle.ts';
@@ -50,7 +51,8 @@ import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
 import { TOMES, levelOf, offer, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
-import { GIVERS, SIDE, STRUMENTI, TELA, giverOf } from '../src/quest/squero.ts';
+import { GIVERS, MUTE, SIDE, STRUMENTI, TELA, giverOf } from '../src/quest/squero.ts';
+import { BELFRY, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { HEROES, heroOf } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
@@ -118,6 +120,8 @@ const STEP = 0.5;
 /** The grid's region: the Redentore to the Punta (levels 1, 2 and level 3's fondamenta), or San Giorgio once the gondola has crossed. */
 const MAINLAND = { x0: -420, x1: 62, z0: -197, z1: 22, seed: SPAWN as { x: number; z: number } };
 const ISLAND = { x0: -602, x1: -425, z0: -42, z1: 152, seed: APPRODO as { x: number; z: number } };
+/** The campanile's bell chamber, seeded up top where its stair lands (`y`: the floor to start the fill on). */
+const BELLS = { x0: -580, x1: -568, z0: 110, z1: 122, seed: { ...CAMPANILE.top, y: BELFRY.y } as { x: number; z: number } };
 let X0 = 0, Z0 = 0, nx = 0, nz = 0, SEED = MAINLAND.seed;
 function region(r: typeof MAINLAND): void { X0 = r.x0; Z0 = r.z0; nx = Math.round((r.x1 - r.x0) / STEP); nz = Math.round((r.z1 - r.z0) / STEP); SEED = r.seed; }
 region(MAINLAND);
@@ -128,7 +132,7 @@ const N8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]
 function flood(world: World): Float32Array {
   const feet = new Float32Array(nx * nz).fill(NaN), queue: number[] = [];
   const s = toJ(SEED.z) * nx + toI(SEED.x);
-  feet[s] = world.groundAt(SEED.x, SEED.z, 0);
+  feet[s] = world.groundAt(SEED.x, SEED.z, (SEED as { y?: number }).y ?? 0);
   queue.push(s);
   while (queue.length) {
     const c = queue.pop()!, i = c % nx, j = (c - i) / nx, f = feet[c];
@@ -350,7 +354,7 @@ class Run {
   tierOf(m: Mob): Tier {
     if (!isCaster(m)) return 'friar';
     const k = m.kind;
-    return k === REVERENDISSIMO || k === GOVERNATRICE || k === ABATE ? 'boss' : k === SACERDOTE || k === APE || k === GASTALDO || k === MAESTRA || k === BIBLIOTECARIO || k === NOSTROMO || k === COMMISSARIO ? 'elite' : k === APETTA ? 'worker' : k === GONDOLIERE ? 'friar' : 'priest';
+    return k === REVERENDISSIMO || k === GOVERNATRICE || k === ABATE ? 'boss' : k === SACERDOTE || k === APE || k === GASTALDO || k === MAESTRA || k === BIBLIOTECARIO || k === NOSTROMO || k === COMMISSARIO || k === CAMPANARO ? 'elite' : k === APETTA ? 'worker' : k === GONDOLIERE ? 'friar' : 'priest';
   }
   levelOf(m: Mob): 1 | 2 | 3 { return isCaster(m) && this.l3.all.includes(m) ? 3 : isCaster(m) && this.l2.all.includes(m) ? 2 : 1; }
   /** A kill's loot: gold banked, a better piece worn (the old one sold), everything else sold. */
@@ -515,6 +519,7 @@ class Run {
     if (m.kind === ABATE) return 'boss3';
     if (m.kind === BIBLIOTECARIO || m.mates.some((x) => x.kind === BIBLIOTECARIO)) return 'biblio';
     if (this.l3.hidden.some((h) => h.pack.hidden!.quest === 'tela' && h.members.includes(m))) return 'commiss.';
+    if (m.kind === CAMPANARO) return 'campan.';
     if (this.l3.all.includes(m)) return m.home.x > -425 ? 'fond.3' : 'isola';
     if (m.kind === MAESTRA || m.mates.some((x) => x.kind === MAESTRA)) return 'maestra';
     if (m.kind === GASTALDO || m.mates.some((x) => x.kind === GASTALDO)) return 'gastaldo';
@@ -619,7 +624,7 @@ class Run {
     } else if (t) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
-      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO || t.kind === ABATE || t.kind === BIBLIOTECARIO || t.kind === NOSTROMO || t.kind === COMMISSARIO);
+      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO || t.kind === ABATE || t.kind === BIBLIOTECARIO || t.kind === NOSTROMO || t.kind === COMMISSARIO || t.kind === CAMPANARO);
       if (!this.system.casting) {
         // the heal: a long cast, pushed back by every hit taken, so only worth it below 55%
         if (low < 0.55 && this.ready('mend')) { if (this.cast('mend') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
@@ -1037,6 +1042,39 @@ export function playCommissario(build: string, lv: number, dodge: boolean, s = 1
   return { build, lv, elite: 'commiss.', dodge, won: !r.deaths && c.state === 'dead', time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
 }
 
+/** The Campanaro alone in the bell chamber: the hero up the stair, the three clappers out, so he comes up at once. One life, everything else dead. */
+export function playCampanaro(build: string, lv: number, dodge: boolean, s = 1): EliteResult {
+  swings.clear();
+  region(BELLS);
+  const r = new Run(build, dodge);
+  seed = s * 7919;
+  r.dress(process.env.GEAR ?? 'typical3');
+  r.picks = picksTo(build, lv);
+  r.apply();
+  r.stats.revive();
+  r.quest.accepted = r.quest.accepted3 = r.quest.landed = true;
+  r.quest.side.done.push('acqua');
+  r.quest.side.taken.push('rintocchi');
+  r.quest.side.steps.rintocchi = MUTE;
+  for (const m of r.mobs) if (!r.l3.hidden.some((h) => h.members.includes(m as Priest))) { m.state = 'dead'; m.hp = 0; }
+  r.levelUp = () => {};
+  r.paths.reset();
+  const at = CAMPANILE.top;
+  Object.assign(r.player.pos, { x: at.x, y: r.world.standHeight(at.x, at.z), z: at.z });
+  const c = r.l3.campanaro, goal = { x: at.x, z: at.z, r: 1.5 };
+  let t0 = -1, pots = 0, lost = 0;
+  r.step(goal); // the first frame wakes him, on the hero
+  while (r.time < 15 * 60 && !r.deaths && c.state !== 'dead') {
+    if (t0 < 0 && FIGHTING.has(c.state)) t0 = r.time;
+    const z = r.zone('campan.'), p0 = z.potions, h0 = r.stats.hp;
+    r.step(goal);
+    if (t0 >= 0) lost += Math.max(0, h0 - r.stats.hp) / r.stats.hpMax;
+    pots += z.potions - p0;
+  }
+  region(MAINLAND);
+  return { build, lv, elite: 'campan.', dodge, won: !r.deaths && c.state === 'dead', time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
+}
+
 export interface PackResult { build: string; lv: number; dodge: boolean; won: boolean; time: number; potions: number; lost: number; contact: number; kills: number; casts: Map<string, number> }
 
 /** A caster's nightmare: four friars of one pull, set 16 m up the orto's open path and charging, the hero standing his ground at level `lv`, one life. */
@@ -1184,6 +1222,10 @@ if (process.argv[1]?.endsWith('balance.ts')) {
   } else if (mode === 'commissario') {
     const rs: EliteResult[] = [];
     for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [16, 17, 18]) runs(Number(build ?? 3), (s) => rs.push(playCommissario(b, lv, d, s)));
+    console.log(eliteTable(rs));
+  } else if (mode === 'campanaro') {
+    const rs: EliteResult[] = [];
+    for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [16, 17, 18]) runs(Number(build ?? 3), (s) => rs.push(playCampanaro(b, lv, d, s)));
     console.log(eliteTable(rs));
   } else if (mode === 'pack3') {
     const rs: PackResult[] = [];

@@ -15,6 +15,8 @@ export class ThirdPersonCamera {
   yaw: number;
   pitch = 0.3;
   private dist = 7; // wanted distance (wheel / pinch)
+  /** The boom's longest this frame, whatever the wheel wants: San Giorgio's bell chamber holds it short (main.ts). */
+  cap = Infinity;
   private zoom = 7; // eased towards dist, so zoom steps glide instead of jumping
   private shown = 7; // smoothed, collision-limited distance
   private ray = new THREE.Raycaster();
@@ -44,9 +46,10 @@ export class ThirdPersonCamera {
     this.dir.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), Math.cos(this.yaw) * cp);
 
     this.ray.set(this.target, this.dir);
-    this.ray.far = this.zoom;
+    const want = Math.min(this.zoom, this.cap);
+    this.ray.far = want;
     const hit = this.ray.intersectObjects(this.blockers, false)[0];
-    const limit = hit ? Math.max(0.3, hit.distance - 0.3) : this.zoom;
+    const limit = hit ? Math.max(0.3, hit.distance - 0.3) : want;
     // snap in instantly when blocked, ease back out once clear; an unblocked boom just follows the (already eased) zoom
     const free = this.shown >= was - 1e-3;
     this.shown = limit < this.shown || free ? limit : THREE.MathUtils.damp(this.shown, limit, 6, dt);

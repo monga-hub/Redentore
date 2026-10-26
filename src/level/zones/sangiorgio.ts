@@ -104,6 +104,7 @@ export function buildSanGiorgio(b: LevelBuilder): void {
   cenacolo(b, p);
   garden(b, p);
   darsena(b, p);
+  lagoon(b, p);
   p.flush();
 }
 
@@ -295,23 +296,96 @@ function facade(b: LevelBuilder, p: Props): void {
   for (const z of [91, 113]) b.lights.push({ x: FAC + 0.4, y: 2.75, z, kind: 'torch', nx: 1, nz: 0 });
 }
 
+/** The campanile's shaft, and its bell chamber on top: the floor between the four piers, walled in by a parapet (Rintocchi muti, quest/squero.ts). */
+export const BELFRY = { x0: -578, x1: -570, z0: 112, z1: 120, y: 44 } as const;
+/**
+ * The way up and down (quest/progress.ts `climb`): the door at the shaft's foot on the campo, the stair's hatch in the chamber's
+ * floor, and where each lands the hero (`yaw`: facing out of the door, onto the campo; up top, north over the Bacino to San Marco).
+ */
+export const CAMPANILE = {
+  door: { x: -568.8, z: 116, yaw: -Math.PI / 2 },
+  hatch: { x: -571.8, z: 113.8 },
+  top: { x: -573.2, z: 115.2, yaw: Math.PI },
+} as const;
+/** Its three bells, hung high between the piers (over the boss's head): where each clapper is pulled from the floor. */
+export const BELLS = [
+  { at: { x: -574, y: BELFRY.y, z: 117.6 }, r: 1.05, label: 'la campana maggiore', of: 'della campana maggiore' },
+  { at: { x: -576.4, y: BELFRY.y, z: 114.6 }, r: 0.8, label: 'la mezzana', of: 'della mezzana' },
+  { at: { x: -571.6, y: BELFRY.y, z: 118 }, r: 0.6, label: 'la piccola', of: 'della piccola' },
+] as const;
+/** A bell's mouth over the chamber's floor: clear of a 2.8 m Campanaro, and of the hero's jump. */
+export const BELL_MOUTH = 3.2;
+
 function campanile(b: LevelBuilder, p: Props): void {
-  const x0 = -578, x1 = -570, z0 = 112, z1 = 120, cx = -574, cz = 116, H = 44;
+  const { x0, x1, z0, z1, y: H } = BELFRY, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, PIER = 0.8, IN = 3.2; // piers' half width; their inner faces off the middle
   b.area('Campo del campanile', -568, -540, 112, 124);
+  b.area('Cella campanaria', x0, x1, z0, z1);
   b.together(() => {
     b.box(x0, x1, 0, H, z0, z1, 'brick');
     b.band(x0, x1, z0, z1, 0, 1, 0.12);
     b.band(x0, x1, z0, z1, H - 0.4, H, 0.3);
-    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.part(null, cx + dx * 4 - 0.8, cx + dx * 4 + 0.8, H, H + 6, cz + dz * 4 - 0.8, cz + dz * 4 + 0.8, 'stone');
-    b.part(null, x0 - 0.3, x1 + 0.3, H + 6, H + 7, z0 - 0.3, z1 + 0.3, 'stoneDark');
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(cx + dx * 4 - PIER, cx + dx * 4 + PIER, H, H + 6, cz + dz * 4 - PIER, cz + dz * 4 + PIER, 'stone');
   });
+  b.part(null, x0 - 0.3, x1 + 0.3, H + 6, H + 7, z0 - 0.3, z1 + 0.3, 'stoneDark'); // the cornice, a piece of its own: a roof the Diablo view fades over the chamber
+  // The chamber: a stone floor, a parapet between the piers and the invisible rest up to the cornice (nobody falls 44 m),
+  // the stair's iron hatch. The parapet never stops the camera: in this box the follow camera is held short (main.ts).
+  b.floor(x0, x1, z0, z1, 'stone', H);
+  for (const [ax, az, bx, bz] of [[cx - IN, z0, cx + IN, z0 + 0.3], [cx - IN, z1 - 0.3, cx + IN, z1], [x0, cz - IN, x0 + 0.3, cz + IN], [x1 - 0.3, cz - IN, x1, cz + IN]]) {
+    b.box(ax, bx, H, H + 1, az, bz, 'stoneDark', { camera: false });
+    b.box(ax, bx, H + 1, H + 6, az, bz, 'mass', { visible: false });
+  }
+  p.box(CAMPANILE.hatch.x - 0.7, CAMPANILE.hatch.x + 0.7, H, H + 0.05, CAMPANILE.hatch.z - 0.7, CAMPANILE.hatch.z + 0.7, 'iron');
+  // The bells on oak headstocks under the cornice, bronze; their clappers are quest/view.ts's (they go once pulled).
+  for (const { at, r } of BELLS) {
+    const y = H + BELL_MOUTH, h = r * 1.5;
+    p.disc(at.x, y, at.z, r * 1.08, 0.12, 'gold', 0x7a5a2a); // the lip
+    p.cone(at.x, y, at.z, r, h, 'gold', 0x7a5a2a);
+    p.blob(at.x, y + h * 0.7, at.z, r * 0.62, r * 0.45, r * 0.62, 'gold', 0x7a5a2a); // the shoulder
+    p.box(at.x - 0.12, at.x + 0.12, y + h * 0.8, H + 6, at.z - 0.12, at.z + 0.12, 'wood');
+  }
+  p.box(x0 + 0.4, x1 - 0.4, H + 5.6, H + 6, cz - 0.15 + 1.6, cz + 0.15 + 1.6, 'wood'); // the beam they hang from
+  p.box(x0 + 0.4, x1 - 0.4, H + 5.6, H + 6, cz - 0.15 - 1.4, cz + 0.15 - 1.4, 'wood');
+  // The door at the foot, onto the campo.
+  b.box(x1, x1 + 0.12, 0, 2.7, cz - 0.9, cz + 0.9, 'wood', { collide: false, camera: false });
+  b.part(null, x1, x1 + 0.25, 2.7, 3.1, cz - 1.15, cz + 1.15, 'stone');
+  for (const z of [cz - 1.05, cz + 1.05]) b.part(null, x1, x1 + 0.25, 0, 2.7, z - 0.15, z + 0.15, 'stone');
+  b.lights.push({ x: x1 + 0.6, y: 2.9, z: cz, kind: 'torch', nx: 1, nz: 0 });
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.4, 3, 16), material('stone'));
   drum.position.set(cx, H + 8.5, cz);
   b.add(drum, 'stone');
   b.add(new THREE.Mesh(new THREE.ConeGeometry(3, 7, 16), material('roof')), 'roof').position.set(cx, H + 13.5, cz);
   p.blob(cx, H + 17.6, cz, 0.4, 0.8, 0.4, 'gold'); // the angel
-  p.box(cx - 1.2, cx + 1.2, H + 1, H + 3.6, cz - 1.2, cz + 1.2, 'iron', 0, 0x6a5a40); // the bell
-  b.lights.push({ x: cx, y: H + 3, z: cz, kind: 'glow', color: 0x9fb8ff });
+  b.lights.push({ x: cx, y: H + 4.5, z: cz, kind: 'glow', color: 0x9fb8ff });
+}
+
+/**
+ * What the bell chamber looks out on, past where any level walks (the fog hides it from the ground; up there it lifts, fx/atmosphere.ts):
+ * across the Bacino to the north San Marco, the Palazzo Ducale and the Riva degli Schiavoni running east to the Arsenale; the Lido, a
+ * long low strip of trees far to the east. Masses in the night, a few windows lit.
+ */
+function lagoon(b: LevelBuilder, p: Props): void {
+  const far = (x0: number, x1: number, z0: number, z1: number, h: number, role: Role = 'mass') => b.box(x0, x1, -1.2, h, z0, z1, role, { collide: false, camera: false });
+  const lit = (x0: number, x1: number, z: number, y: number, seed: number) => { for (let x = x0, i = seed; x > x1; x -= 3.4, i++) if ((i * 7) % 5 < 2) p.box(x - 0.5, x, y, y + 1.1, z - 0.1, z, 'lantern'); };
+  // The Piazzetta: the Libreria, the two columns, the Palazzo Ducale; the basilica's domes and the campanile behind.
+  far(-262, -286, 300, 330, 12); // la Libreria
+  far(-298, -334, 300, 326, 16, 'stone'); // il Palazzo Ducale
+  lit(-299, -333, 299.9, 7, 1);
+  for (const x of [-288, -296]) b.column(x, 298, 0.7, 0, 11, 'stone', false);
+  for (const [x, z, r] of [[-322, 340, 6], [-314, 334, 4.5], [-330, 334, 4.5], [-322, 328, 4.5]]) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), material('stone'));
+    m.position.set(x, 18, z);
+    b.add(m, 'stone');
+  }
+  far(-312, -332, 326, 346, 18); // the basilica under them
+  far(-283, -290, 320, 327, 52, 'brick'); // il campanile di San Marco
+  far(-282.5, -290.5, 319.5, 327.5, 60, 'stone');
+  p.cone(-286.5, 60, 323.5, 4.2, 9, 'gold', 0x6a8a70); // its green-gold spire
+  // The Riva degli Schiavoni, house fronts east to the Arsenale's towers.
+  for (let x = -336, i = 0; x > -520; x -= 16, i++) { far(x, x - 15, 300, 318, 10 + ((i * 29) % 7)); lit(x - 1, x - 14, 299.9, 4 + (i % 3) * 2.5, i); }
+  for (const x of [-528, -540]) far(x, x - 6, 300, 306, 22, 'brick');
+  // The Lido, out to the east past the lagoon.
+  far(-845, -870, -260, 400, 3, 'grass');
+  for (let z = -240, i = 0; z < 390; z += 18, i++) p.blob(-852 - (i % 3) * 4, 5, z, 6, 4, 7, 'hedge');
 }
 
 function monastery(b: LevelBuilder, p: Props): void {

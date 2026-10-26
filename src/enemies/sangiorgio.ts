@@ -7,12 +7,13 @@
 // the Calice poured in a wedge before him, from 70% the campanile's bells in rings to jump, from 40% the tide over the
 // floor but for islands of light, haste under 20%, and a wedding that will not wait past six minutes.
 // The Veronese's chain (quest/squero.ts) wakes the Commissario delle Arti in the chiostro dei cipressi, a miniboss off the way,
-// and at half his health his three granatieri.
+// and at half his health his three granatieri. Padre Archivista's Rintocchi muti brings the Campanaro di San Giorgio up to the bell
+// chamber once its three clappers are out: bells' rings and a hammer's boom in eight metres of floor, 44 m over the lagoon.
 // Tuned with scripts/balance.ts for a hero who walks in from the Governatrice in level 2's gear.
 import type { World } from '../core/physics.ts';
-import { CENACOLO } from '../level/zones/sangiorgio.ts';
+import { BELFRY, CENACOLO } from '../level/zones/sangiorgio.ts';
 import { PRIEST, killAll, pull, revive, spawnPriests, type Bounds, type CasterKind, type Priest } from './caster.ts';
-import { FARI_LIT, VINO, type SideId } from '../quest/squero.ts';
+import { FARI_LIT, MUTE, VINO, type SideId } from '../quest/squero.ts';
 import { GONDOLIERE } from './zitelle.ts';
 
 export const MONACO: CasterKind = {
@@ -80,6 +81,25 @@ export const COMMISSARIO: CasterKind = {
 export const GRANATIERE: CasterKind = { ...MARINAIO, hp: 420, xp: 24, aggro: 14, melee: { ...MARINAIO.melee!, damage: 100 } };
 
 /**
+ * Il Campanaro di San Giorgio, who rang the bells for the pope of 1800 until his hands bled (Padre Archivista's Rintocchi muti): a
+ * monk's body grown to 2.8 m and gone to bronze, the bell hammer in his fist. He comes up the stair once the three clappers are out,
+ * into the bell chamber's eight metres: from the first blow the Rintocchi (rings to jump, as the Abate's), and the Rimbombo, the
+ * hammer brought down on the floor (a nova to get out of, in a room with no room). Half down he hurries; berserk at four minutes.
+ */
+export const CAMPANARO: CasterKind = {
+  ...MONACO,
+  name: 'Il Campanaro di San Giorgio',
+  hp: 5000, xp: 260,
+  aggro: 9, leash: 30, blind: 12,
+  speed: 3.4, walk: 6, radius: 0.6, margin: 0.9,
+  melee: { reach: 1.8, hit: 3, windup: 0.8, swing: 1.4, cooldown: 2.6, damage: 200 },
+  nova: { every: 10, cast: 2, radius: 3.4, damage: 380 }, // the Rimbombo
+  toll: { phase: 1, every: 11, n: 3, gap: 0.9, speed: 5, width: 1, reach: 10, damage: 220 },
+  phases: { at: [1, 0.5], haste: 1.2, berserk: 240, rage: 2.5 },
+  resist: 0.6,
+};
+
+/**
  * L'Abate di San Giorgio. Below 70% the Rintocchi, below 40% Acqua alta (caster.ts), haste under 20%, berserk at 6 minutes.
  * No nova: up close the Calice is the thing to step out of.
  */
@@ -105,6 +125,7 @@ export const ABATE: CasterKind = {
 export const PREPS: Record<string, { text: string; apply: (k: CasterKind) => void }> = {
   faro: { text: "La Lanterna del faro: l'acqua alta lascia un'isola asciutta in più", apply: (k) => { k.tide = { ...k.tide!, n: k.tide!.n + 1 }; } }, // I fari della darsena
   calice: { text: 'Le Ampolle di San Benedetto: il Calice di Cana brucia il 40% in meno', apply: (k) => { k.pour = { ...k.pour!, damage: Math.round(k.pour!.damage * 0.6) }; } }, // Acqua di San Benedetto
+  rintocchi: { text: 'Il Batacchio di San Giorgio: le campane dell\'Abate suonano due rintocchi, non tre', apply: (k) => { k.toll = { ...k.toll!, n: k.toll!.n - 1 }; } }, // Rintocchi muti
 };
 const PRISTINE = { ...ABATE };
 /** ABATE as it was written, with the weakenings `ids` on it (unknown ids are ignored). */
@@ -129,6 +150,8 @@ const rect = (x0: number, x1: number, z0: number, z1: number): Bounds => ({ x0, 
 const QUAY = rect(-376, -301, 0.5, 19.5), ALLORI = rect(-545, -515, 47, 77), CIPRESSI = rect(-501, -465, 47, 77);
 /** The darsena with both quays out to the lighthouses (zones/sangiorgio.ts darsena): the Fanalista's wave, and the Nostromo once it calls him. */
 export const DARSENA = rect(-599.5, -562.5, 124.5, 149.5);
+/** The bell chamber's floor inside its parapet (zones/sangiorgio.ts BELFRY). */
+export const BELL_FLOOR = rect(BELFRY.x0 + 0.3, BELFRY.x1 - 0.3, BELFRY.z0 + 0.3, BELFRY.z1 - 0.3);
 
 /**
  * Every pack of level 3, in the order saved games index them (appended after level 2's mobs; the hidden ones after the
@@ -160,9 +183,11 @@ export const PACKS: Pack[] = [
   // Hidden. La tela tagliata taken: the Commissario delle Arti back in the chiostro dei cipressi, where the troops slept; at half his health his granatieri.
   { label: 'Chiostro dei cipressi', at: [-483, 62], bounds: CIPRESSI, members: [[COMMISSARIO, -483, 54]], hidden: { quest: 'tela', step: 0, say: 'Nel chiostro dei cipressi qualcuno conta i quadri ad alta voce, in francese...', rest: true } },
   { label: 'Chiostro dei cipressi', at: [-483, 58], bounds: CIPRESSI, members: [[GRANATIERE, -497, 50], [GRANATIERE, -469, 50], [GRANATIERE, -483, 74]], hidden: { quest: 'tela', step: 0, say: 'Il Commissario delle Arti chiama i granatieri: «À moi, la garde!»', under: 0.5 } },
+  // Hidden. Rintocchi muti: the third clapper out, the Campanaro comes up the stair into the bell chamber, his floor between the parapets.
+  { label: 'Cella campanaria', at: [-574, 116], bounds: BELL_FLOOR, members: [[CAMPANARO, -573.4, 113.6]], hidden: { quest: 'rintocchi', step: MUTE, say: 'Le campane mute tremano: il Campanaro di San Giorgio sale dalla scala a riprendersi i batacchi!' } },
 ];
 
-export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest; commissario: Priest; hidden: { pack: Pack; members: Priest[] }[] }
+export interface Level3 { all: Priest[]; boss: Priest; bibliotecario: Priest; nostromo: Priest; commissario: Priest; campanaro: Priest; hidden: { pack: Pack; members: Priest[] }[] }
 
 const GONE = 1e3; // s a sleeper has lain dead: past the sink, out of sight (enemies/priests.ts)
 
@@ -174,7 +199,7 @@ export function spawnLevel3(world: World): Level3 {
   const hidden = PACKS.flatMap((pack, i) => (pack.hidden ? [{ pack, members: packs[i] }] : []));
   for (const { members } of hidden) lull(members);
   const all = [...packs.filter((_, i) => !PACKS[i].hidden).flat(), boss, ...hidden.flatMap((h) => h.members)];
-  return { all, boss, bibliotecario: all.find((m) => m.kind === BIBLIOTECARIO)!, nostromo: all.find((m) => m.kind === NOSTROMO)!, commissario: all.find((m) => m.kind === COMMISSARIO)!, hidden };
+  return { all, boss, bibliotecario: all.find((m) => m.kind === BIBLIOTECARIO)!, nostromo: all.find((m) => m.kind === NOSTROMO)!, commissario: all.find((m) => m.kind === COMMISSARIO)!, campanaro: all.find((m) => m.kind === CAMPANARO)!, hidden };
 }
 
 /**

@@ -12,6 +12,8 @@ import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA } fr
 import { Overlay, Shadows, arm, loadModel, stand } from '../core/models.ts';
 import { flash, ownMaterials } from './friars.ts';
 import { still } from './control.ts';
+import { DRAGO } from './drago.ts';
+import { Serpent } from './serpent.ts';
 
 // The casters, one body per kind, each generated, rigged and animated with Meshy AI (see
 // ATTRIBUTION.md), with a Meshy-made staff in the right fist. Preti non-morti: hooded skeletons
@@ -43,7 +45,7 @@ const SHADOW = 0x8a3cff, SMOKE = 0x1a0b26;
  */
 interface Look {
   body: string; prop: string; height: number; staff: number; grip: number;
-  clips: Record<Exclude<CasterState, 'pour'>, string> & { pour?: string }; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
+  clips: Record<Exclude<CasterState, 'pour' | 'dive'>, string> & { pour?: string }; step: Record<-1 | 1, string>; pace: { 1: number; [-1]: number; run: number };
   shoots: { clip: string; from: number; rate: number }[]; swings: { clip: string; from: number; hit: number }[]; deaths: string[];
   bolt: { core: number; glow: number; size: number };
   /** A ghost's self-glow (rgb 0..1) over its own colours, which it tints that hue by the 4th (0..1, 0.5 if left out): the zitelle. */
@@ -56,6 +58,8 @@ interface Look {
   steel?: boolean;
   /** Cast in bronze, this colour: the body's paint gone for the metal, a faint warmth kept through the hit flash (the Campanaro). */
   bronze?: number;
+  /** Carpaccio's dragon: `body` is its head alone, on enemies/serpent.ts's procedural body; its telegraphs in sea and venom. */
+  serpent?: boolean;
 }
 const Y = new THREE.Vector3(0, 1, 0), Q = new THREE.Quaternion(), UP = new THREE.Quaternion();
 const CAST = 'mage_soell_cast', RELEASE = { clip: 'mage_soell_cast_3', from: 0.75, rate: 1.4 }, THROW = { clip: 'Cast_Throw', from: 0.66, rate: 1.2 };
@@ -160,6 +164,13 @@ const LOOKS = new Map<CasterKind, Look>([
     bolt: { core: 0xfff0f4, glow: 0xc0204a, size: 1.6 }, // wine
     sheen: [0.55, 0.15, 0.55],
   }],
+  [DRAGO, { // enemies/drago.ts: its brain's states play on serpent.ts's body, not on clips
+    body: 'drago.glb', prop: '', height: 8, staff: 0, grip: 0,
+    clips: { pray: '', chase: '', cast: '', swing: '', nova: '', spin: '', evade: '', dead: '' },
+    step: { [-1]: '', 1: '' }, pace: { 1: 1, [-1]: 1, run: 1 }, shoots: [], swings: [], deaths: [''],
+    bolt: { core: 0xeaffd8, glow: 0x5ce03a, size: 1.5 }, // a gob of venom
+    serpent: true,
+  }],
 ]);
 /** The lace: lines and the fuso's threads on the floor, white-gold, a square decal per width along each. */
 const LACE = 0xfff0d0, LACE_DECALS = 48;
@@ -200,6 +211,10 @@ const brandBlast: Style = { ...novaBlast, color: 0xffd0e0, color2: BRAND };
 const INK = 0x3a5cff;
 const inkFlame: Style = { ...novaFlame, color: 0x9ab0ff, color2: 0x050a30 };
 const inkBlast: Style = { ...novaBlast, color: 0xd8e0ff, color2: INK };
+// Carpaccio's dragon: its Coda's ring in sea foam, its breath's wedge in venom.
+const SEA = 0x9ad8c8, VENOM = 0x6ee050;
+const foamFlame: Style = { life: [0.5, 0.8], size: [0.35, 0.6], grow: 0.8, color: 0xe0fff8, color2: 0x2a6a70, hdr: 1.2, tex: T.smoke, erode: true, grav: -2, fadeIn: 0.2 };
+const venomMist: Style = { life: [0.6, 1], size: [0.6, 1], grow: 1.5, color: 0x8cff6a, color2: 0x0a2a08, hdr: 1.2, alpha: 0.6, tex: T.smoke, erode: true, drag: 2, grav: -0.3 };
 // The Abate's: the Calice's wedge of wine, the bells' bronze rings, the tide's water and its islands of light. The Commissario's
 // Squarcio: the same wedge, cut thin, in steel and ice.
 const STEEL = 0x7fd8ff;
@@ -228,8 +243,11 @@ interface Template {
   glow: THREE.SpriteMaterial; // the crystal's charging glow, shared by the kind
 }
 
+/** A caster's body as Priests drives it: a rigged Meshy body (View) or the dragon's (serpent.ts). */
+interface Body { readonly root: THREE.Object3D; hit(n: number, f: Priest): void; tipAt(v?: THREE.Vector3): THREE.Vector3; update(f: Priest, dt: number, vfx: Vfx, d: number): void }
+
 /** One priest's model and animation (its nameplate is ui/plates.ts's). */
-class View {
+class View implements Body {
   readonly root = new THREE.Group();
   private mixer: THREE.AnimationMixer;
   private actions = new Map<string, THREE.AnimationAction>();
@@ -431,7 +449,7 @@ export class Priests {
   readonly root = new THREE.Group();
   readonly all: Priest[];
   readonly boss: Priest; // il Reverendissimo
-  private views: View[] = [];
+  private views: Body[] = [];
   private bolts: Bolt[] = [];
   readonly spent: Bolt[] = []; // bolts that landed or fizzled this frame (the director's impact sounds)
   private flights = new Map<Bolt, Flight>();
@@ -489,14 +507,14 @@ export class Priests {
     this.loading = true;
     const vfx = this.vfx;
     const looks = [...LOOKS].filter(([k]) => this.all.some((f) => f.kind === k)); // only the bodies this set needs
-    Promise.all(looks.flatMap(([, l]) => [loadModel(l.body), loadModel(l.prop)])).then((gltfs) => { // two kinds on one body each get their own copy
+    Promise.all(looks.flatMap(([, l]) => [loadModel(l.body, l.serpent ? 1024 : 512), l.serpent ? undefined : loadModel(l.prop)])).then((gltfs) => { // two kinds on one body each get their own copy
       const templates = new Map<CasterKind, Template>();
       looks.forEach(([kind, look], i) => {
-        const body = gltfs[i * 2], prop = gltfs[i * 2 + 1];
-        dress(body.scene, prop.scene, look);
+        const body = gltfs[i * 2]!, prop = gltfs[i * 2 + 1];
+        if (prop) dress(body.scene, prop.scene, look);
         templates.set(kind, { scene: body.scene, clips: body.animations, look, glow: vfx.sprite(T.glow, look.bolt.glow, 2.4, 1).material });
       });
-      this.views = this.all.map((f) => new View(templates.get(f.kind)!));
+      this.views = this.all.map((f) => (LOOKS.get(f.kind)!.serpent ? new Serpent(templates.get(f.kind)!.scene, vfx, f.kind.dive!.spots) : new View(templates.get(f.kind)!)));
       for (const v of this.views) this.root.add(v.root);
     }, (e) => console.error('priest model failed to load', e));
   }
@@ -618,8 +636,10 @@ export class Priests {
     let k = 0;
     for (const f of this.all) {
       if (f.state !== 'nova' || !f.kind.nova || k >= this.teles.length) continue;
-      const [t, s] = this.teles[k++], n = f.kind.nova, p = Math.min(f.t / n.cast, 1), r = n.radius;
+      const [t, s] = this.teles[k++], n = f.kind.nova, p = Math.min(f.t / n.cast, 1), r = n.radius, sea = LOOKS.get(f.kind)!.serpent;
       t.on = s.on = true;
+      t.color.setHex(sea ? SEA : SHADOW).multiplyScalar(tele.hdr!);
+      s.color.setHex(sea ? SEA : SHADOW).multiplyScalar(teleSigil.hdr!);
       t.x = s.x = f.x; t.y = s.y = f.y + 0.06; t.z = s.z = f.z;
       t.size = r * 2;
       t.fill = 0.08 + 0.92 * p;
@@ -630,7 +650,7 @@ export class Priests {
       s.size = (4.5 + p * 1.5) * r / 6;
       for (let i = v.count((40 + p * 120) * r / 6, dt); i > 0; i--) {
         const a = Math.random() * Math.PI * 2, e = r * (0.97 + Math.random() * 0.06);
-        v.spawn(novaFlame, f.x + Math.cos(a) * e, f.y + 0.1, f.z + Math.sin(a) * e, 0, 0.6 + p, 0);
+        v.spawn(sea ? foamFlame : novaFlame, f.x + Math.cos(a) * e, f.y + 0.1, f.z + Math.sin(a) * e, 0, 0.6 + p, 0);
       }
     }
     for (; k < this.teles.length; k++) this.teles[k][0].on = this.teles[k][1].on = false;
@@ -732,7 +752,7 @@ export class Priests {
     let k = 0;
     const pourer = this.all.find((c) => c.state === 'pour');
     if (pourer) {
-      const f = pourer, C = f.kind.pour!, p = Math.min(f.t / C.cast, 1), steel = LOOKS.get(f.kind)!.steel;
+      const f = pourer, C = f.kind.pour!, p = Math.min(f.t / C.cast, 1), steel = LOOKS.get(f.kind)!.steel, sea = LOOKS.get(f.kind)!.serpent;
       for (let r = 0; r < RAYS; r++) {
         const a = f.pourA + (r / (RAYS - 1) - 0.5) * C.angle * 0.92, dx = Math.sin(a), dz = Math.cos(a);
         for (let d = 1.2; d < C.length * p + 0.6 && d < C.length && k < this.wine.length; d += Math.max(1, (d * C.angle) / (RAYS - 1)) * 0.8) {
@@ -741,10 +761,10 @@ export class Priests {
           c.x = f.x + dx * d; c.y = f.y + 0.06; c.z = f.z + dz * d;
           c.size = Math.max(steel ? 0.9 : 1.3, (d * C.angle) / (RAYS - 1) * 1.3);
           c.alpha = 0.3 + 0.6 * p;
-          c.color.setHex(steel ? STEEL : WINE).multiplyScalar(wineTele.hdr!);
+          c.color.setHex(steel ? STEEL : sea ? VENOM : WINE).multiplyScalar(wineTele.hdr!);
         }
       }
-      if (Math.random() < dt * 20) { const a = f.pourA + (Math.random() - 0.5) * C.angle, d = Math.random() * C.length * p; v.spawn(steel ? steelSpark : wineMist, f.x + Math.sin(a) * d, f.y + 0.2, f.z + Math.cos(a) * d, 0, 0.4, 0); }
+      if (Math.random() < dt * 20) { const a = f.pourA + (Math.random() - 0.5) * C.angle, d = Math.random() * C.length * p; v.spawn(steel ? steelSpark : sea ? venomMist : wineMist, f.x + Math.sin(a) * d, f.y + 0.2, f.z + Math.cos(a) * d, 0, 0.4, 0); }
     }
     for (; k < this.wine.length; k++) this.wine[k].on = false;
     if (!K) return;
@@ -795,6 +815,7 @@ export class Priests {
   /** The Calice is poured: wine splashing out along the wedge, a red mist, a shake if it caught the hero. The Squarcio: sparks down the cut. */
   private poured(f: Priest, hit: boolean): void {
     const C = f.kind.pour!, v = this.vfx;
+    if (LOOKS.get(f.kind)!.serpent) return; // the dragon's breath lets go in serpent.ts
     if (LOOKS.get(f.kind)!.steel) {
       for (let i = 0; i < 50; i++) {
         const d = 1 + Math.random() * (C.length - 1), a = f.pourA + (Math.random() - 0.5) * C.angle * 0.5;
@@ -816,6 +837,7 @@ export class Priests {
 
   /** A nova goes off: a shock wave racing out to its radius, a ring of shadow flame, scorched cracks. */
   private nova(f: Priest, hit: boolean): void {
+    if (LOOKS.get(f.kind)!.serpent) return; // the Coda comes down in serpent.ts
     const r = f.kind.nova!.radius, v = this.vfx, y = f.y + 0.05, k = r / 6, [wave, cracks, scar] = blastOf(r);
     v.decal(wave, f.x, y + 0.02, f.z);
     v.decal(cracks, f.x, y, f.z);

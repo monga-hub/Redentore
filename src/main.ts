@@ -25,7 +25,8 @@ import { Priests } from './enemies/priests.ts';
 import { Bees } from './enemies/bees.ts';
 import { CODEGA, GASTALDO, GONDOLIERE, GOVERNATRICE, MAESTRA, VELO, ZITELLA, spawnLevel2 } from './enemies/zitelle.ts';
 import { FRIAR, GROUPS, RISE } from './enemies/brain.ts';
-import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, pull } from './enemies/caster.ts';
+import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, pull, revive } from './enemies/caster.ts';
+import { DRAGO, spawnDrago, waves } from './enemies/drago.ts';
 import { ABATE, AMANUENSE, BIBLIOTECARIO, CAMPANARO, COMMISSARIO, DARSENA, GRANATIERE, MARINAIO, MONACO, NOSTROMO, PREPS, due as wakes, lull, prepare, rouse, spawnLevel3 } from './enemies/sangiorgio.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, BLESSING, BOONS, CHEST, CROCE, HEADS, NPC, PUNTA, QUESTS, Quest, SECOND, SPEZIALE, THIRD } from './quest/progress.ts';
 import { Ferry } from './quest/ferry.ts';
@@ -47,12 +48,12 @@ import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
 import { DiabloFx } from './fx/diabloFx.ts';
 import { GothicDressing } from './level/gothic.ts';
-import { audioReady, initAudio, tap, voices } from './audio/engine.ts';
+import { audioReady, initAudio, loadBank, tap, voices } from './audio/engine.ts';
 import { Director } from './audio/director.ts';
 import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
-import { Equipment, SHOP2, crit, effects, shop, starter } from './loot/gear.ts';
+import { Equipment, SHOP2, crit, effects, shop, starter, worth as value } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
 import { VendorPanel } from './ui/vendor.ts';
@@ -154,6 +155,15 @@ scene.add(sangiorgio.root);
 const L3_KINDS = [['Monaco nero', MONACO, 1.9, 16], ['Amanuense', AMANUENSE, 1.8, 16], ['Marinaio annegato', MARINAIO, 1.85, 16], ['Il Bibliotecario', BIBLIOTECARIO, 2.4, 18, 'elite'], ['Il Nostromo della darsena', NOSTROMO, 2.7, 18, 'elite'],
   ['Il Commissario delle Arti', COMMISSARIO, 2.7, 18, 'elite'], ['Granatiere annegato', GRANATIERE, 1.95, 17], ['Il Campanaro di San Giorgio', CAMPANARO, 2.8, 18, 'elite'], ["L'Abate di San Giorgio", ABATE, 4.4]] as const;
 const ofKind3 = (k: typeof L3_KINDS[number][1]) => sangiorgio.all.filter((f) => f.kind === k);
+/**
+ * Carpaccio's dragon, a prototype (enemies/drago.ts): `?drago=1` puts the hero in the Teatro Verde, at level 18 or more in Fra'
+ * Bortolo's purples, with the dragon under the lagoon behind the stage; `drago()` in the console calls it up again. Nothing is
+ * autosaved meanwhile: the run in progress stays as it was.
+ */
+const drago = new URLSearchParams(location.search).has('drago') ? spawnDrago(level.world) : undefined;
+const dragon = drago && new Priests(level.world, kit.vfx, playerStats, level.areas, drago, true);
+const DRAGO_START = { x: -574, z: -12, yaw: 0 }; // up the Teatro Verde's tiers, the stage and the lagoon ahead
+if (dragon) scene.add(dragon.root);
 const ferry = new Ferry(); // Mastro Iseppo's gondola between the Punta and San Giorgio
 const ISLAND_VIEW = { x: -545, z: 108 }; // between the dome and the campanile: what the crossing's camera looks at
 scene.add(ferry.root);
@@ -171,6 +181,8 @@ const kinds: Kind[] = [ // the levels are only shown, on the nameplates
   { name: 'Ape operaia', max: APETTA.hp, height: Bees.HEIGHT.worker, all: bees.all.filter((f) => f.kind === APETTA), ready: () => bees.root.children.length > 0, lv: 5 },
   ...L2_KINDS.map(([name, kind, height, lv, rank]) => ({ name, max: kind.hp, height, all: ofKind(kind), ready: () => zitelle.root.children.length > 0, lv, rank, ...(kind === GOVERNATRICE ? { ownBar: () => questView.bossShown } : {}) })),
   ...L3_KINDS.map(([name, kind, height, lv, rank]) => ({ name, max: kind.hp, height, all: ofKind3(kind), ready: () => sangiorgio.root.children.length > 0, lv, rank, ...(kind === ABATE ? { ownBar: () => questView.bossShown } : {}) })),
+  ...(drago ? [{ name: DRAGO.name!, max: DRAGO.hp, height: 9, all: [drago.boss], ready: () => dragon!.root.children.length > 0, ownBar: () => questView.bossShown },
+    { name: 'Marinaio annegato', max: MARINAIO.hp, height: 1.85, all: drago.sailors, ready: () => dragon!.root.children.length > 0, lv: 16 }] : []),
 ];
 const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, kinds); // click/tap an enemy, Tab for the nearest
 const FALLEN = 3.6; // s the hero lies dead before waking
@@ -186,6 +198,7 @@ playerStats.onDeath = () => { // the hero falls; the fight is over at once, the 
   bees.wipe();
   zitelle.wipe();
   sangiorgio.wipe();
+  dragon?.wipe();
   ferry.abort(player);
   player.model.die();
   deathScreen.show();
@@ -195,12 +208,12 @@ playerStats.onHurt = (n) => { player.model.flinch(n); kit.system.pushback(); }; 
 /** Wake at the last checkpoint at full health; the grey fades back out. */
 function wake(): void {
   deathScreen.hide();
-  const at = quest.checkpoint();
+  const at = drago ? DRAGO_START : quest.checkpoint();
   player.respawn(at);
   playerStats.revive();
   player.model.revive();
   const where = at === SPAWN ? 'sulla fondamenta' : at === CROCE ? 'oltre il Ponte de la Croce' : at === ANDITO ? "nell'andito delle Zitelle"
-    : at === PUNTA ? 'alla Punta della Giudecca' : at === APPRODO ? "sull'approdo di San Giorgio" : at === ANTIREF ? "nell'antirefettorio di San Giorgio" : 'alla porta del coro';
+    : at === DRAGO_START ? 'sulle gradinate del Teatro Verde' : at === PUNTA ? 'alla Punta della Giudecca' : at === APPRODO ? "sull'approdo di San Giorgio" : at === ANTIREF ? "nell'antirefettorio di San Giorgio" : 'alla porta del coro';
   kit.system.notices.push({ kind: 'error', text: `Sei caduto. Ti risvegli ${where}.` });
 }
 const plates = new Plates(kinds, cam.camera, kit.magic, () => targeting.target?.mob); // WoW nameplates: the hero's debuffs, health, level, casts
@@ -215,9 +228,9 @@ const buffs = () => {
     hallow: m.hallows.reduce((t, z) => (Math.hypot(p.x - z.x, p.z - z.z) < z.r && Math.abs(p.y - z.y) < 1.5 ? Math.max(t, z.t) : t), 0),
   });
 };
-kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); sangiorgio.hurtWhere(inside, n); };
+kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); sangiorgio.hurtWhere(inside, n); dragon?.hurtWhere(inside, n); };
 kit.aimed = () => targeting.target?.mob;
-const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all, ...sangiorgio.all];
+const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all, ...sangiorgio.all, ...(drago?.all ?? [])];
 kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
 dctl.swing = () => { const a = kit.system.slots[PRIMARY]; return !!a && kit.system.cooldown(a) === 0 && kit.system.tryCast(PRIMARY); }; // the base attack a click-attack repeats
@@ -263,23 +276,70 @@ const due = (h: (typeof l3.hidden)[number]) => !woken.has(h) && wakes(h, l3, (q,
 const saved = new Set(loaded?.dead ?? []);
 for (const h of l3.hidden) if (due(h)) rouseHidden(h, false, (m) => !saved.has(mobs.indexOf(m)));
 booted = true;
+let dragoWas = drago?.boss.state;
 let bossAct = 0, bossRage = false, lastBoss = priests.boss, wed = false; // wed: the Abate's rite begun (his pull line said)
 /** A boss's new act, called out: the Reverendissimo's, the Governatrice's, the Abate's; and the end of its patience. */
 const ACTS = [
   ['Il Reverendissimo marchia il pavimento: esci dai cerchi!', 'Il Reverendissimo è furibondo: colpisce sempre più spesso!'],
   ['La Governatrice chiama le sue figlie: finché vivono, il velo la protegge!', 'Altre due zitelle accorrono al velo: abbattile!', 'La Governatrice gira il fuso: stai fuori dai fili!'],
   ["Suonano le campane di San Giorgio: salta i rintocchi quando ti raggiungono!", "Sale l'acqua alta: corri sulle isole di luce!", "L'Abate è furibondo: colpisce sempre più spesso!"],
+  ['Il drago chiama i suoi: dalla laguna salgono i marinai annegati!', 'Altri annegati escono dal mare, e il drago è furibondo: colpisce sempre più spesso!'],
 ];
-const RAGE = ['La pazienza del Reverendissimo è finita: ora ogni colpo è mortale!', 'La pazienza della Governatrice è finita: ora ogni colpo è mortale!', "Le nozze non aspettano più: ora ogni colpo dell'Abate è mortale!"];
-const actsOf = (k: object) => (k === ABATE ? 2 : k === GOVERNATRICE ? 1 : 0);
+const RAGE = ['La pazienza del Reverendissimo è finita: ora ogni colpo è mortale!', 'La pazienza della Governatrice è finita: ora ogni colpo è mortale!', "Le nozze non aspettano più: ora ogni colpo dell'Abate è mortale!",
+  'Il drago non ha più pazienza: ora ogni suo colpo è mortale!'];
+const actsOf = (k: object) => (k === DRAGO ? 3 : k === ABATE ? 2 : k === GOVERNATRICE ? 1 : 0);
 // XP is what the hero killed plus the quests' rewards. The dead of a load were counted into its saved XP (a save from
 // before the levels: the worth of its dead, short of a won fight's), and a victory's dead are worth nothing.
 const fell = mobs.map((m) => m.state === 'dead');
 let slain = loaded?.build ? loaded.build.xp - questXpIn(loaded) : quest.bossDead ? 0 : worth.reduce((s, w, i) => s + (fell[i] && !sleepers.has(mobs[i] as typeof l3.boss) ? w : 0), 0); // the hidden packs lie dead asleep, worth nothing yet
 const sweep = () => mobs.forEach((m, i) => { if (m.state === 'dead') fell[i] = true; }); // after a victory: its dead count for nothing
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
+if (drago && dragon) arena(); // the dragon's sandbox, over whatever was loaded
 const picked = (id: string) => levels.picks.filter((p) => p === id).length;
 /** The next level-up's two cards; the world holds still until one is picked. */
+/**
+ * The dragon's sandbox (`?drago=1`): a hero under level 18 dealt its cards up to it (an ability whenever one is offered), every
+ * slot in Fra' Bortolo's best purple if it beats what is worn, whole, on the Teatro Verde's tiers; the theatre's own pack put to
+ * sleep. `drago()` in the console calls the dragon up again.
+ */
+function arena(): void {
+  const LV = 18;
+  while (levels.picks.length < LV - 1) {
+    const cards = offer(levels.picks, Math.random, levels.learned, levels.schools), c = cards.find((k) => k.kind === 'ability') ?? cards[0];
+    if (!c) break;
+    levels.picks.push(c.id);
+    if (c.kind === 'ability') kit.system.learn(c.id);
+  }
+  const worn = { ...gear.worn };
+  for (const it of shop(true)) { const cur = ITEM.get(worn[it.slot!] ?? ''); if (!cur || value(it) > value(cur)) worn[it.slot!] = it.id; }
+  booted = false; // its base attacks learnt quietly: the book isn't up yet
+  gear.decode(worn); // and the stats laid on
+  booted = true;
+  slain = Math.max(slain, 10 * LV * (LV - 1) - quest.bonusXp); // the XP of level 18: no level-up windows to pick through
+  levels.xp = slain + quest.bonusXp;
+  shownLv = levels.lv;
+  const pack = sangiorgio.all.filter((m) => m.home.x < -548 && m.home.z > -40 && m.home.z < -5 && m.state !== 'dead');
+  lull(pack);
+  for (const m of pack) fell[mobs.indexOf(m)] = true; // asleep, not killed
+  player.respawn(DRAGO_START);
+  cam.yaw = DRAGO_START.yaw;
+  playerStats.revive();
+  loadBank('boss');
+  loadBank('arcane');
+  dragon!.load();
+  kit.system.notices.push({ kind: 'info', text: 'Prova del drago di Carpaccio: scendi verso il palco del Teatro Verde. Niente salvataggi automatici.' });
+  Object.assign(window, { drago: () => {
+    const b = drago!.boss;
+    revive(b, level.world);
+    b.phase = b.fight = 0;
+    lull(drago!.sailors);
+    drago!.wave = 0;
+    player.respawn(DRAGO_START);
+    cam.yaw = DRAGO_START.yaw;
+    playerStats.revive();
+    return 'Il drago torna sotto la laguna: scendi verso il palco.';
+  } });
+}
 function openLevelUp(): void {
   kit.system.cancel();
   input.consume();
@@ -303,11 +363,12 @@ function openLevelUp(): void {
 }
 // A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
 cam.update(0, input, player.pos);
-const intro = loaded ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE), audioReady);
+const intro = loaded || drago ? undefined : new Intro(cam.camera, cam.camera.position.clone(), player.pos.clone().setY(player.pos.y + EYE), audioReady);
 const audio = new Director({ // sound and music, read off the world every frame
-  player, stats: playerStats, kit, quest, friars: friars.all, casters: [...priests.all, ...zitelle.all, ...sangiorgio.all], bees: bees.all,
+  player, stats: playerStats, kit, quest, friars: friars.all, casters: [...priests.all, ...zitelle.all, ...sangiorgio.all, ...(drago?.sailors ?? [])], bees: bees.all,
+  epic: () => !!drago && drago.boss.state !== 'pray' && drago.boss.state !== 'dead' && drago.boss.state !== 'evade', // the dragon's fight: the boss's music
   get boss() { return quest.boss2Dead ? sangiorgio.boss : quest.bossDead ? zitelle.boss : priests.boss; }, // whichever boss is still to come
-  get spent() { return zitelle.spent.length || sangiorgio.spent.length ? [...priests.spent, ...zitelle.spent, ...sangiorgio.spent] : priests.spent; }, fires: fx.torches.em, areaAt: (x, z) => level.areaAt(x, z),
+  get spent() { return zitelle.spent.length || sangiorgio.spent.length || dragon?.spent.length ? [...priests.spent, ...zitelle.spent, ...sangiorgio.spent, ...(dragon?.spent ?? [])] : priests.spent; }, fires: fx.torches.em, areaAt: (x, z) => level.areaAt(x, z),
 });
 const menu = new Menu({
   snapshot: () => serialize(game),
@@ -325,6 +386,7 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
   { all: bees.all.filter((f) => f.kind === APETTA), height: Bees.HEIGHT.worker },
   ...L2_KINDS.map(([, kind, height]) => ({ all: ofKind(kind), height })),
   ...L3_KINDS.map(([, kind, height]) => ({ all: ofKind3(kind), height })),
+  ...(drago ? [{ all: [drago.boss], height: 8 }, { all: drago.sailors, height: 1.85 }] : []),
 ], kit.vfx, cam.camera, CHEST);
 scene.add(dfx.root);
 const standing = () => friars.all.reduce((n, f) => n + (f.state === 'dead' ? 0 : 1), 0); // friars left to give a head
@@ -511,14 +573,14 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { dragoSet: drago, dragon, zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 // The autosave (core/save.ts): every few seconds and when the tab is hidden (iOS may kill it then), only
 // while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
 const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin', 'pour']); // 'spin': the Governatrice's fuso; 'pour': the Abate's Calice
 const KEEP = 5; // s
 let kept = KEEP;
-const keep = () => { if (!flying() && dying <= 0 && !playerStats.dead && !ferry.trip && !mobs.some((m) => FIGHTING.has(m.state))) autosave(serialize(game)); }; // never afloat
+const keep = () => { if (!drago && !flying() && dying <= 0 && !playerStats.dead && !ferry.trip && !mobs.some((m) => FIGHTING.has(m.state))) autosave(serialize(game)); }; // never afloat
 addEventListener('visibilitychange', () => { if (document.hidden) keep(); });
 
 const timer = new THREE.Timer();
@@ -547,6 +609,7 @@ renderer.setAnimationLoop(() => {
       bees.update(dt, unseen);
       zitelle.update(dt, unseen);
       sangiorgio.update(dt, unseen);
+      dragon?.update(dt, unseen);
       questView.idle(dt, player.pos);
       questView.peek(eye);
       audio.update(dt, cam.camera, intro, false, pressed);
@@ -593,6 +656,15 @@ renderer.setAnimationLoop(() => {
   bees.update(dt, player.pos);
   zitelle.update(dt, player.pos);
   sangiorgio.update(dt, player.pos);
+  if (drago && dragon) {
+    dragon.update(dt, player.pos);
+    if (drago.boss.state !== dragoWas) { // called up out of the lagoon, fallen
+      if (dragoWas === 'pray' && drago.boss.state === 'dive') kit.system.notices.push({ kind: 'error', text: "L'acqua dietro il palco ribolle: il drago di Carpaccio sale dalla laguna!" });
+      if (drago.boss.state === 'dead') kit.system.notices.push({ kind: 'info', text: 'Il drago di Carpaccio è caduto. Per un\'altra prova: drago() in console, o ricarica la pagina.' });
+      dragoWas = drago.boss.state;
+    }
+    waves(drago, level.world);
+  }
   quest.side.march(dt, player.pos); // the Cardinale's procession, with the hero at his side
   if (quest.side.escort.hp === 0) { // he fell: his waves go back under (no kills), he gets up at the altar, and the procession is to start again
     for (const h of procession) { for (const m of h.members) fell[mobs.indexOf(m)] = true; lull(h.members); woken.delete(h); }
@@ -621,7 +693,7 @@ renderer.setAnimationLoop(() => {
     lull(h.members);
     woken.delete(h);
   }
-  const boss = quest.boss2Dead ? sangiorgio.boss : quest.bossDead ? zitelle.boss : priests.boss, rage = boss.fight >= boss.kind.phases!.berserk; // the boss's acts and berserk, called out as they come
+  const boss = drago && drago.boss.state !== 'pray' ? drago.boss : quest.boss2Dead ? sangiorgio.boss : quest.bossDead ? zitelle.boss : priests.boss, rage = boss.fight >= boss.kind.phases!.berserk; // the boss's acts and berserk, called out as they come
   for (const text of questView.update(dt, player.pos, pressed, boss)) kit.system.notices.push({ kind: 'info', text });
   if (boss !== lastBoss) { lastBoss = boss; bossAct = boss.phase; bossRage = rage; } // the Reverendissimo's acts are not the Governatrice's
   if (boss.kind === ABATE && wed !== (boss.state !== 'pray' && boss.state !== 'dead')) { // pulled: the doge's words at the Sensa, turned on the hero
@@ -690,6 +762,11 @@ renderer.setAnimationLoop(() => {
     cam.pitch += ((ferry.trip === 'out' ? 0.08 : 0.25) - cam.pitch) * k;
   }
   cam.cap = aloft() ? 3.6 : Infinity; // 6 m of headroom between piers 6.4 m apart
+  if (drago) { // the boom eased back and the aim raised to take the dragon in
+    const up = FIGHTING.has(drago.boss.state) || drago.boss.state === 'dive', k = 1 - Math.exp(-dt * 1.5);
+    cam.reach += ((up ? 12 : 0) - cam.reach) * k;
+    cam.lift += ((up ? 3 : 0) - cam.lift) * k;
+  }
   if (diablo) dcam.update(dt, input, player.pos);
   else cam.update(dt, input, player.pos);
   blend.apply(cam.camera, dt);

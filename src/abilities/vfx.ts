@@ -806,7 +806,7 @@ export class Vfx {
     const dmap = decalAtlas();
     this.glow = new Particles(3072, this.map, THREE.AdditiveBlending);
     this.smoke = new Particles(1024, this.map, THREE.NormalBlending);
-    this.floorGlow = new Decals(224, dmap, THREE.AdditiveBlending); // the casters hold 18 for their telegraphs, level 2 up to 54 more for its own and the lace, level 3 ~100 (the Calice's wine, bells, isles, ink)
+    this.floorGlow = new Decals(320, dmap, THREE.AdditiveBlending); // the casters hold 18 for their telegraphs, level 2 up to 54 more for its own and the lace, level 3 ~100 (the Calice's wine, bells, isles, ink), the dragon ~90 (its breath's wedge, foam, its spots)
     this.floorDark = new Decals(24, dmap, THREE.NormalBlending);
     const beam = document.createElement('canvas');
     beam.width = 4; beam.height = 128;

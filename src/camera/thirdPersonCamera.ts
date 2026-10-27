@@ -17,6 +17,10 @@ export class ThirdPersonCamera {
   private dist = 7; // wanted distance (wheel / pinch)
   /** The boom's longest this frame, whatever the wheel wants: San Giorgio's bell chamber holds it short (main.ts). */
   cap = Infinity;
+  /** The boom's shortest this frame: held back to take in Carpaccio's dragon over the stage (main.ts, eased there). */
+  reach = 0;
+  /** m the aim rises over the player's head: raised to Carpaccio's dragon's head (main.ts, eased there). */
+  lift = 0;
   private zoom = 7; // eased towards dist, so zoom steps glide instead of jumping
   private shown = 7; // smoothed, collision-limited distance
   private ray = new THREE.Raycaster();
@@ -46,7 +50,7 @@ export class ThirdPersonCamera {
     this.dir.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), Math.cos(this.yaw) * cp);
 
     this.ray.set(this.target, this.dir);
-    const want = Math.min(this.zoom, this.cap);
+    const want = Math.max(Math.min(this.zoom, this.cap), this.reach);
     this.ray.far = want;
     const hit = this.ray.intersectObjects(this.blockers, false)[0];
     const limit = hit ? Math.max(0.3, hit.distance - 0.3) : want;
@@ -55,7 +59,7 @@ export class ThirdPersonCamera {
     this.shown = limit < this.shown || free ? limit : THREE.MathUtils.damp(this.shown, limit, 6, dt);
 
     this.camera.position.copy(this.target).addScaledVector(this.dir, this.shown);
-    this.camera.lookAt(this.target);
+    this.camera.lookAt(this.target.x, this.target.y + this.lift, this.target.z);
     if (this.camera.fov !== FOV) { // back from the Diablo view's narrow lens
       this.camera.fov = FOV;
       this.camera.updateProjectionMatrix();

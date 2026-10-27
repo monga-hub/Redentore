@@ -53,6 +53,12 @@ export interface CasterKind {
    * player) show on its floor; `warn` s later the tide floods everything else for `time` s, `dps` to a hero out of them.
    */
   tide?: { phase: number; every: number; warn: number; time: number; n: number; r: number; dps: number };
+  /**
+   * L'Immersione (Carpaccio's dragon, enemies/drago.ts): every `every` s of fighting it goes under for `under` s, out of reach,
+   * and comes up at another of its `spots`, `damage` to a hero within `radius` of it then; the last `warn` s show which. Pulled,
+   * it rises at its home spot the same way, `under` - `rise` s after.
+   */
+  dive?: { every: number; under: number; warn: number; rise: number; radius: number; damage: number; spots: [number, number][] };
 }
 
 /**
@@ -197,7 +203,7 @@ const LOS_EVERY = 0.25;
 export const SPIN_DRAW = 0.8; // s: tracing a ray through the cloister costs ~0.2 ms
 const CHEST = 1.1; // m above the feet: where bolts leave the staff and strike the player
 
-export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'spin' | 'pour' | 'evade' | 'dead';
+export type CasterState = 'pray' | 'chase' | 'cast' | 'swing' | 'nova' | 'spin' | 'pour' | 'dive' | 'evade' | 'dead';
 
 export interface Bounds { x0: number; x1: number; z0: number; z1: number }
 
@@ -226,6 +232,8 @@ export interface Priest {
   tollCd: number; // s until the next Rintocchi
   tide?: Tide; // Acqua alta, while it is on
   tideCd: number; // s until the next
+  diveCd: number; // s until the next Immersione (the dragon)
+  diveTo: number; // the spot (kind.dive.spots) it comes up at
   wards?: Priest[]; // the Governatrice's: the zitelle she calls, two at each new phase, who keep her veil up
   backoff: number; // backpedal budget left until the next cast
   blind: number; // s pulled without line of sight
@@ -347,7 +355,7 @@ export function spawnPriests(world: World, groups: [number, number, number][][],
     g.forEach(([x, z, yaw], k) => {
       const kind = kinds[i]?.[k] ?? PRIEST;
       mates.push({ kind, x, y: feet(world, x, z), z, yaw, hp: kind.hp, state: 'pray', t: 0, cd: 0, melee: 0, nova: kind.nova?.every ?? 0, struck: false,
-        phase: 0, fight: 0, brand: kind.phases?.marks?.every ?? 0, marks: [], lines: [], lineCd: kind.lines ? kind.lines.every * 0.5 : 0, spinCd: 0, spinA: 0, ...calm(kind), backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
+        phase: 0, fight: 0, brand: kind.phases?.marks?.every ?? 0, marks: [], lines: [], lineCd: kind.lines ? kind.lines.every * 0.5 : 0, spinCd: 0, spinA: 0, diveTo: 0, ...calm(kind), backoff: kind.backoff, blind: 0, los: { ok: false, t: 0 }, move: 0, home: { x, z, yaw }, bounds: bounds[i], mates, cc: control(kind.resist) });
     });
     return mates;
   });
@@ -417,8 +425,8 @@ export function wipe(fs: { state: string; t: number }[]): void {
 }
 
 /** The Abate's timers at the start of a fight: the Calice, the bells and the tide all wait a while. */
-function calm(K: CasterKind): Pick<Priest, 'pourCd' | 'pourA' | 'rings' | 'tollCd' | 'tide' | 'tideCd'> {
-  return { pourCd: (K.pour?.every ?? 0) * 0.5, pourA: 0, rings: [], tollCd: (K.toll?.every ?? 0) * 0.4, tide: undefined, tideCd: (K.tide?.every ?? 0) * 0.3 };
+function calm(K: CasterKind): Pick<Priest, 'pourCd' | 'pourA' | 'rings' | 'tollCd' | 'tide' | 'tideCd' | 'diveCd'> {
+  return { pourCd: (K.pour?.every ?? 0) * 0.5, pourA: 0, rings: [], tollCd: (K.toll?.every ?? 0) * 0.4, tide: undefined, tideCd: (K.tide?.every ?? 0) * 0.3, diveCd: K.dive?.every ?? 0 };
 }
 
 function enter(f: Priest, s: CasterState): void {
@@ -430,8 +438,16 @@ function enter(f: Priest, s: CasterState): void {
 
 /** Aggro: the priest and every praying mate turn on the player. */
 export function pull(f: Priest): void {
-  for (const m of f.mates) if (m.state === 'pray') { enter(m, 'chase'); m.cd = Math.random() * 0.8; } // don't open in unison
+  for (const m of f.mates) if (m.state === 'pray') {
+    enter(m, 'chase');
+    m.cd = Math.random() * 0.8; // don't open in unison
+    const V = m.kind.dive;
+    if (V) { enter(m, 'dive'); m.t = V.under - V.rise; m.diveTo = nearest(V.spots, m.home); } // the dragon rises out of the water at home
+  }
 }
+
+/** The index of the spot nearest `p`. */
+const nearest = (spots: [number, number][], p: { x: number; z: number }) => spots.reduce((b, s, i) => (Math.hypot(s[0] - p.x, s[1] - p.z) < Math.hypot(spots[b][0] - p.x, spots[b][1] - p.z) ? i : b), 0);
 
 /** Line of sight at chest height: no wall or column between the two points (0.5 m samples). */
 export function sees(world: World, a: Target, b: Target): boolean {
@@ -460,7 +476,7 @@ export function think(f: Priest, p: Target, world: World, dt: number, bolts: Bol
   const P = f.kind.phases;
   if (!P) return act(f, p, world, dt, bolts, 1, 1) + cut(f, p, dt);
   if (f.state === 'dead') { f.marks.length = 0; f.lines.length = 0; if (f.rings.length || f.tide) Object.assign(f, calm(f.kind)); return 0; }
-  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova' || f.state === 'spin' || f.state === 'pour';
+  const fighting = f.state === 'chase' || f.state === 'cast' || f.state === 'swing' || f.state === 'nova' || f.state === 'spin' || f.state === 'pour' || f.state === 'dive';
   if (fighting) {
     f.fight += dt;
     while (f.phase < P.at.length && f.hp <= f.kind.hp * P.at[f.phase]) {
@@ -606,6 +622,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
   if (K.nova && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.nova -= dt * haste;
   if (K.pour && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.pourCd -= dt * haste;
   if (K.spin && f.phase >= K.spin.phase && f.state !== 'spin') f.spinCd -= dt * haste;
+  if (K.dive && (f.state === 'chase' || f.state === 'cast' || f.state === 'swing')) f.diveCd -= dt * haste;
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
   const toPlayer = Math.atan2(f.x - p.x, f.z - p.z);
   const reach = K.melee ? K.melee.reach + K.radius : 0;
@@ -621,6 +638,12 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       if (Math.hypot(p.x - f.home.x, p.z - f.home.z) > K.leash || f.blind > K.blind) { enter(f, 'evade'); return 0; }
       f.move = 0;
       if (K.spin && f.phase >= K.spin.phase && f.spinCd <= 0 && dist < K.spin.length + 4 && level) { enter(f, 'spin'); f.spinA = Math.atan2(p.x - f.x, p.z - f.z) + Math.PI / 4; return 0; }
+      if (K.dive && f.diveCd <= 0) { // under, to come up at another of its spots
+        enter(f, 'dive');
+        const here = nearest(K.dive.spots, f), k = Math.floor(Math.random() * (K.dive.spots.length - 1));
+        f.diveTo = k >= here ? k + 1 : k;
+        return 0;
+      }
       if (K.nova && f.nova <= 0 && dist < K.nova.radius && level) { enter(f, 'nova'); return 0; }
       if (K.pour && f.pourCd <= 0 && dist < K.pour.length && level) { enter(f, 'pour'); f.pourA = Math.atan2(p.x - f.x, p.z - f.z); f.yaw = toPlayer; return 0; }
       if (K.melee && dist <= reach && level) {
@@ -673,6 +696,16 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       f.pourCd = C.every;
       enter(f, 'chase');
       return level && inPour(f, p) ? C.damage : 0;
+    }
+    case 'dive': { // the Immersione: under, out of reach, then up at its spot with a burst of water
+      const V = K.dive!;
+      if (f.t < V.under) return 0;
+      const [x, z] = V.spots[f.diveTo];
+      f.x = x; f.z = z; f.y = feet(world, x, z);
+      f.diveCd = V.every;
+      f.melee = Math.max(f.melee, 1);
+      enter(f, 'chase');
+      return Math.hypot(p.x - x, p.z - z) <= V.radius && Math.abs(p.y - f.y) < 2.5 ? V.damage : 0;
     }
     case 'spin': { // the fuso: two crossed lines turning round her; she stands and spins
       const S = K.spin!;
@@ -755,7 +788,7 @@ export function revive(f: Priest, world: World): void {
 
 /** Damage a priest. Returns true if this killed it. Evading and dead priests ignore it. */
 export function hurt(f: Priest, n: number): boolean {
-  if (f.state === 'dead' || f.state === 'evade' || n <= 0) return false;
+  if (f.state === 'dead' || f.state === 'evade' || f.state === 'dive' || n <= 0) return false; // the dragon under the water: out of reach
   n *= f.kind.frail ?? 1;
   if (veiled(f)) n *= 1 - f.kind.veil!.cut; // the Governatrice's veil
   f.hp -= exposed(f.cc, n); // Febbre di palude

@@ -29,6 +29,8 @@ export interface AudioWorld {
   casters: readonly Priest[]; // priests, sacerdoti and the boss
   bees: readonly Priest[];
   boss: Priest;
+  /** A fight that wants the boss's music though it isn't `boss` (main.ts: Carpaccio's dragon). */
+  epic?: () => boolean;
   spent: readonly Bolt[]; // bolts that landed or fizzled this frame (priests.ts)
   fires: readonly { x: number; y: number; z: number; kind: string }[];
   areaAt(x: number, z: number): Area | undefined;
@@ -377,7 +379,7 @@ export class Director {
     if (won > this.won) { this.won = won; setMusic('victory'); return; }
     if (w.stats.dead) return; // the death sting plays on
     const fighting = (m: Friar | Priest) => FIGHTING.has(m.state) && Math.hypot(m.x - p.x, m.z - p.z) < 35;
-    const boss = fighting(w.boss);
+    const boss = fighting(w.boss) || !!w.epic?.();
     if (boss || w.friars.some(fighting) || w.casters.some(fighting) || w.bees.some(fighting)) this.engaged = 0;
     else this.engaged += dt;
     const want = boss ? 'boss' : this.engaged < 5 ? 'combat' : 'explore';

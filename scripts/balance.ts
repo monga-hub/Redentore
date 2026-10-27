@@ -26,6 +26,7 @@
 //   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
 //   node scripts/balance.ts commissario [runs]     the Commissario delle Arti alone in the cipressi, his granatieri at his half, every build at 16, 17, 18, dodging and not, one life (GEAR default typical3)
 //   node scripts/balance.ts campanaro [runs]       the Campanaro di San Giorgio alone in the bell chamber, 44 m up, likewise
+//   node scripts/balance.ts drago [builds] [runs]   Carpaccio's dragon alone at the Teatro Verde (main.ts's ?drago=1), its drowned at 40% and 20%, builds (melee,arcane; default every one) at 18 and 19, dodging and not, one life (GEAR default typical3)
 //   node scripts/balance.ts incoronazione [runs]   the Cardinale's procession from the altar to the Bacino, its three waves of monaci on him, the bot at his side, every build at 16, 17, 18, three tries (he falls: back to the altar)
 //   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
@@ -39,7 +40,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
 import { CHURCH_FLOOR, SPAWN } from '../src/level/plan.ts';
 import { APPRODO, BERTHS, CHEST, CHOIR_DOOR, NPC, Quest, SPEZIALE } from '../src/quest/progress.ts';
-import { ABATE, ABATE_AT, BIBLIOTECARIO, CAMPANARO, COMMISSARIO, NOSTROMO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
+import { ABATE, ABATE_AT, BIBLIOTECARIO, CAMPANARO, COMMISSARIO, MARINAIO, NOSTROMO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3, type Level3 } from '../src/enemies/sangiorgio.ts';
 import { GASTALDO, GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, PACKS, VELO, ZITELLA, spawnLevel2, type Level2 } from '../src/enemies/zitelle.ts';
 import { GROUNDED, inPour, onLine, veiled } from '../src/enemies/caster.ts';
 import { ZF } from '../src/level/zones/zitelle.ts';
@@ -56,6 +57,7 @@ import { CARDINALE, GIVERS, MUTE, SIDE, SIDE_BY, STRUMENTI, TELA, giverOf } from
 import { ESCORT } from '../src/quest/escort.ts';
 import type { Target } from '../src/enemies/brain.ts';
 import { BELFRY, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
+import { DRAGO, DRAGO_SPOTS, spawnDrago, waves } from '../src/enemies/drago.ts';
 import { HEROES, heroOf } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
@@ -246,6 +248,8 @@ function dangers(casters: Priest[], friars: Friar[], p: { x: number; z: number }
       x += (dz / d) * 1.2 + (dx / d) * (d < 4 ? 0.6 : d > 6 ? -0.4 : 0); z += (-dx / d) * 1.2 + (dz / d) * (d < 4 ? 0.6 : d > 6 ? -0.4 : 0);
     }
     if (c.state === 'nova' && c.kind.nova) away(c.x, c.z, c.kind.nova.radius + 0.8);
+    const V = c.kind.dive; // the Immersione: off the spot it comes up at, once its ring fills
+    if (V && c.state === 'dive' && V.under - c.t < V.warn - REACT) away(V.spots[c.diveTo][0], V.spots[c.diveTo][1], V.radius + 0.8);
     if (c.state === 'pour' && c.t > REACT && inPour(c, p)) { // the Calice: across the wedge, the short way out
       const ax = Math.sin(c.pourA), az = Math.cos(c.pourA), side = (p.x - c.x) * az - (p.z - c.z) * ax >= 0 ? 1 : -1;
       x += az * side * 2; z += -ax * side * 2;
@@ -321,7 +325,7 @@ class Run {
   hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number) => {
     n = crit(n * tune.dmg * HANDS * this.worn.dmg, this.worn.crit, rnd);
     for (const m of this.mobs) if (m.state !== 'dead' && inside(m.x, m.z, m)) {
-      if ((m === this.boss || m === this.l2.boss || m === this.l3.boss) && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
+      if ((m === this.boss || m === this.l2.boss || m === this.l3.boss || (isCaster(m) && m.kind === DRAGO)) && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
       if (isCaster(m)) casterHurt(m, n); else friarHurt(m, n);
     }
   };
@@ -526,6 +530,7 @@ class Run {
     if (m.kind === BIBLIOTECARIO || m.mates.some((x) => x.kind === BIBLIOTECARIO)) return 'biblio';
     if (this.l3.hidden.some((h) => h.pack.hidden!.quest === 'tela' && h.members.includes(m))) return 'commiss.';
     if (m.kind === CAMPANARO) return 'campan.';
+    if (m.kind === DRAGO || (m.kind === MARINAIO && !this.l3.all.includes(m))) return 'drago'; // its drowned: no pack of the level's
     if (this.l3.all.includes(m)) return m.home.x > -425 ? 'fond.3' : 'isola';
     if (m.kind === MAESTRA || m.mates.some((x) => x.kind === MAESTRA)) return 'maestra';
     if (m.kind === GASTALDO || m.mates.some((x) => x.kind === GASTALDO)) return 'gastaldo';
@@ -630,7 +635,7 @@ class Run {
     } else if (t) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
-      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO || t.kind === ABATE || t.kind === BIBLIOTECARIO || t.kind === NOSTROMO || t.kind === COMMISSARIO || t.kind === CAMPANARO);
+      const big = isCaster(t) && (t.kind === REVERENDISSIMO || t.kind === APE || t.kind === GOVERNATRICE || t.kind === MAESTRA || t.kind === GASTALDO || t.kind === ABATE || t.kind === BIBLIOTECARIO || t.kind === NOSTROMO || t.kind === COMMISSARIO || t.kind === CAMPANARO || t.kind === DRAGO);
       if (!this.system.casting) {
         // the heal: a long cast, pushed back by every hit taken, so only worth it below 55%
         if (low < 0.55 && this.ready('mend')) { if (this.cast('mend') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
@@ -713,7 +718,7 @@ class Run {
       const at = this.aim(c);
       if (at) { this.struck(casterThink(c, at, this.world, dt, this.bolts)); continue; }
       const was = c.state, d = casterThink(c, p, this.world, dt, this.bolts);
-      if ((c === this.boss || c === this.l2.boss || c === this.l3.boss || c === this.l3.commissario) && d > 0) { const k = was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : was === 'pour' && c.state !== 'pour' ? 'calice' : c.tide && c.tide.t >= c.kind.tide!.warn ? 'acqua' : c.rings.length ? 'campane' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
+      if ((c === this.boss || c === this.l2.boss || c === this.l3.boss || c === this.l3.commissario || c.kind === DRAGO) && d > 0) { const k = was === 'dive' ? 'dive' : was === 'swing' ? 'melee' : was === 'nova' && c.state !== 'nova' ? 'nova' : was === 'pour' && c.state !== 'pour' ? 'calice' : c.tide && c.tide.t >= c.kind.tide!.warn ? 'acqua' : c.rings.length ? 'campane' : 'marks'; this.taken.set(k, (this.taken.get(k) ?? 0) + d * this.stats.armor * (this.stats.veil > 0 ? 0.5 : 1) * (this.stats.immune > 0 ? 0 : 1)); }
       dmg += d;
     }
     p.y -= lift;
@@ -1083,6 +1088,39 @@ export function playCampanaro(build: string, lv: number, dodge: boolean, s = 1):
   return { build, lv, elite: 'campan.', dodge, won: !r.deaths && c.state === 'dead', time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
 }
 
+/** Carpaccio's dragon alone (the `?drago=1` sandbox): the hero on the Teatro Verde's tiers, its drowned sailors at its acts as main.ts calls them. One life, everything else dead. */
+export function playDrago(build: string, lv: number, dodge: boolean, s = 1): EliteResult {
+  swings.clear();
+  region(ISLAND);
+  const r = new Run(build, dodge);
+  seed = s * 7919;
+  r.dress(process.env.GEAR ?? 'typical3');
+  r.picks = picksTo(build, lv);
+  r.apply();
+  r.stats.revive();
+  r.quest.accepted = r.quest.accepted3 = r.quest.landed = true;
+  for (const m of r.mobs) { m.state = 'dead'; m.hp = 0; }
+  const d = spawnDrago(r.world);
+  r.casters.push(...d.all);
+  r.mobs.push(...d.all);
+  r.levelUp = () => {};
+  r.paths.reset();
+  Object.assign(r.player.pos, { x: -574, y: r.world.standHeight(-574, -12), z: -12 });
+  const c = d.boss, goal = { x: DRAGO_SPOTS[0][0], z: DRAGO_SPOTS[0][1] + 4, r: 2 };
+  let t0 = -1, pots = 0, lost = 0;
+  while (r.time < 15 * 60 && !r.deaths && c.state !== 'dead') {
+    if (t0 < 0 && FIGHTING.has(c.state)) t0 = r.time;
+    const z = r.zone('drago'), p0 = z.potions, h0 = r.stats.hp;
+    r.step(goal);
+    waves(d, r.world);
+    if (t0 >= 0) lost += Math.max(0, h0 - r.stats.hp) / r.stats.hpMax;
+    pots += z.potions - p0;
+  }
+  if (process.env.DEALT) console.log(`  ${build} ${lv} ${dodge ? 'dodge' : 'no dodge'}: ${c.state}, ${Math.round(c.hp)} hp left at ${Math.round(r.time - t0)} s; dealt: ${[...r.dealt].map(([k, v]) => `${k} ${Math.round(v)}`).join(', ')}; taken: ${[...r.taken].map(([k, v]) => `${k} ${Math.round(v)}`).join(', ')}`);
+  region(MAINLAND);
+  return { build, lv, elite: 'drago', dodge, won: !r.deaths && c.state === 'dead', time: t0 >= 0 ? r.time - t0 : 0, potions: pots, lost };
+}
+
 export interface EscortResult { build: string; lv: number; dodge: boolean; won: boolean; tries: number; time: number; low: number; deaths: number }
 
 /**
@@ -1293,6 +1331,10 @@ if (process.argv[1]?.endsWith('balance.ts')) {
   } else if (mode === 'campanaro') {
     const rs: EliteResult[] = [];
     for (const d of [true, false]) for (const b of Object.keys(BUILDS)) for (const lv of [16, 17, 18]) runs(Number(build ?? 3), (s) => rs.push(playCampanaro(b, lv, d, s)));
+    console.log(eliteTable(rs));
+  } else if (mode === 'drago') {
+    const rs: EliteResult[] = [];
+    for (const d of [true, false]) for (const b of build ? build.split(',') : Object.keys(BUILDS)) for (const lv of [18, 19]) runs(Number(n ?? 3), (s) => rs.push(playDrago(b, lv, d, s)));
     console.log(eliteTable(rs));
   } else if (mode === 'incoronazione') {
     const rs: EscortResult[] = [];

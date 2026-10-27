@@ -147,6 +147,14 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   scansia di noce a sinistra entrando in Biblioteca: le due pareti lunghe hanno otto scansie ciascuna, tutte con lo
   stesso «Riponi il libro», e solo quella giusta lo prende. Paga 200 PE e *Il libro di sabbia* (collo, epico unico), che
   a ogni apertura del tooltip mostra una pagina diversa.
+- **Il drago di Carpaccio** (prototipo del combattimento della missione 9 di San Giorgio, ancora senza missione né
+  frammenti di lancia): con `?drago=1` nell'indirizzo il gioco parte al Teatro Verde con l'eroe al livello 18, il miglior
+  equipaggiamento viola per posto e il branco del teatro addormentato; il salvataggio automatico è spento. Avvicinandosi
+  al palco il drago (8000 PV, `src/enemies/drago.ts`) sale dalla laguna dietro il palco: testa Meshy su un corpo di
+  serpente costruito nel codice (`src/enemies/serpent.ts`). Morso, sputo di veleno, *Fiato* (cono di veleno), *Coda*
+  (nova attorno a sé), *Immersione* (sparisce sott'acqua e riemerge in uno dei tre punti segnati da briccole; l'anello
+  di quello scelto si riempie di verde un attimo prima); al 40% e al 20% salgono due marinai annegati per volta. In
+  console `drago()` lo rimette in piedi. `node scripts/balance.ts drago melee,arcane` lo gioca con il bot.
 - Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono

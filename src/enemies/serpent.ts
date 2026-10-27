@@ -3,12 +3,13 @@ import { D, T, type Decal, type DecalStyle, type Style, type Vfx } from '../abil
 import { playSfx } from '../audio/engine.ts';
 import type { Priest } from './caster.ts';
 import { flash } from './friars.ts';
+import { Wings } from './wings.ts';
 
 // Carpaccio's dragon (enemies/drago.ts), drawn: a Meshy head (models/drago.glb, made from the plan's concept) on a body Meshy
 // can't rig, so built here every frame. One spine from the tail's tip to the head through the lagoon: the tail curled out of the
 // water by the shore, two coils arching out of the sea behind, the neck rising from the water's edge to the head over the stage.
 // A tube of scales is laid along it each frame (one draw, its vertices rewritten in place), a ridge of spines on its back, two
-// tattered wings at the shoulders. It sinks and rises with the brain: hidden at rest, up out of the water when pulled, under
+// great torn wings at the shoulders (enemies/wings.ts). It sinks and rises with the brain: hidden at rest, up out of the water when pulled, under
 // for the Immersione and up again at its new spot, down into the lagoon dead. The head acts out the bite, the breath and the
 // gob of venom; the tail rises for the Coda and comes down on the shore. Its water: foam where the body cuts the surface, spray
 // and a wave at each rise and fall, the three spots marked by mooring poles and, while it is under, rings on the shore.
@@ -62,20 +63,6 @@ function scales(): THREE.CanvasTexture {
   return t;
 }
 
-/** One wing: an arm and four fingers from the shoulder (local +X out, +Y up, -Z back), a membrane torn along its trailing edge. */
-function wingGeometry(): THREE.BufferGeometry {
-  const P = { S: [0, 0, 0], E: [2.6, 1.8, -0.4], W: [4.4, 3, -0.8], F1: [8, 4.4, -1.2], F2: [7.6, 1.6, -2.2], F3: [6.2, -0.6, -2.8], F4: [3.8, -1.6, -2.6], B: [0.4, -1.8, -1],
-    M12: [6.4, 2.2, -1.9], M23: [5.6, 0.6, -2.4], M34: [4.4, -0.4, -2.6], M4B: [2, -1.2, -1.9] } as const;
-  const tri = [['S', 'E', 'W'], ['S', 'W', 'B'], ['W', 'F1', 'M12'], ['W', 'M12', 'F2'], ['W', 'F2', 'M23'], ['W', 'M23', 'F3'], ['W', 'F3', 'M34'], ['W', 'M34', 'F4'], ['W', 'F4', 'M4B'], ['W', 'M4B', 'B']] as const;
-  const pos: number[] = [], col: number[] = [];
-  for (const t of tri) for (const k of t) { pos.push(...P[k]); const bone = k === 'S' || k === 'E' || k === 'W' || k[0] === 'F'; col.push(...(bone ? [0.62, 0.6, 0.42] : [0.38, 0.2, 0.14])); }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.computeVertexNormals();
-  return g;
-}
-
 const ease = (k: number) => k * k * (3 - 2 * k);
 const clamp01 = (k: number) => Math.min(1, Math.max(0, k));
 const V = () => new THREE.Vector3();
@@ -88,7 +75,10 @@ export class Serpent {
   private pos: THREE.BufferAttribute;
   private nor: THREE.BufferAttribute;
   private spines: THREE.InstancedMesh;
-  private wings: THREE.Group[] = [];
+  private wings: Wings;
+  private open = 0; // the wings: 0 folded, 1 spread
+  private sweep = 0; // their stroke: back +, forward -
+  private lift = 0; // raised over the shoulder
   private head = new THREE.Group();
   private mouth = new THREE.Vector3(); // between the jaws, in the head's frame
   private stump = new THREE.Vector3(); // the neck's way into the head, in its frame (unit)
@@ -168,14 +158,9 @@ export class Serpent {
     this.mats.push(horn);
     this.spines = new THREE.InstancedMesh(new THREE.ConeGeometry(0.2, 1, 5).translate(0, 0.5, 0), horn, SPINES);
     this.spines.frustumCulled = false;
-    const tint = [0.1, 0.05, 0.03]; // the membrane's own glow: a dark leathery umber, not grey
-    const membrane = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85, color: 0x6e5a3e, emissive: new THREE.Color(...tint) });
-    membrane.userData.glow = 0;
-    membrane.userData.ghost = tint;
-    this.mats.push(membrane);
-    const wg = wingGeometry();
-    for (const s of [1, -1]) { const w = new THREE.Group(), m = new THREE.Mesh(wg, membrane); m.scale.set(s * 1.4, 1.4, 1.4); w.add(m); this.wings.push(w); }
-    this.body.add(this.tube, this.spines, this.head, ...this.wings);
+    this.wings = new Wings(skin, GLOW * 1.4);
+    this.mats.push(this.wings.membrane);
+    this.body.add(this.tube, this.spines, this.head, ...this.wings.sides);
     this.body.visible = false;
     this.root.add(this.body);
     this.curve = new THREE.CatmullRomCurve3(this.ctrl, false, 'centripetal');
@@ -431,19 +416,37 @@ export class Serpent {
     this.spines.instanceMatrix.needsUpdate = true;
   }
 
-  /** The wings at the shoulders, where the neck leaves the water: spread and beating slowly, flung wide as it rises. */
+  /**
+   * The wings at the shoulders, where the neck leaves the water: folded under it and for the Immersione, flung open once it
+   * breaks the surface, slow strokes at rest; for the Fiato and the Coda raised back as it rears, then one great beat
+   * forward at the release. Shut as it dies.
+   */
   private fly(f: Priest, dt: number): void {
     let k = Math.round(N * 0.82);
     for (let i = Math.round(N * 0.7); i < N; i++) if (this.pts[i].y > WATER + 1.4 - ease(this.sink) * SINK) { k = i; break; }
     this.shoulder.copy(this.pts[k]);
-    const beat = Math.sin(this.time * (f.state === 'pour' ? 3 : 1.3)) * 0.22, rise = this.sink > 0.05 ? 0.6 * this.sink : 0, fold = f.state === 'dead' ? ease(clamp01(this.dead / 2)) : 0;
-    this.wings.forEach((w, i) => {
+    const K = f.kind, t = this.time, now = f.state;
+    const shut = this.sink > 0.4 || now === 'dive' || (now === 'dead' && this.dead > 0.4);
+    this.open = clamp01(this.open + (shut ? -2.4 : 1.2) * dt);
+    let sweep = Math.sin(t * 1.5) * 0.28, lift = 0.15 + Math.sin(t * 1.5 - 0.9) * 0.1;
+    const cast = now === 'pour' ? K.pour?.cast : now === 'nova' ? K.nova?.cast : undefined;
+    if (cast) { // wound back over the rearing, then the beat at the release (the Fiato's halfway, the Coda's slam)
+      const at = cast * (now === 'pour' ? 0.5 : 0.82), wind = ease(clamp01(f.t / at)), beat = ease(clamp01((f.t - at) / 0.25));
+      sweep = 0.45 * wind - 1.2 * beat;
+      lift = 0.15 + 0.35 * wind - 0.5 * beat;
+    }
+    sweep += (1 - this.open) * 0.4; // folding back, unfolding forward
+    const was = this.sweep;
+    this.sweep += (sweep - this.sweep) * Math.min(1, dt * 9);
+    this.lift += (lift - this.lift) * Math.min(1, dt * 9);
+    const air = -(this.sweep - was) / Math.max(dt, 1e-3); // a forward stroke fills the membrane from the front
+    this.wings.pose(this.open, Math.min(0.4, Math.max(-0.12, 0.1 + air * 0.08)), t);
+    this.wings.sides.forEach((w, i) => {
       const s = i ? -1 : 1;
       w.position.copy(this.shoulder).addScaledVector(this.nrm[k], 0.5 * GIRTH);
       w.position.x += s * 0.5 * GIRTH;
-      w.rotation.set(-0.35, s * (0.35 - fold), s * (0.25 + beat + rise - fold * 0.9), 'YXZ');
+      w.rotation.set(-0.15, s * this.sweep * this.open, s * this.lift * this.open, 'XYZ');
     });
-    void dt;
   }
 
   /** Foam rings where the body cuts the water. */

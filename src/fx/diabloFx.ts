@@ -79,9 +79,12 @@ function splats(): THREE.Texture {
     const r = Math.hypot((x & 127) - 64, (y & 127) - 64) / 64, i = y * 256 + x;
     d[i * 4 + 1] = Math.round(255 * Math.min(1, Math.max(0, a[i] * 0.55 + (1 - r) * 0.5)));
   }
-  g.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.NoColorSpace;
+  // Only red and green are read: two bytes a texel, no mipmaps (a stain is never far smaller than its tile), 128 KB on the GPU.
+  const rg = new Uint8Array(256 * 256 * 2);
+  for (let i = 0; i < 256 * 256; i++) { rg[i * 2] = d[i * 4]; rg[i * 2 + 1] = d[i * 4 + 1]; }
+  const t = new THREE.DataTexture(rg, 256, 256, THREE.RGFormat);
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
   return t;
 }
 

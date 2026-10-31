@@ -395,7 +395,7 @@ const menu = new Menu({
   book: () => book.show(),
   levelTwo: () => { saveBar(BAR); if (setPending(levelTwo)) location.reload(); },
 });
-const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so its dead don't fall again)
+const dfx = new DiabloFx([ // blood and pools in both views; damage numbers, loot beams in Diablo's (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.95 },
   { all: priests.all.filter((f) => f.kind === PRIEST), height: 1.85 },
   { all: priests.all.filter((f) => f.kind === SACERDOTE), height: 2.5 },
@@ -405,7 +405,7 @@ const dfx = new DiabloFx([ // damage numbers, gore, loot beams (after a load, so
   ...L2_KINDS.map(([, kind, height]) => ({ all: ofKind(kind), height })),
   ...L3_KINDS.map(([, kind, height]) => ({ all: ofKind3(kind), height })),
   { all: [drago.boss], height: 8 }, { all: drago.sailors, height: 1.85 },
-], kit.vfx, cam.camera, CHEST);
+], kit.vfx, cam.camera, CHEST, player.pos);
 scene.add(dfx.root);
 const standing = () => friars.all.reduce((n, f) => n + (f.state === 'dead' ? 0 : 1), 0); // friars left to give a head
 questView.friars = standing;

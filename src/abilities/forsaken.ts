@@ -3,11 +3,12 @@ import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
 import type { World } from '../core/physics.ts';
 import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
-import { PILLAR_CAST, SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
+import { BASES, PILLAR_CAST, SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
-import { Grimoire, type BaseBolt, type Bolt, type SpellEvent } from './grimoire.ts';
+import { Grimoire, type BaseBolt, type Bolt, type BoltKind, type SpellEvent } from './grimoire.ts';
+import { L, type Shell, type ShellStyle } from './shells.ts';
 import type { Sound } from '../audio/engine.ts';
 
 // The Forsaken kit: thirty-three abilities and a potion, five a school (the primary attack apart), three of them specials
@@ -52,7 +53,7 @@ const graveDust: Style = { life: [0.9, 1.4], size: [0.6, 1], grow: 2.2, color: D
 const shadowSmoke: Style = { life: [0.8, 1.3], size: [0.7, 1.1], grow: 2, color: SHADOW, alpha: 0.85, tex: T.smoke2, erode: true, dark: true, drag: 3, spin: [0.4, 1.2] };
 const flareViolet: Style = { life: 0.22, size: 1.4, grow: 0.6, color: 0xe6c8ff, color2: VIOLET, hdr: 3, tex: T.star, fadeIn: 0.04 };
 const flareWhite: Style = { life: 0.2, size: 1.6, grow: 0.5, color: 0xffffff, color2: BONE, hdr: 3, tex: T.star, fadeIn: 0.04 };
-const swingTrail: RibbonStyle = { color: 0xfff6e8, color2: VIOLET, hdr: 1.8, alpha: 0.7, width: 0, life: 0.14 };
+const swingTrail: RibbonStyle = { color: 0xfff6e8, color2: VIOLET, hdr: 3, alpha: 0.95, width: 0, life: 0.22 };
 
 const crackDark: DecalStyle = { life: 4, size: 3.2, tile: D.cracks, color: ABYSS, alpha: 0.9, fadeOut: 0.4, dark: true };
 const crackGlow: DecalStyle = { life: 0.9, size: 3.2, tile: D.cracks, color: VIOLET, color2: 0x2a0a50, hdr: 2.6, fadeOut: 0.7 };
@@ -173,16 +174,79 @@ const holyMote: Style = { life: [0.9, 1.4], size: [0.05, 0.09], color: 0xfff4d0,
 
 // the new blows
 const dustRing: DecalStyle = { life: 0.7, size: 1, grow: 5, tile: D.shock, color: DUST, alpha: 0.7, fadeOut: 0.6, dark: true };
-const whirlTrail: RibbonStyle = { color: 0xfff6e8, color2: VIOLET, hdr: 1.6, alpha: 0.55, width: 0, life: 0.22 };
+const whirlTrail: RibbonStyle = { color: 0xfff6e8, color2: VIOLET, hdr: 2.6, alpha: 0.8, width: 0, life: 0.3 };
 const rushDust: Style = { ...graveDust, life: [0.5, 0.8], size: [0.4, 0.7] };
-const graceTrail: RibbonStyle = { color: 0xffe0d0, color2: 0xc0202a, hdr: 2, alpha: 0.8, width: 0, life: 0.2 };
+const graceTrail: RibbonStyle = { color: 0xffe0d0, color2: 0xc0202a, hdr: 3, alpha: 0.95, width: 0, life: 0.28 };
 const bloodSpark: Style = { life: [0.25, 0.45], size: 0.07, color: 0xffd0c0, color2: 0xc0202a, hdr: 3, tex: T.spark, stretch: 0.05, drag: 3, grav: 6 };
+
+// shells (shells.ts): each school's big shapes of light, its own colours. Bone: white crescents edged violet, spears of
+// bone; frost: ice crystals and javelins, pale cyan; plague: toxic green domes and skulls; fire: golden fire arcs and
+// columns (Murano's furnace); lightning: blue-white walls and the bell of the Redentore's tower; holy: gold.
+const HOT = 0xfff4e0;
+const sh = (shape: ShellStyle['shape'], look: number, life: number, color: number, color2: number, hdr: number, size: ShellStyle['size'], more: Partial<ShellStyle> = {}): ShellStyle => ({ shape, look, life, color, color2, hdr, size, ...more });
+// bone
+const boneArc = sh('arc', L.arc, 0.3, 0xfaf4ff, VIOLET, 2, [2.4, 1, 2.4], { grow: 1.15, sweep: [0, 1.4], fadeOut: 0.35 });
+const boneArcBig = { ...boneArc, life: 0.36, size: [2.2, 1, 2.2], hdr: 2, alpha: 0.8 } as ShellStyle;
+const boneBurst = sh('sphere', L.rim, 0.5, 0xf0e4ff, VIOLET, 1.4, [0.5, 0.3, 0.5], { grow: 5, fadeOut: 0.7 });
+const boneWall = sh('ring', L.wall, 0.6, 0xf4ecff, VIOLET, 1.6, [0.8, 1.8, 0.8], { grow: [4, 0.5, 4], fadeOut: 0.7 });
+const boneSpear = sh('bonespear', L.body, 1.25, BONE, VIOLET, 2.2, [7, 0.25, 7], { grow: [1, 15, 1], ease: 8, fadeIn: 0.02, fadeOut: 0.35 });
+const boneSpearSmall = { ...boneSpear, size: [5, 0.12, 5], grow: [1, 14, 1], life: 0.9 } as ShellStyle;
+const boneSkull = sh('skull', L.body, 1.1, 0xf4ecff, VIOLET, 1.6, 0.9, { grow: 1.6, rise: 1.4, fadeIn: 0.15, fadeOut: 0.6 });
+const voidArc = sh('arc', L.arc, 0.34, 0xffe6e0, 0xc0202a, 2.8, [2.4, 1, 2.4], { grow: 1.2, sweep: [0, 1.4], fadeOut: 0.35 }); // Colpo di grazia's red
+const shadowBurst = sh('sphere', L.rim, 0.45, 0xd8b8ff, 0x3a1070, 1.4, [0.4, 0.3, 0.4], { grow: 4, fadeOut: 0.7 });
+// frost
+const iceCrystal = sh('crystal', L.body, 1.5, 0x9fe0ff, 0x2a5aff, 0.95, [1.4, 0.2, 1.4], { grow: [1, 5.5, 1], ease: 7, fadeIn: 0.02, fadeOut: 0.3 });
+const iceBurst = sh('sphere', L.rim, 0.5, 0x5ad4ff, DEEP, 1.35, [0.4, 0.3, 0.4], { grow: 5, fadeOut: 0.7 });
+const iceWall = sh('ring', L.wall, 0.7, 0x5ad4ff, DEEP, 1.35, [0.8, 2, 0.8], { grow: [6, 0.6, 6], fadeOut: 0.7 });
+const iceBreath = sh('cone', L.breath, 0.6, 0xc8eeff, DEEP, 1.1, [0.6, 2, 0.6], { grow: [5, 4, 5], ease: 2.5, fadeIn: 0.1, fadeOut: 0.6 });
+const iceSpearFly = sh('icespear', L.body, 1, 0xc8f0ff, ICE, 1.8, 1.6);
+const frostOrbShell = sh('sphere', L.rim, 1, 0x6adcff, DEEP, 1.5, 0.5);
+const blizzardWall = sh('ring', L.swirl, 1, 0x4ac8ff, DEEP, 0.85, [1, 4, 1]);
+// plague
+const toxicDome = sh('sphere', L.rim, 0.8, 0x9aff50, 0x2a7a10, 1.1, [0.5, 0.35, 0.5], { grow: 5, fadeOut: 0.7 });
+const toxicWall = sh('ring', L.wall, 0.8, 0x9aff50, 0x6a2acc, 1.1, [0.8, 1.6, 0.8], { grow: [6, 0.5, 6], fadeOut: 0.7 });
+const plagueSkull = sh('skull', L.body, 1.8, 0x9aff50, 0x6a2acc, 1.2, 0.9, { grow: 1.8, rise: 1.2, fadeIn: 0.2, fadeOut: 0.6 });
+const globShell = sh('sphere', L.rim, 1, 0xb0ff70, PLAGUE, 1.4, 0.3);
+const feverSwirl = sh('ring', L.swirl, 1.2, 0x9aff50, 0x8a3aff, 1.1, [1, 0.5, 1], { grow: [1.3, 7, 1.3], ease: 4, fadeOut: 0.5 });
+// fire
+const GILT = 0xffc040;
+const fireArc = sh('arc', L.arc, 0.4, 0xffc040, FIRE, 2.4, [2.2, 1, 2.2], { grow: 1.3, sweep: [0, 1.4], fadeOut: 0.4 });
+const fireBurst = sh('sphere', L.rim, 0.6, 0xfff0b0, FIRE, 1.8, [0.6, 0.45, 0.6], { grow: 6, fadeOut: 0.7 });
+const fireCore = sh('sphere', L.rim, 0.32, HOT, GILT, 2.6, 0.5, { grow: 3.2, fadeOut: 0.8 });
+const fireWall = sh('ring', L.wall, 0.8, 0xffe08a, FIRE, 1.8, [1, 2.4, 1], { grow: [5, 0.6, 5], fadeOut: 0.7 });
+const fireColumn = sh('ring', L.swirl, 1.2, 0xffa830, FIRE, 1.1, [0.8, 1, 0.8], { grow: [1.3, 7, 1.3], ease: 6, fadeIn: 0.03, fadeOut: 0.5 });
+const flameTongue = sh('flame', L.body, 1.1, 0xffb040, FIRE, 1.2, [3, 0.4, 3], { grow: [1.2, 14, 1.2], ease: 6, spin: 3, fadeIn: 0.03, fadeOut: 0.45 });
+const fireBreath = sh('cone', L.breath, 0.7, 0xffd890, FIRE, 1.7, [0.6, 2, 0.6], { grow: [5, 4.2, 5], ease: 2.5, fadeIn: 0.08, fadeOut: 0.6 });
+const fireBall = sh('sphere', L.rim, 1, 0xffd070, FIRE, 2, 0.5);
+// lightning
+const voltBurst = sh('sphere', L.rim, 0.4, 0x5a8aff, 0x5a2aff, 1.7, [0.4, 0.3, 0.4], { grow: 5, fadeOut: 0.7 });
+const voltWall = sh('ring', L.wall, 0.6, 0x5a8aff, 0x5a2aff, 1.6, [1, 3, 1], { grow: [7, 0.4, 7], fadeOut: 0.7 });
+const bell = sh('bell', L.body, 1.2, 0x6a9aff, 0x5a2aff, 2, 3, { fadeIn: 0.08, fadeOut: 0.5 });
+const sparkShell = sh('sphere', L.rim, 1, 0x7aa4ff, 0x5a2aff, 1.8, 0.22);
+const rodColumn = sh('ring', L.swirl, 1, 0x4a7aff, 0x5a2aff, 1.2, [0.3, 3, 0.3]);
+// holy
+const goldBurst = sh('sphere', L.rim, 0.6, HOT, GOLD, 1.8, [0.5, 0.38, 0.5], { grow: 6, fadeOut: 0.7 });
+const goldWall = sh('ring', L.wall, 0.8, HOT, GOLD, 1.7, [0.8, 2.4, 0.8], { grow: [4.5, 0.6, 4.5], fadeOut: 0.7 });
+const halo = sh('sphere', L.rim, 1, HOT, GOLD, 1.6, 1.25); // Aureola, Patto: the gold sphere round the hero
+// what each school's base attack and bolts look like in flight and where they land
+const boltBall = (st: ShellStyle): ShellStyle => ({ ...st, look: L.body, life: 1 }); // in flight: a ball of light, filled
+const BOLT_SHELL: Partial<Record<BoltKind, [ShellStyle, number]>> = { pyre: [boltBall(fireBall), 0.5], frost: [boltBall(frostOrbShell), 0.3], venom: [boltBall(globShell), 0.26], judge: [boltBall(goldBurst), 0.3], hammer: [boltBall(goldBurst), 0.26],
+  thorn: [boltBall(globShell), 0.17], umbra: [boltBall(shadowBurst), 0.17], ember: [boltBall(fireBall), 0.2], spark: [boltBall(sparkShell), 0.14], smite: [boltBall(goldBurst), 0.16] }; // radius, m
+/** m out a ring or sphere shell ends at, its scale 1. */
+const reach = (st: ShellStyle) => (typeof st.size === 'number' ? st.size : st.size[0]) * (typeof st.grow === 'object' ? st.grow[0] : st.grow ?? 1);
+/** A spell let go (Forsaken.release): its school's wall of light round the hero's feet, crescents whirling off him. */
+const arcOf = (color: number, color2: number): ShellStyle => ({ ...boneArc, color, color2 });
+const RELEASE: Partial<Record<School, [ShellStyle, ShellStyle]>> = {
+  bone: [boneWall, boneArc], frost: [iceWall, arcOf(0x9fe8ff, DEEP)], plague: [toxicWall, arcOf(0xb0ff60, 0x2a7a10)], fire: [fireWall, fireArc],
+  storm: [voltWall, arcOf(0x8ab4ff, 0x5a2aff)], holy: [goldWall, arcOf(HOT, GOLD)], shadow: [{ ...boneWall, color: 0xd8b8ff, color2: 0x3a1070 }, arcOf(0xd8b8ff, 0x3a1070)],
+};
+const BASE_BURST: Record<Exclude<BaseBolt, 'lance'>, ShellStyle> = { thorn: toxicDome, umbra: shadowBurst, ember: fireBurst, spark: voltBurst, smite: goldBurst };
 
 interface Cloud { x: number; y: number; z: number; t: number; life: number; pool: Decal }
 interface Glob { ax: number; ay: number; az: number; bx: number; by: number; bz: number; t: number; trail: number; cloud: Cloud }
 interface Later { t: number; f: () => void }
 
-interface Flight { core: THREE.Sprite; halo: THREE.Sprite; trail: number }
+interface Flight { core: THREE.Sprite; halo: THREE.Sprite; trail: number; shell?: Shell; spear?: Shell; px: number; py: number; pz: number }
 const BOLT_LOOK = { pyre: [0xffb040, FIRE, 0.6, 2.2], frost: [0xc8eeff, DEEP, 0.32, 1.3], lance: [0xffffff, ICE, 0.18, 0.6], venom: [0xc8ff8a, PLAGUE, 0.28, 1.1],
   judge: [0xfff4d0, GOLD, 0.42, 1.9], hammer: [0xffe080, GOLD, 0.45, 1.6],
   thorn: [0xd8ff9a, PLAGUE, 0.16, 0.6], umbra: [0xe6c8ff, VIOLET, 0.2, 0.7], ember: [0xffd070, FIRE, 0.2, 0.7], spark: [0xffffff, STORM, 0.18, 0.7], smite: [0xfff4d0, GOLD, 0.2, 0.7] } as const; // core, halo, core size, halo size
@@ -215,6 +279,13 @@ export class Forsaken {
   private rodMarks: Decal[];
   private hallowFloors: Decal[];
   private stormFloor: Decal; // Bufera di bora
+  private castOrb: Shell; // the spell gathering between the hands
+  private castOrbOn = false;
+  private halo: Shell; // Aureola del redento, Patto della tomba: the gold sphere
+  private bells: Shell[]; // Rintocco: the bell over each mark, falling with the bolt
+  private blizzardWall: Shell;
+  private rodColumns: Shell[];
+  private shieldOrbs: Shell[];
   private whirl = -1; // the club's trail while whirling
   readonly system: AbilitySystem<Forsaken>;
   readonly player: PlayerController;
@@ -278,6 +349,13 @@ export class Forsaken {
     this.rodMarks = Array.from({ length: 2 }, () => v.hold(rodMark));
     this.hallowFloors = Array.from({ length: 2 }, () => v.hold(hallowFloor));
     this.stormFloor = v.hold(stormFloor);
+    const S = v.shells;
+    this.castOrb = S.hold(fireBall);
+    this.halo = S.hold(halo);
+    this.bells = Array.from({ length: MARKS }, () => S.hold(bell));
+    this.blizzardWall = S.hold(blizzardWall);
+    this.rodColumns = Array.from({ length: 2 }, () => S.hold(rodColumn));
+    this.shieldOrbs = Array.from({ length: 6 }, () => S.hold(sparkShell));
     this.wispCore = v.sprite(T.star, 0xeafffa, 2.2, 0.45);
     this.wispHalo = v.sprite(T.glow, WISP, 0.7, 1);
     this.wispCore.visible = this.wispHalo.visible = false;
@@ -293,7 +371,9 @@ export class Forsaken {
     this.time += dt;
     this.comboT += dt;
     this.fallSow -= dt;
+    this.castOrbOn = false;
     this.system.update(dt, pressed);
+    this.castOrb.on = this.castOrbOn;
     const p = this.player.pos, v = this.vfx;
 
     for (let i = this.later.length - 1; i >= 0; i--) {
@@ -346,6 +426,7 @@ export class Forsaken {
     }
     this.immune = immune;
     s.on = immune;
+    this.halo.on = immune;
     if (immune) {
       const fade = Math.min(1, this.stats.immune * 1.5);
       s.x = p.x; s.y = p.y + 0.05; s.z = p.z;
@@ -353,6 +434,9 @@ export class Forsaken {
       s.alpha = fade * (0.75 + 0.25 * Math.sin(this.time * 6));
       s.size = 3 + Math.sin(this.time * 3) * 0.1;
       aura.set(GOLD, fade);
+      const h = this.halo, r = 1.25 + Math.sin(this.time * 3) * 0.05; // the gold sphere round him
+      Object.assign(h, { on: true, x: p.x, y: p.y + 1, z: p.z, sx: r, sy: r * 1.15, sz: r, alpha: fade * 0.9, t: 0.05 });
+      h.yaw += dt * 0.8;
       for (let n = v.count(30, dt); n > 0; n--) {
         const a = rnd(0, Math.PI * 2), d = rnd(0.6, 1.4);
         v.spawn(goldMote, p.x + Math.cos(a) * d, p.y + 0.1, p.z + Math.sin(a) * d, 0, rnd(1.5, 3), 0);
@@ -502,6 +586,7 @@ export class Forsaken {
     v.burst(healGlow, p.x, p.y + 0.6, p.z, 5 * k, 0.4, 0.4);
     v.decal(healRing, p.x, p.y + 0.05, p.z);
     v.decal(healRunes, p.x, p.y + 0.04, p.z);
+    v.shell({ ...goldWall, color: 0xe8fff0, color2: GRAVE }, p.x, p.y + 0.04, p.z, 0, 0, 0, 0.45 * k);
     v.pulse(p.x, p.y + 1, p.z, GRAVE, 18 * k);
   }
 
@@ -540,6 +625,11 @@ export class Forsaken {
       v.spawn(style, x, y, z, (c.x - x) * 2.6, (c.y - y) * 2.6, (c.z - z) * 2.6);
     }
     if (prog > 0.05 && Math.random() < dt * 14) v.spawn({ ...core, size: (core.size as number) * (0.3 + 0.5 * prog) }, c.x, c.y, c.z);
+    const o = this.castOrb, k = 0.08 + 0.2 * prog * (1 + Math.sin(this.time * 20) * 0.06); // the spell itself, swelling between the hands
+    this.castOrbOn = true;
+    Object.assign(o, { on: true, x: c.x, y: c.y, z: c.z, sx: k, sy: k, sz: k, alpha: Math.min(1, prog * 4), t: 0.1 });
+    o.yaw += dt * 5; o.pitch += dt * 3;
+    o.color.setHex(core.color2 ?? core.color).multiplyScalar(1.6);
   }
 
   /** A jagged stroke of lightning from a to b, `w` wide. */
@@ -556,12 +646,38 @@ export class Forsaken {
     v.ribbons.end(glow);
   }
 
+  /** A spell let go: a ring of its school's light bursts round the hero, bigger after a cast bar. */
+  release(school: string | undefined, big: boolean): void {
+    const R = RELEASE[school as School], p = this.player.pos, k = big ? 1 : 0.75;
+    if (!R) return;
+    this.sh(R[0], p.x, p.y + 0.04, p.z, (1.7 * k) / reach(R[0])); // the wall ends ~1.7 m out
+    this.arcs(R[1], p.x, p.y + 1, p.z, big ? 3 : 2, 0.6 * k);
+  }
+
+  /** Shell `st` at (x,y,z), `k` × its size, a random turn about up. */
+  private sh(st: ShellStyle, x: number, y: number, z: number, k = 1, yaw = rnd(0, Math.PI * 2), pitch = 0, roll = 0): void {
+    this.vfx.shell(st, x, y, z, yaw, pitch, roll, k);
+  }
+
+  /** `n` crescents of `st` whirling flat round (x,y,z), each its own tilt: fire arcs, bone arcs flung out of a burst. */
+  private arcs(st: ShellStyle, x: number, y: number, z: number, n: number, k: number): void {
+    for (let i = 0; i < n; i++) this.sh(st, x, y + rnd(-0.2, 0.4), z, k * rnd(0.85, 1.15), (i / n) * Math.PI * 2 + rnd(-0.4, 0.4), rnd(-0.35, 0.35), rnd(-0.3, 0.3) + (i % 2) * Math.PI);
+  }
+
+  /** `n` shells of `st` erupting on a ring of radius `r` round (x,y,z), `delay` s apart in turn, leaning out. */
+  private ringOf(st: ShellStyle, x: number, y: number, z: number, n: number, r: number, k: number, delay = 0): void {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rnd(-0.2, 0.2), go = () => this.sh(st, x + Math.cos(a) * r, y, z + Math.sin(a) * r, k * rnd(0.8, 1.2), -a + Math.PI / 2, rnd(0.15, 0.4));
+      if (delay > 0) this.at(i * delay, go); else go();
+    }
+  }
+
   /** What a spell left this frame (grimoire.ts events), drawn and heard where it happened. */
   private spell(e: SpellEvent): void {
     const v = this.vfx;
     if (e.type === 'zap' || e.type === 'drain' || e.type === 'spread') {
       const [a, ...rest] = e.pts;
-      if (e.type === 'zap') { const b = rest[0]; this.lightning(a, b, 0.8); v.burst(voltSpark, b.x, b.y, b.z, 10, 0.2, 4); v.pulse(b.x, b.y, b.z, STORM, 18); playSfx('zap', b, { gain: -4 }); return; }
+      if (e.type === 'zap') { const b = rest[0]; this.lightning(a, b, 0.8); this.sh(voltBurst, b.x, b.y, b.z, 0.35); v.burst(voltSpark, b.x, b.y, b.z, 10, 0.2, 4); v.pulse(b.x, b.y, b.z, STORM, 18); playSfx('zap', b, { gain: -4 }); return; }
       if (e.type === 'drain') { // the soul torn out of the foe, drawn into the hands
         const b = rest[0], r = v.ribbons.begin(drainTrail);
         for (let i = 0; i <= 8; i++) { const t = i / 8, w = Math.sin(t * Math.PI) * 0.4; v.ribbons.push(r, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t + w, a.z + (b.z - a.z) * t); }
@@ -577,6 +693,8 @@ export class Forsaken {
         v.burst(droplet, b.x, b.y, b.z, 10, 0.2, 2.5, 1);
       }
       v.burst(droplet, a.x, a.y, a.z, 20, 0.3, 3, 2);
+      this.sh(toxicDome, a.x, a.y - CHEST_Y, a.z, 0.5);
+      this.sh(plagueSkull, a.x, a.y, a.z, 0.8, Math.atan2(a.x - this.player.pos.x, a.z - this.player.pos.z));
       v.decal(splash, a.x, a.y - CHEST_Y + 0.03, a.z);
       v.pulse(a.x, a.y, a.z, PLAGUE, 22);
       playSfx('plague_hit', a);
@@ -587,6 +705,8 @@ export class Forsaken {
         const a = e.pts[i - 1], b = e.pts[i];
         this.lightning(a, b, i === 1 ? 1.2 : 1);
         if (i === 1) v.spawn(flareVolt, b.x, b.y, b.z);
+        this.sh(voltBurst, b.x, b.y, b.z, i === 1 ? 0.6 : 0.4);
+        this.lightning(a, b, 0.6);
         v.burst(voltSpark, b.x, b.y, b.z, 12, 0.2, 5);
       }
       const b = e.pts[1];
@@ -597,6 +717,10 @@ export class Forsaken {
     const { x, y, z } = e, g = y + 0.04;
     switch (e.type) {
       case 'pyre':
+        this.sh(fireBurst, x, y + 1.2, z, tune.pyreR / 6);
+        this.sh(fireCore, x, y + 1.2, z, 1.2);
+        this.sh(fireWall, x, g, z, tune.pyreR / 5);
+        this.arcs(fireArc, x, y + 1, z, 3, tune.pyreR / 3);
         v.spawn(flareFire, x, y + 1.2, z);
         v.burst(pyreSpark, x, y + 1.2, z, 46, 0.3, 7, 2);
         v.burst(pyreFlame, x, y + 0.9, z, 26, tune.pyreR * 0.4, 2.5, 2);
@@ -610,6 +734,10 @@ export class Forsaken {
         playSfx('fire_hit', { x, y: y + 1, z });
         break;
       case 'frost':
+        this.sh(iceBurst, x, y + 1.2, z, 0.6);
+        this.sh(iceCrystal, x, y - 0.1, z, 0.9);
+        this.ringOf(iceCrystal, x, y - 0.1, z, 3, 0.9, 0.5);
+        this.sh(iceWall, x, g, z, 0.55);
         v.spawn({ ...flareIce, size: 1.2 }, x, y + 1.2, z);
         v.burst(iceShard, x, y + 1.2, z, 14, 0.2, 4, 2);
         v.burst(snow, x, y + 1.2, z, 22, 0.4, 2.5);
@@ -620,12 +748,17 @@ export class Forsaken {
         playSfx('frost_hit', { x, y: y + 1, z });
         break;
       case 'lance':
+        this.sh(iceBurst, x, y + 1.2, z, 0.3);
+        this.sh(iceCrystal, x, y - 0.1, z, 0.45);
         v.burst(frostMote, x, y + 1.2, z, 14, 0.15, 4);
         v.burst(iceShard, x, y + 1.2, z, 6, 0.15, 3, 1);
         playSfx('frost_hit', { x, y: y + 1, z }, { gain: -5 });
         break;
       case 'base': { // a base bolt lands
         const [spark, color, sound] = BASE_HIT[e.kind as Exclude<BaseBolt, 'lance'>];
+        this.sh(BASE_BURST[e.kind as Exclude<BaseBolt, 'lance'>], x, y + 1.2, z, e.big ? 0.5 : 0.3);
+        if (e.kind === 'ember') this.arcs(fireArc, x, y + 1.1, z, e.big ? 2 : 1, 0.4);
+        if (e.big) this.sh(e.kind === 'thorn' ? toxicWall : e.kind === 'ember' ? fireWall : e.kind === 'spark' ? voltWall : e.kind === 'smite' ? goldWall : boneWall, x, g, z, 0.35);
         v.burst(spark, x, y + 1.2, z, e.big ? 20 : 12, e.big ? 0.4 : 0.15, 4, 1);
         v.pulse(x, y + 1.2, z, color, e.big ? 18 : 10);
         playSfx(sound, { x, y: y + 1, z }, { gain: -9 });
@@ -633,6 +766,8 @@ export class Forsaken {
       }
       case 'caligo': { // the fog rolls out ahead, rime on the floor under it
         const r = e.r ?? 8, f = e.dir ?? 0;
+        this.sh(iceBreath, x - Math.sin(f) * 0.6, y + 1.2, z - Math.cos(f) * 0.6, r / 8, f, -Math.PI / 2 + 0.06);
+        for (let d = 2.4; d < r; d += 2.2) { const q = d; this.at(d * 0.03, () => this.sh(iceCrystal, x - Math.sin(f) * q + rnd(-0.5, 0.5), y - 0.1, z - Math.cos(f) * q + rnd(-0.5, 0.5), 0.5 + q * 0.06)); }
         for (let i = 0; i < 70; i++) {
           const a = f + rnd(-0.75, 0.75), sp = rnd(r * 0.6, r * 1.3), dx = -Math.sin(a), dz = -Math.cos(a);
           v.spawn(i % 3 ? frostMist : snow, x + dx * 0.8, y + 1.2, z + dz * 0.8, dx * sp, rnd(-0.3, 0.5), dz * sp);
@@ -642,6 +777,8 @@ export class Forsaken {
         break;
       }
       case 'shatter':
+        this.sh(iceBurst, x, y + 1.2, z, 0.9);
+        this.ringOf(iceCrystal, x, y - 0.1, z, 5, 1.2, 0.7);
         v.spawn(flareIce, x, y + 1.2, z);
         v.burst(iceShard, x, y + 1, z, 42, 0.5, 6, 3);
         v.burst(snow, x, y + 1, z, 30, 0.6, 3);
@@ -652,12 +789,16 @@ export class Forsaken {
         playSfx('ice_shatter', { x, y: y + 1, z });
         break;
       case 'thaw':
+        this.sh(iceBurst, x, y + 1.2, z, 0.5);
         v.spawn(flareIce, x, y + 1.2, z);
         v.burst(iceShard, x, y + 1, z, 30, 0.5, 6, 3);
         v.burst(frostMist, x, y + 1, z, 8, 0.6, 1.5);
         playSfx('ice_shatter', { x, y: y + 1, z });
         break;
       case 'font':
+        this.sh(iceWall, x, g, z, 1.1);
+        this.sh(iceBurst, x, y + 0.3, z, 1.1);
+        this.ringOf(iceCrystal, x, y - 0.1, z, 8, 3.4, 1.15, 0.012);
         v.decal(fontRing, x, g + 0.03, z);
         v.decal({ ...fontFloor, life: tune.fontRoot + 0.5 }, x, g + 0.01, z);
         v.decal(dustRing, x, g, z);
@@ -671,6 +812,9 @@ export class Forsaken {
         break;
       case 'toll': {
         const top = { x: x + rnd(-1, 1), y: y + 18, z: z + rnd(-1, 1) }, foot = { x, y: y + 0.1, z };
+        this.sh(voltWall, x, g, z, tune.tollR / 7);
+        this.sh(voltBurst, x, y + 0.6, z, tune.tollR / 4);
+        this.lightning({ x: x + rnd(-3, 3), y: y + 14, z: z + rnd(-3, 3) }, { x: x + rnd(-1, 1), y: y + 0.1, z: z + rnd(-1, 1) }, 1.4);
         this.lightning(top, foot, 1.6);
         this.lightning({ x: (top.x + x) / 2 + rnd(-2, 2), y: y + 9, z: (top.z + z) / 2 + rnd(-2, 2) }, { x: x + rnd(-2, 2), y: y + 0.1, z: z + rnd(-2, 2) }, 1.2);
         v.decal(tollShock, x, g + 0.03, z);
@@ -687,6 +831,9 @@ export class Forsaken {
       }
       case 'leap':
         this.player.model.play('slam', 0.05);
+        this.sh(boneWall, x, g, z, tune.leapR / 3);
+        this.sh(boneBurst, x, y + 0.2, z, tune.leapR / 3.5);
+        this.ringOf(boneSpearSmall, x, y - 0.2, z, 6, tune.leapR * 0.7, 0.9, 0.02);
         v.decal({ ...dustRing, grow: tune.leapR * 1.8 }, x, g, z);
         v.decal({ ...shockBone, grow: tune.leapR * 1.5 }, x, g + 0.02, z);
         v.decal(crackDark, x, g, z);
@@ -701,10 +848,14 @@ export class Forsaken {
       case 'charge':
         this.player.model.play('slash3', 0.08);
         if (e.big) { v.spawn(flareWhite, x, y + 1.2, z); v.burst(shard, x, y + 1, z, 14, 0.3, 4, 2); v.shake(0.3); }
+        this.sh(boneArcBig, this.player.pos.x, this.player.pos.y + 1.1, this.player.pos.z, 1, this.player.facing, 0, -Math.PI / 2);
+        this.sh(boneBurst, x, y + 1, z, 0.35);
         v.decal(dustRing, this.player.pos.x, this.player.pos.y + 0.04, this.player.pos.z);
         playSfx('charge_hit', { x, y: y + 1, z });
         break;
       case 'grace':
+        this.sh(voidArc, this.player.pos.x, this.player.pos.y + 1.2, this.player.pos.z, e.big ? 1.25 : 1, this.player.facing, 0, -Math.PI / 2 + 0.3);
+        if (e.big) this.sh({ ...shadowBurst, color2: 0xc0202a }, x, y + 1, z, 0.6);
         if (e.big) {
           v.burst(bloodSpark, x, y + 1, z, 30, 0.4, 5, 1);
           v.decal(crackGlow, x, g + 0.01, z);
@@ -718,13 +869,18 @@ export class Forsaken {
         v.burst(pyreSmoke, x, y, z, 3, 0.2, 0.5);
         break;
       case 'venom':
+        this.sh(toxicDome, x, y + 1.1, z, 0.35);
         v.burst(droplet, x, y + 1.2, z, 16, 0.2, 2.5, 1);
         v.burst(bubble, x, y + 1, z, 5, 0.3, 0.6);
         v.decal({ ...splash, size: 1.4 }, x, g + 0.02, z);
         v.pulse(x, y + 1.2, z, PLAGUE, 14);
         playSfx('plague_hit', { x, y: y + 1, z }, { gain: -6 });
         break;
-      case 'miasma':
+      case 'miasma': {
+        const r = e.r ?? 7;
+        this.sh(toxicWall, x, g, z, r / 4.8);
+        this.sh(toxicDome, x, y, z, r / 4);
+        for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + rnd(-0.3, 0.3); this.sh(plagueSkull, x + Math.cos(a) * r * 0.45, y + 0.6, z + Math.sin(a) * r * 0.45, rnd(0.8, 1.1), -a - Math.PI / 2); }
         v.decal({ ...shockPlague, grow: (e.r ?? 7) * 1.9 }, x, g + 0.03, z);
         v.decal({ ...splash, size: 3.5 }, x, g + 0.02, z);
         v.ring(toxic, x, y + 0.5, z, 16, 0.8, (e.r ?? 7) * 1.1, 0.3);
@@ -735,7 +891,10 @@ export class Forsaken {
         playSfx('plague_cloud', { x, y: y + 1, z }, { gain: -4 });
         playSfx('nova', { x, y: y + 0.5, z }, { gain: -8 });
         break;
+      }
       case 'fever':
+        this.sh(feverSwirl, x, g, z, (e.r ?? 4) / 3);
+        this.sh(plagueSkull, x, y + 1.6, z, 1.1, Math.atan2(x - this.player.pos.x, z - this.player.pos.z));
         v.decal({ ...feverPool, size: (e.r ?? 4) * 1.4 }, x, g + 0.02, z);
         v.burst(feverMote, x, y + 1, z, 40, e.r ?? 4, 1.2, 1);
         v.pulse(x, y + 1, z, 0x9aff40, 20);
@@ -743,11 +902,16 @@ export class Forsaken {
         break;
       case 'pillar': {
         const r = e.r ?? 3.5;
-        v.burst(pyreFlame, x, y + 0.5, z, 60, r * 0.6, 3, 7);
+        this.sh(fireColumn, x, g, z, r / 2.2);
+        for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; this.sh(flameTongue, x + Math.cos(a) * r * 0.35, g, z + Math.sin(a) * r * 0.35, r / 3.2, a); }
+        this.sh(fireWall, x, g, z, r / 5);
+        this.sh(fireBurst, x, y + 0.6, z, r / 6);
+        this.arcs(fireArc, x, y + 1.5, z, 4, r / 3);
+        v.burst(pyreFlame, x, y + 0.5, z, 36, r * 0.6, 3, 7);
         v.burst(pyreSpark, x, y + 1, z, 50, r * 0.5, 8, 6);
         v.burst(pyreEmber, x, y + 2, z, 40, r * 0.5, 3, 5);
         v.burst(pyreSmoke, x, y + 3, z, 8, 1, 1.5, 1);
-        v.spawn({ ...flareFire, size: 3 }, x, y + 2, z);
+        v.spawn({ ...flareFire, size: 2 }, x, y + 2, z);
         v.decal({ ...fireShock, grow: r * 1.8 }, x, g + 0.02, z);
         v.decal({ ...firePool, size: r * 1.8 }, x, g + 0.03, z);
         v.decal(fireScar, x, g, z);
@@ -758,6 +922,10 @@ export class Forsaken {
         break;
       }
       case 'cero':
+        this.sh(fireBurst, x, y + 1.2, z, (e.r ?? 4) / 6);
+        this.sh(fireCore, x, y + 1.2, z, 1);
+        this.sh(fireWall, x, g, z, (e.r ?? 4) / 5);
+        this.arcs(fireArc, x, y + 1.2, z, 2, (e.r ?? 4) / 4);
         v.spawn({ ...flareFire, size: 2.6 }, x, y + 1.2, z);
         v.burst(pyreSpark, x, y + 1.2, z, 50, 0.3, 8, 2);
         v.burst(pyreFlame, x, y + 1, z, 30, 1.5, 3, 2);
@@ -770,6 +938,9 @@ export class Forsaken {
         break;
       case 'furnace': { // the breath fans out ahead
         const r = e.r ?? 8, f = e.dir ?? 0;
+        this.sh(fireBreath, x - Math.sin(f) * 0.6, y + 1.2, z - Math.cos(f) * 0.6, r / 8, f, -Math.PI / 2 + 0.06);
+        this.sh(fireArc, x, y + 1.2, z, 1.6, f, 0.1);
+        this.sh(fireArc, x, y + 1.3, z, 2.3, f, -0.1, Math.PI);
         for (let i = 0; i < 90; i++) {
           const a = f + rnd(-0.75, 0.75), sp = rnd(r * 0.8, r * 1.6), dx = -Math.sin(a), dz = -Math.cos(a);
           v.spawn(i % 3 ? pyreBall : pyreFlame, x + dx * 0.8, y + 1.2, z + dz * 0.8, dx * sp, rnd(-0.3, 0.8), dz * sp);
@@ -793,6 +964,9 @@ export class Forsaken {
         break;
       }
       case 'orb':
+        this.sh(iceBurst, x, y + 1, z, (e.r ?? 3.5) / 2.5);
+        this.sh(iceWall, x, g, z, (e.r ?? 3.5) / 4.8);
+        this.ringOf(iceCrystal, x, y - 0.1, z, 5, 1.4, 0.8);
         v.spawn(flareIce, x, y + 1, z);
         v.burst(iceShard, x, y + 1, z, 40, 0.5, 7, 3);
         v.burst(snow, x, y + 1, z, 40, 1, 3);
@@ -804,6 +978,8 @@ export class Forsaken {
         playSfx('ice_shatter', { x, y: y + 1, z });
         break;
       case 'squall':
+        this.sh(voltWall, x, g, z, (e.r ?? 6) / 7);
+        this.sh(voltBurst, x, y + 1, z, (e.r ?? 6) / 3);
         v.decal({ ...tollShock, grow: (e.r ?? 6) * 2 }, x, g + 0.03, z);
         v.decal({ ...dustRing, grow: (e.r ?? 6) * 1.6 }, x, g, z);
         v.ring(voltSpark, x, y + 1, z, 60, 0.6, 14, 1);
@@ -815,6 +991,8 @@ export class Forsaken {
         playSfx('thunder', { x, y: y + 1, z });
         break;
       case 'judge':
+        this.sh(goldBurst, x, y + 1.2, z, 0.5);
+        this.sh(goldWall, x, g, z, 0.45);
         v.spawn(flareGold, x, y + 1.2, z);
         v.burst(goldMote, x, y + 1.2, z, 40, 0.3, 4, 1);
         v.ring(goldRune, x, y + 0.4, z, 6, 0.6, 1, 0.6);
@@ -826,6 +1004,7 @@ export class Forsaken {
         playSfx('strike_hit', { x, y: y + 1, z });
         break;
       case 'hammer':
+        this.sh(goldBurst, x, y + 1.4, z, 0.45);
         v.spawn({ ...flareGold, size: 2.2 }, x, y + 1.4, z);
         v.burst(goldMote, x, y + 1.4, z, 30, 0.2, 5, 1);
         v.burst(boneSpark, x, y + 1.4, z, 20, 0.2, 5);
@@ -835,6 +1014,7 @@ export class Forsaken {
         playSfx('toll_bell', { x, y: y + 1, z }, { gain: -12 });
         break;
       case 'hallow':
+        this.sh(goldWall, x, g, z, (e.r ?? 4) / 3.6);
         v.decal({ ...shockGold, grow: (e.r ?? 4) * 1.6 }, x, g + 0.03, z);
         v.ring(goldRune, x, y + 0.3, z, 12, e.r ?? 4, 0.5, 0.6);
         v.burst(holyMote, x, y + 0.3, z, 40, e.r ?? 4, 0.5, 1);
@@ -842,6 +1022,7 @@ export class Forsaken {
         playSfx('ward', { x, y: y + 1, z }, { gain: -6 });
         break;
       case 'wall': // a bolt bursts on a wall it ran into
+        if (e.kind && e.kind in BOLT_SHELL) this.sh(e.kind === 'pyre' || e.kind === 'ember' ? fireBurst : e.kind === 'venom' || e.kind === 'thorn' ? toxicDome : e.kind === 'spark' ? voltBurst : e.kind === 'umbra' ? shadowBurst : e.kind === 'frost' ? iceBurst : goldBurst, x, y, z, e.kind === 'pyre' ? 0.5 : 0.25);
         if (e.kind === 'pyre') {
           v.spawn({ ...flareFire, size: 1.6 }, x, y, z);
           v.burst(pyreSpark, x, y, z, 30, 0.2, 5, 1);
@@ -882,16 +1063,32 @@ export class Forsaken {
       v.ribbons.end(f.trail);
       f.core.visible = f.halo.visible = false;
       this.spare.push(f.core, f.halo);
+      if (f.shell) v.shells.release(f.shell);
+      if (f.spear) v.shells.release(f.spear);
       this.flights.delete(b);
     }
     for (const b of m.bolts) {
       const [core, halo, cs, hs] = BOLT_LOOK[b.kind];
       let f = this.flights.get(b);
       if (!f) {
-        f = { core: this.bolt(core, b.kind === 'pyre' ? 1.6 : 2.2), halo: this.bolt(halo, b.kind === 'pyre' ? 1.2 : 1.8), trail: v.ribbons.begin(BOLT_TRAIL[b.kind]) };
+        f = { core: this.bolt(core, b.kind === 'pyre' ? 1.6 : 2.2), halo: this.bolt(halo, b.kind === 'pyre' ? 1.2 : 1.8), trail: v.ribbons.begin(BOLT_TRAIL[b.kind]), px: b.x, py: b.y, pz: b.z };
+        const look = BOLT_SHELL[b.kind];
+        if (look) { f.shell = v.shells.hold(look[0]); f.shell.on = true; }
+        if (b.kind === 'lance' || b.kind === 'frost') f.spear = v.shells.hold(iceSpearFly); // shown once it has a heading
         this.flights.set(b, f);
       }
       const pulse = 1 + Math.sin(b.t * 30) * 0.1;
+      const dx = b.x - f.px, dy = b.y - f.py, dz = b.z - f.pz, dl = Math.hypot(dx, dy, dz);
+      if (f.shell) { // a ball of the school's light, its surface boiling
+        const k = BOLT_SHELL[b.kind]![1] * pulse;
+        Object.assign(f.shell, { x: b.x, y: b.y, z: b.z, sx: k, sy: k, sz: k, alpha: Math.min(1, b.t * 12), t: 0.08 + 0.1 * Math.sin(b.t * 9) });
+        f.shell.yaw += dt * 6; f.shell.pitch += dt * 4;
+      }
+      if (f.spear && dl > 1e-4) { // the javelin along its flight, its tip ahead
+        const l = b.kind === 'frost' ? 2.2 : 1.6, ux = dx / dl, uy = dy / dl, uz = dz / dl;
+        Object.assign(f.spear, { on: v.shells.loaded, x: b.x - ux * l * 0.7, y: b.y - uy * l * 0.7, z: b.z - uz * l * 0.7, yaw: Math.atan2(-ux, -uz), pitch: -Math.PI / 2 + Math.asin(Math.max(-1, Math.min(1, uy))), sx: l * 1.6, sy: l, sz: l * 1.6, alpha: Math.min(1, b.t * 12), t: 0.05 });
+      }
+      f.px = b.x; f.py = b.y; f.pz = b.z;
       f.core.position.set(b.x, b.y, b.z); f.core.scale.setScalar(cs * pulse);
       f.halo.position.set(b.x, b.y, b.z); f.halo.scale.setScalar(hs * pulse);
       v.ribbons.push(f.trail, b.x, b.y, b.z);
@@ -921,9 +1118,11 @@ export class Forsaken {
       v.pulse(o.x, o.y + 1, o.z, ICE, 14);
     }
     this.rodMarks.forEach((d, i) => { // Parafulmine: an iron pole of light, crackling at the tip
-      const r = m.rods[i];
-      d.on = !!r;
+      const r = m.rods[i], c = this.rodColumns[i];
+      d.on = c.on = !!r;
       if (!r) return;
+      Object.assign(c, { x: r.x, y: r.y, z: r.z, alpha: Math.min(1, r.t) * (0.7 + 0.3 * Math.sin(this.time * 30)), t: 0 });
+      c.yaw += dt * 4;
       d.x = r.x; d.y = r.y + 0.05; d.z = r.z; d.rot += dt * 2; d.alpha = Math.min(1, r.t) * 0.8;
       for (let n = v.count(90, dt); n > 0; n--) v.spawn(rodGlow, r.x, r.y + rnd(0, 2.6), r.z);
       if (Math.random() < dt * 8) v.spawn(crackle, r.x + rnd(-0.2, 0.2), r.y + 2.6 + rnd(0, 0.3), r.z + rnd(-0.2, 0.2));
@@ -938,15 +1137,22 @@ export class Forsaken {
     });
     const sf = this.stormFloor, at = m.blizzardAt; // Bufera di bora while it blows
     sf.on = !!at;
+    const bw = this.blizzardWall;
+    bw.on = !!at;
     if (at) {
+      Object.assign(bw, { x: at.x, y: at.y, z: at.z, sx: tune.blizzardR, sy: 4, sz: tune.blizzardR, alpha: 0.6, t: 0 });
+      bw.yaw += dt * 2.5;
       sf.x = at.x; sf.y = at.y + 0.04; sf.z = at.z; sf.size = tune.blizzardR * 2.2; sf.rot += dt * 0.6; sf.alpha = 0.7;
       for (let n = v.count(70 * tune.blizzardR, dt); n > 0; n--) { const a = rnd(0, Math.PI * 2), r = Math.sqrt(Math.random()) * tune.blizzardR; v.spawn(snow, at.x + Math.cos(a) * r, at.y + rnd(3, 6), at.z + Math.sin(a) * r, 3, -3, 1); }
       for (let n = v.count(4, dt); n > 0; n--) v.spawn(frostMist, at.x + rnd(-2, 2), at.y + rnd(0.3, 1.5), at.z + rnd(-2, 2), 1.5, 0, 0.5);
     }
+    this.shieldOrbs.forEach((o, k) => { o.on = k < m.sparks; });
     if (m.sparks > 0) { // Scudo di saette: the charges circling the hero
       const p = this.player.pos;
       for (let k = 0; k < m.sparks; k++) {
         const a = this.time * 4 + (k * Math.PI * 2) / m.sparks, x = p.x + Math.cos(a) * 0.9, z = p.z + Math.sin(a) * 0.9, y = p.y + 1.1 + Math.sin(a * 2) * 0.2;
+        const o = this.shieldOrbs[k], r = 0.13 * (1 + Math.sin(this.time * 25 + k) * 0.15);
+        if (o) { Object.assign(o, { x, y, z, sx: r, sy: r, sz: r, alpha: 1, t: 0.1 }); o.yaw += dt * 8; }
         for (let n = v.count(30, dt); n > 0; n--) v.spawn(sparkOrb, x, y, z);
         if (Math.random() < dt * 6) v.spawn(crackle, x, y, z);
       }
@@ -962,8 +1168,14 @@ export class Forsaken {
     this.marks.forEach((d, i) => {
       const t = m.tolls[i];
       d.on = !!t;
+      if (!t && this.bells[i]?.on) { const b = this.bells[i]; this.vfx.shell({ ...bell, life: 0.5, fadeIn: 0.01, fadeOut: 0.9, grow: 1.5, ease: 2 }, b.x, b.y, b.z, b.yaw, 0, 0, 0.93); b.on = false; } // the bolt struck: it rings out
       if (!t) return;
-      const p = 1 - Math.max(0, t.t) / 0.6;
+      const p = 1 - Math.max(0, t.t) / 0.6, b = this.bells[i];
+      if (b) { // the tower's bell, out of the dark over the mark, swinging down with the bolt
+        const fall = p * p;
+        Object.assign(b, { on: true, x: t.x, y: t.y + 5.5 - fall * 3.6, z: t.z, sx: 2.6, sy: 2.6, sz: 2.6, alpha: Math.min(1, p * 3), t: 0.05 });
+        b.roll = Math.sin(this.time * 9) * 0.25 * (1 - p); b.yaw += dt;
+      }
       d.x = t.x; d.y = t.y + 0.06; d.z = t.z;
       d.size = tune.tollR * 2 * (0.7 + 0.3 * p);
       d.alpha = 0.4 + 0.6 * p;
@@ -1031,8 +1243,9 @@ export class Forsaken {
     playSfx('swing', chest(this), { variant: step });
     this.at(BLOW, () => {
       const q = this.player.pos, x = q.x + fx * 1.5, z = q.z + fz * 1.5;
-      if (step < 2) { // shards flung along the sweep: right to left, then back
+      if (step < 2) { // a crescent of bone-light along the sweep, shards flung with it: right to left, then back
         const dir = step === 0 ? 1 : -1;
+        this.sh(boneArc, q.x, q.y + 1.05 + step * 0.15, q.z, tune.fallRange / 2.6, f, dir * 0.12, step === 0 ? Math.PI : 0);
         for (let s = -1; s <= 1; s += 0.25) {
           const g = f - s * dir * 1.1, dx = -Math.sin(g), dz = -Math.cos(g), r = rnd(1.2, tune.fallRange - 0.2);
           v.spawn(boneSpark, q.x + dx * r, q.y + 1 + s * 0.2, q.z + dz * r, dx * 4 - Math.cos(g) * dir * 3, rnd(-0.5, 0.5), dz * 4 + Math.sin(g) * dir * 3);
@@ -1041,8 +1254,12 @@ export class Forsaken {
         v.burst(graveDust, x, q.y + 0.6, z, 2, 0.3, 0.6);
         return;
       }
-      // the overhead smash: the club bites the floor
+      // the overhead smash: a crescent top to floor, the club bites it and bone-light bursts off a ring
       const y = q.y + 0.04;
+      this.sh(boneArcBig, q.x, q.y + 1.1, q.z, 1, f, 0, -Math.PI / 2);
+      this.sh(boneWall, x, y, z, 0.5);
+      this.sh(boneBurst, x, q.y + 0.2, z, 0.35);
+      this.ringOf(boneSpearSmall, x, q.y - 0.2, z, 4, 0.9, 0.55);
       v.decal(crackDark, x, y, z);
       v.decal(crackGlow, x, y + 0.01, z);
       v.decal(shockBone, x, y + 0.02, z);
@@ -1086,6 +1303,11 @@ export class Forsaken {
   impale(m: Mob): void {
     const v = this.vfx, x = m.x, y = m.y + 0.03, z = m.z;
     v.spike(x, m.y - 0.3, z, 3.2, 0.12, rnd(0, 6.3), 0, 1.3);
+    this.sh(boneSpear, x, m.y - 0.3, z, 1, rnd(0, 6.3), 0.08);
+    this.ringOf(boneSpearSmall, x, m.y - 0.2, z, 5, 1.1, 0.9, 0.02);
+    this.sh(boneWall, x, y, z, 0.6);
+    this.sh(boneBurst, x, m.y + 1.2, z, 0.4);
+    this.sh(boneSkull, x, m.y + 2.6, z, 1, Math.atan2(x - this.player.pos.x, z - this.player.pos.z));
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * Math.PI * 2 + rnd(-0.3, 0.3), r = rnd(0.7, 1.2);
       v.spike(x + Math.cos(a) * r, m.y - 0.1, z + Math.sin(a) * r, rnd(0.9, 1.6), 0.55, a, rnd(0.02, 0.1), 1.1);
@@ -1117,6 +1339,10 @@ export class Forsaken {
   /** Lamento della cripta's slam: a shock wave and two rings of bone spikes bursting outwards. */
   nova(): void {
     const v = this.vfx, p = this.player.pos, y = p.y + 0.04;
+    this.sh(boneBurst, p.x, p.y + 0.6, p.z, tune.novaR / 3);
+    this.sh(boneWall, p.x, y, p.z, tune.novaR / 3.2);
+    this.arcs(boneArc, p.x, p.y + 0.9, p.z, 4, tune.novaR / 3.5);
+    this.ringOf(boneSpearSmall, p.x, p.y - 0.2, p.z, 8, tune.novaR * 0.75, 1, 0.015);
     v.decal(shockBig, p.x, y + 0.02, p.z);
     v.decal(shockDust, p.x, y + 0.01, p.z);
     v.decal(crackDarkBig, p.x, y, p.z);
@@ -1294,6 +1520,8 @@ export const ABILITIES: Ability<Forsaken>[] = [
       v.burst(shadowSmoke, b.x, b.y, b.z, 10, 0.5, 1.1);
       v.burst(violetSpark, b.x, b.y, b.z, 20, 0.3, 4);
       v.decal(crackGlow, b.x, k.player.pos.y + 0.04, b.z);
+      v.shell(shadowBurst, a.x, a.y, a.z, 0, 0, 0, 0.6);
+      v.shell(shadowBurst, b.x, b.y, b.z, 0, 0, 0, 0.8);
       v.pulse(b.x, b.y + 0.5, b.z, VIOLET, 40);
       k.blinkHide();
       k.player.model.play('roll', 0.15);
@@ -1351,6 +1579,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
       }
       v.burst(ghostWisp, a.x, a.y, a.z, 10, 0.5, 1.2);
       v.decal(shockGhost, a.x, k.player.pos.y + 0.05, a.z);
+      v.shell({ ...shadowBurst, color: 0xeef4ff, color2: GHOST }, a.x, a.y, a.z, 0, 0, 0, 0.7);
       v.spawn(flareGhost, a.x, a.y + 0.2, a.z);
       v.pulse(a.x, a.y, a.z, GHOST, 30);
     },
@@ -1507,6 +1736,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     fire(k) {
       k.magic.whirl();
       const p = k.player.pos;
+      k.vfx.shell(tune.fxFrostWhirl ? { ...boneArc, color2: ICE } : boneArc, p.x, p.y + 1, p.z, k.player.facing + rnd(0, 6.3), rnd(-0.1, 0.1), 0, 1.15);
       k.vfx.ring(tune.fxFrostWhirl ? snow : boneSpark, p.x, p.y + 1, p.z, 18, 1.6, 4, 0.5);
       k.vfx.decal(dustRing, p.x, p.y + 0.04, p.z);
       playSfx('whirl', chest(k));
@@ -1737,6 +1967,8 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.player.model.play('scream', 0.25);
       const a = chest(k), v = k.vfx, y = k.player.pos.y + 0.05;
       v.decal(shockGold, a.x, y, a.z);
+      v.shell(goldBurst, a.x, a.y, a.z, 0, 0, 0, 0.7);
+      v.shell(goldWall, a.x, y, a.z, 0, 0, 0, 0.6);
       v.ring(goldRune, a.x, a.y + 0.6, a.z, 12, 0.9, 0.8, 0.3);
       v.spawn(flareGold, a.x, a.y + 0.9, a.z);
       k.beam(a.x, y, a.z, GOLD, 1);
@@ -1789,6 +2021,8 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.player.model.play('scream', 0.25);
       const a = chest(k), v = k.vfx, y = k.player.pos.y + 0.05;
       v.decal(shockGold, a.x, y, a.z);
+      v.shell({ ...goldBurst, color2: VIOLET }, a.x, a.y, a.z, 0, 0, 0, 0.7);
+      v.shell({ ...goldWall, color2: VIOLET }, a.x, y, a.z, 0, 0, 0, 0.6);
       v.burst(goldMote, a.x, a.y, a.z, 50, 0.6, 3, 1.5);
       v.spawn(flareGold, a.x, a.y + 0.3, a.z);
       k.beam(a.x, y, a.z, GOLD, 0.8);
@@ -1837,7 +2071,12 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
 ];
 
-for (const a of ABILITIES) a.school = SCHOOL[a.id]; // each school its own global cooldown
+for (const a of ABILITIES) {
+  a.school = SCHOOL[a.id]; // each school its own global cooldown
+  if (BASES.includes(a.id) || a.id === 'potion') continue;
+  const fire = a.fire; // a skill let go (not its channel's ticks): its school's ring of light round the hero
+  a.fire = function (k, tick) { if (!tick) k.release(a.school, !!a.cast); fire.call(this, k, tick); };
+}
 
 /** The starting bar: the primary attack fixed on the big button (slot 0), the potion fixed on its own (slot 9), the starting
  *  kit on the next slots, which on touch run from the bottom-left of the thumb arc up (ui/actionBar.ts RING). Every unlock

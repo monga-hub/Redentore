@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Shells, type Shell, type ShellStyle } from './shells.ts';
 
 // Spell effects for every caster, player and enemies, Diablo/WoW style: textured, layered and
 // cheap. Everything is pooled and allocated once at startup, nothing per frame:
@@ -789,6 +790,8 @@ export class Vfx {
   private floorGlow: Decals;
   private floorDark: Decals;
   private spikes = new Spikes();
+  /** The spells' big glowing shapes: bursts, walls of light, crescents, breath, the spectral Meshy shapes (shells.ts). */
+  readonly shells = new Shells();
   /** Sentenza del sepolcro's beam. */
   readonly column: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
   private flash = 0;
@@ -818,11 +821,11 @@ export class Vfx {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(beam), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }),
     );
     this.column.visible = false;
-    this.textures = [this.map, dmap, this.column.material.map!];
+    this.textures = [this.map, dmap, this.column.material.map!, this.shells.noise];
     // The smoke draws first so the glows sit on top of it.
     this.smoke.mesh.renderOrder = 1;
     // A PointLight at intensity 0 still counts in the shader: added once here, only dimmed later.
-    this.root.add(this.floorDark.mesh, this.floorGlow.mesh, this.smoke.mesh, this.glow.mesh, this.ribbons.mesh, this.spikes.mesh, this.column, this.light);
+    this.root.add(this.floorDark.mesh, this.floorGlow.mesh, this.smoke.mesh, this.glow.mesh, this.ribbons.mesh, this.spikes.mesh, this.shells.root, this.column, this.light);
   }
 
   /** Share of the particles spawned that are kept (the quality ladder's ultra-light rungs thin them out, main.ts). */
@@ -856,6 +859,12 @@ export class Vfx {
     return Math.floor(rate * dt + Math.random());
   }
 
+  /** A shell (shells.ts) at (x,y,z), turned `yaw` (then `pitch`, `roll`), `scale` × its size. */
+  shell(s: ShellStyle, x: number, y: number, z: number, yaw = 0, pitch = 0, roll = 0, scale = 1): Shell | undefined {
+    if (this.density < 1 && Math.random() > this.density) return undefined; // the ultra-light rungs thin them like the particles: their fill is the cost
+    return this.shells.spawn(s, x, y, z, yaw, pitch, roll, scale);
+  }
+
   decal(s: DecalStyle, x: number, y: number, z: number, rot?: number): Decal {
     return (s.dark ? this.floorDark : this.floorGlow).spawn(s, x, y, z, rot);
   }
@@ -882,6 +891,7 @@ export class Vfx {
    */
   prime(): void {
     this.priming = 2;
+    this.shells.prime();
   }
 
   /** A blow landing on someone at (x,y,z): a white-hot flash and splinters; `big` for heavy hits. */
@@ -922,6 +932,7 @@ export class Vfx {
     this.floorGlow.update(dt);
     this.floorDark.update(dt);
     this.spikes.update(dt);
+    this.shells.update(dt);
     if (this.priming > 0) {
       this.priming--;
       for (const m of [this.glow.mesh, this.smoke.mesh, this.ribbons.mesh, this.floorGlow.mesh, this.floorDark.mesh, this.spikes.mesh]) m.visible = true; // empty: nothing shows

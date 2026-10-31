@@ -3,7 +3,7 @@ import { buildLevel } from './level/index.ts';
 import { SPAWN } from './level/plan.ts';
 import { Input } from './core/input.ts';
 import { PlayerController } from './player/controller.ts';
-import { EYE, ThirdPersonCamera } from './camera/thirdPersonCamera.ts';
+import { EYE, STEPS as WOW_STEPS, ThirdPersonCamera } from './camera/thirdPersonCamera.ts';
 import { Intro } from './camera/intro.ts';
 import { Hud } from './ui/hud.ts';
 import { TouchControls } from './ui/touch.ts';
@@ -41,8 +41,8 @@ import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
 import { autosave, deserialize, questXpIn, serialize, setPending, startup, upcoming, type Game } from './core/save.ts';
 import { BAR, install, migration, prepared } from './core/prepared.ts';
-import { isDiablo, onQuality, onStyle } from './core/style.ts';
-import { CameraBlend, DiabloCamera } from './camera/diabloCamera.ts';
+import { getView, isDiablo, onQuality, onStyle, setView, VIEWS } from './core/style.ts';
+import { CameraBlend, DiabloCamera, STEPS as DIABLO_STEPS } from './camera/diabloCamera.ts';
 import { BELFRY } from './level/zones/sangiorgio.ts';
 import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
@@ -92,6 +92,18 @@ scene.add(player.mesh);
 const cam = new ThirdPersonCamera(innerWidth / innerHeight, SPAWN.yaw, level.cameraBlockers);
 const dcam = new DiabloCamera(cam.camera); // "Stile Diablo": same lens object, high fixed view
 const blend = new CameraBlend(); // eases style switches and the intro's hand-over
+{ // the minimap's camera button: close -> medium -> far -> close, both views at once, so a style switch keeps it; the pinch and the wheel still zoom in between
+  const btn = document.querySelector<HTMLButtonElement>('#minimap .view')!;
+  const show = (v: number, now = false) => {
+    cam.setDist(WOW_STEPS[v], now);
+    dcam.setDist(DIABLO_STEPS[v], now);
+    btn.title = btn.ariaLabel = `Visuale: ${VIEWS[v].toLowerCase()}`;
+    const k = [1, 0.72, 0.48][v]; // the hero in the viewfinder shrinks as the lens pulls back
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24"><path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5"/><g transform="translate(12 13) scale(${k}) translate(-12 -13)"><circle cx="12" cy="7.5" r="3"/><path class="man" d="M6.5 19.5c0-4 2.4-6.5 5.5-6.5s5.5 2.5 5.5 6.5z"/></g></svg>`;
+  };
+  show(getView(), true);
+  btn.addEventListener('click', () => { setView((getView() + 1) % VIEWS.length); show(getView()); });
+}
 const hud = new Hud(HEROES[hero].portrait, HEROES[hero].name);
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
@@ -586,6 +598,8 @@ Object.assign(window, { dragoSet: drago, dragon, sandbox, zitelle, l2, sangiorgi
 // while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
 const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin', 'pour']); // 'spin': the Governatrice's fuso; 'pour': the Abate's Calice
 const KEEP = 5; // s
+const PACK = 12, CALM = 22; // m: three fighting foes this close widen the framing; none alive this close draws it in
+const BOSSES = [priests.boss, zitelle.boss, sangiorgio.boss, bees.queen]; // framed wide in their fight, like the dragon
 let kept = KEEP;
 const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && dying <= 0 && !playerStats.dead && !ferry.trip && !mobs.some((m) => FIGHTING.has(m.state))) autosave(serialize(game)); }; // never afloat
 addEventListener('visibilitychange', () => { if (document.hidden) keep(); });
@@ -778,10 +792,23 @@ renderer.setAnimationLoop(() => {
     cam.pitch += ((ferry.trip === 'out' ? 0.08 : 0.25) - cam.pitch) * k;
   }
   cam.cap = aloft() ? 3.6 : Infinity; // 6 m of headroom between piers 6.4 m apart
+  const up = FIGHTING.has(drago.boss.state) || drago.boss.state === 'dive'; // the dragon's fight
   { // the boom eased back and the aim raised to take the dragon in
-    const up = FIGHTING.has(drago.boss.state) || drago.boss.state === 'dive', k = 1 - Math.exp(-dt * 1.5);
+    const k = 1 - Math.exp(-dt * 1.5);
     cam.reach += ((up ? 12 : 0) - cam.reach) * k;
     cam.lift += ((up ? 3 : 0) - cam.lift) * k;
+  }
+  { // automatic framing around the player's chosen distance: wider in a pack or with a boss up, closer with nobody about
+    let near = 0, calm = true;
+    for (const f of foes) {
+      if (f.state === 'dead') continue;
+      const d = Math.hypot(f.x - player.pos.x, f.z - player.pos.z);
+      if (d < CALM) calm = false;
+      if (d < PACK && FIGHTING.has(f.state)) near++;
+    }
+    const boss = up || BOSSES.some((b) => FIGHTING.has(b.state) && Math.hypot(b.x - player.pos.x, b.z - player.pos.z) < CALM);
+    const want = boss ? 1.3 : near >= 3 ? 1.22 : calm ? 0.88 : 1, k = 1 - Math.exp(-dt * 0.9); // slow: a breath, never a lurch
+    cam.frame = dcam.frame += (want - dcam.frame) * k;
   }
   if (diablo) dcam.update(dt, input, player.pos);
   else cam.update(dt, input, player.pos);

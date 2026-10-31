@@ -4,18 +4,22 @@ import type { Input } from '../core/input.ts';
 // "Stile Diablo" camera, after Diablo Immortal: high up at a fixed yaw (the site reads diagonally,
 // not along its axes), looking steeply down through a narrow perspective lens, pulled back so the
 // hero is about a seventh of the screen tall with plenty of floor around and sits a little below
-// the centre. No orbit; wheel and pinch zoom within a range. Walls and roofs between the camera
+// the centre. No orbit; wheel, pinch and the minimap's camera button zoom within a range, framing widens and narrows around it. Walls and roofs between the camera
 // and the hero fade or lift off (fx/occlusion.ts) rather than pulling the camera in.
 
 export const DIABLO = { yaw: Math.PI / 4, pitch: THREE.MathUtils.degToRad(58), fov: 33 }; // yaw: looking towards -X -Z, south-east (level/plan.ts)
 const MIN_DIST = 9, MAX_DIST = 24, DIST = 18;
+/** m: the minimap camera button's close / medium / far (core/style.ts getView). */
+export const STEPS = [12, DIST, MAX_DIST] as const;
 const AIM_UP = 1, AIM_AHEAD = 1.3; // m: aim over the head and a little up-screen, so the hero sits below the centre
 const FOLLOW = 8, FOLLOW_Y = 5; // 1/s: a quick but soft follow; stairs ease in slower
 
 export class DiabloCamera {
   readonly yaw = DIABLO.yaw;
   private dist = DIST; // wanted (wheel / pinch)
-  private zoom = DIST; // eased towards dist
+  private zoom = DIST; // eased towards dist * frame
+  /** Automatic framing, times the wanted distance: wider in a pack or a boss fight, closer when calm (main.ts, eased there). */
+  frame = 1;
   private focus = new THREE.Vector3();
   private placed = false;
   private dir = new THREE.Vector3();
@@ -33,10 +37,16 @@ export class DiabloCamera {
     this.placed = false;
   }
 
+  /** A camera-button step; `now` skips the glide (a load). */
+  setDist(d: number, now = false): void {
+    this.dist = d;
+    if (now) this.zoom = d * this.frame;
+  }
+
   update(dt: number, input: Input, feet: THREE.Vector3): void {
     const { wheel, zoom } = input.consume(); // drags are dropped: the view never orbits
     this.dist = THREE.MathUtils.clamp(this.dist * (1 + wheel * 0.12) * zoom, MIN_DIST, MAX_DIST);
-    this.zoom = THREE.MathUtils.damp(this.zoom, this.dist, 10, dt);
+    this.zoom = THREE.MathUtils.damp(this.zoom, this.dist * this.frame, 10, dt);
     const x = feet.x - Math.sin(this.yaw) * AIM_AHEAD, y = feet.y + AIM_UP, z = feet.z - Math.cos(this.yaw) * AIM_AHEAD;
     const f = this.focus;
     if (!this.placed || f.distanceToSquared(feet) > 400) f.set(x, y, z); // a teleport cuts, it doesn't pan across the map

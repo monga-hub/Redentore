@@ -3,6 +3,8 @@ import type { Input } from '../core/input.ts';
 
 const MIN_DIST = 1.5, MAX_DIST = 30, SENS = 0.005, FOV = 60;
 const MIN_PITCH = -0.35, MAX_PITCH = 1.35;
+/** m: the minimap camera button's close / medium / far (core/style.ts getView). */
+export const STEPS = [4.5, 7, 11] as const;
 export const EYE = 1.6; // m above the feet the camera orbits
 
 /**
@@ -21,7 +23,9 @@ export class ThirdPersonCamera {
   reach = 0;
   /** m the aim rises over the player's head: raised to Carpaccio's dragon's head (main.ts, eased there). */
   lift = 0;
-  private zoom = 7; // eased towards dist, so zoom steps glide instead of jumping
+  /** Automatic framing, times the wanted distance: wider in a pack or a boss fight, closer when calm (main.ts, eased there). */
+  frame = 1;
+  private zoom = 7; // eased towards dist * frame, so zoom steps glide instead of jumping
   private shown = 7; // smoothed, collision-limited distance
   private ray = new THREE.Raycaster();
   private target = new THREE.Vector3();
@@ -35,6 +39,12 @@ export class ThirdPersonCamera {
     this.yaw = yaw;
   }
 
+  /** A camera-button step; `now` skips the glide (a load). */
+  setDist(d: number, now = false): void {
+    this.dist = d;
+    if (now) this.zoom = this.shown = d * this.frame;
+  }
+
   update(dt: number, input: Input, feet: THREE.Vector3): void {
     const { dx, dy, wheel, zoom } = input.consume();
     this.yaw -= dx * SENS; // deltas only accumulate while a button is held
@@ -43,7 +53,7 @@ export class ThirdPersonCamera {
     if (input.down('KeyE')) this.yaw -= 2 * dt;
     this.dist = THREE.MathUtils.clamp(this.dist * (1 + wheel * 0.12) * zoom, MIN_DIST, MAX_DIST);
     const was = this.zoom;
-    this.zoom = THREE.MathUtils.damp(this.zoom, this.dist, 14, dt);
+    this.zoom = THREE.MathUtils.damp(this.zoom, this.dist * this.frame, 14, dt);
 
     this.target.set(feet.x, feet.y + EYE, feet.z);
     const cp = Math.cos(this.pitch);

@@ -132,7 +132,7 @@
       @keyframes lowhp { to { filter: brightness(1.7) } }
 
       /* Minimap (src/ui/minimap.ts): round chart in a bronze ring, top right, zone name on a plate
-         above, N on the rim (pointing to the real north as the chart turns), zoom buttons below right, big-map button below left. The column right of it stays free for the menu
+         above, N on the rim (pointing to the real north as the chart turns), zoom buttons below right, big-map button below left, camera-distance button above left. The column right of it stays free for the menu
          and fullscreen buttons; narrow screens drop it under the player frame. */
       #minimap {
         --m: 150px;
@@ -167,6 +167,9 @@
       #minimap .zin { right: -6px; bottom: 16px; }
       #minimap .zout { right: 16px; bottom: -6px; }
       #minimap .wmap { left: -10px; bottom: 12px; width: 34px; height: 34px; }
+      #minimap .view { left: -10px; top: 12px; width: 30px; height: 30px; } /* the camera's three distances (main.ts), opposite the map button */
+      #minimap .view svg { display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 2; }
+      #minimap .view svg circle, #minimap .view svg path.man { fill: currentColor; stroke: none; }
       body.touch #minimap { --m: calc(150px * var(--k)); }
       @media (max-width: 720px) { #minimap { top: calc(26px + 80px * var(--k, 1) + env(safe-area-inset-top)); } }
 
@@ -438,6 +441,7 @@
       <b class="north">N</b>
       <button class="zin" aria-label="Ingrandisci">+</button><button class="zout" aria-label="Riduci">&minus;</button>
       <button class="wmap orb" aria-label="Mappa (M)" title="Mappa (M)"></button>
+      <button class="view"></button>
     </div>
     <div id="stick"><div id="knob"></div></div>
     <button id="jump" class="touch-btn ring orb" aria-label="Salta" style="--a: 180deg; --r: 196px; --d: 54px"></button>

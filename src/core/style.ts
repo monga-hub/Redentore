@@ -52,3 +52,20 @@ export function onQuality(f: (q: Quality) => void): void {
   qsubs.push(f);
   f(quality);
 }
+
+// The minimap's camera button: three distances, close / medium / far (camera/*.ts STEPS), one tap
+// each round. Persisted like the style; a pinch or the wheel still zooms freely in between.
+const VKEY = 'redentore.view';
+export const VIEWS = ['Vicina', 'Media', 'Lontana'] as const;
+
+let view = 1;
+try { view = Math.max(0, ['0', '1', '2'].indexOf(localStorage.getItem(VKEY) ?? '1')); } catch { /* blocked storage: medium */ }
+
+export function getView(): number {
+  return view;
+}
+
+export function setView(v: number): void {
+  view = v;
+  try { localStorage.setItem(VKEY, String(v)); } catch { /* not persisted, still applied */ }
+}

@@ -7,11 +7,11 @@ import { CHURCH_FLOOR as F } from './plan.ts';
 // gotico.glb (one node per asset, feet on y = 0, 1 m tall): skull heaps and bones in the church
 // chapels, the crossing and the cloister corners, candelabra by the chapel altars, coffins,
 // a graveyard of tombstones on the lawns of the chiostro grande and the cortile degli ulivi,
-// a gibbet cage, fallen columns, and spiked skull braziers in place of the plain iron ones.
+// a gibbet cage and fallen columns (the braziers are fx/torches.ts's own Meshy iron).
 // Visual only, no colliders (the layout and the walkable map are untouched): kept to corners,
 // wall feet, lawns and dead ends. Loaded the first time the Diablo view is switched on.
 
-type Model = 'skulls' | 'bones' | 'candelabrum' | 'coffin' | 'gravestone' | 'column' | 'brazier' | 'cage';
+type Model = 'skulls' | 'bones' | 'candelabrum' | 'coffin' | 'gravestone' | 'column' | 'cage';
 
 /** [model, x, z, floor hint, yaw, height m]: the floor is read from the colliders under the spot. */
 type Spot = [Model, number, number, number, number, number];
@@ -55,14 +55,9 @@ export class GothicDressing {
   private on = false;
 
   private readonly world: World;
-  private readonly braziers: { x: number; y: number; z: number }[];
-  private readonly iron: THREE.Object3D[];
 
-  /** `braziers`: flame bases of the iron braziers (fx/torches.ts), whose `iron` is hidden under the Meshy ones. */
-  constructor(world: World, braziers: { x: number; y: number; z: number }[], iron: THREE.Object3D[]) {
+  constructor(world: World) {
     this.world = world;
-    this.braziers = braziers;
-    this.iron = iron;
     this.root.name = 'gothic';
     this.root.visible = false;
   }
@@ -72,19 +67,17 @@ export class GothicDressing {
     this.on = on;
     if (on) this.loading ??= this.load();
     this.root.visible = on && this.root.children.length > 0;
-    for (const o of this.iron) o.visible = !this.root.visible;
   }
 
   private async load(): Promise<void> {
     const gltf = await loadModel('gotico.glb').catch((e) => { console.error('gothic props failed to load', e); return undefined; });
     if (!gltf) return;
     gltf.scene.updateMatrixWorld(true);
-    const spots = [...SPOTS, ...this.braziers.map(({ x, y, z }, i): Spot => ['brazier', x, z, y - 1.1, i * 1.3, 1.15])];
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3();
     gltf.scene.traverse((o) => {
       const src = o as THREE.Mesh;
       if (!src.isMesh) return;
-      const mine = spots.filter((t) => t[0] === src.name);
+      const mine = SPOTS.filter((t) => t[0] === src.name);
       if (!mine.length) return;
       const mat = src.material as THREE.MeshStandardMaterial;
       mat.metalness = 0;

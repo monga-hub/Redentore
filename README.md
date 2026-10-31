@@ -387,8 +387,9 @@ com'è e passa alla visuale Diablo quando si prende il controllo.
   rosso sangue.
 - Arredo gotico Meshy, solo in questa modalità e caricato la prima volta che la si attiva
   (`src/level/gothic.ts`, `public/models/gotico.glb`): cumuli di teschi, ossa, candelabri,
-  bare, lapidi nel chiostro grande e nel cortile degli ulivi, colonne cadute, una gabbia, bracieri
-  di ferro chiodato con teschi. Solo visivo: nessun collider, percorribilità invariata.
+  bare, lapidi nel chiostro grande e nel cortile degli ulivi, colonne cadute, una gabbia (i bracieri
+  sono quelli di ferro di `src/fx/torches.ts`, in entrambe le modalità). Solo visivo: nessun collider,
+  percorribilità invariata.
 
 ## Audio
 
@@ -469,9 +470,16 @@ src/
                              il gradino giusto;
                              il gradino resta salvato sul dispositivo per questa build e
                              segue la scala, "Grafica: Auto" rifà la prova
-  fx/torches.ts              torce e bracieri: fiamme emissive, scintille, pool di 8
-                             PointLight assegnate alle torce più vicine al player; candele,
-                             lampadari e bagliori colorati delle vetrate da `level.lights`
+  fx/torches.ts              il fuoco: torce a muro, bracieri, cesti di fuoco e candelabri
+                             di ferro gotico veneziano (Meshy, `fuoco.glb`, istanziati per
+                             celle di 48 m, solo visivi) nei tre livelli; fiamme billboard
+                             con shader a rumore, HDR per il bloom; pool di 8 PointLight
+                             tremolanti (caduta al quadrato, raggio corto: pozze di luce nel
+                             buio) ai fuochi più vicini al player, gli altri dipingono la
+                             loro luce sul pavimento (e sul muro dietro la torcia), anche nei
+                             gradini bassi; scintille e braci che salgono nell'aria attorno
+                             ai sei fuochi più vicini (metà nei gradini ultra-leggeri);
+                             candele, lampadari e bagliori colorati da `level.lights`
   core/physics.ts            collisioni: tutto è un box (anche ruotato); pavimenti e muri
                              con la stessa regola (step 0,45 m). Nessuna dipendenza da three.
   core/input.ts              tastiera + mouse

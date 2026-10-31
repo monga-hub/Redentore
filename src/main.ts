@@ -461,7 +461,7 @@ questView.reward = (gold) => { bag.gold += gold; };
 questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
 questView.boonTaken = () => levels.apply();
 questView.blockDoors(level.cameraBlockers); // shut doors stop the camera and the targeting rays
-const gothic = new GothicDressing(level.world, fx.torches.braziers, fx.torches.brazierIron); // Meshy skulls, tombs, braziers
+const gothic = new GothicDressing(level.world); // Meshy skulls, tombs, cages
 level.root.add(gothic.root);
 const beams: THREE.Object3D[] = [];
 level.root.traverse((o) => { if (o.userData.beam) beams.push(o); });

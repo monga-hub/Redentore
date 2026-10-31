@@ -195,9 +195,9 @@ export class Director {
   private emitters(): void {
     const w = this.w, e = this.ear;
     // Torches and braziers: the three nearest crackle.
-    const near = w.fires.filter((f) => f.kind === 'torch' || f.kind === 'brazier')
+    const near = w.fires.filter((f) => f.kind === 'torch' || f.kind === 'brazier' || f.kind === 'basket')
       .map((f) => ({ f, d: (f.x - e.x) ** 2 + (f.z - e.z) ** 2 })).filter((o) => o.d < 100).sort((a, b) => a.d - b.d);
-    this.fires.forEach((em, i) => { const o = near[i]; em.set(o ? o.f : null, o ? (o.f.kind === 'brazier' ? 1 : 0.6) : 0); });
+    this.fires.forEach((em, i) => { const o = near[i]; em.set(o ? o.f : null, o ? (o.f.kind !== 'torch' ? 1 : 0.6) : 0); });
     // Praying groups murmur their psalm.
     const pray = this.groups.map((g) => {
       const live = g.filter((m) => m.state === 'pray');

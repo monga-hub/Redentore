@@ -51,10 +51,10 @@ export interface ArcadeOpts {
   upper?: string; // sides ('nesw') whose perimeter wall above the roof gets a marcapiano and windows
 }
 
-/** Extra flame or light for fx/torches.ts: candle flame (no light), hanging lamp, steady coloured glow, wall torch or brazier. */
+/** Extra flame or light for fx/torches.ts: candle flame (no light), hanging lamp, steady coloured glow, wall torch, brazier, iron fire basket or candelabrum. */
 export interface LightSpot {
   x: number; y: number; z: number;
-  kind: 'candle' | 'lamp' | 'glow' | 'torch' | 'brazier';
+  kind: 'candle' | 'lamp' | 'glow' | 'torch' | 'brazier' | 'basket' | 'candelabrum';
   color?: number; // glow only
   nx?: number; nz?: number; // torch: the wall's normal, into the room
 }

@@ -41,9 +41,9 @@ const MOON = 2.4;
 // Outdoor -> indoor endpoints of everything the indoor factor drives.
 const FOG_OUT = new THREE.Color(0x1a2332), FOG_IN = new THREE.Color(0x0c0d11);
 const MOOD = {
-  hemi: [0.5, 0.15],
+  hemi: [0.44, 0.09],
   fog: [0.016, 0.028],
-  exposure: [1.0, 1.15],
+  exposure: [1.0, 1.05],
   cool: [0.7, 0.3],
   vignette: [0.35, 0.55],
   dust: [0.12, 0.45],
@@ -53,7 +53,7 @@ const MOOD = {
 // adds contrast and closes in a heavy vignette.
 const DIABLO_MOOD: Record<keyof typeof MOOD, readonly [number, number]> = {
   ...MOOD,
-  hemi: [0.3, 0.09],
+  hemi: [0.27, 0.06],
   exposure: [1.0, 1.1],
   cool: [0.35, 0.15],
   vignette: [0.62, 0.72],
@@ -63,9 +63,11 @@ const DIABLO_MOOD: Record<keyof typeof MOOD, readonly [number, number]> = {
 // DIABLO_MOOD's outdoor end, scaled by `open`, which fades out by the cloister walks (indoor 0.45):
 // the church and the cloisters keep their dark.
 const DIABLO_OPEN = { hemi: 0.7, moon: 0.9, exposure: 0.35, vignette: -0.25, contrast: -0.1, hero: 0.6 };
-const GRADE = { wow: { sat: 1, contrast: 1, split: 0 }, diablo: { sat: 0.68, contrast: 1.16, split: 0.55 } };
+// Both looks push the contrast and split cold stone from warm fire, after the night-in-the-firelight reference; the Diablo one harder.
+const GRADE = { wow: { sat: 0.94, contrast: 1.12, split: 0.32 }, diablo: { sat: 0.74, contrast: 1.26, split: 0.62 } };
 const HERO_LIGHT = { color: 0xffa860, intensity: 14, distance: 12, decay: 1.5, height: 2.6 }; // the hero's light radius
-const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, lamp: 0.45, glow: 0.55 }; // pools of firelight, less lamplight
+const LAMPS_DOWN = { lamp: 0.4, glow: 0.7 }; // the WoW view: lamplight gives way to the fire too, for pools of warmth in the dark
+const LIGHT_BOOST = { torch: 1.35, brazier: 1.1, basket: 1.1, lamp: 0.3, glow: 0.5 }; // pools of firelight, less lamplight
 const DUST_OUT = new THREE.Color(0xb8c8e0), DUST_IN = new THREE.Color(0xffd6a0);
 const LAGOON_FOG = 0.02; // extra density at the riva
 const ALOFT = { y0: 20, y1: 40, clear: 0.9 }; // m: up San Giorgio's campanile the haze thins to show the lagoon (zones/sangiorgio.ts lagoon)
@@ -95,7 +97,7 @@ const KEY = 'redentore.fx';
 declare const __BUILD__: { sha: string; time: number };
 const SHADOW = PHONE ? 1024 : 2048;
 /** Without the post chain the grade is gone: a lower exposure and a CSS vignette over the canvas (free to composite) keep the dark. */
-const BARE = { exposure: 0.8, vignette: 0.75 };
+const BARE = { exposure: 0.68, vignette: 0.75 }; // the brazier pools would read flat without the grade's contrast: a little darker
 
 const NOISE = /* glsl */ `
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -220,7 +222,7 @@ const GradeShader = {
       float l = dot(c, LUMA), k = uCool * (1.0 - smoothstep(0.25, 1.5, l));
       vec3 night = l * vec3(0.62, 0.8, 1.22);
       c = mix(c, mix(c, night, 0.55), k);
-      if (uSplit > 0.0) { // Diablo grade: desaturate, cold shadows / warm lights, contrast about mid grey
+      { // desaturate, cold shadows / warm lights, contrast about mid grey
         l = dot(c, LUMA);
         c = mix(vec3(l), c, uSat);
         c *= mix(vec3(1.0), mix(vec3(0.8, 0.9, 1.1), vec3(1.2, 0.97, 0.76), smoothstep(0.03, 0.45, l)), uSplit);
@@ -278,7 +280,7 @@ export class Atmosphere {
     this.camera = camera;
     this.level = level;
     this.pixelRatio = renderer.getPixelRatio();
-    this.torches = new Torches(level.lights);
+    this.torches = new Torches(level.lights, (x, z, feet) => level.world.groundAt(x, z, feet));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -320,7 +322,7 @@ export class Atmosphere {
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: PHONE ? 2 : 4 });
     this.composer = new EffectComposer(renderer, rt);
     this.composer.addPass(new RenderPass(scene, camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.8, 0.6, 1.0));
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.95, 0.6, 1.0));
     this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
     this.setSize(innerWidth, innerHeight);
@@ -460,8 +462,8 @@ export class Atmosphere {
     const g = diablo ? GRADE.diablo : GRADE.wow, u = this.grade.uniforms;
     u.uSat.value = g.sat;
     u.uSplit.value = g.split; // uContrast: per frame, with the open air
-    this.torches.boost = diablo ? LIGHT_BOOST : {};
-    this.torches.brazierFlame = diablo ? 0.55 : 1;
+    this.torches.boost = diablo ? LIGHT_BOOST : LAMPS_DOWN;
+    this.torches.brazierFlame = diablo ? 0.8 : 1;
     this.torches.brazierLift = diablo ? 1.8 : 0.5;
     if (diablo) this.scene.add(this.hero);
     else this.scene.remove(this.hero);

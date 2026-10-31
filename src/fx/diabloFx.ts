@@ -199,6 +199,7 @@ export class DiabloFx {
     const y = m.y + h * 0.55;
     this.vfx.burst(spark, m.x, y, m.z, 8, 0.25, 3.2); // the white flash of the blow
     this.vfx.burst(gore, m.x, y, m.z, 10, 0.2, 1.8, 1.5);
+    if (d >= BIG) this.vfx.shake(Math.min(0.12, 0.05 + d / 1500)); // a heavy blow or a crit: a light kick, never a lurch
     if (d >= 8 || Math.random() < 0.25) this.stain(m.x + (Math.random() - 0.5) * 0.8, m.y, m.z + (Math.random() - 0.5) * 0.8, 0.7 + Math.min(d, 50) / 40);
   }
 

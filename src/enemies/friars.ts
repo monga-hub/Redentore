@@ -175,7 +175,8 @@ export function ownMaterials(model: THREE.Object3D): THREE.MeshStandardMaterial[
 
 /** Hit flash: `k` 0..1 of red-hot over each material's own glow; `cc` tints it: icy blue while chilled or frozen, flickering orange while burning. */
 export function flash(mats: THREE.MeshStandardMaterial[], k: number, cc?: Control): void {
-  let r = 0.9 * k, g = 0.15 * k, b = 0.1 * k;
+  const w = Math.max(0, k - 0.65) / 0.35; // the first instants white-hot, then the red
+  let r = 0.9 * k + 0.9 * w, g = 0.15 * k + 0.75 * w, b = 0.1 * k + 0.55 * w;
   if (cc?.root) { r += 0.12; g += 0.34; b += 0.6; } else if (cc?.slow) { r += 0.04; g += 0.12; b += 0.26; }
   if (cc?.burn) { const f = 0.7 + 0.3 * Math.sin(performance.now() * 0.023); r += 0.5 * f; g += 0.17 * f; b += 0.02 * f; }
   for (const m of mats) { const e = m.userData.glow as number, h = m.userData.ghost as number[] | undefined; m.emissive.setRGB((h?.[0] ?? e) + r, (h?.[1] ?? e) + g, (h?.[2] ?? e) + b); } // a ghost keeps its cold glow

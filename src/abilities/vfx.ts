@@ -19,6 +19,8 @@ export const T = { glow: 0, spark: 1, star: 2, smoke: 3, smoke2: 4, wisp: 5, sha
 /** Decal atlas tiles (4×4). */
 export const D = { disc: 0, shock: 1, runes: 2, cracks: 3, scorch: 4, pool: 5, ring: 6, sigil: 7, splash: 8, swirl: 9, frost: 10, glyph: 11 } as const;
 
+const CALM = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 type Range = number | [number, number];
 const pick = (r: Range) => (typeof r === 'number' ? r : r[0] + Math.random() * (r[1] - r[0]));
 
@@ -910,6 +912,7 @@ export class Vfx {
 
   /** Camera shake: `k` 0..1 of trauma, added up and decaying. */
   shake(k: number): void {
+    if (CALM) return; // the system's reduce-motion: no shake at all
     this.trauma = Math.min(1, this.trauma + k);
   }
 

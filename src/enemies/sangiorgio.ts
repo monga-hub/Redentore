@@ -143,11 +143,11 @@ export const ABATE_BOUNDS: Bounds = { x0: CENACOLO.x0 + 3.5, x1: CENACOLO.x1 - 3
 
 type Spot = [number, number];
 /**
- * `hidden`: asleep (dead, out of sight, worth nothing) until that side quest reaches that step, then up and on the hero (`rouse`),
+ * `hidden`: asleep (dead, out of sight, worth nothing) until that side quest reaches that step (or `also` is taken), then up and on the hero (`rouse`),
  * `say` called out; `rest`: up at its spots instead, waiting; `under`: and only once the Commissario, fighting, is under that
  * share of his health (main.ts puts them back to sleep when he is back at rest).
  */
-export interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][]; hidden?: { quest: SideId; step: number; say: string; rest?: true; under?: number } }
+export interface Pack { label: string; at: Spot; bounds: Bounds; members: [CasterKind, number, number][]; hidden?: { quest: SideId; step: number; say: string; rest?: true; under?: number; also?: SideId } }
 const rect = (x0: number, x1: number, z0: number, z1: number): Bounds => ({ x0, x1, z0, z1 });
 const QUAY = rect(-376, -301, 0.5, 19.5), ALLORI = rect(-545, -515, 47, 77), CIPRESSI = rect(-501, -465, 47, 77);
 /** The procession's floors: the crossing with its transepts, the nave with its aisles, the piazzale before the portal. */
@@ -185,8 +185,8 @@ export const PACKS: Pack[] = [
   // Hidden. Acqua di San Benedetto: wine drawn from the well, the cellar's monks who bless it come up round it.
   { label: 'Chiostro degli allori', at: [-530, 62], bounds: ALLORI, members: [[MONACO, -532.5, 64.5], [MONACO, -527.5, 64.5], [MONACO, -530, 58.5]], hidden: { quest: 'acqua', step: VINO, say: 'I monaci della cantina salgono al pozzo a benedire il loro vino!' } },
   // Hidden. La tela tagliata taken: the Commissario delle Arti back in the chiostro dei cipressi, where the troops slept; at half his health his granatieri.
-  { label: 'Chiostro dei cipressi', at: [-483, 62], bounds: CIPRESSI, members: [[COMMISSARIO, -483, 54]], hidden: { quest: 'tela', step: 0, say: 'Nel chiostro dei cipressi qualcuno conta i quadri ad alta voce, in francese...', rest: true } },
-  { label: 'Chiostro dei cipressi', at: [-483, 58], bounds: CIPRESSI, members: [[GRANATIERE, -497, 50], [GRANATIERE, -469, 50], [GRANATIERE, -483, 74]], hidden: { quest: 'tela', step: 0, say: 'Il Commissario delle Arti chiama i granatieri: «À moi, la garde!»', under: 0.5 } },
+  { label: 'Chiostro dei cipressi', at: [-483, 62], bounds: CIPRESSI, members: [[COMMISSARIO, -483, 54]], hidden: { quest: 'tela', step: 0, say: 'Nel chiostro dei cipressi qualcuno conta i quadri ad alta voce, in francese...', rest: true, also: 'drago' } }, // and for the lance's butt
+  { label: 'Chiostro dei cipressi', at: [-483, 58], bounds: CIPRESSI, members: [[GRANATIERE, -497, 50], [GRANATIERE, -469, 50], [GRANATIERE, -483, 74]], hidden: { quest: 'tela', step: 0, say: 'Il Commissario delle Arti chiama i granatieri: «À moi, la garde!»', under: 0.5, also: 'drago' } },
   // Hidden. Rintocchi muti: the third clapper out, the Campanaro comes up the stair into the bell chamber, his floor between the parapets.
   { label: 'Cella campanaria', at: [-574, 116], bounds: BELL_FLOOR, members: [[CAMPANARO, -573.4, 113.6]], hidden: { quest: 'rintocchi', step: MUTE, say: 'Le campane mute tremano: il Campanaro di San Giorgio sale dalla scala a riprendersi i batacchi!' } },
   // Hidden. L'incoronazione: as the Cardinale stops under the dome, mid-nave and on the sagrato, monaci neri close on him (main.ts aims them at him, not the hero).
@@ -216,7 +216,7 @@ export function spawnLevel3(world: World): Level3 {
  */
 export function due(h: Level3['hidden'][number], l3: Level3, reached: (q: SideId, step: number) => boolean, boss3Dead: boolean): boolean {
   const H = h.pack.hidden!, c = l3.commissario;
-  return !boss3Dead && reached(H.quest, H.step) && (!H.under || (c.state !== 'pray' && c.state !== 'dead' && c.state !== 'evade' && c.hp <= c.kind.hp * H.under));
+  return !boss3Dead && (reached(H.quest, H.step) || (!!H.also && reached(H.also, 0))) && (!H.under || (c.state !== 'pray' && c.state !== 'dead' && c.state !== 'evade' && c.hp <= c.kind.hp * H.under));
 }
 
 /** A hidden pack up at its spots, whole; `fight`: and on the hero at once (else at rest, as a load finds it). */

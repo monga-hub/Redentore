@@ -9,6 +9,7 @@ import type { Mark } from './progress.ts';
 // nothing in the game targets or hurts him. Fra' Bortolo in the serra is the same ghost glowing
 // green, and Mastro Iseppo in the squero a Meshy boatwright glowing like a lantern: `Npc` takes where it stands, the tint and the body.
 // A body with no talking clips (an enemy's, like the Fanalista's drowned sailor) talks with its Pray and Idle instead.
+// The statue of San Giorgio has no body at all (`model` ''): only his marker, high over the sagrato at his niche (`height`).
 // He stands wherever his spot is (the Cardinale's moves with his procession, quest/escort.ts), and `cheer` has him gesture
 // to the world a while, facing his own way (the Cardinale crowned on the Bacino).
 
@@ -50,6 +51,7 @@ export interface Spot { x: number; y?: number; z: number; yaw: number }
 export class Npc {
   readonly root = new THREE.Group();
   private at: Spot;
+  private height: number;
   private mixer?: THREE.AnimationMixer;
   private idle?: THREE.AnimationAction;
   private talks: THREE.AnimationAction[] = [];
@@ -60,13 +62,14 @@ export class Npc {
   /** s left of gesturing to the world, not to the hero. */
   cheer = 0;
 
-  /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips (else Pray and Idle). */
-  constructor(at: Spot, tint = GHOST, model = 'zuane.glb') {
+  /** `tint`: the colour his body glows; `model`: his body (public/models), with Idle, Talk_Open and Talk_Right clips (else Pray and Idle), '' none; `height`: his marker's. */
+  constructor(at: Spot, tint = GHOST, model = 'zuane.glb', height = HEIGHT) {
     this.at = at;
+    this.height = height;
     this.root.position.set(at.x, at.y ?? 0, at.z);
     this.root.rotation.y = at.yaw;
     for (const m of Object.values(this.marks)) this.root.add(m);
-    loadModel(model).then((gltf) => {
+    if (model) loadModel(model).then((gltf) => {
       const model = gltf.scene;
       stand(model, HEIGHT);
       model.traverse((o) => {
@@ -99,7 +102,7 @@ export class Npc {
     this.root.position.set(at.x, at.y ?? 0, at.z);
     for (const [k, m] of Object.entries(this.marks)) {
       m.visible = k === mark && !this.talking;
-      m.position.y = HEIGHT + 0.85 + Math.sin(this.time * 2.5) * 0.06;
+      m.position.y = this.height + 0.85 + Math.sin(this.time * 2.5) * 0.06;
     }
     const want = this.talking ? Math.atan2(-(player.x - at.x), -(player.z - at.z)) : at.yaw;
     const d = Math.atan2(Math.sin(want - this.root.rotation.y), Math.cos(want - this.root.rotation.y));

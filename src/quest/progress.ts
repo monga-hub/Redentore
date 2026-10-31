@@ -152,6 +152,7 @@ export const QUESTS = {
   tiara: { title: 'La tiara di cartapesta', xp: 180, gold: 70 }, // his second: the ladies' three jewels
   incoronazione: { title: "L'incoronazione", xp: 350, gold: 150 }, // his third: walked from the altar to the Bacino through three waves, and crowned
   sabbia: { title: 'Il libro di sabbia', xp: 200, gold: 0 }, // the secret one: a page off an amanuense, the book in the labyrinth, its shelf in the library
+  drago: { title: 'Il drago di Carpaccio', xp: 450, gold: 200 }, // the statue of San Giorgio: his lance off three elites, and the dragon out of the lagoon behind the Teatro Verde, ~level 18
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -226,7 +227,7 @@ export class Quest {
     const held = (Object.keys(GIVERS) as Giver[]).map((g) => { const at = GIVERS[g].at; return world.add(at.x, at.z, at.r, at.r, at.y ?? 0, (at.y ?? 0) + 1.8); });
     this.held = held[Object.keys(GIVERS).indexOf('cardinale')];
     this.side.complete = (id) => this.complete(id);
-    this.side.over = (q) => { const g = giverOf(q); return g ? (GIVERS[g].level === 3 ? this.boss3Dead : this.boss2Dead) : false; }; // a secret is never stranded: it has no one to hand it to
+    this.side.over = (q) => { const g = giverOf(q); return g && !q.lasts ? (GIVERS[g].level === 3 ? this.boss3Dead : this.boss2Dead) : false; }; // a secret is never stranded: it has no one to hand it to; the dragon outlives the Abate
   }
 
   get stage(): Stage {

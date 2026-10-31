@@ -108,6 +108,7 @@ export const WEAPONS: Record<string, Weapon> = {
   'baculo-abate': { file: 'baculo.glb', length: 1.65, grip: 0.3, lean: 0.2, staff: 0.6 },
   'sciabola-commissario': { file: 'sciabola.glb', length: 1.0, grip: 0.12, lean: 0.35 }, // the Commissario delle Arti's sabre (the Veronese's La tela tagliata)
   'batacchio-sangiorgio': { file: 'campanaro.glb', length: 1.1, grip: 0.12, lean: 0.35 }, // the clapper of San Giorgio's great bell (Padre Archivista's Rintocchi muti): the bell hammer's model, longer
+  'lancia-sangiorgio': { file: 'lancia.glb', length: 2.1, grip: 0.3, lean: 0.2, staff: 0.62 }, // San Giorgio's lance (Il drago di Carpaccio), held upright like a staff, point up
 };
 /**
  * `fist`, in RightHand's own coordinates (cm): the channel in front of the palm (-Z), across it, the thumb side -X. A shaft

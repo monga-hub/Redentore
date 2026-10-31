@@ -9,8 +9,8 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { ARCHIVISTA, CROWNED, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
-import { BELLS, BELL_MOUTH, CENACOLO } from '../level/zones/sangiorgio.ts';
+import { ARCHIVISTA, CROWNED, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, STATUA, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { BELLS, BELL_MOUTH, CENACOLO, FAC } from '../level/zones/sangiorgio.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
 // leaves that swing open, the chest on the pontile (a Meshy reliquary chest whose lid swings
@@ -41,8 +41,10 @@ const FARO = 0xffb347; // the Fanalista's, lamp oil
 const ARCHIVIO = 0x9fc8ff; // Padre Archivista's, his lantern's pale flame
 const BIACCA = 0xffe2a8; // the Veronese's, lead white and gold
 const PORPORA = 0xffb0a0; // the Cardinale's, candlelight on scarlet
-/** The givers' portraits: Mastro Iseppo's, Padre Archivista's, the Veronese's and the Cardinale's own; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
-const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' }, cardinale: { file: 'cardinale' } };
+/** San Giorgio's statue (no body): the light round him in his niche, his head's glory, and the pool at his foot where he is heard; `y` m up. */
+const NICCHIA = [{ y: 8.8, size: 4.2 }, { y: 10.2, size: 1.5 }] as const;
+/** The givers' portraits: Mastro Iseppo's, Padre Archivista's, the Veronese's and the Cardinale's own, San Giorgio's Carpaccio's; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
+const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' }, cardinale: { file: 'cardinale' }, statua: { file: 'statua', tint: 'sepia(0.3) brightness(1.1)' } }; // the saint's: his head off Carpaccio's San Giorgio e il drago (1516), in San Giorgio Maggiore
 /** The Nozze di Cana's canvas on the Cenacolo's end wall, over the garden door (zones/sangiorgio.ts cenacolo: inside the gilt frame, before the cut edge). */
 const NOZZE = { x0: -540.4, x1: -519.6, y0: 4.8, y1: 10.6, z: CENACOLO.z0 + 0.7 };
 /** A lighthouse's fire seen from across the lagoon: a soft gold halo on a canvas. */
@@ -127,6 +129,7 @@ export class QuestView {
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
   private givers: Record<Giver, Npc>; // the Cardinale on his procession's spot (quest/escort.ts), set with the quest
+  private glory: THREE.Object3D[] = []; // San Giorgio's light: round the statue, his head, the pool at his foot (once level 3 opens)
   private tiara = tiara(); // on the Cardinale's head once he is crowned on the Bacino, until he gives it to the hero
   private crowned?: boolean; // as last drawn (undefined: not yet, so a load finds him crowned without the flash)
   private finds: { q: SideQuest; at: { x: number; y: number; z: number }; m: THREE.Object3D }[] = []; // a gold glint over each find spot and use-point while its quest wants it (a secret's: the book itself, lying there)
@@ -175,7 +178,7 @@ export class QuestView {
   constructor(quest: Quest, vfx: Vfx) {
     this.quest = quest;
     this.vfx = vfx;
-    this.givers = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(quest.side.escort.pose, PORPORA, 'cardinale.glb') };
+    this.givers = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(quest.side.escort.pose, PORPORA, 'cardinale.glb'), statua: new Npc(STATUA, GOLD, '', 10.6) };
     this.givers.cardinale.root.add(this.tiara);
     const iron = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.55, metalness: 0.75 });
     this.gates = quest.gates.map((g) => this.gate(g, iron));
@@ -218,6 +221,18 @@ export class QuestView {
       this.fari.push(s);
       this.root.add(s);
     }
+    const light = halo();
+    light.color.setRGB(1.5, 1.4, 1.15); // moonlit stone, gold at the heart: soft, the statue seen through it
+    for (const n of NICCHIA) { // over the statue in the left niche (zones/sangiorgio.ts facade), just before it
+      const s = new THREE.Sprite(light.clone());
+      s.position.set(FAC + 0.7, n.y, STATUA.z);
+      s.scale.setScalar(n.size);
+      this.glory.push(s);
+    }
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(1.3, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: light.map, color: new THREE.Color(0.9, 0.85, 0.7), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    pool.position.set(STATUA.x, 0.03, STATUA.z);
+    this.glory.push(pool);
+    for (const g of this.glory) { g.visible = false; this.root.add(g); }
     for (const { at, r } of BELLS) { // a rod down the bell's throat and its ball just under the lip (zones/sangiorgio.ts campanile)
       const rod = new THREE.CylinderGeometry(0.05, 0.05, r * 1.1).translate(0, r * 0.55, 0), ball = new THREE.SphereGeometry(r * 0.22, 10, 6);
       const m = new THREE.Mesh(mergeGeometries([rod, ball]), iron);
@@ -316,6 +331,12 @@ export class QuestView {
     this.npc.update(dt, player, m.zuane);
     this.speziale.update(dt, player, m.speziale);
     for (const [g, n] of Object.entries(this.givers) as [Giver, Npc][]) n.update(dt, player, m[g]);
+    const t = performance.now() * 0.001, k = this.givers.statua.talking ? 1.35 + Math.sin(t * 7) * 0.12 : 1 + Math.sin(t * 1.3) * 0.08; // he breathes light, and speaks in it
+    this.glory.forEach((g, i) => {
+      g.visible = this.quest.accepted3;
+      if (i < NICCHIA.length) g.scale.setScalar(NICCHIA[i].size * k);
+      else g.scale.setScalar(k);
+    });
   }
 
   /** The quest givers with a "!" or "?" up, for the maps: `state` is the Mark. */

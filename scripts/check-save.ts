@@ -1,6 +1,7 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
 // dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots, the reload handoff and the autosave survive storage and refuse junk.
+import { SIDE_BY } from '../src/quest/squero.ts';
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, QUESTS, Quest } from '../src/quest/progress.ts';
@@ -189,6 +190,21 @@ if (sb.quest.bonusXp !== z.quest.bonusXp || questXpIn(ss) !== z.quest.bonusXp) f
 if (old.quest.side.taken.length || old.quest.side.done.length || !valid((({ side: _s, ...o }) => o)(ss))) fail('a save from before Mastro Iseppo loads with his quests');
 if (valid({ ...ss, side: { taken: [1], done: [] } }) || valid({ ...ss, side: { taken: [], done: [], kills: { lumi: 'x' } } }) || valid({ ...ss, side: { taken: [], done: [], steps: { fari: 'x' } } })) fail('side quest field validation');
 if (!valid({ ...ss, side: (({ steps: _st, ...o }) => o)(ss.side) })) fail('a save from before the quests in steps is refused');
+// Il drago di Carpaccio (the statue of San Giorgio's): the lance raised, the dragon to kill, its pieces in the bag, survive a save, and so does
+// the dragon dead (ready); once handed in, the lance in the bag; a save from before it loads without it.
+if (sb.quest.side.taken.includes('drago') || sb.quest.side.done.includes('drago')) fail('a save from before the dragon loads with its quest');
+z.quest.side.taken.push('drago');
+z.quest.side.steps.drago = 4;
+for (const id of ['lancia-punta', 'lancia-asta', 'lancia-calcio']) z.bag.add(id);
+const ds = JSON.parse(JSON.stringify(serialize(z))), db = boot();
+db.quest.side.bag = db.bag;
+deserialize(db, ds);
+if (!db.quest.side.active('drago') || db.quest.side.step(SIDE_BY.get('drago')!) !== 4 || !db.bag.count('lancia-calcio') || db.quest.side.ready(SIDE_BY.get('drago')!)) fail(`the dragon's quest restored as ${JSON.stringify(db.quest.side.encode())}`);
+z.quest.side.kills.drago = 1;
+const dk = JSON.parse(JSON.stringify(serialize(z))), dd = boot();
+dd.quest.side.bag = dd.bag;
+deserialize(dd, dk);
+if (!dd.quest.side.ready(SIDE_BY.get('drago')!)) fail('the dragon dead does not survive a save');
 // A fog grid round-trips by its origin; one from before (no origin: level 2 at +X, x 60..300) keeps level 1's cells
 // where they were and lays level 2's on its new side, -X (level/plan.ts).
 const wide = fogOf(boot());

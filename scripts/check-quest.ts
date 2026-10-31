@@ -7,7 +7,7 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
-import { PAGE_DROP, SCANSIA, CARDINALE, CROWNED, DITALE, ONDATE, PROCESSION, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideId } from '../src/quest/squero.ts';
+import { FRAMMENTI, PALCO, RAISED, STATUA, PAGE_DROP, SCANSIA, CARDINALE, CROWNED, DITALE, ONDATE, PROCESSION, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideId } from '../src/quest/squero.ts';
 import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, MONACO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { BELFRY, BELLS, CAMPANILE, LABIRINTO, LIB_F, SCANSIE } from '../src/level/zones/sangiorgio.ts';
 import { itemTip } from '../src/ui/tooltip.ts';
@@ -18,6 +18,8 @@ import { GONDOLIERE, PACKS, spawnLevel2 } from '../src/enemies/zitelle.ts';
 import { hurt as casterHurt, killAll, rise, sees, think, type Bolt } from '../src/enemies/caster.ts';
 import { ESCORT } from '../src/quest/escort.ts';
 import { RISE } from '../src/enemies/brain.ts';
+import { DRAGO, DRAGO_SPOTS } from '../src/enemies/drago.ts';
+import { WEAPONS } from '../src/player/outfit.ts';
 
 const SIDE = ALL_SIDE.filter((q) => giverOf(q) === 'iseppo'); // Mastro Iseppo's in the squero; San Giorgio's below
 let failed = 0;
@@ -593,6 +595,67 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   if (!copy.side.done.includes('sabbia') || s.loot('amanuense', () => 0, false, () => 0) || (b.add('pagina-sabbia'), s.update())) fail('Il libro di sabbia starts again once done');
 }
 
+// Il drago di Carpaccio: the statue of San Giorgio speaks from his niche (no body: a giver at the foot of the facade, standable and out of the
+// Piazzale's pull), level 3's once its chains fall; the lance's three pieces off the Nostromo, the Bibliotecario and the Commissario (who wakes
+// for it), in any order, saved; raised on the Teatro Verde's stage within the dragon's pull; the dragon's death makes it ready, the Abate's
+// does not; handed in for 450 XP, 200 gold and the Lancia di San Giorgio, a unique legendary weapon in the hand. It gates nothing.
+{
+  const l3 = spawnLevel3(level.world), q = new Quest(level.world), s = q.side, b = new Bag(), dq = SIDE_BY.get('drago')!;
+  s.bag = b;
+  const at = feet(STATUA.x + 0.8, STATUA.z);
+  if (giverOf(dq) !== 'statua' || GIVERS.statua.level !== 3) fail('Il drago di Carpaccio is not the statue of San Giorgio\'s, on level 3');
+  if (level.world.blocked(at.x, at.z, at.y) || at.y > 0.3) fail('no room to stand on the sagrato at the foot of San Giorgio\'s niche');
+  if (PACKS3.some((pk) => !pk.hidden && pk.members.some(([k, x, z]) => Math.hypot(x - STATUA.x, z - STATUA.z) < k.aggro))) fail('the statue of San Giorgio is in a pack\'s pull');
+  if (q.marks(0).statua) fail('the statue of San Giorgio shows a marker before level 3 opens');
+  q.accepted2 = q.accepted3 = true;
+  if (q.prompt(at)?.talk !== 'statua' || q.prompt(at)?.text !== 'Parla con San Giorgio' || q.marks(0).statua !== 'offer') fail('the statue of San Giorgio is not to be talked to, with his "!" up');
+  if (QUESTS.drago.xp !== 450 || QUESTS.drago.gold !== 200 || dq.prep || dq.after) fail('Il drago di Carpaccio is not the plan\'s: 450 XP, 200 gold, no chain, nothing on the Abate');
+  const lance = ITEM.get(dq.reward!)!;
+  if (lance.slot !== 'arma' || lance.rarity !== 'leggendario' || !lance.unique || !WEAPONS[lance.id]?.file || SHOP.some((g) => g.id === lance.id)) fail('the Lancia di San Giorgio is not a unique legendary weapon with a model, off the shop');
+  for (let i = 0; i < 3000; i++) if (roll(i % 2 ? 'boss' : 'elite', Math.random, 3).items.includes(lance.id)) { fail('the Lancia di San Giorgio dropped off the dead'); break; }
+  if (s.tokens().length) fail('a piece of the lance is wanted before the quest');
+  const tela = l3.hidden.find((h) => h.members[0] === l3.commissario)!, got = (id: SideId, step: number) => s.reached(id, step);
+  if (due(tela, l3, got, false)) fail('the Commissario wakes before La tela tagliata or the dragon\'s quest');
+  const t = s.talk('statua');
+  if (!t.accept || t.talk.title !== QUESTS.drago.title || t.talk.pages.some((p) => p.length > 420)) fail('the statue does not offer Il drago di Carpaccio');
+  t.accept?.();
+  if (s.tokens().map((k) => `${k.from}:${k.item}`).join() !== FRAMMENTI.map((f) => `${f.from}:${f.item}`).join() || FRAMMENTI.some((f) => !ITEM.get(f.item)?.quest)) fail('the three pieces are not wanted off the Nostromo, the Bibliotecario and the Commissario');
+  if (!due(tela, l3, got, false) || due(tela, l3, got, true)) fail('the Commissario does not wake for the lance\'s butt (before the Abate)');
+  if (q.prompt(feet(PALCO.x, PALCO.z + 1))?.act) fail('the lance can be raised before its pieces are in hand');
+  b.add(FRAMMENTI[2].item); b.add(FRAMMENTI[0].item);
+  s.update();
+  if (s.step(dq) !== 1 || s.progress(dq) !== 2 || !s.line(dq).includes('2/3') || s.tokens().map((k) => k.from).join() !== 'bibliotecario') fail(`two pieces out of order are not counted (${s.line(dq)})`);
+  const copy = new Quest(level.world);
+  copy.side.bag = b;
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (!copy.side.active('drago') || copy.side.progress(dq) !== 2) fail('the pieces do not survive a save');
+  b.add(FRAMMENTI[1].item);
+  for (let i = 0; i < 4; i++) s.update();
+  if (s.step(dq) !== RAISED - 1 || !s.line(dq).includes('Teatro Verde') || s.ready(dq)) fail(`the three pieces do not send the hero to the Teatro Verde (step ${s.step(dq)})`);
+  const stage = feet(PALCO.x, PALCO.z + 1);
+  if (Math.abs(stage.y - PALCO.y) > 0.1 || level.world.blocked(stage.x, stage.z, stage.y)) fail('no room on the Teatro Verde\'s stage by the lance\'s spot');
+  if (Math.hypot(PALCO.x - DRAGO_SPOTS[0][0], PALCO.z - DRAGO_SPOTS[0][1]) > DRAGO.aggro - 2) fail('the lance is raised out of the dragon\'s pull');
+  const raise = q.prompt(stage);
+  if (!raise?.act || !raise.text.startsWith('Leva la lancia')) fail(`no prompt to raise the lance on the stage (${raise?.text})`);
+  raise?.act?.();
+  if (s.step(dq) !== RAISED || !s.line(dq).includes('Abbatti il drago') || s.ready(dq)) fail('the lance raised does not set the dragon to kill');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.step(dq) !== RAISED || copy.side.ready(dq)) fail('the lance raised does not survive a save (the dragon to wake again on a load)');
+  q.boss3Dead = true;
+  if (s.ready(dq) || q.marks(0).statua === 'ready') fail('Il drago di Carpaccio is ready with the Abate dead, the dragon alive');
+  s.killed('marinaio'); s.killed('commissario');
+  if (s.ready(dq)) fail('another death counts for the dragon');
+  const main = q.stage;
+  s.killed('drago');
+  if (!s.ready(dq) || q.marks(0).statua !== 'ready' || q.stage !== main) fail('the dragon\'s death does not make the quest ready, or the quest moves the main one');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (!copy.side.ready(dq)) fail('the dragon dead does not survive a save');
+  const xp = q.bonusXp, paid = s.talk('statua');
+  if (paid.paid?.id !== 'drago' || q.bonusXp !== xp + 450 || b.count(lance.id) !== 1 || FRAMMENTI.some((f) => b.count(f.item)) || !s.done.includes('drago') || q.marks(0).statua) fail('Il drago di Carpaccio is not handed in for 450 XP and the lance, the pieces out of the bag');
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (!copy.side.done.includes('drago') || copy.side.open('statua').length || s.tokens().length) fail('Il drago di Carpaccio is offered again once done');
+}
+
 // The drowned rise again like the orto's friars: late, out of the hero's way, at their spot, worth less.
 const l2 = spawnLevel2(level.world), g0 = l2.all.find((m) => m.kind === GONDOLIERE)!;
 // The markers (Quest.marks): "!" on offer, "?" ready to hand in, "?" over "!", none when idle.
@@ -626,7 +689,7 @@ if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
 console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
-  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order, L'incoronazione escorted through 3 waves, Il libro di sabbia unmarked); `
+  + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order, L'incoronazione escorted through 3 waves, Il libro di sabbia unmarked, Il drago di Carpaccio from the statue); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {
   console.error(`${failed} quest check(s) failed`);

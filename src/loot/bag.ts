@@ -82,6 +82,10 @@ export const ITEMS: readonly Item[] = [
   // Il libro di sabbia's, the secret one: the page off an amanuense, and the book found in the Borges labyrinth.
   { id: 'pagina-sabbia', name: 'Una pagina senza numero', rarity: 'epico', icon: 'relic', lore: 'Né recto né verso: una riga sola, a inchiostro di seppia. «Al centro del giardino dei sentieri che si biforcano».', quest: true, l3: true },
   { id: 'libro-sabbia', name: 'Libro senza titolo', rarity: 'epico', icon: 'relic', lore: 'Sul dorso, a matita: «VI, a sinistra di chi entra». Le pagine non si contano: fra due ce n’è sempre un’altra.', quest: true, l3: true },
+  // Il drago di Carpaccio's: San Giorgio's lance, broken in three when it came down off the canvas with the dragon.
+  { id: 'lancia-punta', name: 'Punta della lancia di San Giorgio', rarity: 'epico', icon: 'nail', lore: 'Ferro dorato a foglia d’ulivo, ancora sporco di verde. Il Nostromo ci accendeva la pipa. Per la statua di San Giorgio.', quest: true, l3: true },
+  { id: 'lancia-asta', name: 'Asta della lancia di San Giorgio', rarity: 'epico', icon: 'relic', lore: 'Frassino dipinto a spire bianche e rosse, come nella tela del Carpaccio. Il Bibliotecario la usava per le scansie alte. Per la statua di San Giorgio.', quest: true, l3: true },
+  { id: 'lancia-calcio', name: 'Calcio della lancia di San Giorgio', rarity: 'epico', icon: 'medal', lore: 'Un pomo d’ottone con la croce rossa. Nell’inventario del Commissario è il numero 1797. Per la statua di San Giorgio.', quest: true, l3: true },
   ...GEAR,
 ];
 export const ITEM = new Map(ITEMS.map((i) => [i.id, i]));

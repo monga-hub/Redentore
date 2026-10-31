@@ -147,8 +147,16 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   scansia di noce a sinistra entrando in Biblioteca: le due pareti lunghe hanno otto scansie ciascuna, tutte con lo
   stesso «Riponi il libro», e solo quella giusta lo prende. Paga 200 PE e *Il libro di sabbia* (collo, epico unico), che
   a ogni apertura del tooltip mostra una pagina diversa.
-- **Il drago di Carpaccio** (prototipo del combattimento della missione 9 di San Giorgio, ancora senza missione né
-  frammenti di lancia): con `?drago=1` nell'indirizzo il gioco parte al Teatro Verde con l'eroe al livello 18, il miglior
+- **Il drago di Carpaccio**, facoltativa (non serve per l'Abate): la dà la statua di San Giorgio nella nicchia sinistra
+  della facciata della basilica, che parla senza corpo, solo luce e voce (ritratto: la testa del santo dal *San Giorgio e
+  il drago* del Carpaccio, 1516, `statua.webp`). I tre pezzi della lancia (`token`) li hanno il Nostromo, il Bibliotecario
+  e il Commissario delle Arti, che per questa missione si sveglia anche senza *La tela tagliata*; in qualunque ordine, e
+  chi li ha già uccisi trova il pezzo accanto al corpo (anche dopo un caricamento o con l'Abate morto). Sul palco del
+  Teatro Verde «Leva la lancia di San Giorgio verso la laguna»: il drago, che fino ad allora dorme, sale dall'acqua. Se
+  l'eroe cade, o ricarica la partita, il drago lo aspetta sotto la laguna finché la missione è a quel passo. Abbattuto,
+  si torna dalla statua: 450 PE, 200 oro e la *Lancia di San Giorgio* (arma leggendaria unica, `lancia.glb`, tenuta
+  dritta come un bastone). Il combattimento è quello del prototipo.
+  Con `?drago=1` nell'indirizzo il gioco parte al Teatro Verde con l'eroe al livello 18, il miglior
   equipaggiamento viola per posto e il branco del teatro addormentato; il salvataggio automatico è spento. Avvicinandosi
   al palco il drago (8000 PV, `src/enemies/drago.ts`) sale dalla laguna dietro il palco: testa Meshy su un corpo di
   serpente costruito nel codice (`src/enemies/serpent.ts`). Morso, sputo di veleno, *Fiato* (cono di veleno), *Coda*

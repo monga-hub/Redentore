@@ -18,11 +18,12 @@
 // two quests (the musicians' instruments, then the canvas back off the Commissario delle Arti) open the Cenacolo, and the
 // Cardinale benedettino before the high altar, who wants the conclave's voting slips counted, the tiara's jewels found, and then to be
 // walked out of his church to be crowned (an escort, quest/escort.ts). Padre Archivista's second sends the hero
-// up the campanile, to the bell chamber 44 m over the lagoon. A quest may run in steps (`want` a list: collect, then use-points that burn what
+// up the campanile, to the bell chamber 44 m over the lagoon. The statue of San Giorgio on the basilica's front speaks too (no body, only light
+// and voice): the three pieces of his lance off three elites, raised on the Teatro Verde's stage, call Carpaccio's dragon out of the lagoon. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
-import { BELLS, LABIRINTO, LIB_F, SCANSIE } from '../level/zones/sangiorgio.ts';
+import { BELLS, FAC, LABIRINTO, LIB_F, SCANSIE } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
 import { ESCORT, Escort } from './escort.ts';
 import { QUESTS, type QuestId } from './progress.ts';
@@ -40,14 +41,19 @@ export const ARCHIVISTA = { x: -506.5, z: 63, yaw: Math.PI / 2, r: 0.35, name: '
 export const VERONESE = { x: -525, z: 43.2, yaw: Math.PI / 2, r: 0.35, name: 'Paolo Veronese' } as const;
 /** The Cardinale benedettino, on the presbytery before the high altar, facing the crossing (2 m toward it from the altar: out of the choir's pull). */
 export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, name: 'Il Cardinale benedettino' } as const;
+/**
+ * San Giorgio, the statue in the left niche of the basilica's front (zones/sangiorgio.ts facade), who speaks: no body, only his light
+ * and his voice. Talked to from the sagrato at the foot of his niche, between the giant order's plinths (out of the Piazzale's pull).
+ */
+export const STATUA = { x: FAC + 2, z: 97.1, yaw: Math.PI / 2, r: 0.2, name: 'San Giorgio', y: 0 } as const;
 
 /** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
-export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro';
+export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro' | 'drago';
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione' | 'sabbia'; // their ids in QUESTS
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione' | 'sabbia' | 'drago'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
-export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale';
+export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale' | 'statua';
 export interface GiverSpec { at: { x: number; y?: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
 
 /**
@@ -85,6 +91,8 @@ export interface SideQuest {
   after?: SideId;
   /** The epic he gives, if any (its XP, gold and title are QUESTS', quest/progress.ts, paid through Quest.complete). */
   reward?: string;
+  /** Not ready once its level's boss is dead (`over`): what it wants outlives him (the dragon, under the lagoon). */
+  lasts?: true;
   /** The Abate weakened once it is handed in (enemies/sangiorgio.ts PREPS). */
   prep?: string;
   /** The tracker's line once it is ready to hand in, if not "Torna da" the giver where he waits. */
@@ -150,6 +158,16 @@ export const PROCESSION = [
 export const ONDATE = [1, 3, 5] as const;
 /** The step past the procession's last: on the Bacino, crowned (quest/view.ts), ready to hand in. */
 export const CROWNED = 7;
+
+/**
+ * Il drago di Carpaccio: the three pieces of San Giorgio's lance, one on each of three elites (laid at their body once dead, so a hero
+ * who felled them before the quest finds them there), raised on the Teatro Verde's stage (zones/sangiorgio.ts garden) toward the
+ * lagoon behind it, where the dragon waits (enemies/drago.ts).
+ */
+export const FRAMMENTI = [{ item: 'lancia-punta', from: 'nostromo' }, { item: 'lancia-asta', from: 'bibliotecario' }, { item: 'lancia-calcio', from: 'commissario' }] as const;
+export const PALCO = { x: -570, y: 0.5, z: -36 };
+/** The step of Il drago di Carpaccio that calls the dragon up: the lance raised, the dragon to kill. */
+export const RAISED = 4;
 
 /** Marieta's letter, off a zitella: each kill's chance starts at `base` and rises by `ramp`; sure once the Maestra's key is taken. */
 export const LETTER_DROP = { base: 0.04, ramp: 0.02 } as const;
@@ -445,6 +463,28 @@ export const SIDE: readonly SideQuest[] = [
     busy: '',
     done: [],
   },
+  // Carpaccio's dragon, the statue of San Giorgio's: the lance in three pieces, raised on the Teatro Verde's stage, and the dragon out of the lagoon.
+  {
+    id: 'drago', giver: 'statua', lasts: true,
+    want: [
+      ...FRAMMENTI.map((f): Want => ({ kind: 'token', ...f })),
+      { kind: 'use', at: PALCO, label: 'la lancia', say: ['Leva la lancia di San Giorgio verso la laguna', 'La lancia si ricompone e brilla: dietro il palco la laguna ribolle!'] },
+      { kind: 'kill', n: 1, from: 'drago' },
+    ],
+    reward: 'lancia-sangiorgio',
+    line: (n, step) => (step < RAISED - 1 ? `Pezzi della lancia di San Giorgio: ${n}/3 (il Nostromo, il Bibliotecario, il Commissario delle Arti)`
+      : step === RAISED - 1 ? 'Porta la lancia sul palco del Teatro Verde, davanti alla laguna' : 'Abbatti il drago di Carpaccio al Teatro Verde'),
+    offer: [
+      'Alza gli occhi, Risorto. Qui, nella nicchia. Sono di pietra da quattro secoli, ma la voce me l\'hanno lasciata. Giorgio, cavaliere di Cappadocia. Il Palladio mi ha messo a guardia della porta, e io guardo.',
+      'In coro, dietro l\'altare, il Carpaccio mi ha dipinto mentre uccido il drago. Ma una tela tagliata insegna alle cose dipinte che si può uscire dalla cornice: la notte delle nozze il drago è sceso dalla mia tela ed è tornato in laguna. Dorme dietro il Teatro Verde.',
+      'La mia lancia si è spezzata in tre, quando è scesa con lui. La punta l\'ha il Nostromo della darsena, l\'asta il Bibliotecario, il calcio il Commissario delle Arti, che conta anche quella. Riportala intera sul palco del Teatro Verde e alzala verso l\'acqua: lui la riconoscerà, e salirà.',
+    ],
+    busy: 'Tre pezzi, Risorto: la punta, l\'asta, il calcio. Poi il palco del Teatro Verde, con la laguna davanti. Non serve cercarlo, il drago: è lui che viene alla lancia.',
+    done: [
+      'L\'ho sentito cadere da qui: l\'acqua si è chiusa sopra di lui come una tela arrotolata. Questa volta non risale. Il Carpaccio aveva ragione, a dipingermi senza paura.',
+      'Tieni la lancia, Risorto. A me basta la pietra, e la porta da guardare. Tu porti la lancia dove serve: dove il buio sale dall\'acqua.',
+    ],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -477,6 +517,10 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     bye: 'Le schede sono contate, la tiara è sul capo giusto, e la laguna l\'ha vista. Va\' in pace, figlio: io resto qui sul sagrato, a guardare il Bacino.',
     decline: 'Va bene. Abbiamo aspettato centoquattro giorni, allora: possiamo aspettare ancora.',
     full: 'Hai la borsa piena, figlio. Fa\' spazio e torna.' },
+  statua: { at: STATUA, level: 3, where: 'nella nicchia della facciata della basilica', greet: 'Risorto. Alza gli occhi: la pietra parla piano, ma parla.',
+    bye: 'Il drago è in fondo alla laguna e la lancia è in mani buone. Io torno pietra, Risorto: chi entra in chiesa mi passi davanti.',
+    decline: 'Va bene. Sono stato quattrocento anni in questa nicchia: posso aspettare ancora.',
+    full: 'Hai la borsa piena, Risorto. Fa\' spazio: una lancia non si appoggia per terra.' },
 };
 export const giverOf = (q: SideQuest): Giver | undefined => (q.secret ? undefined : q.giver ?? 'iseppo');
 /** A quest's steps, one for a single want. */
@@ -546,6 +590,7 @@ export class SideQuests {
   /** Progress for the tracker line. */
   progress(q: SideQuest): number {
     const w = this.want(q);
+    if (w.kind === 'token') return stepsOf(q).filter((s) => s.kind === 'token' && this.have(s.item) > 0).length; // tokens in any order: all of them in the bag
     return w.kind === 'kill' ? Math.min(w.n, this.kills[q.id] ?? 0) : w.kind === 'collect' ? Math.min(w.n, this.have(w.item)) : w.kind === 'finds' ? w.finds.filter((f) => this.have(f.item) > 0).length : 0;
   }
 

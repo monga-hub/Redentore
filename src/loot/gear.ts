@@ -188,6 +188,7 @@ const UNIQUE3: typeof DEFS = [
   ['batacchio-sangiorgio', 'Batacchio di San Giorgio', 'arma', 'epico', 'potenza vigore critico', 'La lingua della campana maggiore. Suonò per Pio VII, nel 1800; ora suona dove la porti.'],
   ['tiara-cartapesta', 'Tiara di cartapesta', 'testa', 'epico', 'intelletto spirito critico', 'Cartapesta dorata e i gioielli delle dame di Venezia. Incoronò Pio VII a San Giorgio, il 21 marzo 1800; la seconda volta, davanti alla laguna.'],
   ['libro-di-sabbia', 'Il libro di sabbia', 'amuleto', 'epico', 'intelletto spirito critico', 'Riposto nella sesta scansia, tornato nella tua borsa.'],
+  ['lancia-sangiorgio', 'Lancia di San Giorgio', 'arma', 'leggendario', 'potenza critico vigore', 'Scese dalla tela del Carpaccio con il drago, e con il drago è tornata. Il Risorto la porta dove il buio sale dall’acqua.'],
 ];
 /** Il libro di sabbia's: never the same page twice running (ui/tooltip.ts turns one at each opening). */
 const SABBIA: readonly string[] = [

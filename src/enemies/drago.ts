@@ -1,10 +1,11 @@
-// Il drago di Carpaccio (the San Giorgio plan's quest 9; this is its prototype, the fight alone): the sea serpent of Carpaccio's
+// Il drago di Carpaccio (the statue of San Giorgio's quest, quest/squero.ts `drago`): the sea serpent of Carpaccio's
 // San Giorgio e il drago, down off the canvas and back in the lagoon, rising out of the water behind the Teatro Verde's stage.
 // The caster brain of caster.ts on a kind that never walks: it holds the shore at one of three spots and lunges, breathes and
 // lashes from there. The Fiato, its breath poured in a wedge (`pour`); the Coda, the tail brought down round it (`nova`);
 // the Immersione (`dive`), under the water and up at another spot; from 40% the drowned sailors climb out of the lagoon, and
 // again at 20% (`waves`). Pure math like caster.ts: the balance bot drives it in Node (scripts/balance.ts drago), and the body,
-// a Meshy head on a procedural serpent, is enemies/serpent.ts's. No quest yet: main.ts's `?drago=1` sandbox calls it up.
+// a Meshy head on a procedural serpent, is enemies/serpent.ts's. main.ts keeps it asleep until the lance is raised on the stage;
+// its `?drago=1` sandbox calls it up at once.
 import type { World } from '../core/physics.ts';
 import { PRIEST, killAll, spawnPriests, type Bounds, type CasterKind, type Priest } from './caster.ts';
 import { MARINAIO, lull, rouse } from './sangiorgio.ts';
@@ -21,7 +22,7 @@ export const TEATRO: Bounds = { x0: -599.4, x1: -549, z0: -39.6, z1: -9 };
 export const DRAGO: CasterKind = {
   ...PRIEST,
   name: 'Il drago di Carpaccio',
-  hp: 8000, xp: 0, // the quest's reward will be its worth
+  hp: 8000, xp: 0, // the quest's reward is its worth (450 XP)
   aggro: 16, leash: 40, blind: Infinity,
   range: 24, keep: 0, speed: 0, walk: 14, cast: 1.8, cooldown: 3.4, bolt: 14, life: 4, damage: 110, // a gob of venom at range
   radius: 1.6, margin: 0,

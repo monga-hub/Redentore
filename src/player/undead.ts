@@ -13,21 +13,35 @@ import { HEROES, type Hero } from './heroes.ts';
 //
 // Locomotion: a hunched, heavy-breathing idle that now and then twirls the club, a crouched guard
 // for a few seconds after any fight, a walk and a charging run whose stride is matched to the
-// ground speed (paces measured from the planted foot, so the feet don't skate), a running jump.
+// ground speed (each body's own paces, measured from the planted foot, so the feet don't skate: the
+// stride builds up as he pushes off and winds down as he brakes, player/controller.ts), a running jump
+// from his own clip's takeoff that lands with its own touchdown. The base clips share one weight,
+// each fading in or out at the pace of the switch, so nothing pops however quickly they change.
 // Moves (the combo's three swings, a cast per kind of spell, hit reactions, a roll) are layered
 // over it: the upper body always, the legs only while standing still, so running keeps its stride
 // underneath. A death clip takes the whole body. A fresnel shell (the aura) glows over the body
 // for Velo spettrale and Patto della tomba, and flashes red on a hit.
 
 const LOCO = { idle: 'Idle_Breathe', combat: 'Idle_Combat', fidget: 'Idle', walk: 'Walking', run: 'Run_Charge', air: 'Jump_Run' } as const;
-type State = keyof typeof LOCO;
-// m/s each clip covers at rate 1: a planted foot's speed under the hips (measured on the clips;
-// the run's own root motion, stripped from the file, agrees).
-const PACE = { walk: 1.55, run: 4.52 };
-const FADE = 0.25, STANCE_FADE = 0.45;
-// Airborne: the running jump's flight, from takeoff (s into the clip) at a slow rate so a fall
-// of any length stays in the air pose.
-const AIR = { from: 0.55, rate: 0.6 };
+type Loco = keyof typeof LOCO;
+type State = Loco | 'land';
+/**
+ * Each body's clips: m/s its walk and run cover at rate 1 (a planted foot's speed under the hips, measured on the clips),
+ * and its running jump's takeoff and touchdown (s into Jump_Run, where the feet leave the floor and find it again).
+ */
+const GAIT: Record<Hero, { walk: number; run: number; up: number; down: number }> = {
+  risorto: { walk: 1.55, run: 4.52, up: 0.58, down: 0.96 },
+  bortolo: { walk: 1.6, run: 4.14, up: 0.79, down: 1.12 },
+  fosca: { walk: 1.55, run: 4.2, up: 0.6, down: 0.93 },
+  tizian: { walk: 1.5, run: 3.16, up: 0.64, down: 0.9 },
+  zanetto: { walk: 1.62, run: 3.78, up: 0.77, down: 0.99 },
+};
+// s each switch of the base clip takes: from standing into the stride and back, the calm stances, the takeoff, out of a landing.
+const FADE = 0.22, START = 0.16, STOP = 0.3, STANCE_FADE = 0.45, TAKEOFF = 0.1, LANDED = 0.2;
+const RUN_AT: [number, number] = [3.2, 3.8]; // m/s asked for: below, the walk; above, the run (between: as it was)
+// Airborne: the jump's flight from takeoff to just short of touchdown over FLIGHT s (a jump's air time), held there on a longer
+// fall; on the floor again, the touchdown and what follows, LAND s standing (a beat while running).
+const FLIGHT = 0.6, LAND = [0.34, 0.14];
 const COMBAT = 6; // s the guard lasts after a blow, a cast or a hit
 const FIDGET: [number, number] = [9, 16]; // s of calm standing between two club twirls
 
@@ -174,8 +188,15 @@ export class UndeadModel {
   readonly root = new THREE.Group();
   readonly aura = new Aura();
   private mixer?: THREE.AnimationMixer;
-  private actions = {} as Record<State, THREE.AnimationAction>;
+  private actions = {} as Record<Loco, THREE.AnimationAction>;
   private state?: State;
+  private weight = { idle: 0, combat: 0, fidget: 0, walk: 0, run: 0, air: 0 } as Record<Loco, number>;
+  private fade = FADE; // s the switch under way takes
+  private gaitClip: 'walk' | 'run' = 'run';
+  private airT = 0;
+  private landT = 0;
+  private deadK = 0;
+  private readonly pace: (typeof GAIT)[Hero];
   private layers = new Map<string, Layer>();
   private playing?: Shot;
   private holdK = new Map<Hold, number>();
@@ -197,6 +218,7 @@ export class UndeadModel {
   private worn: GearState = {};
 
   constructor(hero: Hero) {
+    this.pace = GAIT[hero];
     loadModel(HEROES[hero].file).then((gltf) => {
       const model = gltf.scene;
       stand(model, HEROES[hero].height);
@@ -214,9 +236,9 @@ export class UndeadModel {
       this.leftHand = model.getObjectByName('LeftHand');
       const mixer = (this.mixer = new THREE.AnimationMixer(model));
       const clip = (name: string) => THREE.AnimationClip.findByName(gltf.animations, name);
-      for (const [s, name] of Object.entries(LOCO) as [State, string][]) {
+      for (const [s, name] of Object.entries(LOCO) as [Loco, string][]) {
         const c = clip(name);
-        if (c) this.actions[s] = mixer.clipAction(c);
+        if (c) this.actions[s] = mixer.clipAction(c).setEffectiveWeight(0).play();
       }
       for (const s of ['air', 'fidget'] as const) {
         this.actions[s].setLoop(THREE.LoopOnce, 1);
@@ -300,14 +322,15 @@ export class UndeadModel {
     this.playing?.layer.lower.stop();
     this.playing = undefined;
     this.holdOn.clear();
-    this.dying.reset().play();
-    if (this.state) this.dying.crossFadeFrom(this.actions[this.state], 0.2, false);
+    this.dying.reset().setEffectiveWeight(0).play();
+    this.deadK = 0;
   }
 
   revive(): void {
     this.dead = false;
     this.dying?.stop();
     this.state = undefined;
+    for (const k of Object.keys(this.weight) as Loco[]) this.weight[k] = 0;
     this.combatT = 0;
   }
 
@@ -326,19 +349,22 @@ export class UndeadModel {
     return this.root.getWorldPosition(v).setY(v.y + 1.1);
   }
 
-  /** `speed`: horizontal m/s this frame; `grounded`: feet on the floor. */
   /** Where the walk or run cycle is, 0..1 (a footfall each half), or -1 when not striding: the footsteps follow it. */
   get gait(): number {
     const a = (this.state === 'walk' || this.state === 'run') && this.actions[this.state];
     return a ? (a.time / a.getClip().duration) % 1 : -1;
   }
 
-  animate(dt: number, speed: number, grounded: boolean): void {
+  /** `speed`: horizontal m/s this frame; `grounded`: feet on the floor; `want`: m/s the keys or the stick ask for (0: none, or not his to choose). */
+  animate(dt: number, speed: number, grounded: boolean, want = 0): void {
     if (!this.mixer) return;
     this.outfit?.update(dt);
     const showAura = this.aura.update(dt) || this.priming-- > 0;
     for (const s of this.shells) s.visible = showAura;
-    if (this.dead) {
+    if (this.dead) { // the fall takes the whole body over 0.2 s
+      this.deadK = Math.min(1, this.deadK + dt / 0.2);
+      this.dying?.setEffectiveWeight(this.deadK);
+      for (const k of Object.keys(this.weight) as Loco[]) this.actions[k].setEffectiveWeight(this.weight[k] * (1 - this.deadK));
       this.mixer.update(dt);
       this.outfit?.clear(dt, 0);
       return;
@@ -346,24 +372,50 @@ export class UndeadModel {
     this.combatT = Math.max(0, this.combatT - dt);
     const standing = grounded && speed < 0.3;
     this.calm = standing && this.combatT === 0 && this.state !== 'fidget' ? this.calm + dt : 0;
-    let next: State = !grounded ? 'air' : !standing ? (speed < 4 ? 'walk' : 'run') : this.combatT > 0 ? 'combat' : 'idle';
+    // The stride asked for (the run from the first push, not after a walk's worth of speeding up); braking keeps the one he is in.
+    if (want > RUN_AT[1]) this.gaitClip = 'run';
+    else if (want > 0 && want < RUN_AT[0]) this.gaitClip = 'walk';
+    else if (!want && this.state !== 'walk' && this.state !== 'run') this.gaitClip = speed < 4 ? 'walk' : 'run';
+    const air = this.actions.air, P = this.pace;
+    if (!grounded) this.airT += dt;
+    else if (this.state === 'air') { // touchdown: his own landing from the clip, if he was up long enough to need one
+      if (this.airT > 0.2) {
+        this.landT = LAND[want > 0 ? 1 : 0];
+        air.time = Math.max(air.time, P.down);
+        air.timeScale = 1;
+      }
+      this.airT = 0;
+    }
+    if (grounded) this.landT = Math.max(0, this.landT - dt);
+    let next: State = !grounded ? 'air' : this.landT > 0 ? 'land' : !standing ? this.gaitClip : this.combatT > 0 ? 'combat' : 'idle';
     if (this.state === 'fidget' && next === 'idle' && this.actions.fidget.time < this.actions.fidget.getClip().duration - 0.45) next = 'fidget'; // let the twirl finish
     else if (next === 'idle' && this.calm > this.nextFidget && !this.playing) {
       next = 'fidget';
       this.nextFidget = FIDGET[0] + Math.random() * (FIDGET[1] - FIDGET[0]);
     }
     if (next !== this.state) {
-      const from = this.state && this.actions[this.state], to = this.actions[next];
-      to.reset().play();
-      if (next === 'air') { to.time = AIR.from; to.timeScale = AIR.rate; }
-      if (next === 'idle' || next === 'combat') to.time = Math.random() * to.getClip().duration * 0.5;
-      const calmSwap = (next === 'idle' || next === 'combat' || next === 'fidget') && (this.state === 'idle' || this.state === 'combat' || this.state === 'fidget');
-      if (from) to.crossFadeFrom(from, calmSwap ? STANCE_FADE : FADE, false);
+      const was = this.state, calm = (x?: State) => x === 'idle' || x === 'combat' || x === 'fidget', key = next === 'land' ? 'air' : next;
+      const to = this.actions[key];
+      if (next === 'air') { // the takeoff, from his clip's own
+        to.reset();
+        to.time = P.up;
+        to.timeScale = (P.down - 0.03 - P.up) / FLIGHT;
+      } else if (next !== 'land' && this.weight[key] < 0.05) { // a clip faded out starts over; one still showing carries on
+        to.reset();
+        if (calm(next) && next !== 'fidget') to.time = Math.random() * to.getClip().duration * 0.5;
+      }
+      this.fade = next === 'air' ? TAKEOFF : was === 'land' ? LANDED : calm(next) && calm(was) ? STANCE_FADE : calm(was) && !calm(next) ? START : calm(next) ? STOP : FADE;
       this.state = next;
     }
-    // stride matched to the ground speed, so the planted foot stays planted
-    if (next === 'walk') this.actions.walk.timeScale = speed / PACE.walk;
-    if (next === 'run') this.actions.run.timeScale = speed / PACE.run;
+    if (next === 'air' && air.time >= P.down - 0.03) { air.time = P.down - 0.03; air.timeScale = 0; } // a long fall holds the last of the flight
+    // The base clips: the one in play fades in, the rest out, at the switch's pace; together they always weigh 1.
+    const on: Loco = next === 'land' ? 'air' : next;
+    let sum = 0;
+    for (const k of Object.keys(this.weight) as Loco[]) sum += this.weight[k] = Math.max(0, Math.min(1, this.weight[k] + (k === on ? 1 : -1) * dt / this.fade));
+    for (const k of Object.keys(this.weight) as Loco[]) { this.weight[k] /= sum || 1; this.actions[k].setEffectiveWeight(this.weight[k]); }
+    // stride matched to the ground speed, so the planted foot stays planted (and slows with him as he brakes)
+    this.actions.walk.timeScale = speed / P.walk;
+    this.actions.run.timeScale = speed / P.run;
     this.still += ((standing ? 1 : 0) - this.still) * Math.min(1, dt / FADE);
 
     let busy = 0; // how much of the upper body a move or a held pose has: a staff comes down from upright for it (not for the charge, a sprint)

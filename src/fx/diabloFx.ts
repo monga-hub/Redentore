@@ -103,7 +103,7 @@ export function beamTexture(): THREE.Texture {
 // it lies deep with a faint sheen, its rim darker; as it dries it goes to a dull maroon. `aState`:
 // opacity, how far it has spread (0..1), how wet it still is (0..1).
 const decalMaterial = (map: THREE.Texture) => new THREE.ShaderMaterial({
-  uniforms: { map: { value: map } },
+  uniforms: { map: { value: map }, shade: { value: 1 } },
   vertexShader: /* glsl */ `
     attribute vec3 aState;
     attribute vec2 aTile;
@@ -116,6 +116,7 @@ const decalMaterial = (map: THREE.Texture) => new THREE.ShaderMaterial({
     }`,
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
+    uniform float shade;
     varying vec2 vUv;
     varying vec3 vState;
     void main() {
@@ -126,7 +127,7 @@ const decalMaterial = (map: THREE.Texture) => new THREE.ShaderMaterial({
       vec3 c = mix(vec3(0.045, 0.005, 0.004), vec3(0.1, 0.006, 0.005), deep);
       c = mix(c, mix(vec3(0.1, 0.006, 0.005), vec3(0.24, 0.012, 0.009), deep), wet);
       c += vec3(0.07, 0.025, 0.02) * wet * smoothstep(0.82, 0.95, m.g); // the sheen on the deep of it
-      gl_FragColor = vec4(c, a);
+      gl_FragColor = vec4(c * shade, a);
     }`,
   transparent: true,
   depthWrite: false,
@@ -215,6 +216,7 @@ export class DiabloFx {
       this.state.setXYZ(i, age < 0 ? 0 : THREE.MathUtils.clamp((life - age) / (life / 3), 0, 1) * 0.95, spread, THREE.MathUtils.clamp(1 - age / (life * 0.45), 0, 1));
     }
     this.state.needsUpdate = true;
+    (this.decals.material as THREE.ShaderMaterial).uniforms.shade.value = this.enabled ? 1 : 0.3; // unlit: the WoW view's night floor is far darker
     this.flourish.visible = this.enabled;
     if (!this.enabled) return;
 

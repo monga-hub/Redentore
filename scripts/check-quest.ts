@@ -15,7 +15,7 @@ import { SHOP } from '../src/loot/gear.ts';
 import { roll } from '../src/loot/bag.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
 import { GONDOLIERE, PACKS, spawnLevel2 } from '../src/enemies/zitelle.ts';
-import { hurt as casterHurt, killAll, rise, sees, think, type Bolt } from '../src/enemies/caster.ts';
+import { hurt as casterHurt, killAll, rise, sees, think, wipe, type Bolt } from '../src/enemies/caster.ts';
 import { ESCORT } from '../src/quest/escort.ts';
 import { RISE } from '../src/enemies/brain.ts';
 import { DRAGO, DRAGO_SPOTS } from '../src/enemies/drago.ts';
@@ -498,6 +498,24 @@ if (copy.side.taken.length || copy.side.done.join() !== 'ferri,lumi' || Object.k
   const bit = ESCORT.hp - e.hp;
   if (bit <= 0 || e.hp <= 0 || waves[0].members.some((m) => Math.hypot(m.x - e.pose.x, m.z - e.pose.z) > 3)) fail(`the first wave does not close on the Cardinale and strike him (${bit} in 8 s)`);
   if (s.progress(inc) !== 0 || !s.line(inc).includes('cupola')) fail('the first wave\'s line does not count its monaci');
+  // every wave at its stop, with the Cardinale's collider on him (Quest.update keeps it there each frame, as in main.ts): its
+  // monaci stay on him for half a minute, his own body hiding him from no one, and after a wipe (or a pull gone too far) sent
+  // home they find him again from there; else the wave stood at home and the procession waited for kills that never came
+  {
+    const wq = new Quest(level.world), we = wq.side.escort;
+    waves.forEach((h, i) => {
+      Object.assign(we.pose, PROCESSION[(stepsOf(inc)[ONDATE[i] - 1] as { to: number }).to]);
+      wq.update(we.pose);
+      rouse(h.members, level.world, true);
+      const run = (T: number) => { for (let t = 0; t < T; t += 1 / 30) for (const m of h.members) think(m, we.pose, level.world, 1 / 30, bolts); };
+      run(30);
+      const gave = h.members.filter((m) => m.state === 'evade' || m.state === 'pray').length;
+      wipe(h.members);
+      run(20);
+      if (gave || h.members.some((m) => m.state !== 'chase' && m.state !== 'swing')) fail(`the wave ${i + 1}'s monaci give up on the Cardinale at his stop (${gave} evaded), or do not come back for him after a wipe (${h.members.map((m) => m.state)})`);
+      lull(h.members);
+    });
+  }
   s.killed('monaco', 'incoronazione'); s.killed('monaco', 'acqua'); s.killed('monaco');
   if (s.progress(inc) !== 1) fail('a monaco not of the procession counts for it');
   copy.side.bag = b;

@@ -449,10 +449,14 @@ export function pull(f: Priest): void {
 /** The index of the spot nearest `p`. */
 const nearest = (spots: [number, number][], p: { x: number; z: number }) => spots.reduce((b, s, i) => (Math.hypot(s[0] - p.x, s[1] - p.z) < Math.hypot(spots[b][0] - p.x, spots[b][1] - p.z) ? i : b), 0);
 
-/** Line of sight at chest height: no wall or column between the two points (0.5 m samples). */
-export function sees(world: World, a: Target, b: Target): boolean {
-  const dx = b.x - a.x, dz = b.z - a.z, n = Math.ceil(Math.hypot(dx, dz) / 0.5);
-  for (let i = 1; i < n; i++) if (world.blocked(a.x + (dx * i) / n, a.z + (dz * i) / n, a.y + 0.6, 0.05)) return false;
+/**
+ * Line of sight at chest height: no wall or column between the two points (0.5 m samples). A target with a body of its own
+ * (`r`: the Cardinale, his collider on him) does not hide itself: the samples inside its box (to its corners) are not looked at,
+ * else the procession's monaci lost him at arm's length and evaded home, and from there never saw him again.
+ */
+export function sees(world: World, a: Target, b: Target & { r?: number }): boolean {
+  const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), n = Math.ceil(d / 0.5), own = b.r ? b.r * Math.SQRT2 + 0.05 : 0;
+  for (let i = 1; i < n; i++) if ((d * (n - i)) / n > own && world.blocked(a.x + (dx * i) / n, a.z + (dz * i) / n, a.y + 0.6, 0.05)) return false;
   return true;
 }
 

@@ -10,7 +10,9 @@
 // Punta shut until the third quest is taken; San Giorgio is reached only by Mastro Iseppo's gondola (a link between the
 // two berths, quest/ferry.ts); its Cenacolo opens with the Bibliotecario's key, its garden door with the Abate's death. The
 // campanile's bell chamber is reached only by its stair (a link between the door at its foot and the floor up top, quest/progress.ts
-// climb), and walled in: nobody walks off it.
+// climb), and walled in: nobody walks off it. And no drawn triangle of the level has a corner with a zero normal: a pixel of one
+// shades as NaN, which the bloom spreads over the whole frame (a flat grey flash, the Diablo view over the cloisters; builder.ts dropFlat).
+import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { World, PLAYER } from '../src/core/physics.ts';
 import { SPAWN } from '../src/level/plan.ts';
@@ -226,6 +228,17 @@ for (const [x, z] of [[0, -2], [0, -20], [0, -37], [0, -48.5]]) if (!at(won, x, 
 if (choirWake !== CHOIR_DOOR) fail('quest      with the choir door open a death should wake at the choir door');
 if (!at(won, CHOIR_DOOR.x, CHOIR_DOOR.z) || world.blocked(CHOIR_DOOR.x, CHOIR_DOOR.z, world.standHeight(CHOIR_DOOR.x, CHOIR_DOOR.z))) fail('quest      the choir-door checkpoint is not open ground');
 for (const a of level.areas) if (!cells(won, a)) fail(`${a.zone.padEnd(11)} ${a.label} unreachable`);
+let flat = 0;
+level.root.traverse((o) => {
+  if (!(o instanceof THREE.Mesh)) return;
+  const g = o.geometry as THREE.BufferGeometry, nrm = g.getAttribute('normal'), ix = g.getIndex();
+  if (!nrm) return;
+  const count = ix ? ix.count : nrm.count;
+  for (let k = 0; k < count; k++) {
+    const i = ix ? ix.getX(k) : k;
+    if (Math.hypot(nrm.getX(i), nrm.getY(i), nrm.getZ(i)) < 1e-6 && flat++ < 3) fail(`normals     ${o.parent?.name} ${o.userData.role ?? ''}: a triangle corner at (${[0, 1, 2].map((c) => g.getAttribute('position').getComponent(i, c).toFixed(2))}) has a zero normal`);
+  }
+});
 let reached = 0;
 for (let n = 0; n < won.length; n++) if (!Number.isNaN(won[n])) reached++;
 console.log(`${reached} walkable cells reached, ${world.boxes.length} colliders, ${(performance.now() - t0).toFixed(0)} ms`);

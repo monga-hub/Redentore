@@ -633,6 +633,47 @@ function chamferBox(w: number, h: number, d: number, b: number): THREE.BufferGeo
   return g;
 }
 
+/**
+ * Clears every lit mesh under `root` of zero normals. Triangles with no area (three points in a row along an arcade's
+ * top, a shape's triangulation; a lathe's doubled crease point) get zero normals, and the rare pixel the rasterizer
+ * still gives one (a camera a hair off) shades as normalize(0), NaN: the bloom's blur spreads that one texel over the
+ * whole frame, which flashed flat grey in the Diablo view over the cloisters. Such a triangle is dropped, it covers
+ * nothing; a real one with a zero-normal corner (none today) gives that corner its own normal.
+ */
+export function dropFlat(root: THREE.Object3D): void {
+  const seen = new Set<THREE.BufferGeometry>(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  root.traverse((o) => {
+    if (!(o instanceof THREE.Mesh) || seen.has(o.geometry)) return;
+    const g: THREE.BufferGeometry = o.geometry, n = g.getAttribute('normal'), p = g.getAttribute('position'), idx = g.getIndex();
+    seen.add(g);
+    if (!n || g.groups.length) return;
+    const flat = (i: number) => n.getX(i) === 0 && n.getY(i) === 0 && n.getZ(i) === 0;
+    const count = idx ? idx.count : n.count, at = (k: number) => (idx ? idx.getX(k) : k), fill = new Map<number, THREE.Vector3>(), keep: number[] = [];
+    for (let t = 0; t < count; t += 3) {
+      const v = [at(t), at(t + 1), at(t + 2)];
+      if (!v.some(flat)) { keep.push(t); continue; }
+      a.fromBufferAttribute(p, v[0]);
+      b.fromBufferAttribute(p, v[1]).sub(a);
+      c.fromBufferAttribute(p, v[2]).sub(a);
+      const ll = b.lengthSq() * c.lengthSq(), f = b.cross(c); // area-weighted
+      if (f.lengthSq() <= 1e-10 * ll) continue; // sin² of its angle at a: no area, dropped
+      keep.push(t);
+      for (const i of v) if (flat(i)) (fill.get(i) ?? fill.set(i, new THREE.Vector3()).get(i)!).add(f);
+    }
+    for (const [i, f] of fill) n.setXYZ(i, ...f.normalize().toArray());
+    if (keep.length * 3 === count) return;
+    if (idx) {
+      g.setIndex(keep.flatMap((t) => [at(t), at(t + 1), at(t + 2)]));
+      return;
+    }
+    for (const [name, attr] of Object.entries(g.attributes)) {
+      const s = attr.itemSize, src = attr.array, out = new (src.constructor as Float32ArrayConstructor)(keep.length * 3 * s);
+      keep.forEach((t, k) => out.set(src.subarray(t * s, (t + 3) * s), k * 3 * s));
+      g.setAttribute(name, new THREE.BufferAttribute(out, s, attr.normalized));
+    }
+  });
+}
+
 /** Gives every vertex of `g` the colour a tinted role multiplies its plaster by (materials.ts, aTint). */
 export function tinted(g: THREE.BufferGeometry, c: THREE.Color): THREE.BufferGeometry {
   const n = g.getAttribute('position').count, a = new Float32Array(3 * n);

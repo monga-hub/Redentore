@@ -1,4 +1,4 @@
-import { LevelBuilder } from './builder.ts';
+import { LevelBuilder, dropFlat } from './builder.ts';
 import { buildFondamenta } from './zones/fondamenta.ts';
 import { buildChiesa } from './zones/chiesa.ts';
 import { buildConvento } from './zones/convento.ts';
@@ -34,5 +34,6 @@ export function buildLevel(): Level {
   dressLevel(b); // vegetation, covered walks, furniture
   finishGround(b); // ground masks, grass tufts, pebbles (needs the dressing's trunks and benches)
   b.flush(); // merge trims, arches and roofs per zone and role
+  dropFlat(b.root);
   return b;
 }

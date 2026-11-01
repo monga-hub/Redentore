@@ -16,6 +16,7 @@ interface Spec {
   grime?: boolean; // walls: darker, dirtier band near the ground
   macro?: number; // strength of large-scale world-space colour variation (breaks tiling)
   peel?: number; // plaster: world-space scaling threshold (lower = more brick showing)
+  stain?: boolean; // San Giorgio's white stone: damp streaks, smoke halos, the acqua alta's tide line and salt under it
   shape?: boolean; // paint by form (aShape): banded macro blotches, local foot/top gradient, lit chamfers
   tinted?: boolean; // the painted map (not the brick under a peel) times the vertex attribute aTint: one batch, many colours (facades.ts)
   vcol?: boolean; // untextured, shaded by the geometry's baked vertex colours (props.ts crowns, bark)
@@ -45,10 +46,10 @@ const SPECS = {
   trunk: { tint: 0x6e5846, rough: 0.95, vcol: true },
   wood: { tile: 1.5, rough: 0.8, macro: 0.1, shape: true }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
-  istria: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, paint: 'stone', tint: 0xfff4e6, glow: 0.14 }, // San Giorgio's white orders, cornices and vaults inside: they read in the firelit dark
-  volta: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, paint: 'stone', tint: 0xffdcae, glow: 0.32 }, // its vaults' and dome's coffer frames, arches and cornices: warm, as if the fires below reached them
+  istria: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, stain: true, paint: 'stone', tint: 0xfff4e6, glow: 0.14 }, // San Giorgio's white orders, cornices and vaults inside: they read in the firelit dark
+  volta: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, stain: true, paint: 'stone', tint: 0xffdcae, glow: 0.32 }, // its vaults' and dome's coffer frames, arches and cornices: warm, as if the fires below reached them
   lacunare: { tile: 2.4, rough: 0.7, macro: 0.1, shape: true, paint: 'stone', tint: 0xa0765a, glow: 0.12 }, // the coffers' sunk panels, in shadow
-  doratura: { tint: 0xe8b85a, rough: 0.3, metal: 0.55, glow: 0.3 }, // the canvases' gilt frames, catching what light there is
+  doratura: { tint: 0xf0bc48, rough: 0.3, metal: 0.35, glow: 0.3, vcol: true }, // the canvases' carved gilt frames, catching what light there is: their vertex colours darken the hollows
   luna: { tint: 0x9db6e0, rough: 0.2, glow: 0.7 }, // the dome's windows with the moon in them
   marble: { tile: 4.2, rough: 0.5, macro: 0.14 }, // San Giorgio's red, cream and ochre slabs on the diagonal, worn and cracked
   glass: { tint: 0xa9cdd6, rough: 0.1 },
@@ -212,6 +213,23 @@ const FRAG_MAP = `{
   tex.rgb *= mix(vec3(1.0), vec3(0.7, 0.68, 0.62), g);
 #endif
 #endif
+#ifdef TRI_STAIN
+  {
+    // Damp streaks run down from every ledge, smoke has dulled the stone in broad halos, and the acqua alta left its tide
+    // line about a metre up, the stone darker and salt-bloomed under it. Walls only, never the tops.
+    vec2 wp = vec2(vTriPos.x + vTriPos.z, vTriPos.y);
+    float side = 1.0 - w.y;
+    float streak = smoothstep(0.58, 0.9, triNoise(vec2(wp.x * 2.4, wp.y * 0.16 + 3.0)) * 0.7 + triNoise(wp * 3.7) * 0.3);
+    float halo = smoothstep(0.5, 0.9, triNoise(wp * 0.3 + 23.0) * 0.65 + triNoise(wp * 1.4 + 2.0) * 0.35);
+    tex.rgb *= mix(vec3(1.0), vec3(0.62, 0.56, 0.47), side * (0.75 * streak + 0.55 * halo));
+    float tide = 0.85 + 0.3 * triNoise(vec2(wp.x * 0.7, 1.0));
+    float damp = 1.0 - smoothstep(tide - 0.04, tide + 0.02, vTriPos.y);
+    tex.rgb *= mix(vec3(1.0), vec3(0.74, 0.7, 0.6), side * damp * 0.8);
+    tex.rgb *= 1.0 - 0.25 * side * damp * smoothstep(tide - 0.12, tide - 0.03, vTriPos.y); // the line itself
+    float salt = smoothstep(0.55, 0.75, triNoise(wp * vec2(2.0, 3.0)) * 0.7 + triNoise(wp * 9.0) * 0.3) * damp * side;
+    tex.rgb = mix(tex.rgb, vec3(0.9, 0.88, 0.82), salt * 0.35);
+  }
+#endif
   diffuseColor *= tex;
 }`;
 // Bump from the brick height (mortar ~1.5 cm deep), three's perturbNormalArb inlined.
@@ -253,11 +271,12 @@ function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
   if (role === 'water') Object.assign(m, { transparent: true, opacity: 0.85 });
   // white for geometry without colours (boxes, cones, discs)
   if (s.vcol) Object.assign(m, { vertexColors: true, defaultAttributeValues: { color: [1, 1, 1] } });
-  if (s.vcol && role !== 'trunk') m.emissive.set(s.tint!).multiplyScalar(LEAF_GLOW);
+  if (s.vcol && role !== 'trunk' && !s.glow) m.emissive.set(s.tint!).multiplyScalar(LEAF_GLOW);
   if (!s.tile) return m;
   m.map = texture(s.paint ?? role);
   m.defines = {};
   if (s.grime) m.defines.TRI_GRIME = '';
+  if (s.stain) m.defines.TRI_STAIN = '';
   if (role === 'brick') m.defines.TRI_BRICK = '';
   if (s.peel) m.defines.TRI_PEEL = '';
   if (s.shape) m.defines.TRI_SHAPE = '';

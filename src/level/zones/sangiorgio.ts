@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { type LevelBuilder, extrude, ring, shaped } from '../builder.ts';
 import { material, type Role } from '../materials.ts';
 import { Z } from '../plan.ts';
@@ -297,7 +297,7 @@ function interior(b: LevelBuilder): void {
     }
     for (let k = 0; k < AISLE.length + 1; k++) {
       const x0 = k < AISLE.length ? AISLE[k] + 0.42 : -519.6, x1 = k ? AISLE[k - 1] - 0.42 : FAC - 0.4, c = (x0 + x1) / 2, r = (x1 - x0) / 2; // x0 < x1
-      b.part(null, x0, x1, 0.7, SPRING, ...face(0.03), 'stone'); // the recess, plain stone without the order's glow: it sits back
+      b.part(null, x0, x1, 0.7, SPRING, ...face(0.03), 'volta'); // the recess, warm as if the fires reached it, the white order standing out on it
       b.decor(shaped(lunette(c, SPRING, r - 0.3, w + s * 0.035, s)), 'stone');
       b.decor(shaped(arch(c, SPRING, r - 0.3, r, 0.22)).translate(0, 0, w + s * 0.11), 'istria'); // the arch
       b.part(null, c - 0.2, c + 0.2, SPRING + r - 0.34, SPRING + r + 0.1, ...face(0.3), 'istria'); // its keystone
@@ -327,15 +327,15 @@ function interior(b: LevelBuilder): void {
   torus(RING + 4.6 + DOME - 1.5, 1.6, 0.18, 'gold');
   for (let k = 0; k < 8; k++) b.decor(shaped(arch(0, 0, DOME - 0.75, DOME - 0.35, 0.3)).rotateY((k * Math.PI) / 8).translate(SGX, RING + 4.6, SGZ), 'istria');
   ceilings(b);
-  // The canvases in their gilt frames: Tintoretto's Ultima Cena (south) and Raccolta della manna (north) on the presbytery's
-  // walls, his Deposizione and Bassano's Adorazione dei pastori over the aisles' altars, turn and turn about.
-  const quads: THREE.BufferGeometry[] = [];
+  // The canvases in their carved gilt frames (frames() below): Tintoretto's Ultima Cena (south) and Raccolta della manna
+  // (north) on the presbytery's walls, his Deposizione and Bassano's Adorazione dei pastori over the aisles' altars, turn and
+  // turn about.
+  const quads: THREE.BufferGeometry[] = [], hung: Hung[] = [];
   const canvas = (x: number, y: number, z: number, s: number, w: number, h: number, [px, py, pw, ph]: readonly number[]) => {
     const g = new THREE.PlaneGeometry(w, h), uv = g.getAttribute('uv');
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (px + uv.getX(i) * pw) / 512, 1 - (py + (1 - uv.getY(i)) * ph) / 432);
-    quads.push((s < 0 ? g.rotateY(Math.PI) : g).translate(x, y, z + s * 0.04));
-    const d = (a: number) => [Math.min(z, z + s * a), Math.max(z, z + s * a)] as const, t = 0.22;
-    for (const [x0, x1, y0, y1] of [[-t, w + t, -t, 0], [-t, w + t, h, h + t], [-t, 0, 0, h], [w, w + t, 0, h]]) slab(b, null, x - w / 2 + x0, x - w / 2 + x1, y - h / 2 + y0, y - h / 2 + y1, ...d(0.14), 'doratura');
+    quads.push((s < 0 ? g.rotateY(Math.PI) : g).translate(x, y, z + s * 0.02));
+    hung.push([x, y, z, s, w, h]);
   };
   for (const [z, s, art] of [[92.4, 1, CANVAS.cena], [111.6, -1, CANVAS.manna]] as const) canvas(-547, 5.7, z, s, 8.4, 5.4, art);
   for (const [k, x] of [-488, -502, -514].entries()) {
@@ -343,6 +343,8 @@ function interior(b: LevelBuilder): void {
     canvas(x, 3.9, 117.55, -1, 2.6, 3.2, k % 2 ? CANVAS.deposizione : CANVAS.pastori);
   }
   b.add(new THREE.Mesh(mergeGeometries(quads)!, CANVASES));
+  frames(b, hung);
+  walls(b);
   // Corinthian capitals: the colonnades' and the choir screen's over each column's own, the aisles' pilasters' set into the wall.
   capitals(b, [
     ...[94, 110].flatMap((z) => [-485, -492, -499, -506, -513].map((x): [number, number, number, number] => [x, 11.8, z, 0.75])),
@@ -540,6 +542,191 @@ function ceilings(b: LevelBuilder): void {
     at.forEach((m, i) => im.setMatrixAt(i, m));
     im.computeBoundingSphere();
     im.userData.pieces = pieces; // occlusion: each coffer goes with its ceiling
+    b.add(im, role);
+  }
+}
+
+/** A canvas on a wall: its middle (x, y) on the wall at z, facing `s` (+z 1, -z -1), w × h. */
+type Hung = [number, number, number, number, number, number];
+
+/**
+ * Carved gilt frames, Venetian baroque, round every canvas: four instanced pieces for all of them. A moulding run along each
+ * side (a lip on the canvas, a beaded astragal, a flat frieze, a fat torus, the outer cavetto), a cartouche over each corner
+ * (a cushion, acanthus breaking out past the corner and lying along the rails, a rosette), a shell crest over the top and a
+ * smaller one hanging under, one midway up each side of the wide ones, pearls along the bead. Dark gold in the hollows and
+ * bright on the ridges (vertex colours), so the fires' light runs along the carving. Each frame one occlusion piece.
+ */
+function frames(b: LevelBuilder, list: Hung[]): void {
+  const shade = (g: THREE.BufferGeometry, top: number) => { // hollows dark, ridges bright: by how far out of the wall
+    const pos = g.getAttribute('position'), c = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const k = Math.min(1, Math.max(0, pos.getZ(i) / top));
+      c.set([0.34 + 0.95 * k, 0.31 + 0.95 * k, 0.24 + 0.85 * k], i * 3);
+    }
+    return g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  };
+  const blob = (sx: number, sy: number, sz: number, a: number, x: number, y: number, z: number) => new THREE.SphereGeometry(1, 8, 5).scale(sx, sy, sz).rotateZ(a).translate(x, y, z);
+  const leaf = (a: number, r: number, len: number, z: number) => blob(len / 2, len * 0.17, 0.09, a, Math.cos(a) * (r + len / 2), Math.sin(a) * (r + len / 2), z);
+  // the moulding for t = 1: (u, v) across it from the canvas out and out of the wall, run along x -0.5..0.5
+  const P = [[0, 0], [0, 0.1], [0.05, 0.16], [0.1, 0.17], [0.13, 0.24], [0.19, 0.28], [0.25, 0.24], [0.28, 0.18], [0.34, 0.17], [0.58, 0.17], [0.62, 0.25], [0.7, 0.35], [0.8, 0.37], [0.88, 0.31], [0.93, 0.21], [0.97, 0.15], [1, 0.08], [1, 0]];
+  let rail: THREE.BufferGeometry = new THREE.ExtrudeGeometry(new THREE.Shape(P.map(([u, v]) => new THREE.Vector2(u, v))), { depth: 1, bevelEnabled: false });
+  rail.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.5, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1)); // (u, v, along) -> (along, u, v)
+  rail.deleteAttribute('normal');
+  rail.deleteAttribute('uv');
+  rail = mergeVertices(rail); // smooth: the gilding's highlights roll over the mouldings
+  rail.computeVertexNormals();
+  const corner = mergeGeometries([ // over the corner square, its outer corner up and right
+    new THREE.SphereGeometry(0.5, 10, 6).scale(1.05, 1.05, 0.6).translate(0, 0, 0.12), // the cushion
+    ...[-0.8, 0, 0.8].map((d) => leaf(Math.PI / 4 + d, 0.18, d ? 0.62 : 0.8, 0.26)), // acanthus out past the corner
+    leaf(Math.PI, 0.3, 0.7, 0.26), leaf(-Math.PI / 2, 0.3, 0.7, 0.26), // and along the rails' friezes
+    new THREE.SphereGeometry(0.16, 8, 5).scale(1, 1, 0.7).translate(0, 0, 0.42), // the rosette
+  ])!;
+  const crest = mergeGeometries([ // on the moulding's outer edge, rising up
+    blob(0.42, 0.34, 0.14, 0, 0, 0.3, 0.2), // the cartouche
+    ...Array.from({ length: 9 }, (_, i) => { const a = (Math.PI * (i + 0.5)) / 9; return blob(0.34, 0.07, 0.06, a, Math.cos(a) * 0.62, 0.3 + Math.sin(a) * 0.62, 0.12); }), // the shell's ribs
+    ...[-1, 1].map((s) => new THREE.TorusGeometry(0.2, 0.06, 5, 10, Math.PI * 1.5).rotateZ(s > 0 ? -Math.PI / 4 : Math.PI * 0.75).translate(s * 0.58, 0.12, 0.14)), // C-scrolls at its foot
+  ])!;
+  const kinds = [shade(rail, 0.37), shade(corner, 0.5), shade(crest, 0.32), new THREE.SphereGeometry(1, 6, 4)]; // rails, corners, crests, pearls
+  const at: THREE.Matrix4[][] = kinds.map(() => []), pieces: number[][] = kinds.map(() => []);
+  const T = new THREE.Matrix4(), R = new THREE.Matrix4(), S = new THREE.Matrix4();
+  for (const [x, y, z, s, w, h] of list) {
+    const t = w > 5 ? 0.56 : 0.36, W = w / 2 - 0.03, H = h / 2 - 0.03, piece = b.pieceId(); // the moulding's width; it laps the canvas 3 cm
+    const F = new THREE.Matrix4().makeRotationY(s < 0 ? Math.PI : 0).setPosition(x, y, z);
+    const put = (k: number, a: number, px: number, py: number, pz: number, sx: number, sy: number, sz: number) => {
+      at[k].push(F.clone().multiply(T.makeTranslation(px, py, pz)).multiply(R.makeRotationZ(a)).multiply(S.makeScale(sx, sy, sz)));
+      pieces[k].push(piece);
+    };
+    for (const [a, px, py, len] of [[0, 0, H, 2 * W], [Math.PI, 0, -H, 2 * W], [Math.PI / 2, -W, 0, 2 * H], [-Math.PI / 2, W, 0, 2 * H]]) put(0, a, px, py, 0, len, t, t);
+    for (const [a, sx, sy] of [[0, 1, 1], [Math.PI / 2, -1, 1], [Math.PI, -1, -1], [-Math.PI / 2, 1, -1]]) put(1, a, sx * (W + t / 2), sy * (H + t / 2), 0, t * 1.45, t * 1.45, t * 1.2);
+    put(2, 0, 0, H + t * 0.9, 0, t * 2.2, t * 2.2, t * 1.3);
+    put(2, Math.PI, 0, -H - t * 0.9, 0, t * 1.5, t * 1.5, t);
+    if (w > 5) for (const sx of [-1, 1]) put(2, -sx * Math.PI / 2, sx * (W + t * 0.9), 0, 0, t * 1.4, t * 1.4, t);
+    const r = 0.045 * t, gap = 0.16 * t, u = 0.19 * t; // the pearls, on the bead
+    for (const [px, py, dx, dy, n] of [[-W, H + u, 1, 0, 2 * W], [-W, -H - u, 1, 0, 2 * W], [-W - u, -H, 0, 1, 2 * H], [W + u, -H, 0, 1, 2 * H]])
+      for (let d = gap / 2; d < n; d += gap) put(3, 0, px + dx * d, py + dy * d, 0.25 * t, r, r, r * 0.8);
+  }
+  kinds.forEach((g, k) => {
+    const im = new THREE.InstancedMesh(g, material('doratura'), at[k].length);
+    at[k].forEach((m, i) => im.setMatrixAt(i, m));
+    im.computeBoundingSphere();
+    im.userData.pieces = pieces[k];
+    b.add(im, 'doratura');
+  });
+}
+
+/**
+ * The church's walls dressed, after the real nave's: a wainscot of white stone round the aisles, the presbytery and the
+ * transepts' ends (a plinth, moulded frames round inlaid panels of red, green and yellow marble, a capping); memorial tablets
+ * of black stone in white frames, gilt lettering, a pediment, between the niches and by the doors; iron sconces, a candle
+ * burning in each, flanking the canvases and the tablets; on the transepts' ends a string course, a great tablet over it and
+ * tall moulded panels above, torn banners either side; moulded panels over the presbytery's cornice; wall torches either side
+ * of the Tintorettos, whose frames catch their light. One instanced unit box per role for all of it (a tint per box), so the
+ * hundreds of pieces cost a matrix each; the stone's stains and the acqua alta's tide line are its material's (materials.ts).
+ */
+function walls(b: LevelBuilder): void {
+  const at = new Map<Role, [THREE.Matrix4, number, number][]>();
+  let piece = 0; // each wall's dress one occlusion piece
+  /** A box on the wall along x at z = w, the room on its `s` side: x0..x1, y0..y1, d0..d1 out of it; turned `a` in the wall's plane. */
+  const box = (role: Role, x0: number, x1: number, y0: number, y1: number, w: number, s: number, d0: number, d1: number, tint = 0xffffff, a = 0) => {
+    let l = at.get(role);
+    if (!l) at.set(role, (l = []));
+    l.push([new THREE.Matrix4().makeRotationZ(a).scale(new THREE.Vector3(x1 - x0, y1 - y0, d1 - d0)).setPosition((x0 + x1) / 2, (y0 + y1) / 2, w + (s * (d0 + d1)) / 2), tint, piece]);
+  };
+  const MARBLE = [0xffb4a0, 0xa8d4b4, 0xffe2a0]; // over the floor's marble: rosso di Verona, verde antico, giallo di Siena
+  /** A wainscot along x0..x1 standing on y0, h tall, in panels of about 2 m. */
+  const wainscot = (x0: number, x1: number, w: number, s: number, y0: number, h: number) => {
+    box('stoneDark', x0, x1, y0, y0 + 0.24, w, s, 0, 0.12); // the plinth
+    box('istria', x0, x1, y0 + 0.24, y0 + h - 0.14, w, s, 0, 0.05); // the field
+    box('istria', x0 - 0.02, x1 + 0.02, y0 + h - 0.14, y0 + h, w, s, 0, 0.13); // the capping, its lip under it
+    box('istria', x0, x1, y0 + h - 0.2, y0 + h - 0.14, w, s, 0, 0.08);
+    const n = Math.max(1, Math.round((x1 - x0) / 2)), pw = (x1 - x0) / n, lo = y0 + 0.38, hi = y0 + h - 0.32;
+    for (let i = 0; i < n; i++) {
+      const a = x0 + i * pw + 0.14, c = a + pw - 0.28;
+      box('marble', a + 0.07, c - 0.07, lo + 0.07, hi - 0.07, w, s, 0.05, 0.065, MARBLE[Math.abs(Math.round(a)) % 3]);
+      riquadro(a, c, lo, hi, w, s, 0.07);
+    }
+  };
+  /** A moulded frame of white stone, f wide, on the wall. */
+  const riquadro = (x0: number, x1: number, y0: number, y1: number, w: number, s: number, f: number) => {
+    box('istria', x0, x1, y0, y0 + f, w, s, 0.03, 0.09);
+    box('istria', x0, x1, y1 - f, y1, w, s, 0.03, 0.09);
+    box('istria', x0, x0 + f, y0 + f, y1 - f, w, s, 0.03, 0.09);
+    box('istria', x1 - f, x1, y0 + f, y1 - f, w, s, 0.03, 0.09);
+  };
+  /** A memorial tablet centred (x, y), tw × th: black stone in a white frame, gilt lines of lettering, a pediment over it, a corbel under. */
+  const tablet = (x: number, y: number, tw: number, th: number, w: number, s: number) => {
+    const W = tw / 2, H = th / 2, f = 0.09, top = y + H + f + 0.1, run = W + 0.16, rise = 0.22 * tw, a = Math.atan2(rise, run), len = Math.hypot(run, rise);
+    box('stoneDark', x - W, x + W, y - H, y + H, w, s, 0, 0.06, 0x6a605a);
+    riquadro(x - W - f, x + W + f, y - H - f, y + H + f, w, s, f);
+    box('istria', x - W - 0.16, x + W + 0.16, y + H + f, top, w, s, 0, 0.16); // its cornice
+    for (const k of [-1, 1]) box('istria', x + (k * run) / 2 - len / 2, x + (k * run) / 2 + len / 2, top + rise / 2 - 0.05, top + rise / 2 + 0.05, w, s, 0, 0.14, 0xffffff, -k * a);
+    box('istria', x - W * 0.6, x + W * 0.6, y - H - f - 0.14, y - H - f, w, s, 0, 0.16); // the corbel
+    for (let i = 0; i < 6; i++) { const lw = W * (i % 2 ? 0.6 : 0.8) * (i ? 1 : 0.7), ly = y + H - 0.12 - i * ((th - 0.2) / 6); box('gold', x - lw, x + lw, ly - 0.035 * (i ? 1 : 1.4), ly, w, s, 0.06, 0.07); }
+  };
+  /** An iron sconce at (x, y) on the wall: back plate, arm, a gilt drip pan, a candle burning. */
+  const sconce = (x: number, y: number, w: number, s: number) => {
+    box('iron', x - 0.06, x + 0.06, y - 0.24, y + 0.1, w, s, 0, 0.03);
+    box('iron', x - 0.02, x + 0.02, y - 0.16, y - 0.12, w, s, 0.03, 0.3);
+    box('iron', x - 0.02, x + 0.02, y - 0.16, y, w, s, 0.26, 0.3);
+    box('gold', x - 0.08, x + 0.08, y, y + 0.03, w, s, 0.2, 0.36);
+    box('flower', x - 0.028, x + 0.028, y + 0.03, y + 0.3, w, s, 0.25, 0.31, 0xf0e6cf); // the candle
+    b.lights.push({ x, y: y + 0.3, z: w + s * 0.28, kind: 'candle' });
+  };
+  /** A banner on a gilt rod at y1, len long, torn: a swallow tail, one side hanging lower; a gilt band and cross on it. */
+  const banner = (x: number, y1: number, len: number, w: number, s: number, role: Role) => {
+    box('gold', x - 0.8, x + 0.8, y1 - 0.06, y1, w, s, 0.14, 0.22);
+    box(role, x - 0.6, x + 0.6, y1 - len, y1 - 0.06, w, s, 0.16, 0.18);
+    box(role, x - 0.6, x - 0.08, y1 - len - 0.7, y1 - len, w, s, 0.16, 0.18);
+    box(role, x + 0.12, x + 0.6, y1 - len - 0.35, y1 - len, w, s, 0.16, 0.18);
+    box('gold', x - 0.6, x + 0.6, y1 - 0.42, y1 - 0.36, w, s, 0.18, 0.19);
+    box('gold', x - 0.05, x + 0.05, y1 - len * 0.75, y1 - 0.7, w, s, 0.18, 0.19);
+    box('gold', x - 0.3, x + 0.3, y1 - 1.25, y1 - 1.15, w, s, 0.18, 0.19);
+  };
+
+  // The aisles: the wainscot between the pilasters (round the niches), sconces either side of the altarpieces, tablets either
+  // side of the wide bay's saint, a great one by the door.
+  for (const [w, s] of [[86.4, 1], [117.6, -1]]) {
+    piece = b.pieceId();
+    for (let k = 0; k < AISLE.length + 1; k++) {
+      const x0 = k < AISLE.length ? AISLE[k] + 0.42 : -519.6, x1 = k ? AISLE[k - 1] - 0.42 : FAC - 0.4;
+      const cut = [-495.5, -508.2].find((c) => c > x0 && c < x1);
+      if (cut) { wainscot(x0, cut - 1, w, s, 0, 1.3); wainscot(cut + 1, x1, w, s, 0, 1.3); } else wainscot(x0, x1, w, s, 0, 1.3);
+    }
+    for (const x of [-488, -502, -514]) for (const d of [-2.15, 2.15]) sconce(x + d, 3, w, s);
+    for (const d of [-2.1, 2.1]) tablet(-495.5 + d, 2.3, 0.7, 0.9, w, s);
+    for (const d of [-1.45, 1.45]) sconce(-508.2 + d, 2.6, w, s);
+    tablet(-481.5, 2.8, 1.4, 1.0, w, s);
+    for (const d of [-1.5, 1.5]) sconce(-481.5 + d, 2.5, w, s);
+  }
+  // The presbytery: the wainscot under the Tintorettos, wall torches either side, moulded panels over the cornice.
+  for (const [w, s] of [[92.4, 1], [111.6, -1]]) {
+    piece = b.pieceId();
+    wainscot(-553.9, -540.6, w, s, P, 1.7);
+    for (const x of [-553.1, -540.9]) b.lights.push({ x, y: P + 2.75, z: w + s * 0.32, kind: 'torch', nx: 0, nz: s });
+    for (const [x0, x1] of [[-553.6, -549.6], [-549.1, -544.9], [-544.4, -540.6]]) riquadro(x0, x1, 9.8, 15, w, s, 0.14);
+  }
+  // The transepts' ends: the wainscot round the niches and the door, a string course, the great tablet, banners, tall panels.
+  for (const [w, s] of [[80.4, 1], [123.6, -1]]) {
+    piece = b.pieceId();
+    const runs = s > 0 ? [[-539.6, -536.5], [-534.5, -531.7], [-528.3, -525.5], [-523.5, -520.4]] : [[-539.6, -536.5], [-534.5, -525.5], [-523.5, -520.4]];
+    for (const [x0, x1] of runs) wainscot(x0, x1, w, s, 0, 1.3);
+    box('istria', -539.6, -520.4, 5.1, 5.4, w, s, 0, 0.28);
+    box('istria', -539.6, -520.4, 4.98, 5.1, w, s, 0, 0.16);
+    tablet(-530, 7.2, 2.6, 1.5, w, s);
+    banner(-525.2, 11.4, 3.4, w, s, 'cloth');
+    banner(-534.8, 11.4, 2.6, w, s, 'azure');
+    for (const [x0, x1] of [[-538.8, -533], [-532, -528], [-527, -521.2]]) riquadro(x0, x1, 12.4, 18.8, w, s, 0.16);
+    for (const [x0, x1] of [[-539, -536.6], [-523.4, -521]]) riquadro(x0, x1, 6, 11, w, s, 0.12);
+    b.lights.push({ x: -530, y: 9, z: w + s * 2.5, kind: 'glow', color: 0xffb46a }); // up the wall: the tablet and the banners in the fires' light
+  }
+
+  const unit = new THREE.BoxGeometry(1, 1, 1), c = new THREE.Color();
+  for (const [role, l] of at) {
+    const im = new THREE.InstancedMesh(unit, material(role), l.length);
+    l.forEach(([m], i) => im.setMatrixAt(i, m));
+    if (l.some(([, t]) => t !== 0xffffff)) l.forEach(([, t], i) => im.setColorAt(i, c.setHex(t)));
+    im.computeBoundingSphere();
+    im.userData.pieces = l.map(([, , p]) => p);
     b.add(im, role);
   }
 }

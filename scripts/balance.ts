@@ -846,8 +846,8 @@ function route3(r: Run): Goal[] {
   return [
     { name: 'zuane', x: NPC.x, z: NPC.z, r: 2.2, done: (r) => { r.quest.report2(); r.quest.accept3(); r.paths.reset(); } },
     ...PACKS3.flatMap((p, i) => (ON_THE_WAY3.includes(p.label) ? [pack(i)] : [])),
-    { name: 'gondola', x: BERTHS.punta.x, z: BERTHS.punta.z, r: 1.5, done: (r) => { // the crossing, ~11 s afloat
-      r.time += 11;
+    { name: 'gondola', x: BERTHS.punta.x, z: BERTHS.punta.z, r: 1.5, done: (r) => { // the crossing, ~17 s afloat (scripts/check-ferry.ts)
+      r.time += 17;
       Object.assign(r.player.pos, { x: APPRODO.x, y: r.world.standHeight(APPRODO.x, APPRODO.z), z: APPRODO.z });
       r.quest.landed = true;
       region(ISLAND);

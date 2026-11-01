@@ -24,14 +24,20 @@ import { front, houses } from '../facades.ts';
 //   biblioteca         x -508..-470, z -6..20 on a solid ground floor; antirefettorio x -536..-524, z 36..44
 //   cenacolo           x -548..-512, z 4..36 (the boss's hall); giardino and teatro verde z -36..-8, the riva x -452..-444
 
-/** The Punta's water edge, and the pontile where the gondola waits (its north side, `FERRY_A`). */
+/** The Punta's water edge, and the pontile where the gondola waits (across its end, `FERRY_A`). */
 export const PUNTA_END = -404;
 export const PIER = { x0: -417, x1: PUNTA_END, z0: 8, z1: 12 };
 /** The approdo in front of the basilica, and its gondola berth. */
 export const LANDING = { x0: -444, x1: -433, z0: 98, z1: 102 };
-/** Where the gondola lies at each end (its middle, on the water), and the way between them (quest/ferry.ts). */
-export const FERRY_A = { x: -412, z: 13.8 }, FERRY_B = { x: -438.5, z: 103.8 };
-export const CROSSING: [number, number][] = [[FERRY_A.x, FERRY_A.z], [-418, 26], [-428, 56], [-434, 84], [FERRY_B.x, FERRY_B.z]];
+/**
+ * Where the gondola lies at each end (its middle, on the water, and its yaw, the bow +X): across the end of each landing stage,
+ * its 0.72 m half-beam 0.3 m off the stage's invisible edge (0.6 m out), the bow north at the Punta and south at San Giorgio,
+ * the way each trip leaves (quest/ferry.ts rows OUT and BACK to arrive the same way, so it never swings through a stage).
+ */
+export const FERRY_A = { x: PIER.x0 - 1.62, z: (PIER.z0 + PIER.z1) / 2, yaw: -Math.PI / 2 };
+export const FERRY_B = { x: LANDING.x1 + 1.62, z: (LANDING.z0 + LANDING.z1) / 2, yaw: Math.PI / 2 };
+/** The striped paline the gondola ties up to: by each stage's outer corners, clear of the hull. */
+export const PALINE: [number, number][] = [[PIER.x0 - 0.3, PIER.z0 - 0.8], [PIER.x0 - 0.3, PIER.z1 + 0.8], [LANDING.x1 + 0.3, LANDING.z0 - 0.8], [LANDING.x1 + 0.3, LANDING.z1 + 0.8]];
 export const SG = { x0: -600, x1: -444, z0: -40, z1: 134 };
 export const FAC = -478; // the basilica's front
 /** The church's interior dress (marble floors, pilasters, niches, the dome's ribs): its own zone, kept off level 2's GPU. */
@@ -104,7 +110,7 @@ export function buildPunta(b: LevelBuilder): void {
   b.barrier(PIER.x0, PIER.x1, PIER.z0 - 0.6, PIER.z0);
   b.barrier(PIER.x0, PIER.x1, PIER.z1, PIER.z1 + 0.6);
   b.barrier(PIER.x0 - 0.6, PIER.x0, PIER.z0, PIER.z1);
-  for (const x of [-409, -415.5]) palina(p, x, PIER.z1 + 0.8);
+  for (const [x, z] of PALINE.slice(0, 2)) palina(p, x, z);
   lampPost(b, p, PIER.x0 + 0.6, PIER.z0 + 0.5, 0);
   p.flush();
 }
@@ -151,13 +157,13 @@ function shore(b: LevelBuilder, p: Props): void {
   b.barrier(-562, x1 + 0.6, z1, z1 + 0.6);
   b.barrier(x0 - 0.6, x0, z0, 150);
   b.barrier(x0, x1, z0 - 0.6, z0);
-  // The approdo: a wooden landing stage, the gondola's berth on its north side.
+  // The approdo: a wooden landing stage, the gondola's berth across its end.
   b.box(LANDING.x0, LANDING.x1, -0.35, 0, LANDING.z0, LANDING.z1, 'wood', { camera: false });
   for (let x = LANDING.x1 - 0.4; x > LANDING.x0; x -= 1.6) for (const z of [LANDING.z0 + 0.2, LANDING.z1 - 0.2]) p.disc(x, -1.2, z, 0.14, 1.2, 'wood');
   b.barrier(LANDING.x0, LANDING.x1, LANDING.z0 - 0.6, LANDING.z0);
   b.barrier(LANDING.x0, LANDING.x1, LANDING.z1, LANDING.z1 + 0.6);
   b.barrier(LANDING.x1, LANDING.x1 + 0.6, LANDING.z0, LANDING.z1);
-  for (const x of [-436, -441]) palina(p, x, LANDING.z1 + 0.8);
+  for (const [x, z] of PALINE.slice(2)) palina(p, x, z);
   lampPost(b, p, LANDING.x1 - 0.6, LANDING.z0 + 0.5, 0);
   for (let z = -30; z < 134; z += 9.5) if (z < 96 || z > 104) bitta(p, x1 - 0.5, z);
   for (const z of [92, 128]) lampPost(b, p, -448, z, 0);

@@ -57,7 +57,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   a livello 1 finito si riparte dal rapporto a Fra' Zuane, la nebbia di guerra resta al suo posto).
 - **Livello 3, "Le nozze di San Giorgio"** (l'ultimo): morta la Governatrice, Fra' Zuane manda il Risorto a
   est, oltre i Tre Oci, lungo la fondamenta di San Giovanni fino alla Punta della Giudecca (`src/level/zones/sangiorgio.ts`,
-  `buildPunta`); al pontile della Punta Mastro Iseppo rema la gondola (`src/quest/ferry.ts`, ~11 s sul bacino, la
+  `buildPunta`); al pontile della Punta la gondola di Mastro Iseppo, remata dall'ombra di un gondoliere annegato, lo porta (`src/quest/ferry.ts`, ~17 s sul bacino, la
   camera guarda l'isola e la nebbia del bacino si apre) fino all'approdo di San Giorgio Maggiore (`buildSanGiorgio`):
   piazzale, facciata palladiana, basilica con navata, crociera sotto la cupola e coro dei monaci, campanile, chiostro
   dei cipressi e chiostro degli allori, Scalone e Biblioteca del Longhena, antirefettorio e Cenacolo palladiano,

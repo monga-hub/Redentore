@@ -32,6 +32,8 @@ const CSS = `
 #levelup .ic::after { content: ''; position: absolute; inset: 0; pointer-events: none;
   box-shadow: inset 0 0 0 1px #000, inset 3px 3px 2px -1px rgba(255,240,200,.2), inset -3px -3px 4px -1px rgba(0,0,0,.6); background: linear-gradient(150deg, rgba(255,255,255,.14), transparent 40%); }
 #levelup h3 { margin: 2px 0 0; font: bold 19px Georgia, serif; color: #ffd75e; }
+#levelup h3 .n { margin-left: 8px; padding: 0 7px; font: bold 14px/20px system-ui, sans-serif; vertical-align: 2px; border-radius: 9px; color: #1a1208; background: #ffd75e; }
+body.diablo #levelup h3 .n { background: #ff8a5a; border-radius: 1px; }
 #levelup p { margin: 0; color: #e9dcc0; }
 #levelup .foot { margin-top: auto; display: flex; gap: 10px; align-items: center; font: 12px system-ui, sans-serif; color: #b8a888; }
 #levelup kbd { padding: 1px 7px; font: 700 13px/1.4 sans-serif; color: #1a1208; background: #e0b55a; border-radius: 3px; }
@@ -139,13 +141,19 @@ export class LevelUp {
     this.onPick = pick;
     this.title.textContent = `Livello ${lv}`;
     this.cardsEl.innerHTML = cards.map((c, i) => {
-      const stacks = c.max > 1 && Number.isFinite(c.max) ? `<span>${count(c.id) + 1}/${c.max}</span>` : '';
       const school = SCHOOL_NAME.get(c.school ?? SCHOOL[c.of ?? '']);
       return `<button class="card ${c.kind}" data-i="${i}" tabindex="-1"><span class="tag">${c.kind === 'filler' && c.apply ? 'Potenziamento' : TAG[c.kind]}${school ? ` · ${school}` : ''}</span><div class="ic">${ICONS[c.icon] ?? ''}</div>`
-        + `<h3></h3><p></p><div class="foot">${stacks}<kbd>${i + 1}</kbd></div></button>`;
+        + `<h3></h3><p></p><div class="foot"><kbd>${i + 1}</kbd></div></button>`;
     }).join('');
     this.cardsEl.querySelectorAll('.card').forEach((b, i) => {
-      b.querySelector('h3')!.textContent = cards[i].name;
+      const c = cards[i], h = b.querySelector('h3')!;
+      h.textContent = c.name;
+      if (c.max > 1 && Number.isFinite(c.max)) { // a stacking card: which pick this is, of how many
+        const n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = `${count(c.id) + 1}/${c.max}`;
+        h.append(n);
+      }
       b.querySelector('p')!.textContent = cards[i].text;
     });
     this.sel = -1;

@@ -29,6 +29,7 @@ import { PHONE, weakness } from '../core/device.ts';
 function indoorness(zone: string | undefined, label: string | undefined): number {
   if (zone === 'chiesa' || zone === 'corpo-nord') return 1;
   if (label === 'Ingresso al convento' || label === 'Corridoio del convento' || label === 'Segreteria') return 1;
+  if (zone === 'sangiorgio' && label?.startsWith('Chiostr')) return 0.05; // San Giorgio's two are wide open to the moon: more sky in them, the arcades' lamps do the rest
   if (label?.startsWith('Chiostr') || label === 'Cortile delle Zitelle') return 0.45;
   if (zone === 'zitelle' && !/^(Sagrato|Orto|Androne)/.test(label ?? '')) return 1; // the Zitelle's church and the Pia Casa's rooms
   return 0;

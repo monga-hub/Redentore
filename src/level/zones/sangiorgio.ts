@@ -45,6 +45,7 @@ export const SCANSIE = [-505.8, -472.2].flatMap((x) => Array.from({ length: 8 },
 /** The Borges labyrinth's middle, in the garden: its stone drum. */
 export const LABIRINTO = { x: -496, y: 0, z: -14 };
 export const CENACOLO = { x0: -548, x1: -512, z0: 4, z1: 36 };
+const CEN_CEIL = 11.2; // the Cenacolo's ceiling, coffered (ceilings())
 /**
  * The open stretch of the Manica lunga (convento() and dormitorio()): a vaulted corridor from the chiostro degli allori's west walk
  * (its door at z 62) between the monks' cells, two of them broken open. The rest of the range stays shut.
@@ -491,6 +492,14 @@ function ceilings(b: LevelBuilder): void {
       slab(b, null, x0 - 0.4, x1 + 0.4, y - 0.3, y, z1, z1 + 0.4, 'volta');
     });
   }
+  // The Cenacolo's (refettorio() dresses the hall under it): a coffered ceiling on a cornice round all four walls, the warm ground
+  // between the coffers lit as the church's are, so its height reads over the Abate's fight.
+  b.together((piece) => {
+    const i0 = CENACOLO.x0 + 0.3, i1 = CENACOLO.x1 - 0.3, j0 = CENACOLO.z0 + 0.3, j1 = CENACOLO.z1 - 0.3, nx = 12, nz = 10, w = (i1 - i0) / nx, d = (j1 - j0) / nz;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) coffer(piece, O.set(i0 + (i + 0.5) * w, CEN_CEIL, j0 + (j + 0.5) * d), X.set(1, 0, 0), Y.set(0, 1, 0), w * 0.86, d * 0.86);
+    slab(b, null, i0, i1, CEN_CEIL, CEN_CEIL + 0.12, j0, j1, 'volta');
+    for (const [a, c, e, f] of [[i0, i1, j0, j0 + 0.45], [i0, i1, j1 - 0.45, j1], [i0, i0 + 0.45, j0, j1], [i1 - 0.45, i1, j0, j1]]) slab(b, null, a, c, CEN_CEIL - 0.35, CEN_CEIL, e, f, 'volta');
+  });
   // The drum and the dome.
   b.together((piece) => {
     const Rd = DOME - 0.3, C = new THREE.Vector3(SGX, RING + 4.6, SGZ); // the inner shell
@@ -961,7 +970,12 @@ function monastery(b: LevelBuilder, p: Props): void {
   for (const [x, z] of [[-533, 59], [-527, 65], [-486, 57.5], [-480, 66.5]]) lampPost(b, p, x, z, 0);
   b.arcade(-548, -512, 44, 80, 3, 4.6, { gaps: [[SGX, 44], [SGX, 80], [-512, 62]], upper: 'nesw' });
   b.arcade(-504, -462, 44, 80, 3, 4.6, { gaps: [[-491, 44], [-504, 62]], upper: 'nsw' });
-  for (const [x, z, nx, nz] of [[-547.6, 54, 1, 0], [-547.6, 70, 1, 0], [-512.4, 54, -1, 0], [-503.6, 72, 1, 0], [-462.4, 54, -1, 0], [-462.4, 70, -1, 0]] as const) b.lights.push({ x: x + nx * 0.32, y: 2.75, z: z + nz * 0.32, kind: 'torch', nx, nz });
+  // Torches round every walk, its far corners too: each paints its pool on the paving even when the pooled lights are elsewhere.
+  for (const [x, z, nx, nz] of [
+    [-547.6, 54, 1, 0], [-547.6, 70, 1, 0], [-512.4, 54, -1, 0], [-512.4, 72, -1, 0], [-541, 44.4, 0, 1], [-519, 44.4, 0, 1], [-541, 79.6, 0, -1], [-519, 79.6, 0, -1],
+    [-503.6, 72, 1, 0], [-503.6, 52, 1, 0], [-462.4, 54, -1, 0], [-462.4, 70, -1, 0], [-497, 44.4, 0, 1], [-470, 44.4, 0, 1], [-497, 79.6, 0, -1], [-483, 79.6, 0, -1], [-470, 79.6, 0, -1],
+  ] as const) b.lights.push({ x: x + nx * 0.32, y: 2.75, z: z + nz * 0.32, kind: 'torch', nx, nz });
+  for (const x of [-530, -483]) b.lights.push({ x, y: 8, z: 62, kind: 'glow', color: 0x9fb8ff }); // the moon over each garth
 
   // Antirefettorio: Palladio's vestibule with its two lavabi, between the allori and the cenacolo.
   b.area('Antirefettorio', -536, -524, 36, 44);
@@ -1258,7 +1272,7 @@ const PULLEY = new THREE.CylinderGeometry(1, 1, 1, 10);
  * di Cana on the end wall between pilasters; fallen plaster, a beam down, chairs flung about the floor.
  */
 function refettorio(b: LevelBuilder, q: Props, r: () => number): void {
-  const { x0, x1, z0, z1 } = CENACOLO, T0 = z0 + 4, T1 = z1 - 3, CEIL = 11.2, IN = 0.3;
+  const { x0, x1, z0, z1 } = CENACOLO, T0 = z0 + 4, T1 = z1 - 3, CEIL = CEN_CEIL, IN = 0.3;
   b.floor(x0, x1, z0, z1, 'marble', 0, 0.02);
   const walls = [face('z', x0 + IN, 1), face('z', x1 - IN, -1)];
   for (const f of walls) {
@@ -1319,12 +1333,7 @@ function refettorio(b: LevelBuilder, q: Props, r: () => number): void {
   b.decor(shaped(arch(cu, 6.4, 3.2, 3.6, 0.3)).translate(0, 0, 0.16).applyMatrix4(N.m), 'istria');
   for (const du of [-1.07, 1.07]) b.part(N.m, cu + du - 0.12, cu + du + 0.12, 6.4, 6.4 + Math.sqrt(3.2 ** 2 - du ** 2), 0.04, 0.24, 'istria');
   b.part(N.m, cu - 3.8, cu + 3.8, 6.2, 6.42, 0.04, 0.34, 'istria');
-  // The ceiling: boards on beams, one occlusion piece so the Diablo view lifts it whole.
-  b.together(() => {
-    b.part(null, x0 + IN, x1 - IN, CEIL, CEIL + 0.12, z0 + IN, z1 - IN, 'wood');
-    for (let x = x0 + 3; x < x1 - 1; x += 3) b.part(null, x - 0.2, x + 0.2, CEIL - 0.45, CEIL, z0 + IN, z1 - IN, 'wood');
-    for (const z of [12, 20, 28]) b.part(null, x0 + IN, x1 - IN, CEIL - 0.3, CEIL, z - 0.14, z + 0.14, 'wood');
-  });
+  // The ceiling over it: ceilings(), coffered with the church's.
 
   // The tables: walnut tops on trestles, the cloths dragged half off, pewter and bread, chalices thrown down; the west one's north
   // end collapsed, its top sloping to the floor.

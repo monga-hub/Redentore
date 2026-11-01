@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { extrude } from '../level/builder.ts';
 import { loadModel, stand } from '../core/models.ts';
 import { SPAWN } from '../level/plan.ts';
@@ -32,7 +33,7 @@ const ARRIVE: Record<Crossing, { x: number; z: number; yaw: number }> = {
 /** The hull: half its length (the ferro reaches past it), its half-beam each side (the port side broader, as a gondola's is). */
 export const HULL = { half: 5.4, port: 0.72, starboard: 0.6, bow: 5.75 } as const;
 /** The forcola's notch, where the oar turns (boat frame: +X the bow, +Z starboard, y up, the water at -1.2). */
-const NOTCH = new THREE.Vector3(-3, sheer(-3) + 0.6, HULL.starboard * beam(-3) - 0.04);
+const NOTCH = new THREE.Vector3(-3, sheer(-3) + 0.62, HULL.starboard * beam(-3) - 0.04);
 /** The oar: from the handle to the blade's tip along its own +X, the notch at 0. */
 const OAR = { handle: -1.6, blade: 1.75, tip: 2.8 };
 /** The oar's rest (yaw outboard, pitch down) and the stroke's sweep. */
@@ -169,20 +170,22 @@ function ferroGeometry(): THREE.BufferGeometry {
 /** The forcola: the walnut oar-lock on the starboard gunwale, its notch cradling the oar. */
 function forcolaGeometry(): THREE.BufferGeometry {
   const s = new THREE.Shape().moveTo(-0.11, 0).lineTo(0.11, 0).quadraticCurveTo(0.03, 0.25, 0.08, 0.42).quadraticCurveTo(0.2, 0.55, 0.17, 0.66)
-    .quadraticCurveTo(0.1, 0.7, 0.05, 0.6).quadraticCurveTo(0, 0.55, -0.05, 0.6).quadraticCurveTo(-0.12, 0.74, -0.17, 0.66)
+    .quadraticCurveTo(0.13, 0.7, 0.09, 0.6).quadraticCurveTo(0, 0.5, -0.09, 0.6).quadraticCurveTo(-0.14, 0.74, -0.17, 0.66)
     .quadraticCurveTo(-0.13, 0.45, -0.06, 0.3).quadraticCurveTo(-0.03, 0.15, -0.11, 0);
   return extrude(s, 0.09, 0.015).scale(1, 1.12, 1);
 }
 
-/** The oar along +X, the notch at 0: a round shaft thickening to the blade, a knob at the grip, a flat spade blade. */
-function oarGeometry(): THREE.BufferGeometry[] {
-  const len = OAR.blade - OAR.handle;
-  const shaft = new THREE.CylinderGeometry(0.048, 0.04, len, 10).rotateZ(-Math.PI / 2).translate(OAR.handle + len / 2, 0, 0);
-  const knob = new THREE.SphereGeometry(0.055, 10, 6).translate(OAR.handle, 0, 0);
-  const s = new THREE.Shape().moveTo(OAR.blade - 0.15, 0.04).quadraticCurveTo(OAR.blade + 0.1, 0.09, OAR.blade + 0.3, 0.09).lineTo(OAR.tip - 0.12, 0.085)
-    .quadraticCurveTo(OAR.tip, 0.07, OAR.tip, 0).quadraticCurveTo(OAR.tip, -0.07, OAR.tip - 0.12, -0.085).lineTo(OAR.blade + 0.3, -0.09)
-    .quadraticCurveTo(OAR.blade + 0.1, -0.09, OAR.blade - 0.15, -0.04).closePath();
-  return [shaft, knob, extrude(s, 0.03, 0.008)];
+/** The oar along +X, the notch at 0, in one piece: a stout round shaft, a knob at the grip, the shaft flaring into a broad flat blade. */
+function oarGeometry(): THREE.BufferGeometry {
+  const len = OAR.blade - OAR.handle, R = 0.07;
+  const shaft = new THREE.CylinderGeometry(R, R * 0.9, len, 12).rotateZ(-Math.PI / 2).translate(OAR.handle + len / 2, 0, 0);
+  const knob = new THREE.SphereGeometry(R * 1.3, 12, 8).translate(OAR.handle, 0, 0);
+  const w = 0.15, n = R * 0.9; // the blade's half-width; the shaft's at the neck, where the blade grows out of it
+  const s = new THREE.Shape().moveTo(OAR.blade - 0.35, n).quadraticCurveTo(OAR.blade + 0.05, n, OAR.blade + 0.3, w).lineTo(OAR.tip - 0.16, w)
+    .quadraticCurveTo(OAR.tip, w * 0.85, OAR.tip, 0).quadraticCurveTo(OAR.tip, -w * 0.85, OAR.tip - 0.16, -w).lineTo(OAR.blade + 0.3, -w)
+    .quadraticCurveTo(OAR.blade + 0.05, -n, OAR.blade - 0.35, -n).closePath();
+  const blade = extrude(s, 0.06, 0.02);
+  return mergeGeometries([shaft.toNonIndexed(), knob.toNonIndexed(), blade.toNonIndexed()].map((g) => (g.deleteAttribute('uv'), g)))!;
 }
 
 const _q = new THREE.Quaternion(), _p = new THREE.Quaternion(), _b = new THREE.Quaternion();
@@ -253,7 +256,7 @@ export class Ferry {
     at(new THREE.BoxGeometry(0.4, 0.1, 0.8), velvet, 1.9, -0.9, -0.04);
     // The forcola on the starboard gunwale, the oar in its notch.
     at(forcolaGeometry(), walnut, NOTCH.x, sheer(NOTCH.x) - 0.04, HULL.starboard * beam(NOTCH.x) - 0.04);
-    for (const g of oarGeometry()) this.oar.add(new THREE.Mesh(g, beech));
+    this.oar.add(new THREE.Mesh(oarGeometry(), beech));
     this.oar.position.copy(NOTCH);
     this.oar.rotation.order = 'YZX';
     this.hold[0].position.set(OAR.handle + 0.06, 0, 0);

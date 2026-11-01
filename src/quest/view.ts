@@ -546,7 +546,7 @@ export class QuestView {
       } else if (pr.talk) {
         const g = pr.talk, spec = GIVERS[g], face = FACES[g], s = this.quest.side, all = SIDE.every((sq) => giverOf(sq) !== g || s.done.includes(sq.id));
         this.givers[g].talking = true;
-        this.talk.show({ name: spec.at.name, portrait: `${import.meta.env.BASE_URL}models/${face.file}.webp`, tint: face.tint }, all ? spec.bye : spec.greet, () => this.giverEntries(g), g === 'iseppo' ? () => this.shop2?.() : undefined);
+        this.talk.show({ name: spec.at.name, portrait: `${import.meta.env.BASE_URL}models/${face.file}.webp`, tint: face.tint }, all ? spec.bye : spec.greet, () => this.giverEntries(g), g === 'iseppo' || g === 'riva' ? () => this.shop2?.() : undefined); // Mastro Iseppo's Commercia in the squero and on San Giorgio's approdo, the same goods
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }

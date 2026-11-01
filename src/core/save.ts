@@ -1,6 +1,7 @@
 // Saved games: the state worth keeping as plain JSON (the hero chosen, player, quest flags, who is dead, play
 // time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), one run per hero in
-// localStorage, kept whenever no fight is on (the autosave). The squad screen (ui/select.ts) shows them all; the hero
+// localStorage, kept every few seconds and at once on every kill, card picked and loot taken (the autosave); mid-fight
+// the hero stays where the last calm save left him, his health and mana with him (`keeper`), so a resume never lands in the pull. The squad screen (ui/select.ts) shows them all; the hero
 // picked resumes his own run or starts afresh, and switching heroes reloads the page so every system boots clean (no
 // stray bolts, cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state over the fresh
 // world. iOS reloads a tab it kills for memory, which used to throw the whole run away: the run is kept on the phone. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
@@ -173,9 +174,23 @@ function read(store: Storage, key: string): unknown {
 /** Each hero's own run: his world, quests, bag, gear and level, kept apart so playing one never touches another's. */
 const RUN = (hero: string) => `redentore.hero.${hero}`;
 
-/** Keep `s` as its hero's run (main.ts, out of combat only, so a resume never lands mid-fight). False when storage is full or blocked. */
+/** Keep `s` as its hero's run. False when storage is full or blocked. */
 export function autosave(s: GameState, store: Storage = localStorage): boolean {
   try { store.setItem(RUN(heroOf(s.hero)), JSON.stringify(s)); return true; } catch { return false; }
+}
+
+/**
+ * The autosave main.ts calls: `calm`, the run as it is; mid-fight, the run as it is (XP, level, picks, the dead, the
+ * bag, the quests: all of one moment, so they never disagree) with the hero put back at `start` or the last calm save's
+ * spot, health, mana and charge. A resume then has the level and its card, its dead stay dead (their XP is in it,
+ * so nothing comes back to be farmed), and the living of that fight wake at home to find him where he stood before it.
+ */
+export function keeper(start: GameState['player'], store?: Storage): (s: GameState, calm: boolean) => boolean {
+  let still = start;
+  return (s, calm) => {
+    if (calm) still = s.player;
+    return autosave(calm ? s : { ...s, player: still }, store);
+  };
 }
 
 /** `hero`'s run, if any (undefined: he starts a new game); junk is refused. */

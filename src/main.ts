@@ -39,7 +39,7 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { autosave, deserialize, migrate, questXpIn, resume, serialize, type Game } from './core/save.ts';
+import { autosave, deserialize, keeper, migrate, questXpIn, resume, serialize, type Game } from './core/save.ts';
 import { BAR, prepared } from './core/prepared.ts';
 import { getView, isDiablo, onQuality, onStyle, setView, VIEWS } from './core/style.ts';
 import { CameraBlend, DiabloCamera, STEPS as DIABLO_STEPS } from './camera/diabloCamera.ts';
@@ -379,6 +379,7 @@ function openLevelUp(): void {
     }
     kit.ascend();
     kit.system.notices.push({ kind: 'info', text: c.kind === 'ability' ? `Nuova abilità: ${c.name}` : c.name });
+    keep(); // the card is the run's at once, mid-fight too: a tab killed before the fight ends wakes with it taken
   });
 }
 // A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
@@ -392,7 +393,7 @@ const audio = new Director({ // sound and music, read off the world every frame
 });
 const menu = new Menu({
   opened: () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); },
-  leave: () => { keep(); location.reload(); }, // the run kept (not mid-fight: then the last calm one stands), the squad screen on the reload
+  leave: () => { keep(); location.reload(); }, // the run kept (mid-fight: the hero where the last calm save left him), the squad screen on the reload
 });
 const dfx = new DiabloFx([ // blood and pools in both views; damage numbers, loot beams in Diablo's (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.95 },
@@ -598,14 +599,16 @@ addEventListener('resize', () => {
 // Debug hooks for later ships and for poking around in the console.
 Object.assign(window, { arredi, dragoSet: drago, dragon, sandbox, zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
-// The autosave (core/save.ts): every few seconds and when the tab is hidden (iOS may kill it then), only
-// while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
+// The autosave (core/save.ts keeper): every few seconds, when the tab is hidden (iOS may kill it then) and at once on
+// every kill, card and pickup. Mid-fight (or fallen) the hero is kept where he last stood calm, so a resume lands
+// before the pull, never in it, with all the fight earned. Never afloat, in the intro, the sandbox or the dragon's fight.
 const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin', 'pour']); // 'spin': the Governatrice's fuso; 'pour': the Abate's Calice
 const KEEP = 5; // s
 const PACK = 12, CALM = 22; // m: three fighting foes this close widen the framing; none alive this close draws it in
 const BOSSES = [priests.boss, zitelle.boss, sangiorgio.boss, bees.queen]; // framed wide in their fight, like the dragon
 let kept = KEEP;
-const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && dying <= 0 && !playerStats.dead && !ferry.trip && !mobs.some((m) => FIGHTING.has(m.state))) autosave(serialize(game)); }; // never afloat
+const save = keeper(serialize(game).player); // until a calm save this boot: where the load (or the new game) put him
+const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && !ferry.trip) save(serialize(game), dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state))); };
 addEventListener('visibilitychange', () => { if (document.hidden) keep(); });
 
 const timer = new THREE.Timer();
@@ -707,6 +710,7 @@ renderer.setAnimationLoop(() => {
     kit.system.notices.push({ kind: 'error', text: "Il Cardinale è caduto. Si rialza davanti all'altare: torna da lui per ricominciare la processione" });
   }
   dfx.update(dt, quest.accepted && !quest.key);
+  const took = drops.taken;
   for (const text of drops.update(dt, player.pos)) kit.system.notices.push({ kind: 'error', text }); // before the victory: the boss drops, those he takes with him don't
   bagPanel.update();
   if (!quest.relic && bag.count(RELIC)) { // Fra' Zuane's corona picked up: the side quest starts
@@ -715,6 +719,7 @@ renderer.setAnimationLoop(() => {
   }
   const letter = quest.side.update(); // Marieta's letter, or Il libro di sabbia's page, picked up: its quest starts
   if (letter) kit.system.notices.push({ kind: 'info', text: `Missione: ${QUESTS[letter.id].title}. ${quest.side.line(letter)}` });
+  if (drops.taken !== took) keep(); // what was picked up kept with the quests it started, mid-fight too
   for (const h of l3.hidden) if (due(h)) { // the second lamp lit: the drowned out of the basin, the Nostromo after them; wine drawn: the cellar's monks; the Commissario, his granatieri
     rouseHidden(h, !h.pack.hidden!.rest);
     kit.system.notices.push({ kind: h.pack.hidden!.rest ? 'info' : 'error', text: h.pack.hidden!.say });
@@ -786,6 +791,7 @@ renderer.setAnimationLoop(() => {
     });
     if (fresh && tune.leech) playerStats.heal(playerStats.hpMax * tune.leech * fresh);
     levels.xp = slain + quest.bonusXp;
+    if (fresh) keep(); // the dead and their XP kept together, mid-fight too
     if (levels.lv > shownLv) levelUp.flash((shownLv = levels.lv));
     if (levels.pending > 0 && dying <= 0 && !playerStats.dead && !questView.talking) openLevelUp(); // not over a quest-giver handing in its reward: once the window closes
   }

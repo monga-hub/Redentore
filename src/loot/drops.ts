@@ -100,6 +100,8 @@ export class Drops {
   readonly root = new THREE.Group();
   private pool: Loose[] = [];
   private tracks: { mob: Mob; tier: Tier; level: 1 | 2 | 3; quiet?: () => boolean; quest?: () => string | undefined; dead: boolean; t: number }[];
+  /** Pickups so far (gold, items, quest items): main.ts saves the run on each. */
+  taken = 0;
   /** A quest item walked over: true when its quest takes it (main.ts) instead of the bag. */
   collect?: (id: string) => boolean;
   private layer = document.createElement('div');
@@ -239,6 +241,7 @@ export class Drops {
     if (!item) this.bag.gold += l.gold;
     playSfx('loot', null, { ui: true, rate: item ? 1.1 : 1.7, gain: item ? 0.6 : 0.4 });
     this.gain(item ? `+ ${item.name}` : '', l.gold, item ? colorOf(item.id) : '');
+    this.taken++;
     this.free(l);
     return false;
   }

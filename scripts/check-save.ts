@@ -7,7 +7,7 @@ import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, QUESTS, Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { BACKUP, autosave, chapter, deserialize, forget, migrate, questXpIn, resume, valid, serialize, type Game } from '../src/core/save.ts';
+import { BACKUP, autosave, chapter, deserialize, forget, keeper, migrate, questXpIn, resume, valid, serialize, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
@@ -406,5 +406,35 @@ if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
     if (Math.abs(t.cdr - 0.8) > 1e-9 || eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)) fail(`Gelo della cripta x${twice.filter((id) => id === 'cdr').length}: cooldowns ${t.cdr}, still eligible`);
     for (let i = 0; i < 400; i++) if (offer(g.levels.picks, r, g.levels.learned, sch).includes(cdr)) fail('a maxed Gelo della cripta came back');
   }
+}
+// A level-up mid-fight: the card picked is kept at once, the hero left where the last calm save stood him. The tab dies
+// before the fight ends; the resume has the level, the XP, the card (not offered again: nothing pending), the dead dead
+// with their worth in the XP (nothing to farm again) and the loot once, the hero calm where he was before the pull.
+{
+  const kept = new Map<string, string>(), ks = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v), removeItem: (k: string) => void kept.delete(k) } as Storage;
+  const g = boot(), save = keeper(serialize(g).player, ks);
+  if (!save(serialize(g), false) || resume('risorto', ks)?.player.x !== SPAWN.x) fail('a save before any calm one did not keep the spot the run started on');
+  Object.assign(g.player.pos, { x: -10, y: 0, z: -90 }); g.player.facing = 0.5;
+  g.levels.xp = 25; g.levels.picks = ['hp']; g.levels.apply(); g.stats.hp = 900; g.bag.gold = 10;
+  save(serialize(g), true); // calm: the hero by the pontile, level 2
+  Object.assign(g.player.pos, { x: -14, y: 0, z: -120 }); g.stats.hp = 80; // the pull: into the fight, hurt
+  const rest = g.mobs[0].state;
+  g.mobs[0].state = 'chase'; g.mobs[1].state = 'chase';
+  g.mobs[3].state = 'dead'; g.mobs[4].state = 'dead'; // two killed: level 3
+  g.levels.xp = 70;
+  if (lvOf(g.levels.xp).lv - 1 - g.levels.picks.length !== 1) fail('the fight earned no level-up');
+  save(serialize(g), false); // the kill
+  g.levels.picks.push('dmg'); g.levels.apply(); save(serialize(g), false); // the card picked
+  g.bag.gold += 37; g.bag.add('chiodo'); save(serialize(g), false); // the loot taken
+  const r = boot(); // the tab killed before the fight ends: a fresh boot resumes
+  deserialize(r, resume('risorto', ks)!);
+  if (lvOf(r.levels.xp).lv !== 3 || r.levels.xp !== 70 || r.levels.picks.join() !== 'hp,dmg') fail(`resumed at level ${lvOf(r.levels.xp).lv}, ${r.levels.xp} XP, picks ${r.levels.picks}`);
+  if (lvOf(r.levels.xp).lv - 1 - r.levels.picks.length !== 0) fail('the level picked mid-fight is offered again');
+  if (r.player.pos.x !== -10 || r.player.pos.z !== -90 || r.player.facing !== 0.5 || r.stats.hp !== 900) fail('resumed mid-fight, not where the last calm save stood');
+  if (r.mobs[3].state !== 'dead' || r.mobs[4].state !== 'dead' || r.mobs[0].state === 'dead' || r.mobs[0].state === 'chase') fail('the fight\'s dead came back, or its living still fight');
+  if (resume('risorto', ks)!.build!.xp - questXpIn(resume('risorto', ks)!) !== 70) fail('the XP of the dead kept is not what the resume counts as slain');
+  if (r.bag.gold !== 47 || r.bag.count('chiodo') !== 1) fail(`the loot came back ${r.bag.gold} gold, ${r.bag.count('chiodo')} chiodi`);
+  Object.assign(g.player.pos, { x: -20, y: 0, z: -130 }); g.mobs[0].state = g.mobs[1].state = rest; save(serialize(g), true); // the fight won: calm again
+  if (resume('risorto', ks)?.player.z !== -130) fail('the calm save after the fight did not keep the hero where he stands');
 }
 console.log('save system ok');

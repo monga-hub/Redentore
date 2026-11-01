@@ -2,13 +2,13 @@
 // The Reverendissimo is handed in, Fra' Bortolo found and his heads' rite done, the corona given back (its medal in the
 // bag), level 12 (~1025 XP to the boss with the key's and Bortolo's quests, then the hand-in, the heads and the corona:
 // 1525), every slot in level 1's purple, a frost and bone kit on the bar. The Risorto, with the Nube di peste he used to start with. Standing by Fra' Zuane on the fondamenta.
-// The menu offers it as "Nuova partita: dal livello 2"; `migration` and `install` put it once in place of every old save.
+// The squad screen (ui/select.ts) offers it as the Risorto's "Dal livello 2"; main.ts keeps it as his run.
 // Plain data over a fresh game's serialize: no three.js, so `npm run check` drives it in Node.
 import { levelOf } from '../player/levels.ts';
 import { RELIC_PRIZE } from '../loot/bag.ts';
 import { Discovery } from './discovery.ts';
-import { autosave, resume, save, slots, wipe, type GameState } from './save.ts';
-import { saveBar, type Layout } from '../abilities/system.ts';
+import type { GameState } from './save.ts';
+import type { Layout } from '../abilities/system.ts';
 
 export const XP = 1525;
 /** Level-up cards for levels 2..12, as `offer` deals them: an ability on the even levels to 10, an upgrade or passive between. */
@@ -47,27 +47,4 @@ export function prepared(fresh: GameState, fallen: number, areas: readonly { zon
     gear: { ...GEAR },
     side: { taken: [], done: [], kills: {} },
   };
-}
-
-/** Raise when a new prepared save must replace the captain's saves again. */
-const MIGRATION = 'redentore.prepared.v1';
-
-/**
- * Once per MIGRATION: true on the first boot since when there are saves to replace, so the old ones go and the prepared
- * hero comes in (`install`); a first launch with nothing saved keeps its fresh game. main.ts asks before the kit reads the bar.
- */
-export function migration(store: Storage = localStorage): boolean {
-  try {
-    if (store.getItem(MIGRATION)) return false;
-    store.setItem(MIGRATION, '1');
-    return slots(store).some(Boolean) || !!resume(store);
-  } catch { return false; } // blocked storage: nothing to replace either
-}
-
-/** Every slot and the autosave gone, the prepared hero in slot 1 and the autosave (so this boot resumes it), its bar laid out. */
-export function install(s: GameState, store: Storage = localStorage): void {
-  wipe(store);
-  save(0, { label: 'Pronto per il livello 2', savedAt: Date.now(), state: s }, store);
-  autosave(s, store);
-  saveBar(BAR, store);
 }

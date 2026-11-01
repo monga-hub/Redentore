@@ -1,15 +1,18 @@
-import { HEROES, HERO_IDS, heroOf, type Hero } from '../player/heroes.ts';
+import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
 import { levelOf, type School } from '../player/levels.ts';
-import { resume, slots } from '../core/save.ts';
+import { chapter, forget, resume, type GameState } from '../core/save.ts';
 import { Equipment, starter, type GearState } from '../loot/gear.ts';
 import { SCHOOL_NAME } from './book.ts';
 import { SelectStage } from './selectStage.ts';
+import { playTime } from './menu.ts';
 
-// "Scegli il tuo Risorto", Diablo Immortal style: down the left the heroes (player/heroes.ts, every one of them, in order),
-// each his portrait in a gilt diamond, his level under it and his name beside it; the chosen one lit, with his title and
-// his two schools. In the middle the chosen hero himself on a cemetery island by night (ui/selectStage.ts), in what his
-// save has him wear; a drag turns him. "Entra nel mondo" (Enter) starts the new game with him; the boot waits for it
-// (main.ts), and the stage is freed before the game's renderer is made. Tap a portrait (or ←/→, ↑/↓) to change hero.
+// The squad, Diablo Immortal style, shown on every boot: down the left the heroes (player/heroes.ts, every one of them, in
+// order), each his portrait in a gilt diamond, his level under it and his name beside it, and his own run (core/save.ts):
+// the level of the dungeon reached and the time played, or "Nuovo"; the chosen one lit, with his title and his two schools.
+// In the middle the chosen hero himself on a cemetery island by night (ui/selectStage.ts), in what his run has him wear;
+// a drag turns him. "Continua" (Enter) resumes his run, "Entra nel mondo" starts a new one; "Ricomincia" asks first and
+// forgets only his. The boot waits for it (main.ts), and the stage is freed before the game's renderer is made. Tap a
+// portrait (or ←/→, ↑/↓) to change hero; the last one played is lit at first.
 
 const COLOR: Partial<Record<School, string>> = { bone: '#d9c8ff', shadow: '#b27cff', frost: '#8fdcff', storm: '#bcd2ff', plague: '#a8e05a', holy: '#ffe9a0', fire: '#ff9a4a' };
 
@@ -35,6 +38,21 @@ const CSS = `
 #select .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 #select .who b { font: bold 21px Georgia, serif; color: #9a917f; text-shadow: 0 2px 3px #000; white-space: nowrap; transition: color .15s; }
 #select .who i, #select .who .schools { display: none; }
+#select .who .run { font: 13px/1.2 system-ui, sans-serif; color: #c9b48a; text-shadow: 0 1px 2px #000; }
+#select .who .run.new { color: #8a7f68; font-style: italic; }
+#select .lv:empty { display: none; }
+#select .acts { display: flex; align-items: center; gap: 14px; }
+#select .again { padding: 10px 18px; min-height: 48px; font: bold 15px Georgia, serif; color: #f3e2b0; cursor: pointer; text-shadow: 0 1px 2px #000;
+  border: 2px solid transparent; border-radius: 3px; background: linear-gradient(#3a2c1c, #140e08) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 4px 12px rgba(0,0,0,.8); }
+#select .again[hidden] { display: none; }
+#select .ask { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.7); }
+#select .ask .box { box-sizing: border-box; width: min(380px, 100%); padding: 22px 20px 16px; text-align: center; border: 3px solid transparent; border-radius: 8px;
+  background: linear-gradient(#24180f, #0d0906) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 10px 40px rgba(0,0,0,.9); }
+#select .ask h2 { margin: 0 0 10px; font: bold 20px Georgia, serif; color: #ffd75e; }
+#select .ask p { margin: 0 0 16px; font: 14px/1.4 system-ui, sans-serif; color: #e8dcc0; }
+#select .ask button { display: block; width: 100%; min-height: 52px; margin: 8px 0; cursor: pointer; font: bold 17px Georgia, serif; color: #ffd75e; text-shadow: 0 1px 2px #000;
+  border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3a26, #1c140c) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000; }
+#select .ask button.red { background: linear-gradient(#9a2216, #520c07 55%, #2e0503) padding-box, var(--gilt) border-box; }
 #select .who i { color: #d8c8a0; font-size: 15px; text-shadow: 0 1px 2px #000; }
 #select .schools { gap: 8px; font-size: 14px; text-shadow: 0 1px 2px #000; }
 #select .schools small { color: #9a8c70; font-style: italic; font-size: 12px; }
@@ -63,6 +81,8 @@ body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px 
   #select .lv { min-width: 26px; padding: 0 4px; font-size: 11px; border-width: 1px; }
   #select .who b { font-size: 15px; }
   #select .who i { font-size: 11px; }
+  #select .who .run { font-size: 11px; }
+  #select .again { min-height: 40px; padding: 6px 14px; font-size: 13px; }
   #select .schools { font-size: 11px; gap: 5px; }
   #select .schools small { font-size: 10px; }
   #select .foot { right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); gap: 6px; }
@@ -76,28 +96,34 @@ body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px 
   #select .hero.sel .who i, #select .hero.sel .who .schools { display: none; } /* no room beside him: the name only */
   #select .go { padding: 10px 28px; font-size: 20px; letter-spacing: 3px; }
   #select .foot { left: 16px; right: 16px; align-items: center; }
+  #select .who .run { font-size: 11px; }
   #select .lore { text-align: center; }
 }`;
 
-/** Each hero's own game, if any: the run in progress and the three slots, his highest level among them. */
-function saved(): Map<Hero, { lv: number; worn: GearState }> {
-  const out = new Map<Hero, { lv: number; worn: GearState }>();
-  for (const s of [resume(), ...slots().map((x) => x?.state)]) {
+/** Each hero's own run (core/save.ts), with his level and what it has him wear. */
+function saved(): Map<Hero, { lv: number; worn: GearState; s: GameState }> {
+  const out = new Map<Hero, { lv: number; worn: GearState; s: GameState }>();
+  for (const hero of HERO_IDS) {
+    const s = resume(hero);
     if (!s) continue;
-    const hero = heroOf(s.hero), lv = levelOf(s.build?.xp ?? 0).lv;
-    if ((out.get(hero)?.lv ?? 0) >= lv) continue;
     const gear = new Equipment(); // read as a load would: ids from another build dropped
     gear.worn = starter(HEROES[hero].weapon);
     if (s.gear) gear.decode(s.gear);
-    out.set(hero, { lv, worn: gear.worn });
+    out.set(hero, { lv: levelOf(s.build?.xp ?? 0).lv, worn: gear.worn, s });
   }
   return out;
 }
 
+const LAST = 'redentore.last'; // the hero played last, lit first
+const run = (s: GameState) => `Livello\u00a0${chapter(s)} · ${playTime(s.time).replace(/ /g, '\u00a0')}`; // wraps at the dot only
+
+/** How the chosen hero enters: his own run, a new game (his run forgotten), or the Risorto ready for level 2 (core/prepared.ts). */
+export type Start = 'run' | 'new' | 'l2';
+
 const school = (s: School, second: boolean) => `<span style="color: ${COLOR[s] ?? '#f3e2b0'}">${SCHOOL_NAME.get(s)} <small>${second ? 'secondaria' : 'primaria'}</small></span>`;
 
-/** Show the heroes and wait for one to be chosen; the screen and its stage go once he is. */
-export function chooseHero(): Promise<Hero> {
+/** Show the squad and wait for a hero to be chosen; the screen and its stage go once he is. */
+export function chooseHero(): Promise<{ hero: Hero; start: Start }> {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.append(style);
@@ -105,36 +131,76 @@ export function chooseHero(): Promise<Hero> {
   const el = document.createElement('div');
   el.id = 'select';
   el.setAttribute('role', 'dialog');
-  el.setAttribute('aria-label', 'Scegli il tuo Risorto');
-  el.innerHTML = `<div class="shade"></div><h1>SCEGLI IL TUO RISORTO</h1>
-    <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id]; return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
-      <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv">${games.get(id)?.lv ?? 1}</span></div>
-      <div class="who"><b>${h.name}</b><i>${h.title}</i><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div></div></div>`; }).join('')}</div>
-    <div class="foot"><p class="lore"></p><button type="button" class="go">ENTRA NEL MONDO</button></div>`;
+  el.setAttribute('aria-label', 'La tua squadra');
+  el.innerHTML = `<div class="shade"></div><h1>LA TUA SQUADRA</h1>
+    <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id], g = games.get(id); return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
+      <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv">${g?.lv ?? ''}</span></div>
+      <div class="who"><b>${h.name}</b><span class="run${g ? '' : ' new'}">${g ? run(g.s) : 'Nuovo'}</span><i>${h.title}</i><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div></div></div>`; }).join('')}</div>
+    <div class="foot"><p class="lore"></p><div class="acts"><button type="button" class="again"></button><button type="button" class="go"></button></div></div>`;
   document.body.append(el);
   const stage = new SelectStage(el);
   const rows = [...el.querySelectorAll<HTMLElement>('.hero')], lore = el.querySelector('.lore')!;
+  const go = el.querySelector<HTMLButtonElement>('.go')!, again = el.querySelector<HTMLButtonElement>('.again')!;
   let sel = -1;
   const select = (i: number) => {
     if (i === sel) return;
     sel = i;
-    const id = HERO_IDS[i];
+    const id = HERO_IDS[i], g = games.get(id);
     rows.forEach((c, k) => { c.classList.toggle('sel', k === i); c.setAttribute('aria-selected', String(k === i)); });
     rows[i].scrollIntoView({ block: 'nearest' });
     lore.textContent = HEROES[id].lore;
-    stage.show(id, games.get(id)?.worn ?? starter(HEROES[id].weapon));
+    go.textContent = g ? 'CONTINUA' : 'ENTRA NEL MONDO';
+    again.textContent = g ? 'Ricomincia' : 'Dal livello 2';
+    again.hidden = !g && id !== 'risorto'; // a new Risorto may start ready for level 2
+    stage.show(id, g?.worn ?? starter(HEROES[id].weapon));
   };
-  select(0);
+  let last = 0;
+  try { last = Math.max(0, HERO_IDS.indexOf(localStorage.getItem(LAST) as Hero)); } catch { /* blocked storage: the first */ }
+  select(last);
   return new Promise((done) => {
-    const go = () => { if (!el.isConnected) return; removeEventListener('keydown', key, true); stage.dispose(); el.remove(); style.remove(); done(HERO_IDS[sel]); };
+    let ask: HTMLElement | undefined;
+    const finish = (start: Start) => {
+      if (!el.isConnected) return;
+      const hero = HERO_IDS[sel];
+      if (start === 'new') forget(hero); // confirmed: only his run goes
+      try { localStorage.setItem(LAST, hero); } catch { /* not remembered */ }
+      removeEventListener('keydown', key, true);
+      stage.dispose(); el.remove(); style.remove();
+      done({ hero, start: start === 'run' && !games.has(hero) ? 'new' : start });
+    };
+    const close = () => { ask?.remove(); ask = undefined; again.focus(); };
+    /** "Ricomincia": his run is lost, so it asks first; the Risorto may also start over ready for level 2. */
+    const confirm = () => {
+      const id = HERO_IDS[sel], g = games.get(id);
+      if (!g) { finish('l2'); return; } // nothing to lose
+      ask = document.createElement('div');
+      ask.className = 'ask';
+      ask.setAttribute('role', 'alertdialog');
+      ask.setAttribute('aria-modal', 'true');
+      ask.setAttribute('aria-label', `Ricominciare con ${HEROES[id].name}?`);
+      ask.innerHTML = `<div class="box"><h2>Ricominciare con ${HEROES[id].name}?</h2>
+        <p>La sua partita (liv. ${g.lv} · ${run(g.s)}) andrà persa. Gli altri eroi della squadra non cambiano.</p>
+        <button type="button" class="red" data-a="new">Ricomincia da capo</button>
+        ${id === 'risorto' ? '<button type="button" data-a="l2">Ricomincia dal livello 2</button>' : ''}
+        <button type="button" data-a="no">Annulla</button></div>`;
+      ask.addEventListener('click', (e) => {
+        const a = (e.target as HTMLElement).closest<HTMLElement>('[data-a]')?.dataset.a;
+        if (a === 'no' || e.target === ask) close();
+        else if (a === 'new' || a === 'l2') finish(a);
+      });
+      el.append(ask);
+      ask.querySelector<HTMLElement>('[data-a="no"]')!.focus();
+    };
     const key = (e: KeyboardEvent) => {
       e.stopPropagation();
+      if (ask) { if (e.code === 'Escape') close(); return; } // the dialog's buttons take Enter themselves
       if (e.code === 'ArrowLeft' || e.code === 'ArrowUp' || e.code === 'KeyA' || e.code === 'KeyW') select((sel + rows.length - 1) % rows.length);
       else if (e.code === 'ArrowRight' || e.code === 'ArrowDown' || e.code === 'KeyD' || e.code === 'KeyS') select((sel + 1) % rows.length);
-      else if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); go(); }
+      else if ((e.code === 'Enter' || e.code === 'Space') && !(e.target as HTMLElement).closest?.('button')) { e.preventDefault(); finish('run'); } // a focused button clicks itself
     };
     addEventListener('keydown', key, true);
     rows.forEach((c, i) => c.addEventListener('click', () => select(i)));
-    el.querySelector('.go')!.addEventListener('click', go);
+    go.addEventListener('click', () => finish('run'));
+    again.addEventListener('click', confirm);
   });
 }

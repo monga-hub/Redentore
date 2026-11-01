@@ -1,12 +1,13 @@
 // Save system check (`npm run check`): a game serialized mid-quest and laid over a freshly
 // booted world comes back the same (player, charge, Fra' Zuane's quest stage, key, open gates and their colliders, the
-// dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); slots, the reload handoff and the autosave survive storage and refuse junk.
+// dead staying dead, play time, the explored map, level-up picks and XP, the bag, the gear worn and the Vigore it adds); each hero's
+// run survives storage apart from the others' and refuses junk; the old shared saves migrate to their heroes once, backed up.
 import { SIDE_BY } from '../src/quest/squero.ts';
 import { buildLevel } from '../src/level/index.ts';
 import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, QUESTS, Quest } from '../src/quest/progress.ts';
 import { spawnGroups } from '../src/enemies/brain.ts';
-import { autosave, clearAutosave, deserialize, questXpIn, resume, valid, save, serialize, setPending, slots, startup, takePending, upcoming, type Game } from '../src/core/save.ts';
+import { BACKUP, autosave, chapter, deserialize, forget, migrate, questXpIn, resume, valid, serialize, type Game } from '../src/core/save.ts';
 import { Discovery } from '../src/core/discovery.ts';
 import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
@@ -14,7 +15,7 @@ import { HEROES, type Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
 import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
 import { eligible, levelOf as lvOf } from '../src/player/levels.ts';
-import { BAR, PICKS, install, migration, prepared } from '../src/core/prepared.ts';
+import { BAR, PICKS, prepared } from '../src/core/prepared.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 
@@ -220,49 +221,29 @@ const moved = boot();
 deserialize(moved, { ...zs, player: { ...zs.player, x: 150, z: 15 } });
 if (moved.player.pos.x !== ANDITO.x || moved.player.pos.z !== ANDITO.z) fail(`an old level-2 save woke at (${moved.player.pos.x}, ${moved.player.pos.z})`);
 
-// Storage: three slots, empty ones undefined, junk refused; the pending handoff is taken once.
+// Storage: one run per hero. Playing one never touches another's; junk is refused; "Ricomincia" forgets only his.
 const mem = new Map<string, string>();
 const store = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v), removeItem: (k: string) => void mem.delete(k) } as Storage;
-if (!save(1, { label: 'Orti', savedAt: 1, state: s }, store)) fail('save failed');
-mem.set('redentore.save.2', '{"label":"x","savedAt":1,"state":{"v":1}}');
-const list = slots(store);
-if (list.length !== 3 || list[0] || list[1]?.label !== 'Orti' || list[2]) fail('slots misread');
-setPending(s, store);
-if (!takePending(store) || takePending(store)) fail('pending state not taken exactly once');
-// The autosave: every cold boot resumes it (an iOS tab reloaded after a kill), junk is refused, "Nuova partita" clears it.
-if (resume(store)) fail('resumed a run never kept');
-if (!autosave(s, store)) fail('autosave failed');
-if (resume(store)?.time !== s.time || resume(store)?.time !== s.time) fail('autosave not resumed on every boot');
-mem.set('redentore.auto', '{"v":1,"player":{}}');
-if (resume(store)) fail('junk autosave resumed');
-autosave(s, store);
-clearAutosave(store);
-if (resume(store)) fail('autosave survived a new game');
-// The menu's handoffs across the reload win over the autosave the old page makes on its way out (the reload's
-// visibilitychange): "Nuova partita" boots afresh and stays fresh, a load becomes the run in progress, a cold boot resumes.
-autosave(s, store);
-clearAutosave(store); setPending('new', store); // "Nuova partita"
-autosave(s, store); // the old page, hidden by its reload
-if (upcoming(store, store) !== 'new' || upcoming(store, store) !== 'new') fail('the boot did not see the new game coming (or the peek took it)');
-let up = startup(store, store);
-if (up.state || !up.queued || resume(store)) fail('"Nuova partita" resumed the old run');
-if (startup(store, store).state) fail('the old run came back on the next cold boot');
-autosave(s, store);
-setPending(zs, store); // "Carica"
-autosave(s, store);
-if (JSON.stringify(upcoming(store, store)) !== JSON.stringify(zs)) fail('the boot did not see the load coming');
-up = startup(store, store);
-if (JSON.stringify(up.state) !== JSON.stringify(zs) || JSON.stringify(resume(store)) !== JSON.stringify(zs)) fail('a load left the old run as the one in progress');
-up = startup(store, store); // iOS killed it: the cold boot resumes the loaded run
-if (up.queued || JSON.stringify(up.state) !== JSON.stringify(zs) || JSON.stringify(upcoming(store, store)) !== JSON.stringify(zs)) fail('cold boot after a load did not resume it');
-clearAutosave(store);
-if (upcoming(store, store) !== undefined) fail('a first launch saw a game coming');
+if (resume('risorto', store)) fail('resumed a run never kept');
+const sb0 = { ...JSON.parse(JSON.stringify(serialize(boot('bortolo')))), time: 99 }; // Bortolo's run
+if (!autosave(s, store) || !autosave(sb0, store)) fail('autosave failed');
+if (resume('risorto', store)?.time !== s.time || resume('risorto', store)?.time !== s.time) fail('autosave not resumed on every boot');
+if (resume('bortolo', store)?.time !== 99 || resume('fosca', store)) fail('runs not kept per hero');
+const bortoloBefore = mem.get('redentore.hero.bortolo');
+for (let i = 0; i < 5; i++) autosave({ ...s, time: s.time + i }, store); // the Risorto plays on
+if (mem.get('redentore.hero.bortolo') !== bortoloBefore || resume('risorto', store)?.time !== s.time + 4) fail("playing the Risorto touched Bortolo's run");
+mem.set('redentore.hero.fosca', '{"v":1,"player":{}}');
+if (resume('fosca', store)) fail('junk run resumed');
+forget('risorto', store); // the Risorto starts over
+if (resume('risorto', store) || mem.get('redentore.hero.bortolo') !== bortoloBefore) fail("a new game for the Risorto did not forget only his run");
+if (chapter(s) !== 1 || chapter(zs) !== 2) fail('chapter of a run wrong');
+mem.clear();
 // Level 2 through the autosave: the second quest's stage, its open doors and its checkpoint come back.
 autosave(zs, store);
 const zr = boot();
-deserialize(zr, resume(store)!);
+deserialize(zr, resume('risorto', store)!);
 if (zr.quest.stage !== 'boss2' || !zr.quest.gate('coro-zitelle').open || zr.quest.checkpoint() !== ANDITO) fail(`level 2 resumed at ${zr.quest.stage}`);
-clearAutosave(store);
+mem.clear();
 // Levels: picks and XP round-trip; an hp pick's raised max is in place before the saved hp is clamped to it.
 const lv = boot();
 lv.levels.picks = ['step', 'hp', 'dmg'];
@@ -314,6 +295,7 @@ const ob = older('bortolo', ['lance_dmg', 'lance_split', 'hp'], ['frost', 'lance
 if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || obt.prim.lance.dmg !== 11 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
 const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']);
 if (or.levels.learned.join() !== 'caligo' || or.levels.picks.join() !== 'caligo,caligo_big,caligo_freeze,hp' || or.levels.picks.length !== 4) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks}`);
+function hf0() { const g = boot('fosca'); g.levels.learned = ['plague', 'spit']; return JSON.parse(JSON.stringify(serialize(g))); }
 const hf = boot('fosca'); // Suor Fosca keeps her Nube di peste and Sputo di bile
 hf.levels.learned = ['plague', 'spit'];
 const hfb = boot();
@@ -370,16 +352,28 @@ if (pb.stats.hp !== pb.stats.hpMax || pb.stats.mana !== pb.stats.manaMax || pb.m
 if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(-240, -20)) fail('prepared map not level 1 seen');
 const owned = new Set(['fall', 'plague', 'mend', 'potion', ...PICKS.filter((id) => ['step', 'frost', 'nova', 'caligo', 'font'].includes(id))]);
 if (BAR.bar.filter((x) => x).length !== owned.size || BAR.bar.some((x) => x && !owned.has(x)) || BAR.bar[0] !== 'fall' || BAR.bar[9] !== 'potion') fail(`prepared bar ${BAR.bar}`);
+// The old shared saves (autosave, three slots) go once to their heroes, the most advanced one each; every one kept in the
+// backup as it was; the old bar goes to the autosave's hero; a hero who already has a run keeps it; a first launch has nothing to move.
 mem.clear();
-if (migration(store) || migration(store)) fail('a first launch with nothing saved lost its fresh game');
+migrate(store);
+if (mem.size !== 1 || mem.get(BACKUP)) fail('a first launch migrated something');
 mem.clear();
-save(0, { label: 'old', savedAt: 1, state: s }, store);
-save(2, { label: 'old', savedAt: 1, state: s }, store);
-autosave(s, store);
-if (!migration(store)) fail('migration did not run');
-install(ps, store);
-const after = slots(store);
-if (after[0]?.label !== 'Pronto per il livello 2' || after[1] || after[2] || resume(store)?.build?.xp !== ps.build.xp || !mem.get('redentore.bar')) fail('migration did not swap the saves');
-save(1, { label: 'later', savedAt: 2, state: s }, store);
-if (migration(store)) fail('migration ran twice');
+const slot = (state: unknown) => JSON.stringify({ label: 'old', savedAt: 1, state });
+const { hero: _nh, ...noHero } = JSON.parse(JSON.stringify(serialize(lv))); // a save from before the choice: the Risorto's
+mem.set('redentore.auto', JSON.stringify(hgs)); // Bortolo, xp 0
+mem.set('redentore.save.0', slot(noHero)); // the Risorto at level 5
+mem.set('redentore.save.1', slot(s)); // the Risorto at level 1
+mem.set('redentore.save.2', slot({ ...hgs, time: 5, build: { ...hgs.build, xp: 300 } })); // Bortolo further on
+mem.set('redentore.bar', '["fall"]');
+mem.set('redentore.hero.fosca', JSON.stringify({ ...hf0(), time: 7 })); // Suor Fosca already has a run of her own
+const oldRaw = ['redentore.auto', 'redentore.save.0', 'redentore.save.1', 'redentore.save.2'].map((k) => mem.get(k));
+migrate(store);
+if (resume('risorto', store)?.build?.xp !== 200 || resume('bortolo', store)?.build?.xp !== 300 || resume('fosca', store)?.time !== 7 || resume('tizian', store)) fail('migration did not keep the most advanced run of each hero');
+const backup = JSON.parse(mem.get(BACKUP) ?? '{}');
+if (Object.values(backup).join() !== oldRaw.join() || ['redentore.auto', 'redentore.save.0', 'redentore.save.1', 'redentore.save.2'].some((k) => mem.has(k))) fail('the old saves are not all in the backup, or still in place');
+if (mem.get('redentore.bar.bortolo') !== '["fall"]' || mem.get('redentore.bar.risorto')) fail("the old bar did not go to the autosave's hero");
+autosave({ ...s, time: 1 }, store);
+mem.set('redentore.save.0', slot(zs)); // a stale key after the migration: never moved again
+migrate(store);
+if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
 console.log('save system ok');

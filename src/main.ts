@@ -15,7 +15,7 @@ import { BASES, BASE_ATTACK, CARD, Levels, levelOf, offer, tuneOf, type Card } f
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
 import { AbilityBook } from './ui/book.ts';
-import { PRIMARY, saveBar } from './abilities/system.ts';
+import { PRIMARY, barFor, saveBar } from './abilities/system.ts';
 import { PlayerStats } from './player/stats.ts';
 import { Targeting, type Kind } from './ui/target.ts';
 import { HeroAuras, Plates } from './ui/plates.ts';
@@ -39,8 +39,8 @@ import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
 import { WorldMap } from './ui/worldMap.ts';
-import { autosave, deserialize, questXpIn, serialize, setPending, startup, upcoming, type Game } from './core/save.ts';
-import { BAR, install, migration, prepared } from './core/prepared.ts';
+import { autosave, deserialize, migrate, questXpIn, resume, serialize, type Game } from './core/save.ts';
+import { BAR, prepared } from './core/prepared.ts';
 import { getView, isDiablo, onQuality, onStyle, setView, VIEWS } from './core/style.ts';
 import { CameraBlend, DiabloCamera, STEPS as DIABLO_STEPS } from './camera/diabloCamera.ts';
 import { BELFRY, INTERNO } from './level/zones/sangiorgio.ts';
@@ -59,17 +59,17 @@ import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
 import { VendorPanel } from './ui/vendor.ts';
 import { DeathScreen } from './ui/death.ts';
-import { HEROES, heroOf } from './player/heroes.ts';
+import { HEROES } from './player/heroes.ts';
 import { chooseHero } from './ui/select.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
 initAudio(); // before the intro, whose first press unlocks the sound
-const swap = migration(); // once: the old saves make way for the hero ready for level 2 (core/prepared.ts)
-const ahead = swap ? undefined : upcoming(); // the game this boot starts, whose hero's body loads
-const fresh = !swap && (!ahead || ahead === 'new'); // a new game: its hero chosen first (ui/select.ts)
-const hero = fresh ? await chooseHero() : heroOf(swap || ahead === 'new' ? undefined : ahead?.hero);
-if (fresh) saveBar({ bar: barOf(HEROES[hero].kit, BASE_ATTACK[HEROES[hero].school[0]]), off: [] }); // his school's base attack and kit on the bar, before the kit reads it
+migrate(); // once: the old shared saves go to their heroes (core/save.ts)
+const { hero, start } = await chooseHero(); // the squad: whose run this boot plays (ui/select.ts)
+barFor(hero); // his own bar
+const ahead = start === 'run' ? resume(hero) : undefined; // his run, laid over the fresh world below
+if (start === 'new') saveBar({ bar: barOf(HEROES[hero].kit, BASE_ATTACK[HEROES[hero].school[0]]), off: [] }); // his school's base attack and kit on the bar, before the kit reads it
 // Phones: a 1.5 pixel ratio (a third of DPR 3's pixels on an iPhone) and no MSAA on the canvas, which the post chain draws one quad into.
 const renderer = new THREE.WebGLRenderer({ antialias: !PHONE });
 renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.5 : 2));
@@ -108,7 +108,7 @@ const blend = new CameraBlend(); // eases style switches and the intro's hand-ov
 const hud = new Hud(HEROES[hero].portrait, HEROES[hero].name);
 const fx = new Atmosphere(renderer, scene, cam.camera, level); // sun, torches, fog, particles, post
 const playerStats = new PlayerStats(); // health/mana; enemies call playerStats.takeDamage(n)
-if (swap) saveBar(BAR); // the prepared hero's bar, before the kit reads it
+if (start === 'l2') saveBar(BAR); // the prepared hero's bar, before the kit reads it
 const kit = new Forsaken(player, playerStats, HEROES[hero].school); // abilities on 1..0 - =
 scene.add(kit.vfx.root);
 const questView = new QuestView(quest, kit.vfx); // gates, chest, Fra' Zuane and his dialogue, tracker
@@ -272,13 +272,13 @@ const game: Game = { hero, player, stats: playerStats, kit: kit.system, quest, m
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
 const worthOf = (i: number) => ((mobs[i] as { again?: boolean }).again ? Math.ceil(worth[i] * RISE.xp) : worth[i]); // a risen friar, a quarter
 const levelTwo = prepared(serialize(game), mobs.length - zitelle.all.length - sangiorgio.all.length, level.areas); // the hero ready for level 2, off this fresh boot (level 1's mobs come first)
-if (swap) install(levelTwo); // resumed just below
-const { state: loaded, queued: pending } = startup(); // a slot picked in the menu, carried across the reload, or the run in progress: a tab iOS killed for memory and reloaded, the home-screen app relaunched
+if (start === 'l2') autosave(levelTwo); // the Risorto's run from now on
+const loaded = start === 'l2' ? levelTwo : ahead; // undefined: a new game
 if (loaded) {
   deserialize(game, loaded);
   cam.yaw = player.facing;
   questView.settle();
-  kit.system.notices.push({ kind: 'info', text: pending ? 'Partita caricata' : 'Partita ripresa' });
+  kit.system.notices.push({ kind: 'info', text: 'Partita ripresa' });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
 /**
  * Level 3's hidden packs (enemies/sangiorgio.ts): up once their side quest gets that far, on the hero (the Commissario at
@@ -392,11 +392,8 @@ const audio = new Director({ // sound and music, read off the world every frame
   get spent() { return zitelle.spent.length || sangiorgio.spent.length || dragon.spent.length ? [...priests.spent, ...zitelle.spent, ...sangiorgio.spent, ...dragon.spent] : priests.spent; }, fires: fx.torches.em, areaAt: (x, z) => level.areaAt(x, z),
 });
 const menu = new Menu({
-  snapshot: () => serialize(game),
-  where: () => level.areaAt(player.pos.x, player.pos.z)?.label ?? '',
   opened: () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); },
-  book: () => book.show(),
-  levelTwo: () => { saveBar(BAR); if (setPending(levelTwo)) location.reload(); },
+  leave: () => { keep(); location.reload(); }, // the run kept (not mid-fight: then the last calm one stands), the squad screen on the reload
 });
 const dfx = new DiabloFx([ // blood and pools in both views; damage numbers, loot beams in Diablo's (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.95 },

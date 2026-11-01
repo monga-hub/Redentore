@@ -12,7 +12,9 @@ export const PUSHBACK = 0.5;
 export const PUSHBACKS = 3;
 const MOVING = 0.5; // m/s of feet motion that counts as moving (cancels casts)
 
-const LAYOUT = 'redentore.bar';
+let LAYOUT = 'redentore.bar';
+/** Each hero keeps his own bar (main.ts, before the kit reads it): another hero's arrangement never lands on his. */
+export function barFor(hero: string): void { LAYOUT = `redentore.bar.${hero}`; }
 /** The slots the player fills (ability book, drags), in the order a new unlock takes them: the touch fan's thumb order.
  *  The others are fixed: slot 0 the primary attack (the big button), slot 9 the potion; they keep what the default bar puts there. */
 export const SPARE = [1, 2, 3, 4, 5, 6, 7, 8];

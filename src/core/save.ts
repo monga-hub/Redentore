@@ -1,10 +1,9 @@
 // Saved games: the state worth keeping as plain JSON (the hero chosen, player, quest flags, who is dead, play
-// time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), three localStorage slots, the handoff that carries a loaded game across a reload,
-// and the autosave: the run in progress, kept whenever no fight is on, that a cold boot resumes. iOS reloads a tab
-// it kills for memory (and a home-screen app relaunches from the start), which used to throw the whole run away.
-// Loading and "Nuova partita" reload the page so every system boots clean (no stray bolts,
-// cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state
-// over the fresh world. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
+// time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), one run per hero in
+// localStorage, kept whenever no fight is on (the autosave). The squad screen (ui/select.ts) shows them all; the hero
+// picked resumes his own run or starts afresh, and switching heroes reloads the page so every system boots clean (no
+// stray bolts, cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state over the fresh
+// world. iOS reloads a tab it kills for memory, which used to throw the whole run away: the run is kept on the phone. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
 import { BASE_ATTACK, CARD, levelOf } from '../player/levels.ts';
 import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
@@ -17,10 +16,6 @@ const VERSION = 1;
 /** Flags on Quest saved as they are: the second quest's, Fra' Zuane's corona found and given back, the third quest's. */
 const LEVEL2 = ['reported', 'accepted2', 'arrived', 'key2', 'boss2Dead', 'reported2', 'blessed2', 'relic', 'relicBack',
   'accepted3', 'landed', 'key3', 'boss3Dead', 'reported3', 'blessed3'] as const;
-const SLOT_KEY = (i: number) => `redentore.save.${i}`;
-const PENDING = 'redentore.pending'; // sessionStorage: the state to apply on the next boot
-const AUTO = 'redentore.auto'; // localStorage: the run in progress, resumed by a boot with nothing pending
-export const SLOTS = 3;
 const GONE = 1e3; // s a loaded corpse has lain: past the sink, so it is hidden from the start
 /** x past which nothing is walkable since level 2 moved to -X (level/plan.ts): the fondamenta's +X end. */
 const OLD_EAST = 60;
@@ -171,73 +166,57 @@ export function valid(s: unknown): s is GameState {
       && [o.side.kills, o.side.steps].every((r) => r === undefined || (!!r && typeof r === 'object' && Object.values(r).every(num)))));
 }
 
-export interface Slot { label: string; savedAt: number; state: GameState }
-
 function read(store: Storage, key: string): unknown {
   try { return JSON.parse(store.getItem(key) ?? 'null'); } catch { return null; }
 }
 
-/** The three slots; undefined = empty (or unreadable). */
-export function slots(store: Storage = localStorage): (Slot | undefined)[] {
-  return Array.from({ length: SLOTS }, (_, i) => {
-    const s = read(store, SLOT_KEY(i)) as Slot | null;
-    return s && typeof s.label === 'string' && typeof s.savedAt === 'number' && valid(s.state) ? s : undefined;
-  });
-}
+/** Each hero's own run: his world, quests, bag, gear and level, kept apart so playing one never touches another's. */
+const RUN = (hero: string) => `redentore.hero.${hero}`;
 
-/** False when storage is full or blocked (private mode). */
-export function save(i: number, slot: Slot, store: Storage = localStorage): boolean {
-  try { store.setItem(SLOT_KEY(i), JSON.stringify(slot)); return true; } catch { return false; }
-}
-
-/** Queue `s` for the next boot (see `takePending`), or 'new' for "Nuova partita". */
-export function setPending(s: GameState | 'new', store: Storage = sessionStorage): boolean {
-  try { store.setItem(PENDING, JSON.stringify(s)); return true; } catch { return false; }
-}
-
-/** The state queued by the last load (or 'new'), once: it is cleared so a later refresh starts afresh. */
-export function takePending(store: Storage = sessionStorage): GameState | 'new' | undefined {
-  const s = read(store, PENDING);
-  try { store.removeItem(PENDING); } catch { /* blocked storage: nothing was queued either */ }
-  return s === 'new' || valid(s) ? s : undefined;
-}
-
-/**
- * The game a boot starts: what the menu queued across the reload, else the run in progress (undefined: a new game).
- * The queued one becomes the run in progress, as the page that queued it may have autosaved its own run on the way out
- * (the reload's `visibilitychange`, main.ts): that run came back on a "Nuova partita", and on a cold boot after a load.
- */
-export function startup(session: Storage = sessionStorage, local: Storage = localStorage): { state?: GameState; queued: boolean } {
-  const p = takePending(session);
-  if (p === 'new') clearAutosave(local);
-  else if (p) autosave(p, local);
-  return p ? { state: p === 'new' ? undefined : p, queued: true } : { state: resume(local), queued: false };
-}
-
-/** What the next boot will start, untouched (the queued game, else the run in progress; 'new' or undefined: a new game), for the hero to load before it. */
-export function upcoming(session: Storage = sessionStorage, local: Storage = localStorage): GameState | 'new' | undefined {
-  const p = read(session, PENDING);
-  return p === 'new' || valid(p) ? p : resume(local);
-}
-
-/** Keep `s` as the run in progress (main.ts, out of combat only, so a resume never lands mid-fight). False when storage is full or blocked. */
+/** Keep `s` as its hero's run (main.ts, out of combat only, so a resume never lands mid-fight). False when storage is full or blocked. */
 export function autosave(s: GameState, store: Storage = localStorage): boolean {
-  try { store.setItem(AUTO, JSON.stringify(s)); return true; } catch { return false; }
+  try { store.setItem(RUN(heroOf(s.hero)), JSON.stringify(s)); return true; } catch { return false; }
 }
 
-/** The run in progress, if any: it stays until overwritten or cleared, so every cold boot resumes it. */
-export function resume(store: Storage = localStorage): GameState | undefined {
-  const s = read(store, AUTO);
+/** `hero`'s run, if any (undefined: he starts a new game); junk is refused. */
+export function resume(hero: Hero, store: Storage = localStorage): GameState | undefined {
+  const s = read(store, RUN(hero));
   return valid(s) ? s : undefined;
 }
 
-/** "Nuova partita": the next boot starts afresh. */
-export function clearAutosave(store: Storage = localStorage): void {
-  try { store.removeItem(AUTO); } catch { /* blocked storage: nothing was kept either */ }
+/** The squad screen's "Ricomincia", confirmed: `hero`'s run gone, every other hero's untouched. */
+export function forget(hero: Hero, store: Storage = localStorage): void {
+  try { store.removeItem(RUN(hero)); } catch { /* blocked storage: nothing was kept either */ }
 }
 
-/** Every slot and the autosave gone (core/prepared.ts's one-time migration). */
-export function wipe(store: Storage = localStorage): void {
-  for (let i = 0; i < SLOTS; i++) store.removeItem(SLOT_KEY(i));
-  store.removeItem(AUTO);
+/** The level a run has reached (1-3): the quest it has taken. */
+export const chapter = (s: GameState) => (s.quest.accepted3 ? 3 : s.quest.accepted2 ? 2 : 1);
+
+/** Most advanced first: more XP, then more time played. */
+const ahead = (a: GameState, b: GameState) => (b.build?.xp ?? 0) - (a.build?.xp ?? 0) || b.time - a.time;
+
+const MIGRATED = 'redentore.roster.v1';
+const OLD = ['redentore.auto', 'redentore.save.0', 'redentore.save.1', 'redentore.save.2'];
+/** The old saves, as they were, kept once the migration has moved them. */
+export const BACKUP = 'redentore.backup';
+
+/**
+ * Once: the old shared saves (the autosave, three slots) go to their heroes (absent: the Risorto), the most advanced
+ * one each, unless he has a run already. All of them stay in BACKUP as they were; the old bar goes to the autosave's hero.
+ */
+export function migrate(store: Storage = localStorage): void {
+  try {
+    if (store.getItem(MIGRATED)) return;
+    const raw = OLD.map((k) => store.getItem(k));
+    const parse = (r: string | null) => { try { return JSON.parse(r ?? 'null'); } catch { return null; } };
+    const auto = parse(raw[0]), states = [auto, ...raw.slice(1).map((r) => parse(r)?.state)].filter(valid);
+    const best = new Map<Hero, GameState>();
+    for (const s of states.sort(ahead)) if (!best.has(heroOf(s.hero))) best.set(heroOf(s.hero), s);
+    for (const [hero, s] of best) if (!resume(hero, store)) autosave(s, store);
+    if (raw.some((r) => r !== null)) store.setItem(BACKUP, JSON.stringify(Object.fromEntries(OLD.map((k, i) => [k, raw[i]]))));
+    const bar = store.getItem('redentore.bar'), mine = valid(auto) ? `redentore.bar.${heroOf(auto.hero)}` : '';
+    if (bar && mine && !store.getItem(mine)) store.setItem(mine, bar);
+    for (const k of OLD) store.removeItem(k);
+    store.setItem(MIGRATED, '1');
+  } catch { /* blocked or full storage: the old keys stay, tried again next boot */ }
 }

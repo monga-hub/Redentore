@@ -29,6 +29,11 @@ export function glyph(c: CanvasRenderingContext2D, x: number, y: number, mark: s
 }
 /** A pin standing on a marked quest giver: the glyph takes its place. */
 export const under = (q: Pin, npcs: Pin[]) => npcs.some((n) => Math.hypot(n.x - q.x, n.z - q.z) < 1);
+/** The quest marks both maps draw: the objective's and side quests' gold diamonds (those not on a marked giver), then the givers' glyphs. */
+export const marks = (goal: Pin | undefined, also: Pin[], npcs: Pin[]): { at: Pin; giver: boolean }[] => [
+  ...(goal ? [goal, ...also] : also).filter((q) => !under(q, npcs)).map((at) => ({ at, giver: false })),
+  ...npcs.map((at) => ({ at, giver: true })),
+];
 export const PX = 4; // baked map texels per metre
 const OVERHEAD = 3.6; // m: a slab starting this high is a ceiling or an upper floor, not on the map
 const WALL = 1.6; // m: a box this tall reads as a wall (bright, outlined)
@@ -153,11 +158,11 @@ export class Minimap {
     }
     c.restore();
 
-    for (const g of [...(goal ? [goal, ...also] : also).filter((q) => !under(q, npcs)), ...npcs]) { // gold diamond, or a quest giver's "!"/"?"; beyond the window it clings to the rim, pointing the way
+    for (const { at: g, giver } of marks(goal, also, npcs)) { // gold diamond, or a quest giver's "!"/"?"; beyond the window it clings to the rim, pointing the way
       let [x, y] = at(g);
       const d = Math.hypot(x - r, y - r), max = r - 6;
       if (d > max) { x = r + (x - r) / d * max; y = r + (y - r) / d * max; }
-      if (npcs.includes(g)) { glyph(c, x, y, g.state, 15); continue; }
+      if (giver) { glyph(c, x, y, g.state, 15); continue; }
       c.save();
       c.translate(x, y);
       c.rotate(Math.PI / 4);

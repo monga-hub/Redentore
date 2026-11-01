@@ -560,7 +560,7 @@ function openMap(): void {
   if (menu.paused) return;
   kit.system.cancel();
   input.consume();
-  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), npcs: questView.pins(), quests: questLog(), level: THIRD.includes(quest.stage) && quest.stage !== 'offer3' ? 3 : SECOND.includes(quest.stage) && quest.stage !== 'offer' ? 2 : 1 });
+  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), also: sidePins(), npcs: questView.pins(), quests: questLog(), level: THIRD.includes(quest.stage) && quest.stage !== 'offer3' ? 3 : SECOND.includes(quest.stage) && quest.stage !== 'offer' ? 2 : 1 });
 }
 const pressed = (code: string) => input.pressed(code);
 /**

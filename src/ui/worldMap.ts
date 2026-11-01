@@ -1,11 +1,11 @@
 import type { Discovery } from '../core/discovery.ts';
 import type { Area } from '../level/builder.ts';
 import type { FogLayer } from './fog.ts';
-import { PX, WATER, glyph, under, type Minimap, type Pin } from './minimap.ts';
+import { PX, WATER, glyph, marks, type Minimap, type Pin } from './minimap.ts';
 
 // The big map, WoW style: M (or the book button on the minimap) opens the whole complex in a
 // framed overlay, turned like the minimap to the camera's heading at opening, under the same fog as the minimap. Discovered places carry their
-// names, the player shows as an arrow and the objective as a gold diamond. The game pauses while
+// names, the player shows as an arrow and the quests carry the minimap's marks (ui/minimap.ts marks). The game pauses while
 // it is open; M, Esc, a click or a tap close it. Its DOM is styled here, like ui/menu.ts.
 // WoW's quest log flanks it: the level's discovered places on the left, the quests running on the right (gold once
 // ready to hand in); tapping one tints its place or rings the spot the quest points at. Both columns fold away.
@@ -53,6 +53,8 @@ body.touch #worldmap .foot i { display: none; }
 /** What the map shows of the game when it opens. */
 export interface MapView {
   x: number; z: number; facing: number; view: number; area?: string; goal?: Pin; npcs?: Pin[];
+  /** The side quests' pins, as the minimap's `also`. */
+  also?: Pin[];
   /** The quest log: the quests running and the spot each points at (objective, else giver). */
   quests?: { title: string; line: string; ready: boolean; at?: { x: number; z: number } }[];
   /** The level whose places are listed: 1 the Redentore's, 2 the Giudecca and the Zitelle, 3 the Punta and San Giorgio. */
@@ -239,9 +241,9 @@ export class WorldMap {
     }
 
     this.highlight(at, k);
-    for (const n of v.npcs ?? []) glyph(c, ...at(n.x, n.z), n.state, 20);
-    if (v.goal && !under(v.goal, v.npcs ?? [])) { // gold diamond, as on the minimap
-      const [x, y] = at(v.goal.x, v.goal.z);
+    for (const { at: g, giver } of marks(v.goal, v.also ?? [], v.npcs ?? [])) { // the minimap's marks: gold diamonds, givers' "!"/"?"
+      const [x, y] = at(g.x, g.z);
+      if (giver) { glyph(c, x, y, g.state, 20); continue; }
       c.save();
       c.translate(x, y);
       c.rotate(Math.PI / 4);

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { type LevelBuilder, extrude, ring, shaped } from '../builder.ts';
 import { material, type Role } from '../materials.ts';
 import { Z } from '../plan.ts';
 import { groundPatch } from '../ground.ts';
-import { Props, bench, cypress, fruitTree, shrub } from '../props.ts';
+import { Props, bench, cypress, fruitTree, rng, shrub } from '../props.ts';
+import { place } from '../arredi.ts';
 import { bitta, fanale, lampPost } from './giudecca.ts';
 import { front, houses } from '../facades.ts';
 
@@ -32,6 +34,8 @@ export const FERRY_A = { x: -412, z: 13.8 }, FERRY_B = { x: -438.5, z: 103.8 };
 export const CROSSING: [number, number][] = [[FERRY_A.x, FERRY_A.z], [-418, 26], [-428, 56], [-434, 84], [FERRY_B.x, FERRY_B.z]];
 export const SG = { x0: -600, x1: -444, z0: -40, z1: 134 };
 export const FAC = -478; // the basilica's front
+/** The church's interior dress (marble floors, pilasters, niches, the dome's ribs): its own zone, kept off level 2's GPU. */
+export const INTERNO = 'sangiorgio-interno';
 export const LIB_F = 4.8; // the library's floor
 /**
  * The library's long walnut cases, west then east, each split into eight bays counted from the door's end (z 18.8 down to
@@ -44,6 +48,8 @@ export const CENACOLO = { x0: -548, x1: -512, z0: 4, z1: 36 };
 const SGX = -530, SGZ = 102; // the crossing, under the dome
 const DOME = 9.5, RING = 20; // dome radius, top of the crossing's walls
 const P = 0.6; // presbytery and choir floor
+/** The aisles' minor order: its pilasters (x), and the height its arches spring from, over the capitals. */
+const AISLE = [-485, -492, -499, -506, -510.4, -517.6], SPRING = 7.4;
 
 export function buildPunta(b: LevelBuilder): void {
   b.zone('punta');
@@ -150,41 +156,41 @@ function shore(b: LevelBuilder, p: Props): void {
 
 /** A stone wall run (and the occlusion piece it makes); `doors` cut through it. */
 const stone = (h: number, doors: { at: number; w?: number; h?: number; y0?: number; arch?: boolean }[] = [], y0 = 0) => ({ h, y0, t: 0.8, role: 'stone' as Role, doors, trim: true });
+/** The basilica's walls: white Istrian stone inside, as Palladio's are, reading in the firelit dark. */
+const white = (h: number, doors: Parameters<typeof stone>[1] = []) => ({ ...stone(h, doors), role: 'istria' as Role });
 
 function basilica(b: LevelBuilder, p: Props): void {
   b.area('Basilica di San Giorgio Maggiore', -520, FAC, 86, 118);
   b.area('Crociera sotto la cupola', -540, -520, 80, 124);
   b.area('Presbiterio di San Giorgio', -554, -540, 92, 112);
   b.area('Coro dei monaci', -568, -554, 92, 112);
-  b.floor(-540, FAC, 86, 118, 'stone', 0, 0.02);
-  b.floor(-540, -520, 80, 124, 'stone', 0, 0.02);
   b.floor(-519, FAC - 1, 100.6, 103.4, 'cloth', 0, 0.03); // the carpet up the nave
 
   // Walls: the aisles' outer walls, the transepts, presbytery and choir; the nave's upper walls on the colonnades.
-  b.wallX(86, FAC, -520, stone(13));
-  b.wallX(118, FAC, -520, stone(13));
-  b.wallX(80, -540, -520, stone(RING, [{ at: SGX, w: 3, h: 4.6, arch: true }])); // into the chiostro degli allori
-  b.wallX(124, -540, -520, stone(RING));
-  for (const [z0, z1] of [[80, 86], [118, 124]]) b.wallZ(-520, z0, z1, stone(RING));
-  for (const [z0, z1] of [[80, 92], [112, 124]]) b.wallZ(-540, z0, z1, stone(RING));
-  b.wallX(92, -540, -568, stone(16));
-  b.wallX(112, -540, -568, stone(16));
-  b.wallZ(-568, 92, 112, stone(16));
+  b.wallX(86, FAC, -520, white(13));
+  b.wallX(118, FAC, -520, white(13));
+  b.wallX(80, -540, -520, white(RING, [{ at: SGX, w: 3, h: 4.6, arch: true }])); // into the chiostro degli allori
+  b.wallX(124, -540, -520, white(RING));
+  for (const [z0, z1] of [[80, 86], [118, 124]]) b.wallZ(-520, z0, z1, white(RING));
+  for (const [z0, z1] of [[80, 92], [112, 124]]) b.wallZ(-540, z0, z1, white(RING));
+  b.wallX(92, -540, -568, white(16));
+  b.wallX(112, -540, -568, white(16));
+  b.wallZ(-568, 92, 112, white(16));
   for (const z of [94, 110]) {
-    b.box(FAC, -520, 12.4, RING, z - 0.3, z + 0.3, 'stone', { collide: false });
-    b.part(null, FAC, -520, 11.8, 12.6, z - 0.6, z + 0.6, 'stoneDark');
-    for (const x of [-485, -492, -499, -506, -513]) b.order(x, z, 0.75, 0, 11.8, 'stone');
+    b.box(FAC, -520, 12.4, RING, z - 0.3, z + 0.3, 'istria', { collide: false });
+    b.part(null, FAC, -520, 11.8, 12.6, z - 0.6, z + 0.6, 'istria');
+    for (const x of [-485, -492, -499, -506, -513]) b.order(x, z, 0.75, 0, 11.8, 'istria');
   }
-  for (const [x, z] of [[-520, 92], [-520, 112], [-540, 92], [-540, 112]]) b.box(x - 1.2, x + 1.2, 0, RING, z - 1.2, z + 1.2, 'stone'); // the crossing's piers
+  for (const [x, z] of [[-520, 92], [-520, 112], [-540, 92], [-540, 112]]) b.box(x - 1.2, x + 1.2, 0, RING, z - 1.2, z + 1.2, 'istria'); // the crossing's piers
 
   // Ceilings and roofs: the aisles flat, the nave's barrel vault, the transepts and the choir flat; the dome on its drum.
   for (const [z0, z1] of [[86, 94], [110, 118]]) {
-    b.box(FAC, -520, 13, 13.4, z0, z1, 'stone', { collide: false });
+    b.box(FAC, -520, 13, 13.4, z0, z1, 'istria', { collide: false });
     b.hipRoof(FAC, -520, z0, z1, 13.4, 0.5, 0.3);
   }
-  const vault = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 42, 32, 1, true, 0, Math.PI).rotateZ(Math.PI / 2), material('azure', true)); // the upper half, along X
+  const vault = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 42, 32, 1, true, 0, Math.PI).rotateZ(Math.PI / 2), material('istria', true)); // the upper half, along X
   vault.position.set((FAC - 520) / 2, 12.6, 102);
-  b.add(vault, 'azure');
+  b.add(vault, 'istria');
   b.cameraBlockers.push(vault);
   b.hipRoof(FAC, -520, 94, 110, RING + 0.4);
   for (const [z0, z1] of [[80, 92], [112, 124]]) b.box(-540, -520, RING, RING + 0.4, z0, z1, 'stone', { collide: false });
@@ -194,19 +200,19 @@ function basilica(b: LevelBuilder, p: Props): void {
   b.hipRoof(-568, -540, 92, 112, 16.4);
   const sq = new THREE.Shape([new THREE.Vector2(-540, -92), new THREE.Vector2(-520, -92), new THREE.Vector2(-520, -112), new THREE.Vector2(-540, -112)]);
   sq.holes.push(new THREE.Path().absarc(SGX, -SGZ, DOME, 0, Math.PI * 2, true));
-  const ceil = new THREE.Mesh(new THREE.ExtrudeGeometry(sq, { depth: 0.8, bevelEnabled: false }), material('stone'));
+  const ceil = new THREE.Mesh(new THREE.ExtrudeGeometry(sq, { depth: 0.8, bevelEnabled: false }), material('istria'));
   ceil.rotation.x = -Math.PI / 2;
   ceil.position.y = RING;
-  b.add(ceil, 'stone');
-  const drum = new THREE.Mesh(new THREE.CylinderGeometry(DOME, DOME, 4, 40, 1, true), material('stone', true));
+  b.add(ceil, 'istria');
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(DOME, DOME, 4, 40, 1, true), material('istria', true));
   drum.position.set(SGX, RING + 2.6, SGZ);
-  b.add(drum, 'stone');
+  b.add(drum, 'istria');
   const dome = new THREE.Mesh(new THREE.SphereGeometry(DOME, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2), material('roof', true));
   dome.position.set(SGX, RING + 4.6, SGZ);
   b.add(dome, 'roof');
-  const inner = new THREE.Mesh(new THREE.SphereGeometry(DOME - 0.3, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), material('azure', true));
+  const inner = new THREE.Mesh(new THREE.SphereGeometry(DOME - 0.3, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), material('istria', true));
   inner.position.set(SGX, RING + 4.6, SGZ);
-  b.add(inner, 'azure');
+  b.add(inner, 'istria');
   b.cameraBlockers.push(ceil, drum, dome);
   b.column(SGX, SGZ, 1.4, RING + 4.6 + DOME - 0.4, RING + 4.6 + DOME + 3.2, 'stone', false); // the lantern
   b.add(new THREE.Mesh(new THREE.ConeGeometry(1.8, 2.8, 12), material('roof')), 'roof').position.set(SGX, RING + 4.6 + DOME + 4.6, SGZ);
@@ -238,16 +244,12 @@ function basilica(b: LevelBuilder, p: Props): void {
 
   // The monks' choir behind its screen of columns: carved walnut stalls round three sides, the lectern in the middle.
   b.box(-568, -554, 0, P, 92.4, 111.6, 'stone');
-  for (const z of [94.6, 98.2, 105.8, 109.4]) b.order(-554.4, z, 0.45, P, 7.4, 'stone');
-  b.part(null, -555, -553.8, 7.4, 8, 93.6, 110.4, 'stoneDark');
-  for (const [z0, z1] of [[92.4, 93.8], [110.2, 111.6]]) {
-    b.box(-567.6, -556, P, P + 1.1, z0, z1, 'wood', { camera: false });
-    b.part(null, -567.6, -556, P + 1.1, P + 3.6, z0 < 100 ? z0 : z1 - 0.3, z0 < 100 ? z0 + 0.3 : z1, 'wood');
-  }
-  b.box(-567.6, -566.2, P, P + 1.1, 93.8, 110.2, 'wood', { camera: false });
-  b.part(null, -567.6, -567.3, P + 1.1, P + 3.6, 93.8, 110.2, 'wood');
-  b.box(-561.6, -560.4, P, P + 1.4, SGZ - 0.6, SGZ + 0.6, 'wood');
-  p.box(-561.8, -560.2, P + 1.4, P + 1.6, SGZ - 0.8, SGZ + 0.8, 'cloth', 0, 0x3a2414); // the antiphonary
+  for (const z of [94.6, 98.2, 105.8, 109.4]) b.order(-554.4, z, 0.45, P, 7.4, 'istria');
+  b.part(null, -555, -553.8, 7.4, 8, 93.6, 110.4, 'istria');
+  // (the stalls and the lectern are Meshy pieces, interior() below: these are their colliders)
+  for (const [z0, z1] of [[92.4, 93.8], [110.2, 111.6]]) b.box(-567.6, -556, P, P + 1.1, z0, z1, 'wood', { camera: false, visible: false });
+  b.box(-567.6, -566.2, P, P + 1.1, 93.8, 110.2, 'wood', { camera: false, visible: false });
+  b.box(-561.6, -560.4, P, P + 1.4, SGZ - 0.6, SGZ + 0.6, 'wood', { visible: false });
   for (const z of [96, 108]) b.lights.push({ x: -562, y: P + 2.6, z, kind: 'lamp' });
 
   // Side altars in the aisles, lamps hanging down the nave.
@@ -262,6 +264,184 @@ function basilica(b: LevelBuilder, p: Props): void {
     b.lights.push({ x, y: 7.1, z: SGZ, kind: 'lamp' });
   }
   for (const [x, z] of [[-524, 84], [-536, 84], [-524, 120], [-536, 120]]) b.lights.push({ x, y: 2.75, z: z + (z < 100 ? -3.6 : 3.6), kind: 'torch', nx: 0, nz: z < 100 ? 1 : -1 });
+  interior(b);
+}
+
+/**
+ * The church as a ruin of its grandeur (level/arredi.ts draws and breaks the furniture): pilasters, arches and the cornice on
+ * the aisles' walls, saints in niches, ribs and cornices in the dome, torn banners off the colonnades, the choir's windows; then
+ * pews in two blocks either side of the carpet, chairs strewn and knocked over, lecterns, candelabra, wrecked pews and heaps of
+ * fallen marble. The carpet, the procession's way (quest/squero.ts PROCESSION), the transept's door, every pack's spot and the
+ * quest items stay clear; colliders only on what stands (pews, chairs, lecterns), all under a metre.
+ */
+function interior(b: LevelBuilder): void {
+  b.zone(INTERNO); // shown only past the Punta (main.ts stream): level 2's ground, which sees the island, never uploads it
+  const r = rng(137);
+  b.floor(-540, FAC, 86, 118, 'marble', 0, 0.02); // the red, cream and ochre slabs on the diagonal, worn and cracked
+  b.floor(-540, -520, 80, 124, 'marble', 0, 0.02);
+  b.floor(-568, -541.6, 92.4, 111.6, 'marble', P, 0.02); // presbytery and choir, on their raised floor
+  // Aisle walls, after the real nave: a minor order of pilasters with Corinthian capitals carries a blind arch in every bay over
+  // a darker recess (a side altar or a saint in a niche inside it); over the capitals the pilasters run on as flat lesenes to the
+  // cornice under the vault.
+  for (const [w, s] of [[86.4, 1], [117.6, -1]]) {
+    const face = (d: number) => [Math.min(w, w + s * d), Math.max(w, w + s * d)] as const;
+    for (const x of AISLE) {
+      b.part(null, x - 0.55, x + 0.55, 0, 0.7, ...face(0.36), 'stoneDark');
+      b.part(null, x - 0.42, x + 0.42, 0.7, SPRING - 0.6, ...face(0.26), 'istria');
+      b.part(null, x - 0.36, x + 0.36, SPRING, 11.5, ...face(0.14), 'istria'); // the lesene
+    }
+    for (let k = 0; k < AISLE.length + 1; k++) {
+      const x0 = k < AISLE.length ? AISLE[k] + 0.42 : -519.6, x1 = k ? AISLE[k - 1] - 0.42 : FAC - 0.4, c = (x0 + x1) / 2, r = (x1 - x0) / 2; // x0 < x1
+      b.part(null, x0, x1, 0.7, SPRING, ...face(0.03), 'stone'); // the recess, plain stone without the order's glow: it sits back
+      b.decor(shaped(lunette(c, SPRING, r - 0.3, w + s * 0.035, s)), 'stone');
+      b.decor(shaped(arch(c, SPRING, r - 0.3, r, 0.22)).translate(0, 0, w + s * 0.11), 'istria'); // the arch
+      b.part(null, c - 0.2, c + 0.2, SPRING + r - 0.34, SPRING + r + 0.1, ...face(0.3), 'istria'); // its keystone
+    }
+    b.part(null, FAC - 0.4, -519.6, 11.5, 12.1, ...face(0.5), 'istria');
+    b.part(null, FAC - 0.4, -519.6, 12.1, 12.4, ...face(0.65), 'istria');
+    for (const x of [-495.5, -508.2]) niche(b, x, w, s, 0.9, 'x');
+  }
+  // The nave's upper walls over the colonnades: a lunette window in each bay, moonlight in it.
+  for (const [z, f] of [[94.3, 0], [109.7, -0.2]] as const) for (const c of [-481.5, -488.5, -495.5, -502.5, -509.5, -516.5]) {
+    b.decor(shaped(arch(c, 15.2, 1.45, 1.8, 0.2)).translate(0, 0, z + f + 0.1), 'istria');
+    b.part(null, c - 1.45, c + 1.45, 15.05, 15.25, z + f, z + f + 0.2, 'istria'); // its sill
+    b.decor(shaped(lunette(c, 15.2, 1.45, z + (f ? -0.02 : 0.02), f ? -1 : 1)), 'glass');
+  }
+  // The transepts' ends either side of their doors, the choir's walls above the stalls and its back wall.
+  for (const x of [-524.5, -535.5]) { niche(b, x, 80.4, 1, 0.9, 'x'); niche(b, x, 123.6, -1, 0.9, 'x'); }
+  for (const x of [-565, -561, -557]) { niche(b, x, 92.4, 1, P + 4.2, 'x'); niche(b, x, 111.6, -1, P + 4.2, 'x'); }
+  for (const z of [98, 106]) niche(b, -567.6, z, 1, P + 4.2, 'z');
+  for (const x of [-563, -559]) for (const z of [92.38, 111.62]) b.part(null, x - 0.7, x + 0.7, 9.2, 13.4, z - 0.05, z + 0.05, 'glass');
+  b.part(null, -567.65, -567.55, 9.2, 13.4, SGZ - 0.8, SGZ + 0.8, 'glass');
+  b.part(null, -567.6, -540.4, 8.6, 9, 92.4, 92.9, 'istria'); // the choir's cornice over the niches
+  b.part(null, -567.6, -540.4, 8.6, 9, 111.1, 111.6, 'istria');
+  // The dome: a cornice where it springs and one at the drum's foot, sixteen ribs, a gilt ring under the lantern.
+  const torus = (y: number, r0: number, t: number, role: Role) => b.decor(shaped(new THREE.TorusGeometry(r0, t, 6, 48).toNonIndexed().rotateX(Math.PI / 2).translate(SGX, y, SGZ)), role);
+  torus(RING + 0.2, DOME - 0.15, 0.35, 'istria');
+  torus(RING + 4.5, DOME - 0.35, 0.3, 'istria');
+  torus(RING + 4.6 + DOME - 1.5, 1.6, 0.18, 'gold');
+  for (let k = 0; k < 8; k++) b.decor(shaped(arch(0, 0, DOME - 0.75, DOME - 0.35, 0.3)).rotateY((k * Math.PI) / 8).translate(SGX, RING + 4.6, SGZ), 'istria');
+  // Corinthian capitals: the colonnades' and the choir screen's over each column's own, the aisles' pilasters' set into the wall.
+  capitals(b, [
+    ...[94, 110].flatMap((z) => [-485, -492, -499, -506, -513].map((x): [number, number, number, number] => [x, 11.8, z, 0.75])),
+    ...[94.6, 98.2, 105.8, 109.4].map((z): [number, number, number, number] => [-554.4, 7.4, z, 0.45]),
+    ...[86.4, 117.6].flatMap((w) => AISLE.map((x): [number, number, number, number] => [x, SPRING, w, 0.4])),
+  ]);
+  // Banners hung off the colonnades into the nave, some torn short.
+  for (const x of [-488.5, -495.5, -502.5, -509.5]) for (const z of [94.75, 109.25]) {
+    const low = 6.6 + r() * 2.6;
+    b.part(null, x - 0.7, x + 0.7, low, 11.6, z - 0.04, z + 0.04, 'cloth');
+    b.part(null, x - 0.8, x + 0.8, 11.5, 11.7, z - 0.07, z + 0.07, 'gold');
+  }
+
+  // Braziers lit among the ruins (fx/torches.ts, iron and fire, no collider) at the colonnades' feet, in the transepts and the
+  // crossing's corners: pools of warm light in the dark nave. Braziers, not candelabra: fuoco.glb's brazier is already on the
+  // GPU on level 2 (the Zitelle's pair), a lit candelabrum would put a new prop there. The furniture's candelabra stay cold, and can break.
+  for (const x of [-490.5, -504.5]) for (const z of [95.4, 108.6]) b.lights.push({ x, y: 1.1, z, kind: 'brazier' });
+  for (const z of [84.6, 119.4]) b.lights.push({ x: -530, y: 1.1, z, kind: 'brazier' });
+  // Warm light high up (no flame, no mesh: the pooled lights take the nearest) so the arches, the cornices, the vault and the
+  // dome read over the firelit floor.
+  for (const x of [-489, -503, -515]) b.lights.push({ x, y: 10, z: SGZ, kind: 'glow', color: 0xffb46a });
+  // and low along the aisles, raking the pilasters so their capitals' leaves and the blind arches over them model
+  for (const x of [-488.5, -502.5, -514]) for (const z of [88.8, 115.2]) b.lights.push({ x, y: 5, z, kind: 'glow', color: 0xffb46a });
+  b.lights.push({ x: SGX, y: 9, z: SGZ, kind: 'glow', color: 0xffb46a }, { x: -561, y: 7.5, z: SGZ, kind: 'glow', color: 0xffb46a });
+  // Pews: two blocks between the colonnades and the carpet, facing the altar (-X), a few knocked askew or wrecked; no row
+  // within reach of the monks the Cardinale's procession wakes at x -492 and -506.
+  const rows = [-481.5, -483.8, -486.1, -488.4, -495.5, -497.8, -500.1, -502.4, -509.6, -511.9, -514.2];
+  for (const x of rows) for (const z of [97.6, 106.4]) {
+    const roll = r();
+    if (roll < 0.14) place(b, 'rotta', x, 0, z, -Math.PI / 2 + (r() - 0.5) * 0.6, 0.62);
+    else if (roll < 0.2) place(b, 'panca', x - 0.3, 0, z, -Math.PI / 2 + 0.2, 1.05, { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1), stretch: 2.4 }); // on its back
+    else place(b, 'panca', x, 0, z, -Math.PI / 2 + (roll > 0.85 ? (r() - 0.5) * 0.5 : 0), 1.05, { solid: true, stretch: 2.4 });
+  }
+  // Chairs strewn in the aisles and the transepts' ends, many knocked over.
+  const chairs: [number, number][] = [[-482, 89], [-483.5, 90.6], [-497, 89.8], [-504, 91], [-511, 89.5], [-517, 92], [-482.5, 114.6], [-490, 113], [-497.5, 115], [-504.5, 113.5], [-511.5, 114.8], [-517.5, 112],
+    [-523, 85], [-525.6, 86.4], [-534.4, 85.4], [-537.4, 87], [-523.4, 118.8], [-526, 120.4], [-533.4, 118.2], [-537, 116.8]];
+  for (const [x, z] of chairs) {
+    const yaw = -Math.PI / 2 + (r() - 0.5) * 1.6;
+    if (r() < 0.4) place(b, 'sedia', x, 0, z, yaw, 0.95, { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1) });
+    else place(b, 'sedia', x, 0, z, yaw, 0.95, { solid: true });
+  }
+  // Lecterns before the presbytery's steps and in the transepts, the choir's great one; candelabra by the side altars and
+  // the crossing's corners, one or two thrown down.
+  place(b, 'leggio', -537.6, 0, 97.4, -Math.PI / 2, 1.35, { solid: true });
+  place(b, 'leggio', -537.6, 0, 106.6, -Math.PI / 2 + 0.3, 1.35, { solid: true });
+  place(b, 'leggio', -527.5, 0, 85.5, Math.PI, 1.35, { tilt: Math.PI / 2 });
+  place(b, 'leggio', -561, P, SGZ, Math.PI / 2, 2.1, { fixed: true });
+  for (const x of [-488, -502, -514]) for (const z of [88.6, 115.4]) for (const d of [-2.1, 2.1]) {
+    if (r() < 0.25) place(b, 'candelabro', x + d, 0, z + (z < 100 ? 0.4 : -0.4), r() * 6, 1.6, { tilt: Math.PI / 2 });
+    else place(b, 'candelabro', x + d, 0, z, r() * 6, 1.6);
+  }
+  for (const [x, z] of [[-522.4, 90.4], [-537.6, 90.4], [-522.4, 113.6], [-537.6, 113.6]]) b.lights.push({ x, y: 1.1, z, kind: 'brazier' }); // the crossing's corners, lit
+  // The monks' carved stalls round the choir, facing in.
+  for (let x = -565.9; x < -556; x += 2.08) { place(b, 'stallo', x, P, 92.84, 0, 2.6); place(b, 'stallo', x, P, 111.16, Math.PI, 2.6); }
+  for (let z = 95; z < 110; z += 2.08) place(b, 'stallo', -567.16, P, z, Math.PI / 2, 2.6);
+  // Fallen marble: off cornices and the vault, in the aisles' corners and the transepts.
+  for (const [x, z, s] of [[-516.8, 89.8, 0.24], [-489.5, 115.2, 0.2], [-536, 120.6, 0.22], [-523.2, 82.8, 0.16], [-480.6, 88.4, 0.14], [-510, 116.3, 0.12], [-525.4, 97, 0.13], [-534.8, 98.4, 0.1]]) place(b, 'macerie', x, 0.01, z, r() * 6, s);
+  place(b, 'rotta', -524.6, 0, 107.6, 0.4, 0.62); // a pew dragged under the dome and smashed
+  // Under the dome: what fell from the drum and the cornice, pews and chairs dragged there and thrown down, a candelabrum
+  // overturned; the procession's line (z 102) and the transept's door (x -530) stay clear.
+  for (const [x, z, s] of [[-526, 93.6, 0.2], [-535.4, 110.6, 0.18], [-531.6, 95.2, 0.09], [-527.4, 110, 0.08], [-536.6, 106.2, 0.07]]) place(b, 'macerie', x, 0.01, z, r() * 6, s);
+  place(b, 'rotta', -536, 94.2, 0, 2.6, 0.62);
+  place(b, 'panca', -524.2, 0, 96, 0.5, 1.05, { tilt: Math.PI / 2, stretch: 2.4 });
+  place(b, 'panca', -534.6, 0, 113.8, -0.3, 1.05, { solid: true, stretch: 2.4 });
+  for (const [x, z, down] of [[-529, 93.4, 1], [-533.6, 96.8, 0], [-523.2, 99.2, 1], [-528.2, 111.6, 0], [-531.4, 113, 1], [-525.6, 115, 0], [-537.2, 99, 1]] as const)
+    place(b, 'sedia', x, 0, z, r() * 6, 0.95, down ? { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1) } : { solid: true });
+  place(b, 'candelabro', -532.8, 0, 91.6, 1.3, 1.6, { tilt: Math.PI / 2 });
+  place(b, 'sedia', -527.8, 0, 96.2, 1.1, 0.95, { tilt: Math.PI / 2 });
+  place(b, 'sedia', -533.2, 0, 107.4, -2.2, 0.95, { solid: true });
+  b.zone('sangiorgio');
+}
+
+/** A light arch ring (no bevel, few segments: dozens of them stay cheap on level 3's GPU), springing at (cx, cy), `depth` thick about z 0. */
+function arch(cx: number, cy: number, r0: number, r1: number, depth: number): THREE.BufferGeometry {
+  const sh = new THREE.Shape().moveTo(cx + r1, cy).absarc(cx, cy, r1, 0, Math.PI, false).lineTo(cx - r0, cy).absarc(cx, cy, r0, Math.PI, 0, true).closePath();
+  return new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, -depth / 2);
+}
+
+/** A flat half-disc of radius r over (cx, cy) at z, facing +z (`s` 1) or -z (-1): an arch's lunette, a window's pane. */
+function lunette(cx: number, cy: number, r: number, z: number, s: number): THREE.BufferGeometry {
+  const g = new THREE.CircleGeometry(r, 8, 0, Math.PI).toNonIndexed();
+  return (s < 0 ? g.rotateY(Math.PI) : g).translate(cx, cy, z);
+}
+
+/**
+ * Corinthian capitals, procedural (white Istrian stone), one instanced mesh: each the bell over a column of radius r whose top is
+ * at `top`, two rows of eight acanthus leaves curling out, a volute at each corner under the abacus, the abacus a little wider than
+ * the column's own. A pilaster's is the same capital set into its wall, half buried. [x, top, z, r] each.
+ */
+function capitals(b: LevelBuilder, at: [number, number, number, number][]): void {
+  const h = 1.5, parts: THREE.BufferGeometry[] = []; // for r = 1, the top at y = 0
+  parts.push(new THREE.LatheGeometry([new THREE.Vector2(0.86, 0), new THREE.Vector2(0.9, 0.4 * h), new THREE.Vector2(1.05, 0.82 * h), new THREE.Vector2(0, 0.82 * h)], 12).translate(0, -h, 0));
+  for (const [row, lift] of [[0, 0.02], [1, 0.3]] as const) for (let k = 0; k < 8; k++) {
+    const a = ((k + row * 0.5) / 8) * Math.PI * 2;
+    // a leaf: a flattened half-ellipsoid standing on the bell, its tip leaning out and curling over
+    const leaf = new THREE.SphereGeometry(1, 6, 4, 0, Math.PI).scale(0.3, 0.42 * h, 0.12).rotateX(-0.35).translate(0, 0, 0.88);
+    parts.push(leaf.rotateY(a).translate(0, -h + (lift + 0.42) * h * 0.95, 0));
+  }
+  for (let k = 0; k < 4; k++) { // the volutes, scrolled under the abacus's corners
+    const v = new THREE.TorusGeometry(0.17, 0.06, 5, 10).rotateY(Math.PI / 2).translate(0, 0, 1.12);
+    parts.push(v.rotateY(Math.PI / 4 + (k * Math.PI) / 2).translate(0, -0.2 * h, 0));
+  }
+  parts.push(new THREE.BoxGeometry(2.8, 0.16 * h, 2.8).translate(0, -0.08 * h, 0)); // the abacus
+  const g = mergeGeometries(parts.map((p) => p.toNonIndexed()))!;
+  const im = new THREE.InstancedMesh(g, material('istria'), at.length), m = new THREE.Matrix4();
+  at.forEach(([x, top, z, r], i) => im.setMatrixAt(i, m.makeScale(r, r, r).setPosition(x, top, z)));
+  im.computeBoundingSphere();
+  b.add(im, 'istria');
+}
+
+/** A niche `w` along the wall (axis 'x': a wall at z = w, room on the `s` side; 'z': a wall at x = w), its saint standing at y0. */
+function niche(b: LevelBuilder, a: number, w: number, s: number, y0: number, axis: 'x' | 'z'): void {
+  const m = axis === 'x' ? null : new THREE.Matrix4().makeRotationY(Math.PI / 2).setPosition(w, 0, a);
+  const [c, d0, d1] = axis === 'x' ? [a, Math.min(w, w + s * 0.06), Math.max(w, w + s * 0.06)] : [0, -0.03, 0.03];
+  b.part(m, c - 0.75, c + 0.75, y0, y0 + 2.6, d0, d1, 'stoneDark'); // the recess, painted dark
+  const ar = shaped(arch(c, y0 + 2.6, 0.75, 1.0, 0.24));
+  b.decor(axis === 'x' ? ar.translate(0, 0, w + s * 0.12) : ar.rotateY(Math.PI / 2).translate(w + 0.12, 0, a), 'istria');
+  if (axis === 'x') b.part(null, c - 0.95, c + 0.95, y0 - 0.25, y0, Math.min(w, w + s * 0.45), Math.max(w, w + s * 0.45), 'istria'); // the ledge
+  else b.part(null, w, w + 0.45, y0 - 0.25, y0, a - 0.95, a + 0.95, 'istria');
+  const yaw = axis === 'x' ? (s > 0 ? 0 : Math.PI) : Math.PI / 2;
+  place(b, 'statua', axis === 'x' ? a : w + 0.28, y0, axis === 'x' ? w + s * 0.28 : a, yaw, 2.1);
 }
 
 /** Palladio's white front, facing the Giudecca (+X): the giant order on its plinths under the pediment, the aisles' half pediments. */

@@ -21,6 +21,7 @@ interface Spec {
   vcol?: boolean; // untextured, shaded by the geometry's baked vertex colours (props.ts crowns, bark)
   metal?: number;
   glow?: number; // emissive = tint * glow: accents that must still read in deep shadow
+  paint?: string; // the PAINTERS key of its map when not its own (shares that texture: nothing more on the GPU)
 }
 
 const SPECS = {
@@ -44,6 +45,8 @@ const SPECS = {
   trunk: { tint: 0x6e5846, rough: 0.95, vcol: true },
   wood: { tile: 1.5, rough: 0.8, macro: 0.1, shape: true }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
+  istria: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, paint: 'stone', tint: 0xfff4e6, glow: 0.14 }, // San Giorgio's white orders, cornices and vaults inside: they read in the firelit dark
+  marble: { tile: 4.2, rough: 0.5, macro: 0.14 }, // San Giorgio's red, cream and ochre slabs on the diagonal, worn and cracked
   glass: { tint: 0xa9cdd6, rough: 0.1 },
   gold: { tint: 0xd09a3c, rough: 0.38, metal: 0.45, glow: 0.07 }, // church candlesticks, ribs, banner trim
   cloth: { tint: 0x8c1622, rough: 0.92, glow: 0.04 }, // crimson carpet, banners, altar frontal
@@ -248,7 +251,7 @@ function build(role: Role, side: THREE.Side): THREE.MeshStandardMaterial {
   if (s.vcol) Object.assign(m, { vertexColors: true, defaultAttributeValues: { color: [1, 1, 1] } });
   if (s.vcol && role !== 'trunk') m.emissive.set(s.tint!).multiplyScalar(LEAF_GLOW);
   if (!s.tile) return m;
-  m.map = texture(role);
+  m.map = texture(s.paint ?? role);
   m.defines = {};
   if (s.grime) m.defines.TRI_GRIME = '';
   if (role === 'brick') m.defines.TRI_BRICK = '';

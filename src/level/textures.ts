@@ -334,6 +334,43 @@ function water(): Painter {
   };
 }
 
+/**
+ * San Giorgio's floor (zones/sangiorgio.ts), after the real nave: small square slabs laid on the diagonal, diamonds (rombi) in
+ * terracotta red, cream white and ochre, the colours mixed slab by slab rather than in a checker; then the ruin: worn arrises,
+ * chipped corners, the odd slab split or gone to its mortar bed, a few long cracks, grime trodden in. `n` slabs per tile on
+ * each diagonal.
+ */
+function marble(n: number, size: number): Painter {
+  const red = hex(0xc0644a), redD = hex(0xa24e3c), cream = hex(0xefe6d4), creamW = hex(0xe2d2b4), ochre = hex(0xdcab62), ochreD = hex(0xc8924a);
+  const joint = hex(0x6e6052), bed = hex(0x5c5248), dirt = hex(0x7a6a56);
+  const px = (size / n) * Math.SQRT1_2; // texels per slab side
+  return (u, v) => {
+    const a = (u + v) * n, b = (u - v) * n, ia = Math.floor(a), ib = Math.floor(b), fa = a - ia, fb = b - ib;
+    const ka = mod(ia, n), kb = mod(ib, n), id = hash(ka, kb, 201), id2 = hash(ka, kb, 202), pick = hash(ka, kb, 209);
+    // red leans on one diagonal of the checker, as laid; cream and ochre fill the rest
+    const redOdds = mod(ia + ib, 2) ? 0.5 : 0.14;
+    let col = pick < redOdds ? mix(red, redD, id2) : pick < redOdds + (1 - redOdds) * 0.6 ? mix(cream, creamW, id2) : mix(ochre, ochreD, id2);
+    col = mul(col, 0.93 + 0.12 * id);
+    // veins, as marble: a soft, stretched fbm line
+    const vein = Math.abs(fbm(u + id, v, 6, 6, 4, 203) - 0.5);
+    col = mul(col, 1 - 0.12 * (1 - smooth(0.0, 0.03, vein)));
+    // the edge in texels: joint, worn arris, chipped corners
+    const d = Math.min(fa, 1 - fa, fb, 1 - fb) * px, wob = (fbm(u, v, 64, 64, 2, 204) - 0.5) * 2;
+    const chip = id2 > 0.7 ? Math.max(0, 3 - Math.hypot(Math.min(fa, 1 - fa), Math.min(fb, 1 - fb)) * px * 0.6) : 0;
+    col = mul(col, 0.9 + 0.1 * smooth(1, 3, d + wob));
+    // missing or split slabs: the mortar bed shows, with grit
+    if (id > 0.97) col = mix(bed, dirt, fbm(u, v, 48, 48, 3, 205));
+    else if (id > 0.93 && Math.abs(fa - fb * (0.4 + id2 * 0.5) - 0.3) < 0.025) col = joint;
+    // a few long cracks wandering over many slabs
+    const crack = Math.abs(fbm(u, v, 4, 4, 5, 206) - 0.5), where = smooth(0.62, 0.75, fbm(u, v, 2, 2, 2, 208));
+    col = mix(col, joint, (1 - smooth(0.002, 0.005, crack)) * 0.7 * where);
+    // grime: broad trodden patches
+    const g = smooth(0.5, 0.85, fbm(u, v, 3, 3, 4, 207));
+    col = mix(col, dirt, g * 0.25);
+    return mix(col, joint, Math.max(1 - smooth(0.6, 1.4, d + wob - chip), chip > 0 ? 0.5 * smooth(0, 2, chip) : 0));
+  };
+}
+
 /** Painter and texel size per textured role. */
 export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   stone: { paint: istria(0xe4ddcc, 2, 4, 512), size: 512 },
@@ -352,6 +389,7 @@ export const PAINTERS: Record<string, { paint: AnyPainter; size: number }> = {
   soil: { paint: soil(), size: 256 },
   leafCard: { paint: leafCard(), size: 128 },
   wood: { paint: planks(0x8a6040, 5), size: 256 },
+  marble: { paint: marble(10, 512), size: 512 }, // level 3's church floor only: never drawn, so never uploaded, elsewhere
   water: { paint: water(), size: 256 },
 };
 

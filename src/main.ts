@@ -43,7 +43,8 @@ import { autosave, deserialize, questXpIn, serialize, setPending, startup, upcom
 import { BAR, install, migration, prepared } from './core/prepared.ts';
 import { getView, isDiablo, onQuality, onStyle, setView, VIEWS } from './core/style.ts';
 import { CameraBlend, DiabloCamera, STEPS as DIABLO_STEPS } from './camera/diabloCamera.ts';
-import { BELFRY } from './level/zones/sangiorgio.ts';
+import { BELFRY, INTERNO } from './level/zones/sangiorgio.ts';
+import { Arredi } from './level/arredi.ts';
 import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
 import { DiabloFx } from './fx/diabloFx.ts';
@@ -163,6 +164,8 @@ const procession = l3.hidden.filter((h) => h.pack.hidden!.quest === 'incoronazio
 sangiorgio.aim = (f) => (walkers.has(f) ? quest.side.escort.pose : undefined); // they go for the Cardinale, not the hero
 sangiorgio.strike = (n) => { quest.side.escort.hurt(n); };
 scene.add(sangiorgio.root);
+const arredi = new Arredi(level.furniture, level.world); // San Giorgio's furniture: loads with level 3 in view (stream), breaks under blows
+scene.add(arredi.root);
 /** Level 3's kinds: name, kind, height, level, rank. */
 const L3_KINDS = [['Monaco nero', MONACO, 1.9, 16], ['Amanuense', AMANUENSE, 1.8, 16], ['Marinaio annegato', MARINAIO, 1.85, 16], ['Il Bibliotecario', BIBLIOTECARIO, 2.4, 18, 'elite'], ['Il Nostromo della darsena', NOSTROMO, 2.7, 18, 'elite'],
   ['Il Commissario delle Arti', COMMISSARIO, 2.7, 18, 'elite'], ['Granatiere annegato', GRANATIERE, 1.95, 17], ['Il Campanaro di San Giorgio', CAMPANARO, 2.8, 18, 'elite'], ["L'Abate di San Giorgio", ABATE, 4.4]] as const;
@@ -246,7 +249,7 @@ const buffs = () => {
     hallow: m.hallows.reduce((t, z) => (Math.hypot(p.x - z.x, p.z - z.z) < z.r && Math.abs(p.y - z.y) < 1.5 ? Math.max(t, z.t) : t), 0),
   });
 };
-kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); sangiorgio.hurtWhere(inside, n); dragon.hurtWhere(inside, n); };
+kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); sangiorgio.hurtWhere(inside, n); dragon.hurtWhere(inside, n); arredi.hurtWhere(inside); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all, ...sangiorgio.all, ...drago.all];
 kit.foes = () => foes;
@@ -571,6 +574,9 @@ const pressed = (code: string) => input.pressed(code);
  */
 const LEVEL1 = ['chiesa', 'convento', 'orto', 'corpo-nord', 'giardini', 'laguna', 'calle'].map((z) => level.zones.get(z)!), LEVEL2 = ['giudecca', 'zitelle'].map((z) => level.zones.get(z)!);
 const LEVEL3 = ['punta', 'sangiorgio'].map((z) => level.zones.get(z)!);
+const interno = level.zones.get(INTERNO)!; // San Giorgio's interior dress: inside the island's zone, and hidden until the hero is past the Punta
+LEVEL3[1].add(interno);
+interno.visible = false;
 function stream(x: number, high = false): void {
   const one = x > -100, two = x < -50 && x > -430, three = x < -250;
   for (const g of LEVEL1) g.visible = one || high; // from the bell chamber the Redentore and the Giudecca are in view, not their dead
@@ -578,7 +584,9 @@ function stream(x: number, high = false): void {
   for (const g of LEVEL2) g.visible = two || high;
   zitelle.root.visible = two;
   for (const g of LEVEL3) g.visible = three;
-  sangiorgio.root.visible = dragon.root.visible = three;
+  sangiorgio.root.visible = dragon.root.visible = arredi.root.visible = three;
+  interno.visible = x < -400; // like the furniture: never drawn from level 2's ground
+  if (x < -400) arredi.load(); // on the Punta or the island: never on level 2's ground (a no-op once started)
   if (quest.accepted2) zitelle.load(); // a no-op once started
   if (quest.accepted3) sangiorgio.load();
   if (quest.side.active('drago')) dragon.load(); // the dragon and its drowned, once San Giorgio has asked for his lance
@@ -592,7 +600,7 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { dragoSet: drago, dragon, sandbox, zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { arredi, dragoSet: drago, dragon, sandbox, zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
 
 // The autosave (core/save.ts): every few seconds and when the tab is hidden (iOS may kill it then), only
 // while nobody is fighting and the hero stands, so a resume lands before the pull, never mid-fight.
@@ -677,6 +685,7 @@ renderer.setAnimationLoop(() => {
   bees.update(dt, player.pos);
   zitelle.update(dt, player.pos);
   sangiorgio.update(dt, player.pos);
+  arredi.update(dt);
   { // Carpaccio's dragon: awake under the water once the lance is raised on the stage (a load at that step finds it so), up as the hero comes near
     const s = quest.side;
     dragon.update(dt, player.pos);

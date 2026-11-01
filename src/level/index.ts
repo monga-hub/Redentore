@@ -15,7 +15,7 @@ export type Level = LevelBuilder;
 /**
  * Builds the whole complex, south to north. Returns the builder, which exposes:
  *  - root: THREE.Group with one child group per zone (`zone:<id>`)
- *  - zones: Map<id, Group>  (site, fondamenta, sagrato, calle, chiesa, convento, orto, corpo-nord, giardini, laguna; level 2: giudecca, zitelle; level 3: punta, sangiorgio)
+ *  - zones: Map<id, Group>  (site, fondamenta, sagrato, calle, chiesa, convento, orto, corpo-nord, giardini, laguna; level 2: giudecca, zitelle; level 3: punta, sangiorgio, sangiorgio-interno)
  *  - areas: named sub-areas (HUD labels, walkability check)
  *  - world: collision boxes; cameraBlockers: meshes the camera avoids
  * Every mesh carries userData.role (see materials.ts) for later material passes.

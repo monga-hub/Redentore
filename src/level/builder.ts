@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { World } from '../core/physics.ts';
+import { World, type Box } from '../core/physics.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { material, type Role } from './materials.ts';
 
@@ -59,6 +59,19 @@ export interface LightSpot {
   nx?: number; nz?: number; // torch: the wall's normal, into the room
 }
 
+/** A piece of church furniture for level/arredi.ts: placed and given its collider at build, drawn and broken at run time. */
+export interface Piece {
+  kind: 'panca' | 'rotta' | 'sedia' | 'leggio' | 'stallo' | 'statua' | 'macerie' | 'candelabro';
+  x: number; y: number; z: number;
+  yaw: number; // its front (the model's +Z) turned this far about Y
+  h: number; // m tall
+  tilt?: number; // knocked over: rolled this far about its own Z (a chair on its side, a candelabrum down)
+  stretch?: number; // a pew's length times this
+  box?: Box; // its collider while it stands
+  fixed?: boolean; // never breaks (the choir's great lectern)
+  broken?: boolean;
+}
+
 interface BoxOpts {
   collide?: boolean; // default true
   visible?: boolean; // default true (false = invisible barrier)
@@ -77,6 +90,8 @@ export class LevelBuilder {
   readonly cameraBlockers: THREE.Object3D[] = [];
   /** Candles, lamps and window glows placed by the zones; fx/torches.ts lights them. */
   readonly lights: LightSpot[] = [];
+  /** San Giorgio's church furniture (level/arredi.ts): drawn once its pack loads, broken by the hero's blows. */
+  readonly furniture: Piece[] = [];
   /**
    * Upright solid boxes at least a metre tall, by occlusion piece: [piece, unit cube -> world box].
    * The Diablo view caps them with a coping where it lowers a wall (fx/occlusion.ts).

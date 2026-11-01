@@ -45,6 +45,15 @@ export const SCANSIE = [-505.8, -472.2].flatMap((x) => Array.from({ length: 8 },
 /** The Borges labyrinth's middle, in the garden: its stone drum. */
 export const LABIRINTO = { x: -496, y: 0, z: -14 };
 export const CENACOLO = { x0: -548, x1: -512, z0: 4, z1: 36 };
+/**
+ * The open stretch of the Manica lunga (convento() and dormitorio()): a vaulted corridor from the chiostro degli allori's west walk
+ * (its door at z 62) between the monks' cells, two of them broken open. The rest of the range stays shut.
+ */
+export const DORM = { x0: -566, x1: -548, z0: 56.5, z1: 67.5, c0: 60.5, c1: 63.5 };
+/** The chiostro dei cipressi's well-head, in the lawn between four cypresses. */
+const POZZO2 = { x: -492, z: 57.5 };
+/** The Cenacolo's two tables: their axes, set off the long walls so the monks' benches stand behind them against the wainscot. */
+const TABLES = [CENACOLO.x0 + 2, CENACOLO.x1 - 2];
 const SGX = -530, SGZ = 102; // the crossing, under the dome
 const DOME = 9.5, RING = 20; // dome radius, top of the crossing's walls
 const P = 0.6; // presbytery and choir floor
@@ -115,6 +124,8 @@ export function buildSanGiorgio(b: LevelBuilder): void {
   monastery(b, p);
   library(b, p);
   cenacolo(b, p);
+  dormitorio(b);
+  convento(b);
   garden(b, p);
   darsena(b, p);
   lagoon(b, p);
@@ -730,8 +741,9 @@ function monastery(b: LevelBuilder, p: Props): void {
     [-512, -504, 44, 60, 13, 'plaster'], [-512, -504, 64, 80, 13, 'plaster'], // Longhena's wing, the passage between
     [-548, -536, 36, 44, 12, 'plaster'], [-524, -498, 36, 44, 12, 'plaster'], [-484, -452, 36, 44, 8, 'plaster', 'e'], // the south range
     [-512, -498, 20, 36, 12, 'brick'], [-484, -470, 20, 36, 12, 'brick'], [-512, -508, 4, 20, 10, 'brick', 'n'], [-470, -452, -8, 36, 7, 'plaster', 'ne'],
-    [-600, -548, -8, 80, 12, 'brick', 'n'], // the Manica lunga and the dormitories
+    [-600, -548, -8, DORM.z0, 12, 'brick', 'n'], // the Manica lunga and the dormitories, its front on the garden (dormitorio() opens a stretch of them)
     [-568, -540, 80, 92, 11, 'brick'], [-600, -578, 80, 124, 12, 'brick', 's'], [-578, -568, 80, 112, 10, 'brick'], // round the choir
+    [-600, -548, DORM.z1, 80, 12, 'brick'], [-600, DORM.x0, DORM.z0, DORM.z1, 12, 'brick'], // the rest of the Manica lunga, round the open stretch
   ];
   blocks.forEach(([x0, x1, z0, z1, h, role, sides], i) => {
     if (sides) houses(b, p, x0, x1, z0, z1, h, sides, 400 + 13 * i, role, { convent: true, brick: role === 'brick', tint: 0xf2dcb8 });
@@ -744,7 +756,7 @@ function monastery(b: LevelBuilder, p: Props): void {
 
   // Chiostro degli allori (Buora's, by the church) and chiostro dei cipressi (Palladio's, towards the water).
   b.area('Chiostro degli allori', -548, -512, 44, 80);
-  b.room(-548, -512, 44, 80, { h: 9, roof: false, role: 'brick', trim: true, floor: 'paving', n: [{ at: SGX, arch: true }], s: false, e: [{ at: 62, arch: true }] });
+  b.room(-548, -512, 44, 80, { h: 9, roof: false, role: 'brick', trim: true, floor: 'paving', n: [{ at: SGX, arch: true }], s: false, e: [{ at: 62, arch: true }], w: [{ at: 62, w: 1.8, h: 3, arch: true }] }); // west: the dormitory's door
   b.wallX(80, -548, -540, { h: 9, role: 'brick', trim: true });
   b.wallX(80, -520, -512, { h: 9, role: 'brick', trim: true });
   b.area('Chiostro dei cipressi', -504, -462, 44, 80);
@@ -754,8 +766,9 @@ function monastery(b: LevelBuilder, p: Props): void {
   b.curb(-542, -531.5, 50, 60.5); b.curb(-528.5, -518, 50, 60.5); b.curb(-542, -531.5, 63.5, 74); b.curb(-528.5, -518, 63.5, 74);
   b.well(SGX, 62, 0.9, 0.9);
   for (const [x, z] of [[-538, 55], [-522, 55], [-538, 69], [-522, 69], [-536, 72], [-524, 52]]) shrub(p, x, z, 1.1, 'hedge', true); // the laurels
-  groundPatch(b, -501, -465, 47, 77, 'paving', { skirt: true }).paint(-498, -468, 50, 74, 'grass').paint(-484.5, -481.5, 47, 77, 'gravel');
+  groundPatch(b, -501, -465, 47, 77, 'paving', { skirt: true }).paint(-498, -468, 50, 74, 'grass').paint(-484.5, -481.5, 47, 77, 'gravel').paint(POZZO2.x - 1.8, POZZO2.x + 1.8, POZZO2.z - 1.8, POZZO2.z + 1.8, 'gravel');
   b.curb(-498, -484.5, 50, 74); b.curb(-481.5, -468, 50, 74);
+  b.well(POZZO2.x, POZZO2.z, 0.8, 0.85); // the cypresses' own well-head, in the lawn between them (convento() dresses both wells)
   for (const x of [-496, -488, -478, -470]) for (const z of [53, 62, 71]) cypress(p, x, z, p.rand(7, 9));
   // A lamp post or two in each garden (pooled lights, no shadows): the arcade torches alone leave the middle dark on a phone.
   for (const [x, z] of [[-533, 59], [-527, 65], [-486, 57.5], [-480, 66.5]]) lampPost(b, p, x, z, 0);
@@ -769,7 +782,6 @@ function monastery(b: LevelBuilder, p: Props): void {
   b.wallZ(-524, 36, 44, { h: 6, role: 'stone' });
   b.box(-536, -524, 6, 6.4, 36, 44, 'roof');
   b.box(-536, -524, 6.4, 12, 36, 44, 'plaster', { collide: false });
-  b.floor(-536, -524, 36, 44, 'stone', 0, 0.02);
   for (const x of [-535.2, -524.8]) {
     b.box(x - 0.5, x + 0.5, 0, 1, 39, 41, 'stoneDark', { camera: false });
     p.box(x - 0.4, x + 0.4, 1, 1.05, 39.2, 40.8, 'water', 0, 0x445566);
@@ -830,20 +842,480 @@ function library(b: LevelBuilder, p: Props): void {
 function cenacolo(b: LevelBuilder, p: Props): void {
   const { x0, x1, z0, z1 } = CENACOLO;
   b.area('Cenacolo palladiano', x0, x1, z0, z1);
-  b.room(x0, x1, z0, z1, { h: 12, role: 'plaster', trim: 6, floor: 'stone', n: [{ at: SGX, w: 2.4, h: 3.6, arch: true }], s: [{ at: SGX, w: 2.4, h: 3.6, arch: true }] });
+  b.room(x0, x1, z0, z1, { h: 12, role: 'plaster', trim: 6, n: [{ at: SGX, w: 2.4, h: 3.6, arch: true }], s: [{ at: SGX, w: 2.4, h: 3.6, arch: true }] }); // its floor, skin and dress: refettorio()
   b.hipRoof(x0, x1, z0, z1, 12.4);
-  for (let x = x0 + 3; x < x1 - 1; x += 3) b.part(null, x - 0.2, x + 0.2, 11.4, 12, z0, z1, 'wood'); // the ceiling's beams
-  // The monks' tables along the long walls, their benches; the empty frame of the Nozze di Cana on the end wall.
-  for (const x of [x0 + 1.2, x1 - 1.2]) {
-    b.box(x - 0.6, x + 0.6, 0, 0.85, z0 + 4, z1 - 3, 'wood', { camera: false });
-    p.box(x - 0.55, x + 0.55, 0.85, 0.88, z0 + 4, z1 - 3, 'cloth', 0, 0xe8e0d0);
-    for (let z = z0 + 5; z < z1 - 3; z += 3.5) p.disc(x, 0.88, z, 0.12, 0.18, 'gold'); // chalices
-  }
-  b.part(null, -541, -519, 4.2, 11.2, z0 + 0.3, z0 + 0.55, 'gold'); // over the garden door
+  // The monks' tables along the long walls (refettorio() draws them): their colliders.
+  for (const x of TABLES) b.box(x - 0.5, x + 0.5, 0, 0.85, z0 + 4, z1 - 3, 'wood', { visible: false, camera: false });
+  p.mute(() => { for (let i = 0; i < TABLES.length; i++) for (let z = z0 + 5; z < z1 - 3; z += 3.5) p.disc(0, 0, 0, 1, 1, 'gold'); }); // the chalices that stood here: their dice, so the garden's trees stay put
+  // The empty frame of the Nozze di Cana on the end wall, over the garden door (refettorio() gilds it).
   b.part(null, -540.4, -519.6, 4.8, 10.6, z0 + 0.3, z0 + 0.62, 'stoneDark');
   for (let i = 0; i < 14; i++) { const x = p.rand(-540, -520.5); p.box(x, x + 0.4, 4.8, p.rand(5.2, 6.2), z0 + 0.62, z0 + 0.66, 'cloth', 0, 0xb89870); } // the cut canvas's ragged edge
   b.lights.push({ x: SGX, y: 6, z: z0 + 2, kind: 'glow', color: 0x80d8c0 }); // the frame still glows where the wedding hung
-  for (const x of [x0 + 0.32, x1 - 0.32]) for (const z of [12, 20, 28]) b.lights.push({ x, y: 2.75, z, kind: 'torch', nx: x < SGX ? 1 : -1, nz: 0 });
+  for (const x of [x0 + 0.32, x1 - 0.32]) for (const z of [12, 20, 28]) if (x < SGX || z !== 20) b.lights.push({ x, y: 2.75, z, kind: 'torch', nx: x < SGX ? 1 : -1, nz: 0 }); // not under the pulpit
+}
+
+/** The dormitory's two cells broken open (their doors' x): one off each side of the corridor. */
+const CELLS = { n: -555, s: -559 };
+
+/**
+ * The open stretch of the Manica lunga, its shell (convento() dresses it): a vaulted corridor in from the chiostro degli allori's
+ * west walk between two rows of cells, shut but for one each side, broken open; the range's mass over it to the eaves, and its
+ * own hipped roof between the rest's.
+ */
+function dormitorio(b: LevelBuilder): void {
+  const { x0, x1, z0, z1, c0, c1 } = DORM, H = 3.6; // the cells' ceilings: the corridor's vault springs a little under them
+  b.area('Dormitorio dei monaci', x0, x1, z0, z1);
+  b.together(() => {
+    b.box(x0, x1, H, 12, z0, c0 - 0.15, 'brick');
+    b.box(x0, x1, H, 12, c1 + 0.15, z1, 'brick');
+    b.box(x0, x1, 4.7, 12, c0 - 0.15, c1 + 0.15, 'brick');
+    b.hipRoof(x0, x1, z0, z1, 12);
+  });
+  const wall = { h: H, t: 0.3, role: 'stone' as Role }; // limewashed stone, grimed
+  b.wallX(c0, x0, x1, { ...wall, doors: [{ at: CELLS.s, w: 1.4, h: 2.3 }] });
+  b.wallX(c1, x0, x1, { ...wall, doors: [{ at: CELLS.n, w: 1.4, h: 2.3 }] });
+  for (const d of [-2.25, 2.25]) { b.wallZ(CELLS.s + d, z0, c0, wall); b.wallZ(CELLS.n + d, c1, z1, wall); }
+  for (const [x, z] of [[-561.5, c0 + 0.3], [-552.5, c1 - 0.3]]) b.lights.push({ x, y: 1.9, z, kind: 'candle' }); // a candle on a bracket either wall
+  b.lights.push({ x: x0 + 0.8, y: 2.4, z: (c0 + c1) / 2, kind: 'glow', color: 0x8fb0ff }); // the moon in the window at its end
+  b.lights.push({ x: CELLS.n + 1.2, y: 1.1, z: z1 - 0.8, kind: 'candle' }, { x: CELLS.s - 1.4, y: 1.1, z: z0 + 0.9, kind: 'candle' });
+  b.lights.push({ x: CELLS.n, y: 2.6, z: z1 - 1.8, kind: 'glow', color: 0xffa868 }, { x: CELLS.s, y: 2.6, z: z0 + 1.8, kind: 'glow', color: 0xffa868 }); // the candles' warmth on the whitewash
+}
+
+/** A wall's frame: x along it, y up, z out of its face into the room (axis 'x': the face at z = w, the room on its `s` side; 'z': at x = w). */
+interface Face { m: THREE.Matrix4; yaw: number; u: (a: number) => number; at: (u: number, d: number) => [number, number] }
+function face(axis: 'x' | 'z', w: number, s: number): Face {
+  const yaw = axis === 'x' ? (s > 0 ? 0 : Math.PI) : s > 0 ? Math.PI / 2 : -Math.PI / 2;
+  const m = new THREE.Matrix4().makeRotationY(yaw).setPosition(axis === 'x' ? 0 : w, 0, axis === 'x' ? w : 0);
+  const k = axis === 'x' ? s : -s, v = new THREE.Vector3();
+  return { m, yaw, u: (a) => k * a, at: (u, d) => { v.set(u, 0, d).applyMatrix4(m); return [v.x, v.z]; } };
+}
+
+/** An instanced box by extents in a wall's frame (its turns are right angles: it stays a box). */
+function fbox(q: Props, f: Face, u0: number, u1: number, y0: number, y1: number, d0: number, d1: number, role: Role, tint?: number): void {
+  const [ax, az] = f.at(u0, d0), [bx, bz] = f.at(u1, d1);
+  q.box(Math.min(ax, bx), Math.max(ax, bx), y0, y1, Math.min(az, bz), Math.max(az, bz), role, 0, tint);
+}
+
+/** A board `w` long (along its own x before the turn), `t` thick, `h` tall, standing centred at (x, z) turned `yaw`; `y0` its foot. */
+function board(q: Props, x: number, z: number, w: number, t: number, y0: number, h: number, yaw: number, role: Role, tint?: number): void {
+  q.box(x - w / 2, x + w / 2, y0, y0 + h, z - t / 2, z + t / 2, role, yaw, tint);
+}
+
+const WALNUT = 0x5a3a24, DARK = 0x3a2616, PEWTER = 0x9a968c, LINEN = 0xd8cfbc, STRAW = 0xb89a62, SOOT = 0x141110;
+
+/**
+ * A cell's door in a wall at `a` (world, along it): its stone frame, the dark of the cell behind, and the door shut (with its
+ * grille), swung open, or kicked in (the lower half on the floor, splinters).
+ */
+function cellDoor(q: Props, f: Face, a: number, state: 'shut' | 'ajar' | 'broken', r: () => number, y = 0): void {
+  const u = f.u(a), W = 0.55;
+  fbox(q, f, u - W - 0.2, u - W, y, y + 2.3, 0, 0.12, 'stoneDark');
+  fbox(q, f, u + W, u + W + 0.2, y, y + 2.3, 0, 0.12, 'stoneDark');
+  fbox(q, f, u - W - 0.28, u + W + 0.28, y + 2.3, y + 2.55, 0, 0.16, 'stoneDark');
+  fbox(q, f, u - W, u + W, y, y + 2.3, 0, 0.015, 'iron', SOOT);
+  if (state === 'shut') {
+    fbox(q, f, u - W + 0.02, u + W - 0.02, y + 0.02, y + 2.28, 0.015, 0.07, 'wood', DARK);
+    for (const yy of [0.5, 1.9]) fbox(q, f, u - W + 0.05, u + W - 0.05, y + yy, y + yy + 0.08, 0.07, 0.09, 'iron'); // its bands
+    fbox(q, f, u - 0.15, u + 0.15, y + 1.45, y + 1.7, 0.07, 0.1, 'iron', SOOT); // the grille
+    return;
+  }
+  const th = state === 'ajar' ? 1 + r() * 0.5 : 0.35, len = state === 'ajar' ? 1.06 : 0.9;
+  const [hx, hz] = f.at(u - W + (len / 2) * Math.cos(th), 0.05 + (len / 2) * Math.sin(th));
+  if (state === 'ajar') { board(q, hx, hz, len, 0.06, y + 0.04, 2.22, f.yaw - th, 'wood', DARK); return; }
+  board(q, hx, hz, len, 0.06, y + 1.3, 0.96, f.yaw - th, 'wood', DARK); // the top half, hanging off its upper hinge
+  const [lx, lz] = f.at(u + 0.3, 0.9 + r() * 0.4);
+  q.put(FLAT, 'wood', lx, y + 0.04, lz, 1.0, 0.06, 1.2, 0, f.yaw + (r() - 0.5) * 1.2, 0.08, DARK); // the bottom, kicked in and out again
+  splinters(q, r, ...f.at(u, 0.5), y, 5, DARK);
+}
+
+const FLAT = new THREE.BoxGeometry(1, 1, 1);
+
+/** `n` splinters and planks strewn round (x, z) on floor y. */
+function splinters(q: Props, r: () => number, x: number, z: number, y: number, n: number, tint = WALNUT): void {
+  for (let i = 0; i < n; i++) {
+    const a = r() * 6.28, d = 0.2 + r() * 0.9;
+    q.put(FLAT, 'wood', x + Math.cos(a) * d, y + 0.025, z + Math.sin(a) * d, 0.05 + r() * 0.05, 0.04, 0.25 + r() * 0.5, 0, r() * 6.28, 0, tint);
+  }
+}
+
+/** Fallen coppi and plaster on a floor: `n` shards round (x, z). */
+function shards(q: Props, r: () => number, x: number, z: number, y: number, n: number, spread = 1.2): void {
+  for (let i = 0; i < n; i++) {
+    const a = r() * 6.28, d = r() * spread, s = 0.08 + r() * 0.16;
+    q.put(FLAT, r() < 0.6 ? 'roof' : 'stone', x + Math.cos(a) * d, y + 0.03, z + Math.sin(a) * d, s, 0.05, s * (0.6 + r()), r() * 0.3, r() * 6.28, r() * 0.3);
+  }
+}
+
+/** A crack wandering off (u, y) over a wall's face, in a few dark strokes. */
+function crack(q: Props, f: Face, u: number, y: number, r: () => number): void {
+  let a = r() * 6.28;
+  for (let k = 0; k < 5; k++) {
+    const len = 0.25 + r() * 0.45, du = Math.cos(a) * len, dy = Math.sin(a) * len;
+    const [x, z] = f.at(u + du / 2, 0.05);
+    q.put(FLAT, 'iron', x, y + dy / 2, z, len, 0.025, 0.012, 0, f.yaw, Math.atan2(dy, du), SOOT);
+    u += du; y += dy; a += (r() - 0.5) * 1.6;
+  }
+}
+
+/** A memorial slab let into the wall at `a`: a dark frame, the pale stone, its lines of lettering. */
+function lapide(q: Props, f: Face, a: number, y: number): void {
+  const u = f.u(a);
+  fbox(q, f, u - 0.6, u + 0.6, y, y + 0.85, 0, 0.05, 'stoneDark');
+  fbox(q, f, u - 0.5, u + 0.5, y + 0.08, y + 0.77, 0.05, 0.07, 'stone', 0xd8d0c0);
+  for (let k = 0; k < 4; k++) fbox(q, f, u - 0.38 + (k % 2) * 0.06, u + 0.38 - (k % 2) * 0.06, y + 0.6 - k * 0.12, y + 0.63 - k * 0.12, 0.07, 0.075, 'iron', SOOT);
+}
+
+/** A book open or shut, `s` its size, lying on y. */
+function book(q: Props, r: () => number, x: number, z: number, y: number, s = 1, open = false): void {
+  const tint = [0x6a2418, 0x23304a, 0x4a3c1a, 0x2e2216][Math.floor(r() * 4)], yaw = r() * 6.28;
+  if (open) { q.box(x - 0.2 * s, x + 0.2 * s, y, y + 0.03 * s, z - 0.14 * s, z + 0.14 * s, 'cloth', yaw, LINEN); return; }
+  q.put(FLAT, 'cloth', x, y + 0.04 * s, z, 0.22 * s, 0.08 * s, 0.3 * s, 0, yaw, r() < 0.3 ? 0.2 : 0, tint);
+}
+
+/**
+ * The cloisters' walks dressed as the convent left them: along a wall's face from a0 to a1 (world, along it), one thing per bay,
+ * nothing within 2 m of `keep` (its doors, its torches, the walks' gaps): cells' doors (shut, open, kicked in) where the range
+ * behind has cells, benches against the wall (some smashed), memorial slabs, candelabra, lecterns, chairs thrown about, heaps of
+ * fallen plaster, and coppi shards off the arcade's roof everywhere. What stands collides (under a metre); a walk keeps 1.5 m clear.
+ */
+function walk(b: LevelBuilder, q: Props, r: () => number, f: Face, a0: number, a1: number, keep: number[], doors: boolean): void {
+  const n = Math.max(1, Math.round(Math.abs(a1 - a0) / 3.3)), at = (a: number, d: number) => f.at(f.u(a), d);
+  for (let i = 0; i < n; i++) {
+    const a = a0 + ((a1 - a0) * (i + 0.5)) / n;
+    shards(q, r, ...at(a + (r() - 0.5) * 2, 1 + r()), 0, 2 + Math.floor(r() * 4));
+    if (keep.some((k) => Math.abs(k - a) < 2)) continue;
+    const roll = r(), yaw = f.yaw;
+    if (doors && roll < 0.3) {
+      cellDoor(q, f, a, roll < 0.16 ? 'shut' : roll < 0.24 ? 'ajar' : 'broken', r);
+      if (r() < 0.5) place(b, 'sedia', ...xyz(at(a + 1.2, 0.5)), yaw + (r() - 0.5) * 2, 0.95, { tilt: Math.PI / 2 });
+    } else if (roll < 0.5) {
+      if (r() < 0.25) place(b, 'rotta', ...xyz(at(a, 0.6)), yaw + (r() - 0.5) * 0.4, 0.6);
+      else place(b, 'panca', ...xyz(at(a, 0.28)), yaw, 1.05, { solid: true, stretch: 1.9 });
+      if (r() < 0.4) place(b, 'sedia', ...xyz(at(a + 1.6, 0.5)), r() * 6, 0.95, { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1) });
+    } else if (roll < 0.64) {
+      lapide(q, f, a, 1.25);
+      if (r() < 0.6) place(b, 'candelabro', ...xyz(at(a + 0.9, 0.35)), r() * 6, 1.6, { solid: true });
+      else place(b, 'candelabro', ...xyz(at(a, 0.5)), yaw + Math.PI / 2, 1.6, { tilt: Math.PI / 2 });
+    } else if (roll < 0.74) {
+      const down = r() < 0.4;
+      place(b, 'leggio', ...xyz(at(a, down ? 0.6 : 0.45)), yaw + (r() - 0.5) * 0.6, 1.3, down ? { tilt: Math.PI / 2 } : { solid: true });
+      book(q, r, ...at(a + 0.8, 0.9), 0, 1.4, r() < 0.5);
+    } else if (roll < 0.88) {
+      place(b, 'macerie', ...xyz(at(a, 0.7)), r() * 6, 0.06 + r() * 0.05);
+      shards(q, r, ...at(a, 0.9), 0, 6, 1.6);
+    } else {
+      place(b, 'sedia', ...xyz(at(a - 0.5, 0.45)), yaw + (r() - 0.5) * 0.8, 0.95, { solid: true });
+      place(b, 'sedia', ...xyz(at(a + 0.7, 0.8)), r() * 6, 0.95, { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1) });
+    }
+  }
+}
+/** (x, z) on the floor: place()'s x, y, z. */
+const xyz = ([x, z]: [number, number], y = 0): [number, number, number] => [x, y, z];
+
+/**
+ * San Giorgio's convent as a ruin of its grandeur, in the interior's zone (never on level 2's GPU), with the church's furniture
+ * (level/arredi.ts: what is wood or iron breaks): the Cenacolo, the antirefettorio, the two cloisters' walks and well-heads, the
+ * dormitory's corridor and its two broken cells, the library thrown about. The Abate's floor (enemies/sangiorgio.ts ABATE_BOUNDS)
+ * keeps only what lies down, without colliders; the packs, the quest's givers and their spots, the doors and the walks stay clear.
+ */
+function convento(b: LevelBuilder): void {
+  b.zone(INTERNO);
+  const q = new Props(b, 223), r = rng(229);
+  refettorio(b, q, r);
+  // The antirefettorio: the church's marble, a candelabrum by each lavabo (one thrown down), what fell off its vault. The
+  // Veronese's corner (north-east), the checkpoint before the Cenacolo's door and the lavabi themselves stay clear.
+  b.floor(-536, -524, 36, 44, 'marble', 0, 0.02);
+  place(b, 'candelabro', -534.9, 0, 37.1, 0.4, 1.6, { solid: true });
+  place(b, 'candelabro', -525.4, 0, 37.6, 1.2, 1.6, { tilt: Math.PI / 2 });
+  place(b, 'macerie', -534.6, 0.01, 43.1, 2, 0.07);
+  shards(q, r, -533.6, 42.4, 0, 8, 1.4);
+  const anti = face('x', 36.3, 1);
+  lapide(q, anti, -533.2, 1.4);
+  // The cloisters' walks: their back walls' faces, from corner to corner.
+  const allori = { w: face('z', -547.7, 1), e: face('z', -512.3, -1), s: face('x', 44.3, 1), n: face('x', 79.7, -1) };
+  walk(b, q, r, allori.w, 45.8, 78.2, [54, 62, 70], false); // the dormitory's door between the torches: the cells are behind it
+  walk(b, q, r, allori.e, 45.8, 78.2, [54, 62], true);
+  walk(b, q, r, allori.s, -546.2, -513.8, [SGX], true);
+  walk(b, q, r, allori.n, -546.2, -513.8, [SGX], false); // the transept's white wall: no cells
+  const cipressi = { w: face('z', -503.7, 1), e: face('z', -462.3, -1), s: face('x', 44.3, 1), n: face('x', 79.7, -1) };
+  walk(b, q, r, cipressi.w, 45.8, 78.2, [62, 72], true);
+  walk(b, q, r, cipressi.e, 45.8, 78.2, [54, 70], true);
+  walk(b, q, r, cipressi.s, -502.2, -463.8, [-491, -488.5, -493.5], true);
+  walk(b, q, r, cipressi.n, -502.2, -463.8, [], true);
+  // Both well-heads under their iron: two uprights off the rim, an arch, the pulley, a rope down and the bucket left on the rim.
+  for (const [x, z, rr, h] of [[SGX, 62, 0.9, 0.9], [POZZO2.x, POZZO2.z, 0.8, 0.85]] as const) {
+    const top = h + 0.26, R = rr + 0.1;
+    for (const s of [-1, 1]) q.rod(x + s * R, top, z, x + s * R, top + 1.7, z, 0.035, 'iron');
+    for (let k = 0; k < 6; k++) {
+      const a0 = (k / 6) * Math.PI, a1 = ((k + 1) / 6) * Math.PI;
+      q.rod(x + Math.cos(a0) * R, top + 1.7 + Math.sin(a0) * R * 0.5, z, x + Math.cos(a1) * R, top + 1.7 + Math.sin(a1) * R * 0.5, z, 0.03, 'iron');
+    }
+    q.put(PULLEY, 'iron', x, top + 1.7 + R * 0.5 - 0.12, z, 0.16, 0.05, 0.16, Math.PI / 2, 0, 0);
+    q.rod(x + 0.16, top + 1.7 + R * 0.5 - 0.12, z, x + 0.16, top + 0.3, z, 0.012, 'wood'); // the rope
+    q.put(PULLEY, 'wood', x - rr + 0.05, top + 0.12, z + 0.2, 0.17, 0.24, 0.17, 0.2, 0, 0.1, WALNUT); // the bucket
+    shards(q, r, x + 1.4, z - 0.8, 0, 3, 0.6);
+  }
+  library3(b, q, r);
+  cells(b, q, r);
+  q.flush();
+  b.zone('sangiorgio');
+}
+const PULLEY = new THREE.CylinderGeometry(1, 1, 1, 10);
+
+/**
+ * The Cenacolo palladiano, the Abate's hall, dressed (cenacolo() is its shell): the church's marble on the floor, Palladio's white
+ * hall inside the convent's brick (a skin of Istrian stone over a walnut wainscot, pilasters between the high windows with the moon
+ * in them, a cornice, a boarded ceiling on its beams, a Diocletian window over the antirefettorio's door); the long walnut tables on
+ * their trestles, the cloths dragged half off, pewter, bread, chalices thrown down, one table's end collapsed; the monks' benches
+ * behind them against the wainscot; the reader's pulpit up on the east wall under its sounding board; the gilt frame of the Nozze
+ * di Cana on the end wall between pilasters; fallen plaster, a beam down, chairs flung about the floor.
+ */
+function refettorio(b: LevelBuilder, q: Props, r: () => number): void {
+  const { x0, x1, z0, z1 } = CENACOLO, T0 = z0 + 4, T1 = z1 - 3, CEIL = 11.2, IN = 0.3;
+  b.floor(x0, x1, z0, z1, 'marble', 0, 0.02);
+  const walls = [face('z', x0 + IN, 1), face('z', x1 - IN, -1)];
+  for (const f of walls) {
+    const [ua, ub] = [f.u(z0 + IN), f.u(z1 - IN)].sort((p, s) => p - s);
+    b.part(f.m, ua, ub, 2.66, CEIL, 0, 0.04, 'stone'); // the field, grimed: the order over it in white
+    b.part(f.m, ua, ub, 0, 2.5, 0, 0.1, 'wood'); // the wainscot
+    b.part(f.m, ua, ub, 2.5, 2.66, 0, 0.18, 'wood');
+    for (let z = z0 + 1.2; z < z1 - 0.8; z += 1.6) fbox(q, f, f.u(z) - 0.06, f.u(z) + 0.06, 0.12, 2.5, 0.1, 0.14, 'wood', DARK); // its stiles
+    b.part(f.m, ua, ub, 9.4, 9.8, 0, 0.42, 'istria'); // the cornice
+    b.part(f.m, ua, ub, 9.8, 10.0, 0, 0.58, 'istria');
+    for (let i = 0; i < 7; i++) { // the skin come away in patches, the brick behind it; cracks running off them
+      const z = z0 + 2 + r() * (z1 - z0 - 4), y = 3.2 + r() * 5.4, w = 0.5 + r() * 1.4, h = 0.4 + r() * 1.1;
+      fbox(q, f, f.u(z) - w / 2, f.u(z) + w / 2, y, y + h, 0.02, 0.05, 'brick');
+      fbox(q, f, f.u(z) - w / 2 - 0.25, f.u(z) - w / 2 + 0.3, y + h * 0.3, y + h * 0.7, 0.02, 0.048, 'brick');
+      crack(q, f, f.u(z) + w / 2, y + h * 0.5, r);
+    }
+    for (const z of [8, 14, 26, 32]) { // pilasters between the windows (the pulpit's bay keeps its wall)
+      b.part(f.m, f.u(z) - 0.38, f.u(z) + 0.38, 2.66, 9.0, 0.04, 0.2, 'istria');
+      b.part(f.m, f.u(z) - 0.48, f.u(z) + 0.48, 9.0, 9.4, 0.04, 0.3, 'istria');
+    }
+    for (const z of [11, 17, 23, 29]) { // the high windows, the moon in them
+      const u = f.u(z), sp = 8.1, w = 0.8;
+      b.part(f.m, u - w, u + w, 6.3, sp, 0.04, 0.06, 'luna');
+      b.decor(shaped(lunette(u, sp, w, 0.06, 1)).applyMatrix4(f.m), 'luna');
+      b.decor(shaped(arch(u, sp, w, w + 0.24, 0.16)).translate(0, 0, 0.12).applyMatrix4(f.m), 'istria');
+      b.part(f.m, u - w - 0.24, u - w, 6.3, sp, 0.04, 0.2, 'istria');
+      b.part(f.m, u + w, u + w + 0.24, 6.3, sp, 0.04, 0.2, 'istria');
+      b.part(f.m, u - w - 0.35, u + w + 0.35, 6.12, 6.3, 0.04, 0.3, 'istria'); // its sill on the marcapiano
+    }
+  }
+  // The end walls: the south one (the garden's door, the Nozze's frame), the north (the antirefettorio's door, the Diocletian window over it).
+  for (const [z, s] of [[z0 + IN, 1], [z1 - IN, -1]] as const) {
+    const f = face('x', z, s), [ua, ub] = [f.u(x0 + IN), f.u(x1 - IN)].sort((p, t) => p - t), d0 = f.u(SGX) - 1.2, d1 = f.u(SGX) + 1.2;
+    const gap = s > 0 ? 13.2 : 3.75; // the cornice breaks for the Nozze's frame and pilasters, and for the window
+    b.part(f.m, ua, d0 - 0.3, 0, CEIL, 0, 0.04, 'stone');
+    b.part(f.m, d1 + 0.3, ub, 0, CEIL, 0, 0.04, 'stone');
+    b.part(f.m, d0 - 0.3, d1 + 0.3, 4.25, CEIL, 0, 0.04, 'stone');
+    for (const [a, c] of [[ua, d0 - 0.3], [d1 + 0.3, ub]]) b.part(f.m, a, c, 0, 0.5, 0, 0.1, 'stoneDark');
+    for (const [a, c] of [[ua, f.u(SGX) - gap], [f.u(SGX) + gap, ub]]) {
+      b.part(f.m, a, c, 9.4, 9.8, 0, 0.42, 'istria');
+      b.part(f.m, a, c, 9.8, 10.0, 0, 0.58, 'istria');
+    }
+    for (const u of [d0 - 0.3, d1]) b.part(f.m, u, u + 0.3, 0, 3.6, 0, 0.16, 'istria'); // the door's jambs
+    b.part(f.m, d0 - 0.5, d1 + 0.5, 3.6, 4.0, 0, 0.24, 'istria'); // its lintel
+    b.part(f.m, d0 - 0.7, d1 + 0.7, 4.0, 4.25, 0, 0.36, 'istria'); // its cornice
+  }
+  // The Nozze's gilt frame, in mouldings, between two pilasters (the canvas, quest/view.ts, hangs inside the lip at z0 + 0.7).
+  const S = face('x', z0 + IN, 1);
+  const gild = (x0g: number, x1g: number, y0: number, y1: number, d: number) => {
+    for (const [a, c, e, g] of [[x0g, x1g, y0 - 0.3, y0], [x0g, x1g, y1, y1 + 0.3], [x0g, x0g + 0.3, y0, y1], [x1g - 0.3, x1g, y0, y1]]) b.part(S.m, S.u(a), S.u(c), e, g, 0.02, d, 'doratura');
+  };
+  gild(-540.7, -519.3, 4.8, 10.6, 0.38);
+  gild(-541.2, -518.8, 4.5, 10.9, 0.24);
+  for (const x of [-542.6, -517.4]) { b.part(S.m, S.u(x) - 0.45, S.u(x) + 0.45, 0.5, 9.0, 0.04, 0.3, 'istria'); b.part(S.m, S.u(x) - 0.58, S.u(x) + 0.58, 9.0, 9.4, 0.04, 0.4, 'istria'); }
+  // The Diocletian window over the north door: a half wheel of moonlit glass split by two mullions, its Istrian ring.
+  const N = face('x', z1 - IN, -1), cu = N.u(SGX);
+  b.decor(shaped(lunette(cu, 6.4, 3.2, 0.06, 1)).applyMatrix4(N.m), 'luna');
+  b.decor(shaped(arch(cu, 6.4, 3.2, 3.6, 0.3)).translate(0, 0, 0.16).applyMatrix4(N.m), 'istria');
+  for (const du of [-1.07, 1.07]) b.part(N.m, cu + du - 0.12, cu + du + 0.12, 6.4, 6.4 + Math.sqrt(3.2 ** 2 - du ** 2), 0.04, 0.24, 'istria');
+  b.part(N.m, cu - 3.8, cu + 3.8, 6.2, 6.42, 0.04, 0.34, 'istria');
+  // The ceiling: boards on beams, one occlusion piece so the Diablo view lifts it whole.
+  b.together(() => {
+    b.part(null, x0 + IN, x1 - IN, CEIL, CEIL + 0.12, z0 + IN, z1 - IN, 'wood');
+    for (let x = x0 + 3; x < x1 - 1; x += 3) b.part(null, x - 0.2, x + 0.2, CEIL - 0.45, CEIL, z0 + IN, z1 - IN, 'wood');
+    for (const z of [12, 20, 28]) b.part(null, x0 + IN, x1 - IN, CEIL - 0.3, CEIL, z - 0.14, z + 0.14, 'wood');
+  });
+
+  // The tables: walnut tops on trestles, the cloths dragged half off, pewter and bread, chalices thrown down; the west one's north
+  // end collapsed, its top sloping to the floor.
+  TABLES.forEach((c, k) => {
+    const hall = k ? -1 : 1, broke = k ? T1 : T1 - 4.2; // the hall's side of it; where its top ends
+    q.box(c - 0.55, c + 0.55, 0.76, 0.86, T0, broke, 'wood', 0, WALNUT);
+    for (let z = T0 + 0.4; z < broke; z += 2.4) {
+      q.box(c - 0.42, c + 0.42, 0, 0.76, z - 0.07, z + 0.07, 'wood', 0, DARK); // the trestle
+      q.box(c - 0.5, c + 0.5, 0, 0.08, z - 0.12, z + 0.12, 'wood', 0, DARK);
+    }
+    q.box(c - 0.05, c + 0.05, 0.22, 0.32, T0, broke, 'wood', 0, DARK); // the stretcher
+    for (let z = T0 + 0.6; z < broke - 1; z += 3.4 + r() * 2) { // cloths, one end pulled over the hall's edge
+      const len = 1.6 + r() * 1.6;
+      q.box(c - 0.5, c + 0.5, 0.86, 0.875, z, Math.min(z + len, broke - 0.2), 'cloth', 0, LINEN);
+      if (r() < 0.6) q.box(c + hall * 0.5, c + hall * 0.52, 0.2 + r() * 0.3, 0.87, z, Math.min(z + len, broke - 0.2), 'cloth', 0, LINEN);
+    }
+    for (let z = T0 + 0.8; z < broke - 0.4; z += 1.1) { // a place laid for every monk: pewter plate, a cup, some bread
+      if (r() < 0.25) continue;
+      const pz = z + (r() - 0.5) * 0.3, side = c - hall * 0.15;
+      q.disc(side, 0.875, pz, 0.14, 0.015, 'iron', PEWTER);
+      if (r() < 0.5) q.disc(side + hall * 0.3, 0.875, pz + 0.25, 0.04, 0.12, r() < 0.3 ? 'gold' : 'iron', PEWTER);
+      if (r() < 0.4) q.blob(side + (r() - 0.5) * 0.1, 0.92, pz, 0.08, 0.05, 0.06, 'wood', 0xb08850);
+      if (r() < 0.2) q.put(PULLEY, 'gold', side + hall * 0.35, 0.91, pz - 0.2, 0.045, 0.14, 0.045, Math.PI / 2, r() * 6, 0); // a chalice, knocked over
+    }
+    for (let z = T0 + 3; z < broke; z += 6) b.lights.push({ x: c, y: 1.15, z, kind: 'candle' });
+    for (let z = T0 + 3; z < broke; z += 6) q.disc(c, 0.875, z, 0.035, 0.22, 'flower', 0xf0e6cc);
+    if (broke < T1) { // the collapsed end: its top tipped down to the floor, a trestle on its side, pewter all over the marble
+      const m = new THREE.Matrix4().makeRotationX(Math.atan2(0.82, T1 - broke)).setPosition(c, 0.86, broke);
+      b.part(m, -0.55, 0.55, -0.1, 0, 0, Math.hypot(0.82, T1 - broke), 'wood');
+      q.box(c - 0.42, c + 0.42, 0, 0.14, broke + 1.2, broke + 2, 'wood', 0.3, DARK);
+      for (let i = 0; i < 9; i++) q.disc(c + hall * (0.4 + r() * 1.4), 0.02, broke + r() * 4, 0.14, 0.015, 'iron', PEWTER);
+      splinters(q, r, c + hall * 0.6, broke + 0.4, 0, 6, DARK);
+    }
+  });
+  // The monks' benches behind the tables against the wainscot, facing in: a few smashed, one gone, one tipped on its back.
+  for (const [x, yaw] of [[x0 + IN + 0.32, Math.PI / 2], [x1 - IN - 0.32, -Math.PI / 2]] as const) for (let z = T0 + 1.05; z < T1 - 0.5; z += 2.15) {
+    const roll = r();
+    if (roll < 0.12) continue;
+    if (roll < 0.26) place(b, 'rotta', x + Math.sign(yaw) * 0.25, 0, z, yaw + (r() - 0.5) * 0.4, 0.6);
+    else if (roll < 0.34) place(b, 'panca', x + Math.sign(yaw) * 0.3, 0, z, yaw + 0.15, 1.05, { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1), stretch: 2 });
+    else place(b, 'panca', x, 0, z, yaw, 1.05, { solid: true, stretch: 2 });
+  }
+  // On the hall's side of the tables, chairs: a few still standing at the tables (out of the Abate's floor), the rest thrown across it.
+  for (const [c, hall] of [[TABLES[0], 1], [TABLES[1], -1]] as const) for (let z = T0 + 1.5; z < T1 - 1; z += 2.6 + r() * 1.5) {
+    if (r() < 0.35) place(b, 'sedia', c + hall * 0.95, 0, z, -hall * Math.PI / 2 + (r() - 0.5) * 0.5, 0.95, { solid: true });
+    else place(b, 'sedia', c + hall * (1.2 + r() * 4), 0, z + (r() - 0.5) * 2, r() * 6, 0.95, { tilt: Math.PI / 2 * (r() < 0.5 ? 1 : -1) });
+  }
+  // The reader's pulpit, up on the east wall over the table: a corbel of Istrian stone, its floor, a walnut parapet with a gilt
+  // cross, the great lectern on it, the sounding board over it, the little door it was reached by.
+  const pf = walls[1], pu = pf.u(20);
+  b.together(() => {
+    b.part(pf.m, pu - 0.6, pu + 0.6, 1.9, 2.25, 0.04, 0.5, 'istria');
+    b.part(pf.m, pu - 0.85, pu + 0.85, 2.25, 2.55, 0.04, 0.95, 'istria');
+    b.part(pf.m, pu - 1.05, pu + 1.05, 2.55, 2.72, 0.04, 1.4, 'istria');
+    b.part(pf.m, pu - 1.0, pu + 1.0, 2.72, 3.75, 1.28, 1.36, 'wood'); // the parapet, front and sides
+    for (const s of [-1, 1]) b.part(pf.m, pu + s * 0.96 - 0.04, pu + s * 0.96 + 0.04, 2.72, 3.75, 0.04, 1.36, 'wood');
+    b.part(pf.m, pu - 1.06, pu + 1.06, 3.75, 3.86, 0.04, 1.42, 'wood');
+    b.part(pf.m, pu - 0.05, pu + 0.05, 2.9, 3.6, 1.36, 1.4, 'doratura');
+    b.part(pf.m, pu - 0.25, pu + 0.25, 3.3, 3.38, 1.36, 1.4, 'doratura');
+    b.part(pf.m, pu - 0.9, pu + 0.9, 3.86, 5.8, 0.04, 0.1, 'wood'); // its back
+    b.part(pf.m, pu - 1.15, pu + 1.15, 5.8, 6.0, 0.04, 1.55, 'wood'); // the sounding board
+    b.part(pf.m, pu - 1.2, pu + 1.2, 6.0, 6.12, 0.04, 1.6, 'doratura');
+  });
+  const [px, pz] = pf.at(pu, 0.8);
+  place(b, 'leggio', px, 2.72, pz, pf.yaw, 1.05, { fixed: true });
+  b.lights.push({ x: px - 0.4, y: 4.1, z: pz, kind: 'candle' });
+  fbox(q, pf, pu + 1.3, pu + 2.2, 2.72, 4.9, 0, 0.03, 'iron', SOOT); // the stair's door in the wall, its frame
+  fbox(q, pf, pu + 1.2, pu + 2.3, 4.9, 5.05, 0, 0.1, 'istria');
+  // What fell: plaster and stone heaps in the corners and along the walls, one in the hall; a ceiling beam down across the
+  // west table's broken end; candelabra by the frame wall, one thrown down; a lectern on its side by the north door.
+  for (const [x, z, s] of [[-545.4, 34.6, 0.11], [-514.8, 34.8, 0.12], [-546.4, 5.6, 0.09], [-513.6, 5.4, 0.1], [-538.2, 34.9, 0.07], [-521.6, 35, 0.08], [-533.4, 24.6, 0.05]] as const) {
+    place(b, 'macerie', x, 0.01, z, r() * 6, s);
+    shards(q, r, x, z, 0, 7, 1.8);
+  }
+  const fall = new THREE.Matrix4().makeRotationY(0.5).multiply(new THREE.Matrix4().makeRotationZ(0.22)).setPosition(-543.6, 0.55, 31.6);
+  b.part(fall, -3.4, 3.4, -0.2, 0.2, -0.2, 0.2, 'wood');
+  place(b, 'candelabro', -536.2, 0, 5.6, 0.3, 1.6, { solid: true });
+  place(b, 'candelabro', -523.8, 0, 5.6, 1.1, 1.6, { solid: true });
+  place(b, 'candelabro', -527.5, 0, 6.4, 2.2, 1.6, { tilt: Math.PI / 2 });
+  place(b, 'leggio', -526.3, 0, 34.7, Math.PI, 1.3, { tilt: Math.PI / 2 });
+  for (let i = 0; i < 10; i++) q.disc(-542 + r() * 24, 0.02, 8 + r() * 25, 0.14, 0.015, 'iron', PEWTER); // pewter flung over the floor
+  for (let i = 0; i < 6; i++) book(q, r, -541 + r() * 22, 9 + r() * 22, 0.02, 1.3);
+  for (const x of [-536, -524]) b.lights.push({ x, y: 8.6, z: 20, kind: 'glow', color: 0xffb46a }); // warm light up on the walls and ceiling
+  for (const [k, c] of TABLES.entries()) for (const z of [13, 26]) b.lights.push({ x: c + (k ? -1.6 : 1.6), y: 3, z, kind: 'glow', color: 0xffa860 }); // and low over the tables and benches
+}
+
+/**
+ * The library thrown about (library() is its shell): books pulled off the cases and strewn, chairs at the reading tables and
+ * knocked over, a lectern, candelabra by the globes, fallen plaster. Clear of the cases' bays (SCANSIE) and the aisle.
+ */
+function library3(b: LevelBuilder, q: Props, r: () => number): void {
+  const Y = LIB_F;
+  for (const x of [-499, -483]) for (const z of [2, 11]) {
+    place(b, 'sedia', x - 0.8, Y, z - 1.15, 0.1, 0.95, { solid: true });
+    place(b, 'sedia', x + 0.9, Y, z + 1.3, Math.PI + 0.5, 0.95, { tilt: Math.PI / 2 });
+    for (let i = 0; i < 3; i++) book(q, r, x + (r() - 0.5) * 3, z + (r() < 0.5 ? -1.3 : 1.3) + (r() - 0.5) * 0.6, Y, 1.4, r() < 0.3);
+  }
+  for (const x of [-505.4, -472.6]) for (let z = -3.6; z < 18; z += 1.2 + r() * 1.6) for (let i = 0; i < 2; i++) book(q, r, x + (x < -490 ? 1 : -1) * r() * 1.4, z + r() * 0.6, Y, 1.4, r() < 0.15); // off the cases
+  place(b, 'leggio', -500.5, Y, 16.8, Math.PI - 0.4, 1.3, { solid: true }); // off the aisle from the door
+  place(b, 'candelabro', -504, Y, 9.2, 0.4, 1.6, { solid: true });
+  place(b, 'candelabro', -474, Y, 9.4, 1.9, 1.6, { tilt: Math.PI / 2 });
+  for (const [x, z, s] of [[-506, -4.4, 0.08], [-472, 18.2, 0.07]] as const) { place(b, 'macerie', x, Y + 0.01, z, r() * 6, s); shards(q, r, x, z, Y, 6); }
+}
+
+/**
+ * The dormitory's dress (dormitorio() is its shell): the corridor's vault and marble, the shut cells' doors down both walls, a
+ * bench, a lectern, a candelabrum thrown down, the moonlit window at its end; the two broken cells: a plank bed with its straw
+ * mattress (one collapsed), a prie-dieu, a chest, a crucifix, a stool, the monk's books, the plaster come down.
+ */
+function cells(b: LevelBuilder, q: Props, r: () => number): void {
+  const { x0, x1, z0, z1, c0, c1 } = DORM, cz = (c0 + c1) / 2, R = (c1 - c0 - 0.3) / 2;
+  b.floor(x0, x1, c0 + 0.15, c1 - 0.15, 'marble', 0, 0.02);
+  b.floor(CELLS.n - 2.1, CELLS.n + 2.1, c1 + 0.15, z1, 'wood', 0, 0.02);
+  b.floor(CELLS.s - 2.1, CELLS.s + 2.1, z0, c0 - 0.15, 'wood', 0, 0.02);
+  b.together(() => {
+    const vault = new THREE.Mesh(new THREE.CylinderGeometry(R, R, x1 - x0, 16, 1, true, 0, Math.PI).rotateZ(Math.PI / 2), material('stone', true));
+    vault.position.set((x0 + x1) / 2, 3.1, cz);
+    b.add(vault, 'stone');
+    for (const z of [c0 + 0.15, c1 - 0.15]) b.part(null, x0, x1, 2.95, 3.12, z - (z < cz ? 0 : 0.12), z + (z < cz ? 0.12 : 0), 'istria'); // where it springs
+    for (const x of [-561, -553]) { // transverse ribs
+      const g = shaped(arch(0, 3.1, R - 0.05, R + 0.05, 0.3)).rotateY(Math.PI / 2).translate(x, 0, cz);
+      b.decor(g, 'istria');
+    }
+  });
+  for (const z of [c0 + 0.15, c1 - 0.15]) b.part(null, x0, x1, 0, 0.35, z - (z < cz ? 0 : 0.06), z + (z < cz ? 0.06 : 0), 'stoneDark'); // the skirting
+  const S = face('x', c0 + 0.15, 1), N = face('x', c1 - 0.15, -1), W = face('z', x0, 1);
+  for (const x of [-563.5, -553.5, -550.5]) cellDoor(q, S, x, x === -553.5 ? 'ajar' : 'shut', r);
+  for (const x of [-563.5, -559.5, -551]) cellDoor(q, N, x, x === -563.5 ? 'broken' : 'shut', r);
+  // the window at its end
+  const wu = W.u(cz);
+  b.part(W.m, wu - 0.55, wu + 0.55, 1.2, 2.3, 0, 0.03, 'luna');
+  b.decor(shaped(lunette(wu, 2.3, 0.55, 0.03, 1)).applyMatrix4(W.m), 'luna');
+  b.decor(shaped(arch(wu, 2.3, 0.55, 0.75, 0.14)).translate(0, 0, 0.08).applyMatrix4(W.m), 'istria');
+  b.part(W.m, wu - 0.8, wu + 0.8, 1.05, 1.2, 0, 0.25, 'istria');
+  place(b, 'panca', -557.2, 0, c0 + 0.5, 0, 1.05, { solid: true, stretch: 1.6 });
+  place(b, 'leggio', -565.2, 0, cz + 0.7, Math.PI / 2 + 0.3, 1.3, { solid: true });
+  place(b, 'candelabro', -552, 0, cz + 0.4, 0.8, 1.6, { tilt: Math.PI / 2 });
+  place(b, 'sedia', -561.8, 0, c1 - 0.6, 2.4, 0.95, { tilt: -Math.PI / 2 });
+  place(b, 'macerie', -564.6, 0.01, c0 + 0.7, 1.3, 0.07);
+  shards(q, r, -560, cz, 0, 10, 1.3);
+  shards(q, r, -553, cz - 0.4, 0, 6, 1.2);
+  book(q, r, -556.4, cz + 0.6, 0.02, 1.4, true);
+  // The two cells, each against its back wall: the bed, the prie-dieu under the crucifix, the chest, a stool.
+  for (const [cx, back, s] of [[CELLS.n, z1, -1], [CELLS.s, z0, 1]] as const) {
+    const f = face('x', back, s), u = f.u(cx), broken = s > 0;
+    const at = (du: number, d: number) => f.at(u + du, d);
+    // the bed: a plank frame on legs along the back wall, the straw mattress, a blanket half on the floor
+    const [bx, bz] = at(-0.6, 0.5);
+    b.world.add(bx, bz, 1.0, 0.45, 0, 0.5, 0);
+    if (broken) { // its legs gone at one end: the frame and the mattress slope to the floor
+      q.put(FLAT, 'wood', bx, 0.27, bz, 2.0, 0.1, 0.9, 0, f.yaw, 0.16, WALNUT);
+      q.put(FLAT, 'cloth', bx, 0.4, bz, 1.9, 0.15, 0.8, 0, f.yaw, 0.16, STRAW);
+      splinters(q, r, bx + 0.6, bz, 0, 4, WALNUT);
+    } else {
+      fbox(q, f, u - 1.6, u + 0.4, 0.34, 0.44, 0.05, 0.95, 'wood', WALNUT);
+      for (const du of [-1.5, 0.3]) for (const d of [0.12, 0.88]) fbox(q, f, u + du - 0.05, u + du + 0.05, 0, 0.34, d - 0.05, d + 0.05, 'wood', DARK);
+      fbox(q, f, u - 1.55, u + 0.35, 0.44, 0.6, 0.1, 0.9, 'cloth', STRAW);
+      fbox(q, f, u - 1.55, u - 0.6, 0.6, 0.64, 0.12, 0.88, 'cloth', 0x4a3e30);
+      fbox(q, f, u - 0.9, u - 0.3, 0.02, 0.06, 1.0, 1.7, 'cloth', 0x4a3e30); // the blanket pulled down
+    }
+    // the crucifix and the prie-dieu under it
+    fbox(q, f, u + 1.18, u + 1.26, 1.5, 2.4, 0, 0.05, 'wood', DARK);
+    fbox(q, f, u + 1.0, u + 1.44, 2.05, 2.12, 0, 0.05, 'wood', DARK);
+    fbox(q, f, u + 0.95, u + 1.5, 0, 0.18, 0.4, 0.7, 'wood', WALNUT);
+    fbox(q, f, u + 0.95, u + 1.5, 0, 0.85, 0.05, 0.18, 'wood', WALNUT);
+    fbox(q, f, u + 0.92, u + 1.53, 0.85, 0.9, 0.0, 0.3, 'wood', DARK);
+    // the chest by the door, its lid thrown open; a stool; books and papers
+    const [kx, kz] = at(1.4, 1.9);
+    b.world.add(kx, kz, 0.4, 0.3, 0, 0.5, f.yaw);
+    board(q, kx, kz, 0.8, 0.55, 0, 0.45, f.yaw, 'wood', WALNUT);
+    const [lx, lz] = at(1.4, 1.6);
+    q.put(FLAT, 'wood', lx, 0.65, lz, 0.82, 0.05, 0.4, -1.1, f.yaw, 0, DARK); // its lid, thrown open
+    place(b, 'sedia', ...xyz(at(-0.4, 1.9)), f.yaw + (r() - 0.5) * 2, 0.95, broken ? { tilt: Math.PI / 2 } : { solid: true });
+    for (let i = 0; i < 4; i++) book(q, r, ...at((r() - 0.5) * 2.6, 1.1 + r() * 1.4), 0.02, 1.2, r() < 0.4);
+    for (let i = 0; i < 6; i++) { const [x, z] = at((r() - 0.5) * 3, 0.9 + r() * 2); q.box(x - 0.1, x + 0.1, 0.02, 0.025, z - 0.14, z + 0.14, 'cloth', r() * 6, 0xe2d8c0); } // loose pages
+    if (broken) { place(b, 'macerie', ...xyz(at(0.6, 2.4), 0.01), r() * 6, 0.07); shards(q, r, ...at(0.4, 2), 0, 8, 1.2); }
+    fbox(q, f, u - 2.1, u + 2.1, 3.48, 3.6, 0, 3.8, 'wood', DARK); // its boarded ceiling
+  }
 }
 
 function garden(b: LevelBuilder, p: Props): void {

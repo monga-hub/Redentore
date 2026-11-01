@@ -574,6 +574,21 @@ const LEVEL3 = ['punta', 'sangiorgio'].map((z) => level.zones.get(z)!);
 const interno = level.zones.get(INTERNO)!; // San Giorgio's interior dress: inside the island's zone, and hidden until the hero is past the Punta
 LEVEL3[1].add(interno);
 interno.visible = false;
+/**
+ * On level 3's ground, frees the GPU copies of the textures only level 1 draws (the orto's and the cloisters' plants,
+ * ~17 MB): with San Giorgio's interiors that keeps the island inside a phone's 200 MB. The images stay in memory and three
+ * uploads them again on their next draw (the belfry, the trip back). ponytail: one scene walk per arrival.
+ */
+let released = false;
+function release(zones: THREE.Object3D[]): void {
+  released = true;
+  const maps = (o: THREE.Object3D, into: Set<THREE.Texture>) => { for (const m of [(o as THREE.Mesh).material].flat()) if (m) for (const v of Object.values(m)) if (v instanceof THREE.Texture) into.add(v); };
+  const drop = new Set<THREE.Texture>(), keep = new Set<THREE.Texture>();
+  for (const z of zones) z.traverse((o) => maps(o, drop));
+  const walk = (o: THREE.Object3D): void => { if (zones.includes(o)) return; maps(o, keep); for (const c of o.children) walk(c); };
+  walk(scene);
+  for (const t of drop) if (!keep.has(t)) t.dispose();
+}
 function stream(x: number, high = false): void {
   const one = x > -100, two = x < -50 && x > -430, three = x < -250;
   for (const g of LEVEL1) g.visible = one || high; // from the bell chamber the Redentore and the Giudecca are in view, not their dead
@@ -583,6 +598,7 @@ function stream(x: number, high = false): void {
   for (const g of LEVEL3) g.visible = three;
   sangiorgio.root.visible = dragon.root.visible = arredi.root.visible = three;
   interno.visible = x < -400; // like the furniture: never drawn from level 2's ground
+  if (three && !high && x < -430) { if (!released) release(LEVEL1); } else released = false;
   if (x < -400) { arredi.load(); hangCanvases(); } // on the Punta or the island: never on level 2's ground (no-ops once started)
   if (quest.accepted2) zitelle.load(); // a no-op once started
   if (quest.accepted3) sangiorgio.load();

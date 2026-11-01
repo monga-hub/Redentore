@@ -11,6 +11,13 @@ export const TIP_CSS = `
   max-width: calc(100vw - 16px); pointer-events: none; }
 #bag .tip[hidden] { display: none; }
 #bag .tip.stack { flex-direction: column; }
+#bag .tip.split { flex-wrap: nowrap; max-width: none; } /* the new piece left of the panels, the worn one right: gap set by ui/bag.ts */
+/* Never taller than the screen inside the safe area (scroll-padding carries the insets to ui/bag.ts): stacked, the worn piece gives way first, faded where cut. */
+#bag .tip, #bag .tip .box { max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+#bag .tip { scroll-padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#bag .tip .box { flex-shrink: 0; overflow: hidden; }
+#bag .tip .box.worn { flex-shrink: 1; min-height: 0; }
+#bag .tip .box.cut { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); }
 #bag .tip .box { box-sizing: border-box; width: max-content; max-width: min(250px, calc(100vw - 16px)); padding: 8px 10px;
   background: var(--tip-bg); border: 2px solid var(--tip-border); border-radius: 5px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.6), 0 4px 14px #000; }
 #bag .tip .box.worn { opacity: .92; }

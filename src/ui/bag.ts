@@ -259,13 +259,21 @@ export class BagPanel {
     this.tip.hidden = false;
     const panels = [...this.row.querySelectorAll('.panel.on')].map((p) => p.getBoundingClientRect());
     const p = { left: Math.min(...panels.map((r) => r.left)), right: Math.max(...panels.map((r) => r.right)) };
-    const room = () => p.left - this.tip.offsetWidth >= 16 || p.right + this.tip.offsetWidth <= innerWidth - 16;
-    this.tip.classList.remove('stack'); // the worn piece under the new one instead of beside it, if that fits beside the panels
-    if (!room()) { this.tip.classList.add('stack'); if (!room()) this.tip.classList.remove('stack'); }
-    const b = c.getBoundingClientRect(), w = this.tip.offsetWidth, h = this.tip.offsetHeight;
-    const left = p.left - w - 8, right = p.right + 8, side = left >= 8 || right + w <= innerWidth - 8;
-    this.tip.style.left = `${side ? (left >= 8 ? left : right) : Math.min(Math.max(8, b.left + b.width / 2 - w / 2), innerWidth - w - 8)}px`;
-    this.tip.style.top = `${side ? Math.min(Math.max(8, b.top), innerHeight - h - 8) : b.top - h - 8 < 8 ? Math.min(b.bottom + 8, innerHeight - h - 8) : b.top - h - 8}px`;
+    const t = this.tip, [main, worn] = [...t.children] as HTMLElement[], sa = getComputedStyle(t); // scroll-padding: the safe-area insets
+    const L = 8 + parseFloat(sa.scrollPaddingLeft), R = innerWidth - 8 - parseFloat(sa.scrollPaddingRight);
+    const T = 8 + parseFloat(sa.scrollPaddingTop), B = innerHeight - 8 - parseFloat(sa.scrollPaddingBottom);
+    const lay = (m: string) => { t.className = `tip ${m}`; t.style.gap = m === 'split' ? `${p.right - p.left + 16}px` : ''; return m; };
+    const beside = (m: string) => (m === 'split' ? p.left - main.offsetWidth - 8 >= L && p.right + 8 + worn.offsetWidth <= R
+      : p.left - t.offsetWidth - 8 >= L || p.right + 8 + t.offsetWidth <= R);
+    const whole = () => [t, ...t.children].every((x) => x.scrollHeight <= x.clientHeight + 1); // nothing cut by, or spilling past, the height cap
+    // beside the panels: the worn piece beside the new one, under it, or across the panels; failing that above or
+    // below the cell, side by side or stacked; at worst stacked, the worn piece cut short to fit the screen
+    const m = ['', 'stack', ...(worn ? ['split'] : [])].find((k) => beside(lay(k)) && whole()) ?? lay(['', 'stack'].find((k) => !beside(lay(k)) && whole()) ?? 'stack');
+    for (const x of t.children) x.classList.toggle('cut', x.scrollHeight > x.clientHeight + 1);
+    const b = c.getBoundingClientRect(), w = t.offsetWidth, h = t.offsetHeight;
+    const left = p.left - (m === 'split' ? main.offsetWidth : w) - 8, right = p.right + 8, side = beside(m);
+    t.style.left = `${side ? (left >= L ? left : right) : Math.min(Math.max(L, b.left + b.width / 2 - w / 2), R - w)}px`;
+    t.style.top = `${side ? Math.min(Math.max(T, b.top), B - h) : b.top - h - 8 < T ? Math.min(b.bottom + 8, B - h) : b.top - h - 8}px`;
   }
 }
 

@@ -311,11 +311,18 @@ export const CARDS: Card[] = [
 export const CARD = new Map(CARDS.map((c) => [c.id, c]));
 for (const c of CARDS) if (c.school) SCHOOL[c.id] = c.school;
 
-const counter = (picks: readonly string[]) => {
+/** How many times each card was picked: what the offers filter on (`eligible`) and the level-up badge shows (`stacks`). */
+export const counter = (picks: readonly string[]) => {
   const n = new Map<string, number>();
   for (const p of picks) n.set(p, (n.get(p) ?? 0) + 1);
   return (id: string) => n.get(id) ?? 0;
 };
+
+/**
+ * A stacking card's badge on the level-up window: the picks owned of its max, the very count `eligible` offers it under,
+ * so an offered card never reads full ("1/2" before the second and last; "2/2" would mean maxed, and is never offered). '' for the rest.
+ */
+export const stacks = (c: Card, count: (id: string) => number) => (c.max > 1 && Number.isFinite(c.max) ? `${count(c.id)}/${c.max}` : '');
 
 /** The abilities of school `s` a slot holds: its five, the base attack apart. */
 export const slotsOf = (s: School) => Object.keys(SCHOOL).filter((id) => SCHOOL[id] === s && !BASES.includes(id));

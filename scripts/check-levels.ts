@@ -4,7 +4,7 @@
 // with both parents, the offers leaning to the hero's schools by LEAN and even within each share), the repeatable cards when everything is taken, the
 // replay of picks and tomes into numbers, the merchants' tomes, each hero's starting kit and base attack, the secondary school's base attack
 // learnt with 3 of its 5, and the bar keeping a slot for an ability until it is unlocked, or finding one.
-import { BASES, BASE_ATTACK, CARD, CARDS, LEAN, RISORTO, SCHOOL, SECOND_AT, SPECIALS, START, TOMES, TOME_PRICE, eligible, leanOf, levelOf, need, offer, slotsOf, startOf, tomeOf, tuneOf, type Card, type School } from '../src/player/levels.ts';
+import { BASES, BASE_ATTACK, CARD, CARDS, LEAN, RISORTO, SCHOOL, SECOND_AT, SPECIALS, START, TOMES, TOME_PRICE, counter, eligible, stacks, leanOf, levelOf, need, offer, slotsOf, startOf, tomeOf, tuneOf, type Card, type School } from '../src/player/levels.ts';
 import { FRIAR, spawnGroups } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from '../src/enemies/caster.ts';
 import { AbilitySystem, KEYS, POTION, PRIMARY, type Ability } from '../src/abilities/system.ts';
@@ -42,7 +42,8 @@ for (const c of CARDS.filter((c) => c.kind === 'ability')) {
 }
 for (const id of NEW) if (CARD.get(id)?.tier !== 'A') fail(`${id} must be a tier A ability`);
 
-// Offers over many seeded runs, picking at random among the two, to level 30: the Risorto (and the one of older saves, who
+// Offers over many seeded runs, picking at random among the two, to level 30 (a stacking card's badge is the picks owned
+// of its max, as the offer filter counts them: "2/2" on Gelo della cripta's offer read as maxed come back): the Risorto (and the one of older saves, who
 // started with Nube di peste), Bortolo, a Peste-Sacro hero.
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
@@ -61,6 +62,8 @@ for (let run = 0; run < 600; run++) {
       if (c.kind === 'filler') continue;
       if (!ok.includes(c)) fail(`level ${lv}: ${c.id} offered but not eligible after ${picks}`);
       if (count(c.id) >= c.max) fail(`level ${lv}: maxed ${c.id} offered`);
+      const badge = stacks(c, counter(picks)); // the level-up badge reads the count the offer filtered on, never full
+      if (c.max > 1 && (badge !== `${count(c.id)}/${c.max}` || count(c.id) >= c.max)) fail(`level ${lv}: ${c.id} offered with badge ${badge} after ${count(c.id)} picks`);
       if (c.kind === 'ability' && t.owned.includes(c.id)) fail(`level ${lv}: owned ${c.id} offered`);
       if (c.kind === 'mod' && c.of && !t.owned.includes(c.of)) fail(`level ${lv}: ${c.id} for locked ${c.of}`);
       if (c.kind === 'mod' && BASES.includes(c.of!) && c.of !== BASE_ATTACK[sc[0]] && c.of !== BASE_ATTACK[sc[1]]) fail(`level ${lv}: ${c.id} for a base attack not ${sc}'s`);

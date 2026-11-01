@@ -1,5 +1,5 @@
 import { duck, playSfx, unduck } from '../audio/engine.ts';
-import { SCHOOL, type Card } from '../player/levels.ts';
+import { SCHOOL, stacks, type Card } from '../player/levels.ts';
 import { SCHOOL_NAME } from './book.ts';
 import { ICONS } from './icons.ts';
 
@@ -148,10 +148,12 @@ export class LevelUp {
     this.cardsEl.querySelectorAll('.card').forEach((b, i) => {
       const c = cards[i], h = b.querySelector('h3')!;
       h.textContent = c.name;
-      if (c.max > 1 && Number.isFinite(c.max)) { // a stacking card: which pick this is, of how many
+      const owned = stacks(c, count);
+      if (owned) { // a stacking card: how many of it the hero has, of how many
         const n = document.createElement('span');
         n.className = 'n';
-        n.textContent = `${count(c.id) + 1}/${c.max}`;
+        n.textContent = owned;
+        n.title = `Ne hai ${owned.replace('/', ' su ')}`;
         h.append(n);
       }
       b.querySelector('p')!.textContent = cards[i].text;

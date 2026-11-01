@@ -11,7 +11,7 @@ import { Atmosphere } from './fx/atmosphere.ts';
 import { PHONE } from './core/device.ts';
 import { ABILITIES, Forsaken, PLAGUE_RANGE, barOf, tune } from './abilities/forsaken.ts';
 import { CHARGE, GRACE, LEAP, RANGE } from './abilities/grimoire.ts';
-import { BASES, BASE_ATTACK, CARD, Levels, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
+import { BASES, BASE_ATTACK, CARD, Levels, counter, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
 import { AbilityBook } from './ui/book.ts';
@@ -316,7 +316,6 @@ let slain = loaded?.build ? loaded.build.xp - questXpIn(loaded) : quest.bossDead
 const sweep = () => mobs.forEach((m, i) => { if (m.state === 'dead') fell[i] = true; }); // after a victory: its dead count for nothing
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
 if (sandbox) arena(); // the dragon's sandbox, over whatever was loaded
-const picked = (id: string) => levels.picks.filter((p) => p === id).length;
 /** The next level-up's two cards; the world holds still until one is picked. */
 /**
  * The dragon's sandbox (`?drago=1`): a hero under level 18 dealt its cards up to it (an ability whenever one is offered), every
@@ -365,7 +364,7 @@ function openLevelUp(): void {
   kit.system.cancel();
   input.consume();
   dctl.stop();
-  levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned, levels.schools), picked, (c: Card) => {
+  levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned, levels.schools), counter(levels.picks), (c: Card) => {
     levels.picks.push(c.id);
     if (c.kind === 'ability') { // onto the first free slot, even if an earlier run took it off the bar
       kit.system.learn(c.id);

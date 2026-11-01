@@ -14,7 +14,7 @@ import { tuneOf } from '../src/player/levels.ts';
 import { HEROES, type Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
 import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
-import { eligible, levelOf as lvOf } from '../src/player/levels.ts';
+import { CARD, counter, eligible, levelOf as lvOf, offer, stacks } from '../src/player/levels.ts';
 import { BAR, PICKS, prepared } from '../src/core/prepared.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -376,4 +376,35 @@ autosave({ ...s, time: 1 }, store);
 mem.set('redentore.save.0', slot(zs)); // a stale key after the migration: never moved again
 migrate(store);
 if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
+// Gelo della cripta (max 2) at level 21: a player's first Risorto, a fresh run to level 21, Gelo taken once, saved, resumed
+// (and, once, an old pre-squad autosave migrated): its offer's badge reads 1/2, the count the offer filters on; taken twice it
+// never comes back, through every save; a save holding it past its max loads, stacks only to the max and never offers it.
+{
+  let sd = 7;
+  const r = () => ((sd = (sd * 16807) % 2147483647) - 1) / 2147483646;
+  const run = boot(), xp21 = 10 * 21 * 20;
+  for (let lv = 2; lv <= 20; lv++) { // the cards as main.ts deals them, Gelo taken the first time it shows, never twice
+    const cards = offer(run.levels.picks, r, run.levels.learned, HEROES.risorto.school), c = cards.find((k) => k.id === 'cdr' && !run.levels.picks.includes('cdr')) ?? cards.find((k) => k.id !== 'cdr') ?? cards[0];
+    run.levels.picks.push(c.id);
+  }
+  if (run.levels.picks.filter((id) => id === 'cdr').length !== 1) fail(`the fresh run took Gelo della cripta ${run.levels.picks.filter((id) => id === 'cdr').length} times`);
+  run.levels.xp = xp21;
+  const kept = new Map<string, string>(), ks: Storage = { getItem: (k) => kept.get(k) ?? null, setItem: (k, v) => void kept.set(k, v), removeItem: (k) => void kept.delete(k), clear: () => kept.clear(), key: () => null, length: 0 };
+  kept.set('redentore.auto', JSON.stringify(serialize(run))); // the one old autosave of a pre-squad build
+  migrate(ks);
+  const back = boot();
+  deserialize(back, resume('risorto', ks)!);
+  if (back.levels.picks.join() !== run.levels.picks.join() || lvOf(back.levels.xp).lv !== 21) fail('the migrated run lost or doubled a pick');
+  const sch = HEROES.risorto.school, cdr = CARD.get('cdr')!;
+  let shown = 0;
+  for (let i = 0; i < 400; i++) for (const c of offer(back.levels.picks, r, back.levels.learned, sch)) if (c.id === 'cdr') { shown++; if (stacks(c, counter(back.levels.picks)) !== '1/2') fail(`Gelo della cripta offered with badge ${stacks(c, counter(back.levels.picks))} after one pick`); }
+  if (!shown || stacks(cdr, counter(back.levels.picks)) !== '1/2') fail('Gelo della cripta, taken once, never offered at level 21');
+  for (const twice of [[...back.levels.picks, 'cdr'], [...back.levels.picks, 'cdr', 'cdr']]) { // taken twice; a save past the max
+    const g = boot();
+    deserialize(g, JSON.parse(JSON.stringify({ ...serialize(back), build: { xp: xp21 + 2000, lv: 23, picks: twice, learned: [] } })));
+    const t = tuneOf(g.levels.picks, g.levels.learned, sch);
+    if (Math.abs(t.cdr - 0.8) > 1e-9 || eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)) fail(`Gelo della cripta x${twice.filter((id) => id === 'cdr').length}: cooldowns ${t.cdr}, still eligible`);
+    for (let i = 0; i < 400; i++) if (offer(g.levels.picks, r, g.levels.learned, sch).includes(cdr)) fail('a maxed Gelo della cripta came back');
+  }
+}
 console.log('save system ok');

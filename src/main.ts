@@ -43,7 +43,7 @@ import { autosave, deserialize, migrate, questXpIn, resume, serialize, type Game
 import { BAR, prepared } from './core/prepared.ts';
 import { getView, isDiablo, onQuality, onStyle, setView, VIEWS } from './core/style.ts';
 import { CameraBlend, DiabloCamera, STEPS as DIABLO_STEPS } from './camera/diabloCamera.ts';
-import { BELFRY, INTERNO } from './level/zones/sangiorgio.ts';
+import { BELFRY, INTERNO, hangCanvases } from './level/zones/sangiorgio.ts';
 import { Arredi } from './level/arredi.ts';
 import { DiabloControls } from './player/diabloControls.ts';
 import { Occlusion } from './fx/occlusion.ts';
@@ -583,7 +583,7 @@ function stream(x: number, high = false): void {
   for (const g of LEVEL3) g.visible = three;
   sangiorgio.root.visible = dragon.root.visible = arredi.root.visible = three;
   interno.visible = x < -400; // like the furniture: never drawn from level 2's ground
-  if (x < -400) arredi.load(); // on the Punta or the island: never on level 2's ground (a no-op once started)
+  if (x < -400) { arredi.load(); hangCanvases(); } // on the Punta or the island: never on level 2's ground (no-ops once started)
   if (quest.accepted2) zitelle.load(); // a no-op once started
   if (quest.accepted3) sangiorgio.load();
   if (quest.side.active('drago')) dragon.load(); // the dragon and its drowned, once San Giorgio has asked for his lance

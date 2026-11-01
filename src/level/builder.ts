@@ -447,6 +447,7 @@ export class LevelBuilder {
 
   /** Hipped roof over a rectangle, eaves at y overhanging by `ov`, pitch k (rise per run). Visual only. */
   hipRoof(x0: number, x1: number, z0: number, z1: number, y: number, ov = 0.7, k = 0.45): void {
+    [x0, x1, z0, z1] = [Math.min(x0, x1), Math.max(x0, x1), Math.min(z0, z1), Math.max(z0, z1)]; // extents in any order, like box(): reversed, hip() turns the roof inside out and hangs it under its eaves
     this.decor(hip(x0 - ov, x1 + ov, z0 - ov, z1 + ov, y, k), 'roof'); // its own piece, or the block's
   }
 

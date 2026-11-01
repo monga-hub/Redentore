@@ -46,6 +46,10 @@ const SPECS = {
   wood: { tile: 1.5, rough: 0.8, macro: 0.1, shape: true }, // pergolas, pier, porticoes
   water: { tile: 8, rough: 0.15, macro: 0.2 },
   istria: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, paint: 'stone', tint: 0xfff4e6, glow: 0.14 }, // San Giorgio's white orders, cornices and vaults inside: they read in the firelit dark
+  volta: { tile: 2.4, rough: 0.6, macro: 0.08, shape: true, paint: 'stone', tint: 0xffdcae, glow: 0.32 }, // its vaults' and dome's coffer frames, arches and cornices: warm, as if the fires below reached them
+  lacunare: { tile: 2.4, rough: 0.7, macro: 0.1, shape: true, paint: 'stone', tint: 0xa0765a, glow: 0.12 }, // the coffers' sunk panels, in shadow
+  doratura: { tint: 0xe8b85a, rough: 0.3, metal: 0.55, glow: 0.3 }, // the canvases' gilt frames, catching what light there is
+  luna: { tint: 0x9db6e0, rough: 0.2, glow: 0.7 }, // the dome's windows with the moon in them
   marble: { tile: 4.2, rough: 0.5, macro: 0.14 }, // San Giorgio's red, cream and ochre slabs on the diagonal, worn and cracked
   glass: { tint: 0xa9cdd6, rough: 0.1 },
   gold: { tint: 0xd09a3c, rough: 0.38, metal: 0.45, glow: 0.07 }, // church candlesticks, ribs, banner trim

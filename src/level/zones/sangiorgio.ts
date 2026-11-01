@@ -192,7 +192,7 @@ function basilica(b: LevelBuilder, p: Props): void {
   vault.position.set((FAC - 520) / 2, 12.6, 102);
   b.add(vault, 'istria');
   b.cameraBlockers.push(vault);
-  b.hipRoof(FAC, -520, 94, 110, RING + 0.4);
+  b.hipRoof(FAC, -520, 94, 110, RING + 1); // clear of the vault's crown (RING + 0.6)
   for (const [z0, z1] of [[80, 92], [112, 124]]) b.box(-540, -520, RING, RING + 0.4, z0, z1, 'stone', { collide: false });
   b.hipRoof(-540, -520, 80, 92, RING + 0.4);
   b.hipRoof(-540, -520, 112, 124, RING + 0.4);
@@ -234,11 +234,6 @@ function basilica(b: LevelBuilder, p: Props): void {
   p.blob(-546, P + 4.2, SGZ, 1.3, 1.3, 1.3, 'gold'); // the globe
   p.disc(-546, P + 5.4, SGZ, 0.06, 1.4, 'gold'); // God the Father, as a cross over it
   p.box(-546.5, -545.5, P + 6.2, P + 6.35, SGZ - 0.06, SGZ + 0.06, 'gold');
-  for (const [z, f] of [[92.42, 0.12], [111.58, -0.12]]) {
-    const z0 = Math.min(z, z + f), z1 = Math.max(z, z + f);
-    b.part(null, -552, -542, P + 3, P + 9, z0, z1, 'gold');
-    b.part(null, -551.7, -542.3, P + 3.3, P + 8.7, Math.min(z, z + f * 1.6), Math.max(z, z + f * 1.6), 'azure');
-  }
   for (const z of [99.5, 104.5]) { p.disc(-545, P + 1.35, z, 0.05, 0.4, 'flower'); b.lights.push({ x: -545, y: P + 1.8, z, kind: 'candle' }); }
   b.lights.push({ x: -546, y: P + 3, z: SGZ, kind: 'glow', color: 0xffb060 });
 
@@ -254,8 +249,7 @@ function basilica(b: LevelBuilder, p: Props): void {
 
   // Side altars in the aisles, lamps hanging down the nave.
   for (const x of [-488, -502, -514]) for (const [z0, z1] of [[86.4, 87.8], [116.2, 117.6]]) {
-    b.box(x - 1.6, x + 1.6, 0, 1.1, z0, z1, 'stoneDark', { camera: false });
-    b.part(null, x - 1.4, x + 1.4, 2, 5.6, z0 < 100 ? z0 - 0.1 : z1 - 0.05, z0 < 100 ? z0 + 0.05 : z1 + 0.1, 'gold');
+    b.box(x - 1.6, x + 1.6, 0, 1.1, z0, z1, 'stoneDark', { camera: false }); // its altarpiece: interior() below
     b.lights.push({ x, y: 1.5, z: (z0 + z1) / 2, kind: 'candle' });
   }
   for (const x of [-486, -497, -508]) {
@@ -321,6 +315,23 @@ function interior(b: LevelBuilder): void {
   torus(RING + 4.5, DOME - 0.35, 0.3, 'istria');
   torus(RING + 4.6 + DOME - 1.5, 1.6, 0.18, 'gold');
   for (let k = 0; k < 8; k++) b.decor(shaped(arch(0, 0, DOME - 0.75, DOME - 0.35, 0.3)).rotateY((k * Math.PI) / 8).translate(SGX, RING + 4.6, SGZ), 'istria');
+  ceilings(b);
+  // The canvases in their gilt frames: Tintoretto's Ultima Cena (south) and Raccolta della manna (north) on the presbytery's
+  // walls, his Deposizione and Bassano's Adorazione dei pastori over the aisles' altars, turn and turn about.
+  const quads: THREE.BufferGeometry[] = [];
+  const canvas = (x: number, y: number, z: number, s: number, w: number, h: number, [px, py, pw, ph]: readonly number[]) => {
+    const g = new THREE.PlaneGeometry(w, h), uv = g.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (px + uv.getX(i) * pw) / 512, 1 - (py + (1 - uv.getY(i)) * ph) / 432);
+    quads.push((s < 0 ? g.rotateY(Math.PI) : g).translate(x, y, z + s * 0.04));
+    const d = (a: number) => [Math.min(z, z + s * a), Math.max(z, z + s * a)] as const, t = 0.22;
+    for (const [x0, x1, y0, y1] of [[-t, w + t, -t, 0], [-t, w + t, h, h + t], [-t, 0, 0, h], [w, w + t, 0, h]]) slab(b, null, x - w / 2 + x0, x - w / 2 + x1, y - h / 2 + y0, y - h / 2 + y1, ...d(0.14), 'doratura');
+  };
+  for (const [z, s, art] of [[92.4, 1, CANVAS.cena], [111.6, -1, CANVAS.manna]] as const) canvas(-547, 5.7, z, s, 8.4, 5.4, art);
+  for (const [k, x] of [-488, -502, -514].entries()) {
+    canvas(x, 3.9, 86.45, 1, 2.6, 3.2, k % 2 ? CANVAS.pastori : CANVAS.deposizione);
+    canvas(x, 3.9, 117.55, -1, 2.6, 3.2, k % 2 ? CANVAS.deposizione : CANVAS.pastori);
+  }
+  b.add(new THREE.Mesh(mergeGeometries(quads)!, CANVASES));
   // Corinthian capitals: the colonnades' and the choir screen's over each column's own, the aisles' pilasters' set into the wall.
   capitals(b, [
     ...[94, 110].flatMap((z) => [-485, -492, -499, -506, -513].map((x): [number, number, number, number] => [x, 11.8, z, 0.75])),
@@ -393,10 +404,145 @@ function interior(b: LevelBuilder): void {
   b.zone('sangiorgio');
 }
 
+/**
+ * The church's canvases, one atlas (public/models/dipinti.webp, ATTRIBUTION.md: public-domain works that hang in San Giorgio):
+ * [x, y, w, h] in its 512 × 432 px, from the top left.
+ */
+const CANVAS = { cena: [0, 0, 336, 216], manna: [0, 216, 336, 216], deposizione: [336, 0, 176, 216], pastori: [336, 216, 176, 216] } as const;
+/** Lit by the church and glowing a little of their own colour, like the Cenacolo's Nozze; black until the atlas is in. */
+const CANVASES = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.85, emissive: 0x000000 });
+let hung = false;
+/** Loads the canvases: once, when level 3 comes into view (main.ts stream), so levels 1 and 2 never hold them. */
+export function hangCanvases(): void {
+  if (hung || typeof document === 'undefined') return;
+  hung = true;
+  new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}models/dipinti.webp`, (t) => {
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.generateMipmaps = false; // ponytail: no mip chain (a third more) while level 3 sits at the phone's 200 MB; mips if it ever shimmers
+    t.minFilter = THREE.LinearFilter;
+    CANVASES.map = CANVASES.emissiveMap = t;
+    CANVASES.color.setHex(0xffffff);
+    CANVASES.emissive.setScalar(0.32);
+    CANVASES.needsUpdate = true;
+  });
+}
+
+/**
+ * The coffered ceilings, after Palladio's: the nave's barrel vault ribbed by a transverse arch over each pair of columns and
+ * coffered between, a modillioned cornice where it springs; the presbytery's, choir's and transepts' flat ceilings coffered;
+ * in the dome, its drum's arched windows with the moon in them between pilasters over a balustrade, and three rings of
+ * coffers between the ribs. Each coffer a moulded frame, its sunk panel and a gilt rosette (three instanced meshes for all of
+ * them), warm against the dark, the panels in shadow. Each ceiling one occlusion piece with its dress, so the Diablo view lifts
+ * it whole.
+ */
+function ceilings(b: LevelBuilder): void {
+  const R = 8, VY = 12.6; // the nave's vault (basilica() above): radius, the height of its axis
+  const at: THREE.Matrix4[] = [], pieces: number[] = [];
+  const X = new THREE.Vector3(), Y = new THREE.Vector3(), Zv = new THREE.Vector3(), O = new THREE.Vector3();
+  /** A coffer w × d centred at `o`, `x` along its width, `y` out of the room; flat, so set in by its sag on a curved one. */
+  const coffer = (piece: number, o: THREE.Vector3, x: THREE.Vector3, y: THREE.Vector3, w: number, d: number) => {
+    at.push(new THREE.Matrix4().makeBasis(x, y, Zv.crossVectors(x, y)).scale(new THREE.Vector3(w, 1, d)).setPosition(o));
+    pieces.push(piece);
+  };
+  // The nave: seven transverse arches (against the front, over each pair of columns, into the crossing), three coffers a bay
+  // along it and nine across, the cornice and its modillions both sides.
+  b.together((piece) => {
+    const ribs = [FAC - 0.8, -485, -492, -499, -506, -513, -519.6];
+    for (const x of ribs) b.decor(shaped(arch(0, 0, R - 0.65, R - 0.02, 0.8, 16)).rotateY(Math.PI / 2).translate(x, VY, SGZ), 'volta');
+    const n = 9, a0 = (25 * Math.PI) / 180, da = ((130 * Math.PI) / 180) / n, cell = R * da, sag = R * (1 - Math.cos(da * 0.46)) + 0.02;
+    for (let k = 1; k < ribs.length; k++) {
+      const x0 = ribs[k - 1] - 0.4, x1 = ribs[k] + 0.4, len = (x0 - x1) / 3;
+      for (let i = 0; i < 3; i++) for (let j = 0; j < n; j++) {
+        const a = a0 + (j + 0.5) * da;
+        coffer(piece, O.set(x0 - (i + 0.5) * len, VY + (R - sag) * Math.sin(a), SGZ + (R - sag) * Math.cos(a)), X.set(1, 0, 0), Y.set(0, Math.sin(a), Math.cos(a)), len * 0.9, cell * 0.9);
+      }
+    }
+    const mods: THREE.Matrix4[] = []; // the cornice's modillions
+    for (const [z, s] of [[94, 1], [110, -1]] as const) {
+      slab(b, null, FAC - 0.4, -519.6, VY, VY + 0.35, Math.min(z, z + s * 1.05), Math.max(z, z + s * 1.05), 'volta');
+      for (let x = FAC - 0.9; x > -519.4; x -= 0.7) mods.push(new THREE.Matrix4().makeTranslation(x, VY - 0.11, z + s * 0.78));
+    }
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.22, 0.35), material('volta'), mods.length);
+    mods.forEach((m, i) => im.setMatrixAt(i, m));
+    im.computeBoundingSphere();
+    im.userData.pieces = new Array(mods.length).fill(piece);
+    b.add(im, 'volta');
+  });
+  slab(b, null, -540.4, -539.6, 16, RING, 92, 112, 'istria'); // the crossing's wall over the presbytery's opening, up to its ceiling
+  // The flat ceilings: the presbytery and the choir under 16 m, the transepts under the crossing's 20.
+  for (const [x0, x1, z0, z1, y, nx, nz] of [[-567.4, -540.6, 92.6, 111.4, 16, 12, 8], [-539.4, -520.6, 80.6, 91.6, RING, 8, 5], [-539.4, -520.6, 112.4, 123.4, RING, 8, 5]]) {
+    b.together((piece) => {
+      const w = (x1 - x0) / nx, d = (z1 - z0) / nz;
+      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) coffer(piece, O.set(x0 + (i + 0.5) * w, y, z0 + (j + 0.5) * d), X.set(1, 0, 0), Y.set(0, 1, 0), w * 0.88, d * 0.88);
+      slab(b, null, x0 - 0.4, x1 + 0.4, y - 0.3, y, z0 - 0.4, z0, 'volta'); // the cornice round it, where the walls meet it
+      slab(b, null, x0 - 0.4, x1 + 0.4, y - 0.3, y, z1, z1 + 0.4, 'volta');
+    });
+  }
+  // The drum and the dome.
+  b.together((piece) => {
+    const Rd = DOME - 0.3, C = new THREE.Vector3(SGX, RING + 4.6, SGZ); // the inner shell
+    for (const [e0, e1] of [[5, 25], [25, 43], [43, 58]]) {
+      const lo = (e0 * Math.PI) / 180, hi = (e1 * Math.PI) / 180, e = (lo + hi) / 2;
+      const w = Rd * Math.cos(e) * (Math.PI / 8) * 0.78, d = Rd * (hi - lo) * 0.84, sag = Rd * (1 - Math.cos(Math.hypot(w, d) / 2 / Rd)) + 0.03;
+      for (let k = 0; k < 16; k++) {
+        const a = ((k + 0.5) * Math.PI) / 8;
+        Y.set(Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a));
+        coffer(piece, O.copy(Y).multiplyScalar(Rd - sag).add(C), X.set(Math.cos(a), 0, -Math.sin(a)), Y, w, d);
+      }
+    }
+    // the drum's windows, inside (its shell is DOME round): a pane under a lunette, its arch, jambs and sill; pilasters between
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2, m = new THREE.Matrix4().makeRotationY(a).setPosition(SGX + Math.sin(a) * (DOME - 0.02), 0, SGZ + Math.cos(a) * (DOME - 0.02));
+      if (k % 2) { slab(b, m, -0.3, 0.3, RING + 1.25, RING + 4.3, -0.22, 0, 'volta'); continue; }
+      slab(b, m, -0.62, 0.62, RING + 1.5, RING + 3.4, -0.04, -0.01, 'luna');
+      b.decor(shaped(lunette(0, RING + 3.4, 0.62, -0.03, -1).applyMatrix4(m)), 'luna');
+      b.decor(shaped(arch(0, RING + 3.4, 0.62, 0.84, 0.2).translate(0, 0, -0.1).applyMatrix4(m)), 'volta');
+      for (const s of [-1, 1]) slab(b, m, s * 0.62, s * 0.84, RING + 1.5, RING + 3.4, -0.2, 0, 'volta');
+      slab(b, m, -0.9, 0.9, RING + 1.36, RING + 1.5, -0.32, 0, 'volta');
+    }
+    // the balustrade on the drum's foot: a rail over 64 balusters
+    const rail = new THREE.TorusGeometry(DOME - 0.45, 0.08, 4, 64).toNonIndexed().rotateX(Math.PI / 2).translate(SGX, RING + 1.08, SGZ);
+    b.decor(shaped(rail), 'volta');
+    const vase = new THREE.LatheGeometry([[0.07, 0], [0.07, 0.06], [0.04, 0.12], [0.1, 0.3], [0.04, 0.5], [0.06, 0.6], [0.06, 0.65]].map(([r, y]) => new THREE.Vector2(r, y)), 6);
+    const bal = new THREE.InstancedMesh(vase, material('volta'), 64), m = new THREE.Matrix4();
+    for (let k = 0; k < 64; k++) {
+      const a = (k / 64) * Math.PI * 2;
+      bal.setMatrixAt(k, m.makeTranslation(SGX + Math.sin(a) * (DOME - 0.45), RING + 0.4, SGZ + Math.cos(a) * (DOME - 0.45)));
+    }
+    bal.computeBoundingSphere();
+    bal.userData.pieces = new Array(64).fill(piece); // occlusion: they go with the dome
+    b.add(bal, 'volta');
+  });
+  // Every coffer: the frame (an outer moulding and a stepped inner one), the sunk panel, the rosette in its middle; for a
+  // 1 × 1 cell, its back on y = 0, hanging down (-y) into the room.
+  const bars = (o: number, t: number, depth: number) => [
+    new THREE.BoxGeometry(1 - 2 * o, depth, t).translate(0, -depth / 2, 0.5 - o - t / 2), new THREE.BoxGeometry(1 - 2 * o, depth, t).translate(0, -depth / 2, -0.5 + o + t / 2),
+    new THREE.BoxGeometry(t, depth, 1 - 2 * o - 2 * t).translate(0.5 - o - t / 2, -depth / 2, 0), new THREE.BoxGeometry(t, depth, 1 - 2 * o - 2 * t).translate(-0.5 + o + t / 2, -depth / 2, 0),
+  ];
+  const kinds: [THREE.BufferGeometry, THREE.Material, Role][] = [
+    [mergeGeometries([...bars(0, 0.1, 0.2), ...bars(0.1, 0.06, 0.1)].map((g) => g.toNonIndexed()))!, material('volta'), 'volta'],
+    [new THREE.PlaneGeometry(0.8, 0.8).rotateX(Math.PI / 2).translate(0, -0.01, 0), material('lacunare'), 'lacunare'],
+    [new THREE.SphereGeometry(0.09, 8, 4).scale(1, 0.5, 1).translate(0, -0.03, 0), material('gold'), 'gold'],
+  ];
+  for (const [g, mat, role] of kinds) {
+    const im = new THREE.InstancedMesh(g, mat, at.length);
+    at.forEach((m, i) => im.setMatrixAt(i, m));
+    im.computeBoundingSphere();
+    im.userData.pieces = pieces; // occlusion: each coffer goes with its ceiling
+    b.add(im, role);
+  }
+}
+
+/** A plain box by extents in frame `m` (null = world), batched through decor(): part() without its chamfers (a fifth of the bytes), for trims seen from afar. */
+function slab(b: LevelBuilder, m: THREE.Matrix4 | null, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, role: Role): void {
+  const g = new THREE.BoxGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0)).toNonIndexed().translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  b.decor(shaped(m ? g.applyMatrix4(m) : g), role);
+}
+
 /** A light arch ring (no bevel, few segments: dozens of them stay cheap on level 3's GPU), springing at (cx, cy), `depth` thick about z 0. */
-function arch(cx: number, cy: number, r0: number, r1: number, depth: number): THREE.BufferGeometry {
+function arch(cx: number, cy: number, r0: number, r1: number, depth: number, seg = 6): THREE.BufferGeometry {
   const sh = new THREE.Shape().moveTo(cx + r1, cy).absarc(cx, cy, r1, 0, Math.PI, false).lineTo(cx - r0, cy).absarc(cx, cy, r0, Math.PI, 0, true).closePath();
-  return new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false, curveSegments: 6 }).translate(0, 0, -depth / 2);
+  return new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false, curveSegments: seg }).translate(0, 0, -depth / 2);
 }
 
 /** A flat half-disc of radius r over (cx, cy) at z, facing +z (`s` 1) or -z (-1): an arch's lunette, a window's pane. */

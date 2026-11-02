@@ -6,6 +6,13 @@
 
 export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'KeyR'];
 export const GCD = 1.5;
+/** The bar's cooldown count: m:ss from a minute up, whole seconds down to 3, tenths below. Rounded up, never whole minutes:
+ * "2m" for 67 s read as the base 2 min cooldown, not the 1:08 the upgrades left. */
+export const cdText = (t: number) => {
+  if (t < 3) return t.toFixed(1);
+  const s = Math.ceil(t);
+  return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}`;
+};
 export const CHARGE_MAX = 100;
 /** WoW pushback: each hit taken during a cast sets its bar back this many s, at most PUSHBACKS times per cast. */
 export const PUSHBACK = 0.5;

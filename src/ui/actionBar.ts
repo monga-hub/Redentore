@@ -1,4 +1,4 @@
-import { CHARGE_MAX, GCD, KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
+import { CHARGE_MAX, GCD, cdText, KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { ICONS } from './icons.ts';
 import { onKeys, slotLabel } from '../core/keys.ts';
 
@@ -46,7 +46,6 @@ interface Slot<C extends Caster> {
 const HOLD = 450; // ms
 const DRAG = 6; // px a mouse press travels before it becomes a drag
 
-const secs = (t: number) => (t >= 60 ? `${Math.ceil(t / 60)}m` : t >= 3 ? `${Math.ceil(t)}` : t.toFixed(1));
 const num = (t: number) => t.toLocaleString('it', { maximumFractionDigits: 1 });
 
 export class ActionBar<C extends Caster> {
@@ -141,7 +140,7 @@ export class ActionBar<C extends Caster> {
       const [left, total] = cd >= gcd ? [cd, a.cooldown] : [gcd, GCD];
       const p = left > 0 ? `${((left / total) * 100).toFixed(1)}%` : '0%';
       if (p !== s.p) s.el.style.setProperty('--p', (s.p = p));
-      const text = cd > 0 ? secs(cd) : '';
+      const text = cd > 0 ? cdText(cd) : '';
       if (text !== s.text) s.cd.textContent = s.text = text;
       if (s.wasCd && cd === 0) flash(s.el, 'ready'); // the WoW "ready again" shine
       s.wasCd = cd > 0;

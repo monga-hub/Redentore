@@ -2,10 +2,10 @@
 // key press, cast completion and movement interrupts, cast pushback from hits, channel ticks, mana costs, charge bar and
 // specials, player stats (Velo spettrale, immunity), dragging slots around the bar and remembering it; and the kit's table:
 // every ability card has its ability, a school, a painted icon in the atlas and a tooltip with real numbers.
-import { AbilitySystem, CHARGE_MAX, GCD, PUSHBACK, PUSHBACKS, loadBar, saveBar, type Ability } from '../src/abilities/system.ts';
+import { AbilitySystem, CHARGE_MAX, GCD, cdText, PUSHBACK, PUSHBACKS, loadBar, saveBar, type Ability } from '../src/abilities/system.ts';
 import { PlayerStats } from '../src/player/stats.ts';
-import { ABILITIES, plagueSpot } from '../src/abilities/forsaken.ts';
-import { CARDS, SCHOOL } from '../src/player/levels.ts';
+import { ABILITIES, plagueSpot, tune } from '../src/abilities/forsaken.ts';
+import { CARDS, SCHOOL, tuneOf } from '../src/player/levels.ts';
 import { ATLAS } from '../src/ui/iconAtlas.ts';
 
 const fired: string[] = [];
@@ -228,4 +228,15 @@ for (const a of ABILITIES) {
   if (!(a.cooldown >= 0) || (a.mana !== undefined && !(a.mana > 0))) throw new Error(`${a.id}: cooldown ${a.cooldown}, mana ${a.mana}`);
 }
 for (const c of CARDS) if (c.kind !== 'filler' && !(ATLAS as readonly string[]).includes(c.icon)) throw new Error(`card ${c.id}: icon ${c.icon} not in the atlas`);
+// Upgraded cooldowns count from the upgraded time on the first frame: Aureola at two Santità ranks (67.5 s) reads 1:08,
+// not the base 2 min a whole-minute round-up showed until it dropped under 60 s; the cast starts the live cooldown.
+for (const [t, want] of [[67.5, '1:08'], [120, '2:00'], [60, '1:00'], [59.2, '1:00'], [58.4, '59'], [3, '3'], [2.94, '2.9']] as const) {
+  if (cdText(t) !== want) throw new Error(`cdText(${t}) = ${cdText(t)}, want ${want}`);
+}
+Object.assign(tune, tuneOf(['bubble', 'bubble_cd', 'bubble_cd'], ['bubble']));
+const halo = new AbilitySystem([{ ...table.get('bubble')!, fire: () => {} }], ['bubble'], ctx);
+halo.tryCast(0);
+halo.update(1 / 60, () => false);
+if (cdText(halo.cooldown(table.get('bubble')!)) !== '1:08') throw new Error(`upgraded Aureola shows ${cdText(halo.cooldown(table.get('bubble')!))} after its cast`);
+Object.assign(tune, tuneOf([]));
 console.log(`abilities ok (${ABILITIES.length} in the kit)`);

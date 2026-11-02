@@ -80,6 +80,7 @@ export class VendorPanel {
           + `<small class="price"><span>Prezzo: ${price.toLocaleString('it-IT')} oro</span></small><span class="hint${this.bag.gold < price ? ' no' : ''}">${hint(tap, 'impara', price)}</span></div>`;
       },
       use: (school) => {
+        if (!this.learner.schools.some((s) => s === school)) return;
         const t = TOMES.find((x) => x.school === school)!, { teaches, price } = tomeOf(t, this.learner.owned());
         if (!teaches.length) return;
         if (this.bag.gold < price) return this.host.say('Non hai abbastanza oro.');

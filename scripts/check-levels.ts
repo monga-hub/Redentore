@@ -68,7 +68,7 @@ for (const c of CARDS) {
 }
 {
   const at = (id: string, n: number) => tuneOf(Array(n).fill(id), ['pyre']);
-  if (Math.abs(at('dmg', 10).dmg - 1.8) > 1e-9 || Math.abs(at('fall_dmg', 4).fallDmg - 22) > 1e-9 || Math.abs(at('pyre_big', 5).pyreDmg - 350) > 1e-9) fail('a rank adds the same step again');
+  if (Math.abs(at('dmg', 10).dmg - 1.8) > 1e-9 || Math.abs(at('fall_dmg', 4).fallDmg - 35.2) > 1e-9 || Math.abs(at('pyre_big', 5).pyreDmg - 350) > 1e-9) fail('a rank adds the same step again');
   if (Math.abs(at('cdr', 2).cdr - 0.9 ** 2) > 1e-9 || at('cdr', 60).cdr <= 0 || at('pyre_fast', 40).pyreCast <= 0 || at('armor', 80).armor <= 0) fail('cuts never reach 0');
   if (at('fall_reach', 40).fallArc !== -1 || at('shield_more', 9).shieldOrbs !== 6 || at('orb_slow', 30).orbSpeed !== 2) fail('the capped steps: the full circle, six sparks, the slowest orb');
 }

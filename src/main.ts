@@ -262,7 +262,7 @@ const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all, ...san
 kit.foes = () => foes;
 const dctl = new DiabloControls(renderer.domElement, cam.camera, scene, player, targeting, () => foes); // click to move and attack
 dctl.swing = () => { const a = kit.system.slots[PRIMARY]; return !!a && kit.system.cooldown(a) === 0 && kit.system.tryCast(PRIMARY); }; // the base attack a click-attack repeats
-const AIMED = new Set([...BASES, 'step', 'plague', 'strike', 'pyre', 'frost', 'chain', 'toll', 'leap', 'grace', 'charge', 'spit', 'untore', 'fever', 'drain', 'pillar', 'cero', 'furnace', 'blizzard', 'orb', 'judge', 'hammer', 'caligo']); // casts that go where the hero faces
+const AIMED = new Set([...BASES, 'step', 'plague', 'strike', 'pyre', 'frost', 'chain', 'toll', 'leap', 'grace', 'charge', 'spit', 'untore', 'fever', 'miasma', 'drain', 'pillar', 'cero', 'furnace', 'blizzard', 'orb', 'judge', 'hammer', 'caligo']); // casts that go where the hero faces
 // No living target: the nearest foe in sight within the cast's reach becomes the target, as if tapped (iPhone taps rarely land on a mob).
 const REACH: Record<string, () => number> = { fall: () => tune.fallRange, grace: () => GRACE.range, step: () => 8, leap: () => LEAP.range, charge: () => CHARGE.max, plague: () => PLAGUE_RANGE, drain: () => 25 }; // the rest: RANGE
 kit.system.aim = (a) => { if (AIMED.has(a.id)) { targeting.ensure(REACH[a.id]?.() ?? RANGE); dctl.aim(); } };

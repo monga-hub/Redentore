@@ -116,7 +116,9 @@ function fight(seconds: number, level: number, WARDROBE: object[], picks: string
   player.respawn(level === 3 ? { x: -530, z: 19, yaw: 0 } : level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
   const floor = level === 3 ? 30 : level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
   const t0 = performance.now(), info = w.fx.renderer.info, samples: object[] = (w.SOAK.samples = []);
-  let next = 0, raged = false, change = 0;
+  let next = 0, raged = false, change = 0, special = 0;
+  const specials = kit.system.slots.flatMap((a: { id: string; special?: boolean } | undefined, i: number) => a?.special ? [{ id: a.id, slot: i }] : []);
+  const casts: Record<string, number> = w.SOAK.specials = Object.fromEntries(specials.map((a: { id: string }) => [a.id, 0]));
   const RUNGS = [[0.4, 1], [0.48, 2], [0.56, 3], [0.64, 4], [0.72, 5], [0.82, 0]]; // fraction of the fight, rung
   fx.auto = false; // the ladder walked by hand: swiftshader's frame rate would walk it on its own
   fx.setStep(0, 'soak');
@@ -134,7 +136,9 @@ function fight(seconds: number, level: number, WARDROBE: object[], picks: string
     player.facing = Math.atan2(-dx, -dz);
     targeting.target = { kind: targeting.kinds.find((k: { all: object[] }) => k.all.includes(boss)), mob: boss };
     if ((boss.state === 'nova' || boss.marks.length) && player.pos.z - (dz / d) * 0.25 < floor) { player.pos.x -= (dx / d) * 0.25; player.pos.z -= (dz / d) * 0.25; } // dodge: out of the nova, off the brands
-    for (let i = 0; i < 12; i++) kit.system.tryCast(i);
+    const sp = specials[special % specials.length];
+    if (sp && kit.system.tryCast(sp.slot)) { casts[sp.id]++; special++; }
+    for (let i = 0; i < kit.system.slots.length; i++) if (!kit.system.slots[i]?.special) kit.system.tryCast(i);
     if (t >= change && fx.step === 0) { change = t + 0.5; gear.decode(WARDROBE[dressed++ % WARDROBE.length]); w.SOAK.dressed = dressed; } // down the ladder he keeps what he has on: a rung's programs are its own
     if (t >= next) {
       next = t + 1;
@@ -258,8 +262,10 @@ try {
     await sleep(2000);
   }
   type Sample = { t: number; step: number; prog: number; geo: number; tex: number; gpu: number; phase: number; rage: boolean; state: string; lost: boolean };
-  const r: { samples: Sample[]; errors: string[]; won: boolean; dressed: number } = await evaluate('({ samples: SOAK.samples, errors: SOAK.errors, won: SOAK.won, dressed: SOAK.dressed })');
+  const r: { samples: Sample[]; errors: string[]; won: boolean; dressed: number; specials: Record<string, number> } = await evaluate('({ samples: SOAK.samples, errors: SOAK.errors, won: SOAK.won, dressed: SOAK.dressed, specials: SOAK.specials })');
   const s = r.samples;
+  for (const id of sc.flatMap(specialsOf)) if (!r.specials[id]) fail(`${id} never fired at full fury`);
+  console.log(`specials cast at full fury: ${JSON.stringify(r.specials)}`);
 
   for (const e of [...pageErrors, ...r.errors]) fail(`page: ${e.slice(0, 300)}`);
   if (s.some((x) => x.lost)) fail('WebGL context lost');

@@ -65,7 +65,7 @@ const CERO = { t: 4, r: 4, chain: 2 };
 const FURNACE = { arc: Math.cos(0.8), stun: 2 };
 const BLIZZARD_CHILL = 0.5;
 /** Globo di brina's burst at the end of its roll. */
-export const ORB_BURST = 60;
+export const ORB_BURST = 80;
 const ORB = { range: 15, r: 3.5, tick: 0.5, burst: ORB_BURST, chill: 0.6 };
 const SHIELD = { t: 20, r: 3, every: 1 };
 const ROD = { r: 9, top: 2.6, max: 2 };

@@ -78,8 +78,8 @@ export const BUILDS: Record<string, string[]> = {
   mixed: ['fall_dmg', 'leap', 'whirl', 'ward', 'grace', 'nova', 'dmg', 'hp', 'fall_third', 'whirl_dmg', 'leap_big', 'armor', 'leech', 'ward_long', 'potion_big',
     'fury', 'grace_mul', 'nova_big', 'drain', 'fall_reach', 'potion_cd', 'strike', 'step', 'veil', 'regen'],
   // Bortolo (Gelo, Fulmine): the stiletto on the frozen, the bora, the saette
-  frost: ['blizzard', 'chain', 'font', 'orb', 'toll', 'lance_split', 'frost_fast', 'caligo_freeze', 'chain_fast', 'font_long', 'regen', 'mana', 'lance_dmg', 'lance_third', 'blizzard_big',
-    'orb_slow', 'dmg', 'hp', 'armor', 'frost_deep', 'caligo_big', 'font_cd', 'lance_mana', 'potion_big', 'cdr', 'fury', 'shield', 'squall', 'rod', 'leech', 'potion_cd'],
+  frost: ['blizzard', 'chain', 'font', 'orb', 'toll', 'lance_split', 'lance_dmg', 'lance_third', 'frost_deep', 'caligo_freeze', 'blizzard_big', 'regen', 'mana', 'frost_fast', 'chain_fast', 'font_long',
+    'orb_slow', 'dmg', 'hp', 'armor', 'caligo_big', 'font_cd', 'lance_mana', 'potion_big', 'cdr', 'fury', 'shield', 'squall', 'rod', 'leech', 'potion_cd'],
   // Suor Fosca (Peste, Sacro): poison spread, the breath, the fever, and the judgment
   venom: ['untore', 'miasma', 'fever', 'judge', 'hallow', 'spit_twin', 'fx_venomcloud', 'miasma_more', 'untore_far', 'fever_deep', 'plague_dps', 'thorn_dmg', 'regen', 'mana',
     'plague_size', 'dmg', 'hp', 'armor', 'judge_dmg', 'hallow_big', 'cdr', 'bubble', 'hammer', 'potion_big', 'leech', 'fury', 'bubble_cd', 'potion_cd'],
@@ -87,8 +87,8 @@ export const BUILDS: Record<string, string[]> = {
   fire: ['judge', 'wisp', 'pillar', 'furnace', 'hallow', 'fx_holyfire', 'pyre_fast', 'pyre_big', 'cero_chain', 'ember_split', 'regen', 'mana', 'judge_dmg', 'pillar_big', 'furnace_hot',
     'wisp_dps', 'dmg', 'hp', 'armor', 'cdr', 'bubble', 'hammer', 'potion_big', 'leech', 'fury', 'hallow_big', 'potion_cd'],
   // Zanetto (Fulmine, Ossa): bells and heavy blows
-  storm: ['shield', 'leap', 'whirl', 'squall', 'rod', 'grace', 'chain_fast', 'toll_long', 'whirl_dmg', 'grace_mul', 'leap_big', 'spark_split', 'dmg', 'hp', 'armor', 'regen',
-    'mana', 'chain_long', 'toll_big', 'squall_big', 'rod_long', 'shield_more', 'leap_cd', 'whirl_long', 'potion_big', 'leech', 'fury', 'strike', 'nova'],
+  storm: ['shield', 'leap', 'whirl', 'squall', 'rod', 'grace', 'spark_split', 'spark_dmg', 'spark_third', 'whirl_dmg', 'grace_mul', 'leap_big', 'chain_fast', 'toll_big', 'dmg', 'hp', 'armor', 'regen',
+    'mana', 'chain_long', 'squall_big', 'rod_long', 'shield_more', 'leap_cd', 'whirl_long', 'potion_big', 'leech', 'fury', 'strike', 'nova'],
 };
 /** Whose kit each build plays (player/heroes.ts); HERO=bortolo plays every build on him instead. */
 export const HERO_OF: Record<string, Hero> = { melee: 'risorto', mixed: 'risorto', frost: 'bortolo', venom: 'fosca', fire: 'tizian', storm: 'zanetto' };

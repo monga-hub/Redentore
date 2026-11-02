@@ -228,15 +228,24 @@ for (const a of ABILITIES) {
   if (!(a.cooldown >= 0) || (a.mana !== undefined && !(a.mana > 0))) throw new Error(`${a.id}: cooldown ${a.cooldown}, mana ${a.mana}`);
 }
 for (const c of CARDS) if (c.kind !== 'filler' && !(ATLAS as readonly string[]).includes(c.icon)) throw new Error(`card ${c.id}: icon ${c.icon} not in the atlas`);
-// Upgraded cooldowns count from the upgraded time on the first frame: Aureola at two Santità ranks (67.5 s) reads 1:08,
-// not the base 2 min a whole-minute round-up showed until it dropped under 60 s; the cast starts the live cooldown.
+// Cooldown labels retain m:ss for long waits; an upgraded potion starts from its upgraded cooldown.
 for (const [t, want] of [[67.5, '1:08'], [120, '2:00'], [60, '1:00'], [59.2, '1:00'], [58.4, '59'], [3, '3'], [2.94, '2.9']] as const) {
   if (cdText(t) !== want) throw new Error(`cdText(${t}) = ${cdText(t)}, want ${want}`);
 }
-Object.assign(tune, tuneOf(['bubble', 'bubble_cd', 'bubble_cd'], ['bubble']));
-const halo = new AbilitySystem([{ ...table.get('bubble')!, fire: () => {} }], ['bubble'], ctx);
-halo.tryCast(0);
-halo.update(1 / 60, () => false);
-if (cdText(halo.cooldown(table.get('bubble')!)) !== '1:08') throw new Error(`upgraded Aureola shows ${cdText(halo.cooldown(table.get('bubble')!))} after its cast`);
+Object.assign(tune, tuneOf(['potion_cd', 'potion_cd']));
+const vial = new AbilitySystem([{ ...table.get('potion')!, fire: () => {} }], ['potion'], ctx);
+vial.tryCast(0);
+vial.update(1 / 60, () => false);
+if (cdText(vial.cooldown(table.get('potion')!)) !== '15') throw new Error(`upgraded potion shows ${cdText(vial.cooldown(table.get('potion')!))} after its cast`);
+// Every school's special starts instantly only at full fury, empties it and costs no mana.
+for (const a of ABILITIES.filter((a) => a.special)) {
+  let casts = 0, spent = 0;
+  const special = new AbilitySystem([{ ...a, check: undefined, fire: () => { casts++; } }], [a.id], ctx);
+  special.pool = { mana: 0, spendMana: (n) => { spent += n; return false; } };
+  special.charge = CHARGE_MAX - 1;
+  if (special.tryCast(0) || casts) throw new Error(`${a.id} fired without full fury`);
+  special.charge = CHARGE_MAX;
+  if (!special.tryCast(0) || casts !== 1 || special.casting || special.charge || spent || special.cooldown(a)) throw new Error(`${a.id} did not spend full fury instantly`);
+}
 Object.assign(tune, tuneOf([]));
 console.log(`abilities ok (${ABILITIES.length} in the kit)`);

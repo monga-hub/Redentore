@@ -187,7 +187,7 @@ export function chooseHero(sync: CloudSync): Promise<{ hero: Hero; start: Start 
       try { localStorage.setItem(LAST, hero); } catch { /* not remembered */ }
       removeEventListener('keydown', key, true);
       stage.dispose(); el.remove(); style.remove();
-      done({ hero, start: start === 'run' && !games.has(hero) ? 'new' : start });
+      done({ hero, start }); // 'run' with nothing kept is a new game, told by main.ts after the boot merge (it may bring his run down)
     };
     const close = () => { ask?.remove(); ask = undefined; again.focus(); };
     /** "Ricomincia": his run is lost, so it asks first; the Risorto may also start over ready for level 2. */

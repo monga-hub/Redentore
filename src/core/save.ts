@@ -208,8 +208,8 @@ export function forget(hero: Hero, store: Storage = localStorage): void {
 /** The level a run has reached (1-3): the quest it has taken. */
 export const chapter = (s: GameState) => (s.quest.accepted3 ? 3 : s.quest.accepted2 ? 2 : 1);
 
-/** Most advanced first: more XP, then more time played. */
-const ahead = (a: GameState, b: GameState) => (b.build?.xp ?? 0) - (a.build?.xp ?? 0) || b.time - a.time;
+/** Most advanced first: more XP, then more time played (both only grow along a run). */
+export const ahead = (a: GameState, b: GameState) => (b.build?.xp ?? 0) - (a.build?.xp ?? 0) || b.time - a.time;
 
 const MIGRATED = 'redentore.roster.v1';
 const OLD = ['redentore.auto', 'redentore.save.0', 'redentore.save.1', 'redentore.save.2'];

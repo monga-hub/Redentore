@@ -12,7 +12,7 @@ const CSS = `
 .account .cloud.error { color: #ffb27a; }
 `;
 
-const STATE: Record<Exclude<Status, 'none' | 'out'>, string> = { sync: '☁ Sincronizzo…', ok: '☁ Salvato nel cloud', error: '☁ Cloud non raggiungibile: salvato sul dispositivo' };
+const STATE: Record<Exclude<Status, 'none' | 'out'>, string> = { sync: '☁ Sincronizzo…', ok: '☁ Salvato nel cloud', error: '☁ Cloud non riuscito: salvato sul dispositivo' };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 let styled = false;
 
@@ -26,7 +26,7 @@ export function accountLine(sync: CloudSync): HTMLElement {
     const s = sync.status;
     el.innerHTML = s === 'none' ? ''
       : s === 'out' ? `<a href="/accedi.html?next=${encodeURIComponent(location.pathname)}">Accedi per salvare nel cloud</a>`
-      : `${esc(sync.email)} · <span class="cloud ${s}">${STATE[s]}</span>`;
+      : `${esc(sync.email)} · <span class="cloud ${s}"${sync.error ? ` title="${esc(sync.error)}"` : ''}>${STATE[s]}</span>`;
   };
   draw();
   sync.on(() => { if (!el.isConnected) return false; draw(); });

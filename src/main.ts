@@ -75,7 +75,7 @@ await Promise.race([cloud.ready, new Promise((r) => setTimeout(r, 3e3))]); // a 
 cloud.playing = hero; // from here on, a late merge leaves his device run alone: his uploads win
 barFor(hero); // his own bar
 const ahead = start === 'run' ? resume(hero) : undefined; // his run, laid over the fresh world below
-if (start === 'new') saveBar({ bar: barOf(HEROES[hero].kit, BASE_ATTACK[HEROES[hero].school[0]]), off: [] }); // his school's base attack and kit on the bar, before the kit reads it
+if (start === 'new' || (start === 'run' && !ahead)) saveBar({ bar: barOf(HEROES[hero].kit, BASE_ATTACK[HEROES[hero].school[0]]), off: [] }); // his school's base attack and kit on the bar, before the kit reads it
 // Phones: a 1.5 pixel ratio (a third of DPR 3's pixels on an iPhone) and no MSAA on the canvas, which the post chain draws one quad into.
 const renderer = new THREE.WebGLRenderer({ antialias: !PHONE });
 renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.5 : 2));

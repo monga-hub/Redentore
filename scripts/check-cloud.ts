@@ -1,5 +1,5 @@
-// Cloud saves check (`npm run check`): with a fake hub client, the device and the account merge hero by hero by the
-// run's stamp: a newer cloud run comes down (the device's kept aside), a newer device run goes up, a run on one side
+// Cloud saves check (`npm run check`): with a fake hub client, the device and the account merge hero by hero, the run
+// further on winning: a cloud run further on comes down (the device's kept aside), a newer device run goes up, a run on one side
 // only reaches the other; the hero in play is never overwritten; offline (no client), logged out and a throwing cloud
 // leave the device's runs exactly as they were; autosaves go up in one throttled batch, and a failed one is retried.
 import { CloudSync, GAME, REPLACED, merge, type Saves } from '../src/core/cloud.ts';
@@ -7,6 +7,7 @@ import { autosave, resume, type GameState } from '../src/core/save.ts';
 import type { Hero } from '../src/player/heroes.ts';
 
 const fail = (why: string) => { throw new Error(why); };
+console.warn = () => undefined; // the failures below are meant
 const mem = (): Storage & { m: Map<string, string> } => {
   const m = new Map<string, string>();
   return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, String(v)), removeItem: (k) => void m.delete(k), clear: () => m.clear(), key: (i) => [...m.keys()][i] ?? null, get length() { return m.size; } };
@@ -63,6 +64,46 @@ const cloudRun = (h: ReturnType<typeof hub>, hero: Hero) => h.rows.get(`${GAME}/
   if (cloudRun(h2, 'risorto')?.time !== 33) fail('an unstamped device run was not sent up');
 }
 
+// The captain's case: a level-16 run kept on the computer before cloud saves (no stamp), a level-1 run of the same hero
+// tried on the phone today (stamped). Further on wins, not newer: the computer sends it up, the phone brings it down
+// (its own kept aside), and the phone's run never buries it, whichever device logs in first.
+for (const computerFirst of [true, false]) {
+  const pc = mem(), phone = mem(), h = hub('a@b.it');
+  const old = { ...run('bortolo', 7200), build: { xp: 99999, lv: 16, picks: [] } };
+  pc.setItem('redentore.hero.bortolo', JSON.stringify(old)); // no `at`: kept before cloud saves
+  autosave({ ...run('bortolo', 300), build: { xp: 10, lv: 1, picks: [] } }, phone, Date.now());
+  const order = computerFirst ? [pc, phone, pc] : [phone, pc, phone, pc];
+  for (const store of order) await merge(h.client, store);
+  if (cloudRun(h, 'bortolo')?.time !== 7200) fail(`computer first ${computerFirst}: the cloud holds ${cloudRun(h, 'bortolo')?.time}, not the level-16 run`);
+  if (resume('bortolo', phone)?.time !== 7200) fail(`computer first ${computerFirst}: the phone does not show the level-16 run`);
+  if (resume('bortolo', pc)?.time !== 7200) fail(`computer first ${computerFirst}: the computer lost its level-16 run`);
+  if ((JSON.parse(phone.getItem(REPLACED('bortolo'))!) as GameState).time !== 300) fail('the phone\'s own run was not kept aside');
+}
+// Along one run, the copy played on is further on and goes up as before.
+{
+  const pc = mem(), phone = mem(), h = hub('a@b.it');
+  autosave(run('risorto', 100), pc, 1000);
+  await merge(h.client, pc);
+  await merge(h.client, phone);
+  autosave(run('risorto', 160), phone, 2000); // played on, on the phone
+  await merge(h.client, phone);
+  if ((await merge(h.client, pc)).join() !== 'risorto' || resume('risorto', pc)?.time !== 160) fail('the run played on did not reach the computer');
+}
+// A run the first release's newest-wins merge buried under REPLACED comes back, and goes up again.
+{
+  const pc = mem(), h = hub('a@b.it');
+  autosave({ ...run('bortolo', 300), build: { xp: 10, lv: 1, picks: [] } }, pc, 5000);
+  pc.setItem(REPLACED('bortolo'), JSON.stringify({ ...run('bortolo', 7200), build: { xp: 99999, lv: 16, picks: [] } }));
+  h.rows.set(`${GAME}/bortolo`, { ...run('bortolo', 300), build: { xp: 10, lv: 1, picks: [] }, at: 5000 });
+  if ((await merge(h.client, pc)).join() !== 'bortolo' || resume('bortolo', pc)?.time !== 7200 || cloudRun(h, 'bortolo')?.time !== 7200) fail('the buried run did not come back');
+  if ((JSON.parse(pc.getItem(REPLACED('bortolo'))!) as GameState).time !== 300) fail('the run laid over the buried one was not kept aside');
+  // "Ricomincia" drops the backup with the slot, so it never comes back over the new run.
+  const sync = new CloudSync(pc, async () => h.client, 0);
+  await sync.ready;
+  sync.forget('bortolo');
+  if (pc.getItem(REPLACED('bortolo'))) fail('Ricomincia kept the backup');
+}
+
 // Offline / local dev: no client. Nothing is sent, nothing changes, nothing shows.
 {
   const store = mem();
@@ -111,6 +152,19 @@ const cloudRun = (h: ReturnType<typeof hub>, hero: Hero) => h.rows.get(`${GAME}/
   if (sync.status !== 'ok' || cloudRun(h, 'risorto')?.time !== 60) fail('a failed upload was not retried');
 }
 
+// The hub says no (save → false: no session after all): not "saved", the reason kept for the account line.
+{
+  const store = mem(), h = hub('a@b.it');
+  autosave(run('risorto', 10), store, 1000);
+  h.client.save = async () => false;
+  const sync = new CloudSync(store, async () => h.client, 0);
+  await sync.ready;
+  if (sync.status !== 'error' || !sync.error) fail(`a refused upload at boot: ${sync.status}`);
+  sync.push('risorto');
+  await sync.flush();
+  if (sync.status !== 'error' || !sync.error) fail(`a refused autosave: ${sync.status}`);
+}
+
 // Uploads: autosaves gather into one throttled batch of the latest runs; "Ricomincia" drops the slot.
 {
   const store = mem(), h = hub('a@b.it');
@@ -128,4 +182,4 @@ const cloudRun = (h: ReturnType<typeof hub>, hero: Hero) => h.rows.get(`${GAME}/
   if (cloudRun(h, 'risorto') || !cloudRun(h, 'bortolo')) fail('Ricomincia did not drop only his slot');
 }
 
-console.log('cloud ok: merge both ways, the hero in play kept, offline / logged out / cloud down leave the device alone, throttled uploads');
+console.log('cloud ok: merge both ways, further on wins (a level-16 run kept before cloud saves reaches the phone), a buried run comes back, refused uploads shown, the hero in play kept, offline / logged out / cloud down leave the device alone, throttled uploads');

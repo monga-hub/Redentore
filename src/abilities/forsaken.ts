@@ -2058,7 +2058,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     },
   },
   {
-    id: 'mana_potion', name: 'Fiala di essenza spettrale', icon: 'mana', offGcd: true,
+    id: 'mana_potion', name: 'Fiala di essenza spettrale', icon: 'mana_potion', offGcd: true,
     get cooldown() { return tune.manaPotionCd * tune.cdr; },
     get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${Math.round(tune.manaPotion * 100)}% del mana massimo.`; },
     fire(k) {

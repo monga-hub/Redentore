@@ -160,7 +160,7 @@ const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text
 /** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
 export const SCHOOL: Record<string, School> = { mend: 'holy', ...Object.fromEntries(Object.entries(BASE_ATTACK).map(([s, id]) => [id, s as School])) };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
-  ({ id, kind: 'mod', name, icon: of === 'mana_potion' ? 'mana' : of, text, max, of, apply });
+  ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
 /** The upgrades with a number to grow have no cap: each pick is a rank more, and each rank adds the same share. */
 export const RANKS = Infinity;
 type Num = { [K in keyof Tune]: Tune[K] extends number ? K : never }[keyof Tune];

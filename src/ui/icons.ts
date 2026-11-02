@@ -10,17 +10,18 @@ import { ATLAS, COLS, ROWS } from './iconAtlas.ts';
 // winged lions) goes to index.html's skin as --stone-img and --cap-img.
 
 const style = document.createElement('style');
-style.textContent = `.ico { display: block; width: 100%; height: 100%; background: url(${atlas}) 0 0 / ${COLS * 100}% ${ROWS * 100}% no-repeat; }`;
+style.textContent = `.ico { display: block; width: 100%; height: 100%; background: url(${atlas}) 0 0 / ${COLS * 100}% ${ROWS * 100}% no-repeat; }
+.ico.mana-potion { filter: hue-rotate(110deg); }`;
 document.head.append(style);
 document.documentElement.style.setProperty('--stone-img', `url(${stone})`);
 document.documentElement.style.setProperty('--cap-img', `url(${cap})`);
 
 /** The markup of icon `id` ('' if there's none). */
 export function icon(id: string): string {
-  const n = (ATLAS as readonly string[]).indexOf(id);
+  const n = (ATLAS as readonly string[]).indexOf(id === 'mana_potion' ? 'potion' : id);
   if (n < 0) return '';
   const x = ((n % COLS) / (COLS - 1)) * 100, y = (Math.floor(n / COLS) / (ROWS - 1)) * 100;
-  return `<i class="ico" style="background-position: ${+x.toFixed(3)}% ${+y.toFixed(3)}%" aria-hidden="true"></i>`;
+  return `<i class="ico${id === 'mana_potion' ? ' mana-potion' : ''}" style="background-position: ${+x.toFixed(3)}% ${+y.toFixed(3)}%" aria-hidden="true"></i>`;
 }
 
-export const ICONS: Record<string, string> = Object.fromEntries(ATLAS.map((id) => [id, icon(id)]));
+export const ICONS: Record<string, string> = Object.fromEntries([...ATLAS, 'mana_potion'].map((id) => [id, icon(id)]));

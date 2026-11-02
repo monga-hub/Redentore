@@ -223,11 +223,11 @@ const table = new Map(ABILITIES.map((a) => [a.id, a]));
 for (const c of CARDS) if (c.kind === 'ability' && !table.has(c.id)) throw new Error(`card ${c.id} has no ability`);
 for (const a of ABILITIES) {
   if (!['potion', 'mana_potion'].includes(a.id) && (!a.school || a.school !== SCHOOL[a.id])) throw new Error(`${a.id} has no school`); // the potion: the shared GCD-free slot
-  if (!(ATLAS as readonly string[]).includes(a.icon)) throw new Error(`${a.id}: icon ${a.icon} not in the atlas`);
+  if (!(ATLAS as readonly string[]).includes(a.icon === 'mana_potion' ? 'potion' : a.icon)) throw new Error(`${a.id}: icon ${a.icon} not in the atlas`);
   if (/undefined|NaN/.test(a.desc) || !/\d/.test(a.desc)) throw new Error(`${a.id}: tooltip "${a.desc}"`);
   if (!(a.cooldown >= 0) || (a.mana !== undefined && !(a.mana > 0))) throw new Error(`${a.id}: cooldown ${a.cooldown}, mana ${a.mana}`);
 }
-for (const c of CARDS) if (c.kind !== 'filler' && !(ATLAS as readonly string[]).includes(c.icon)) throw new Error(`card ${c.id}: icon ${c.icon} not in the atlas`);
+for (const c of CARDS) if (c.kind !== 'filler' && !(ATLAS as readonly string[]).includes(c.icon === 'mana_potion' ? 'potion' : c.icon)) throw new Error(`card ${c.id}: icon ${c.icon} not in the atlas`);
 // Cooldown labels retain m:ss for long waits; an upgraded potion starts from its upgraded cooldown.
 for (const [t, want] of [[67.5, '1:08'], [120, '2:00'], [60, '1:00'], [59.2, '1:00'], [58.4, '59'], [3, '3'], [2.94, '2.9']] as const) {
   if (cdText(t) !== want) throw new Error(`cdText(${t}) = ${cdText(t)}, want ${want}`);

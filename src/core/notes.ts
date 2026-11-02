@@ -1,5 +1,5 @@
-// Zone notes: the player's comments tied to where they stood (the minimap's quill, ui/notes.ts). No backend: they
-// live in localStorage on this device and leave it as a Markdown or JSON file, or the clipboard, for whoever fixes the game.
+// Zone notes live in localStorage and can be exported as Markdown, JSON or clipboard text.
+// New notes also get one hub submission attempt through notes-cloud.ts.
 
 export const CATEGORIES = ['bug', 'nome', 'grafica', 'altro'] as const;
 export type Category = (typeof CATEGORIES)[number];

@@ -1,4 +1,5 @@
-import { CATEGORIES, NO_AREA, add, json, list, load, markdown, remove, zones, type Category, type Note } from '../core/notes.ts';
+import { CATEGORIES, NO_AREA, json, list, load, markdown, remove, zones, type Category, type Note } from '../core/notes.ts';
+import { saveAndSubmit } from '../core/notes-cloud.ts';
 
 // The zone notes panel (core/notes.ts), opened by the quill on the minimap: write a note on the zone you stand in
 // (a bug, a name that jars, something drawn wrong), read and delete the ones left, and hand them all over as a
@@ -49,6 +50,7 @@ export class NotesPanel {
   private spot: Spot = { area: '', level: 1, lv: 1, hero: '', x: 0, z: 0 };
   private cat: Category = 'bug';
   private zone = ''; // the filter: '' every zone, else '=' + the zone (an unnamed zone is '=')
+  private message = 0;
   /** The notes' spots, for the minimap's marks. */
   pins: { x: number; z: number }[] = load().map((n) => ({ x: n.x, z: n.z }));
   opened = () => {};
@@ -69,7 +71,8 @@ export class NotesPanel {
       <h2>Note sulla zona</h2><p class="where"></p>
       <div class="cats">${CATEGORIES.map((c) => `<button data-cat="${c}">${LABEL[c]}</button>`).join('')}</div>
       <textarea maxlength="1000" placeholder="Cosa non va qui? Un nome, un muro, un bug…" aria-label="Testo della nota"></textarea>
-      <div class="row"><span class="msg" aria-live="polite"></span><button class="save">Salva nota</button></div>
+      <p>Le nuove note restano sul dispositivo e, se hai effettuato l’accesso, vengono inviate a Mongames. Nessun reinvio automatico. Elimina rimuove solo la copia locale.</p>
+      <div class="row"><span class="msg" aria-live="polite"></span><button class="save">Salva e invia nota</button></div>
       <hr><select aria-label="Filtra per zona"></select><ul></ul>
       <div class="row"><button data-out="md">Scarica .md</button><button data-out="json">Scarica .json</button><button data-out="copy">Copia</button></div>
     </div>`;
@@ -102,7 +105,7 @@ export class NotesPanel {
     this.el.classList.remove('show');
   }
 
-  private say(s: string): void { this.el.querySelector('.msg')!.textContent = s; }
+  private say(s: string): void { this.message++; this.el.querySelector('.msg')!.textContent = s; }
 
   private render(): void {
     const all = load(), here = this.spot.area;
@@ -131,11 +134,18 @@ export class NotesPanel {
   private save(): void {
     const box = this.el.querySelector('textarea')!;
     if (!box.value.trim()) { this.say('Scrivi qualcosa prima di salvare.'); return; }
-    const n = add({ ...this.spot, text: box.value, category: this.cat, version: __BUILD__.sha });
-    if (!n) { this.say('Non salvata: il browser non tiene i dati.'); return; }
+    const saved = saveAndSubmit({ ...this.spot, text: box.value, category: this.cat, version: __BUILD__.sha });
+    if (!saved) { this.say('Non salvata: il browser non tiene i dati.'); return; }
     box.value = '';
-    this.say(`Salvata per ${n.area || NO_AREA}.`);
+    this.say(`Salvata sul dispositivo per ${saved.note.area || NO_AREA}. Invio in corso…`);
+    const message = this.message;
     this.render();
+    void saved.delivery.then((status) => {
+      if (this.message !== message) return; // a later action owns the feedback now
+      this.say(status === 'sent' ? 'Salvata sul dispositivo e inviata a Mongames.'
+        : status === 'out' ? 'Salvata solo sul dispositivo: non hai effettuato l’accesso. Nessun reinvio automatico.'
+        : 'Salvata sul dispositivo. Invio non confermato: puoi esportarla. Nessun reinvio automatico.');
+    });
   }
 
   private out(kind: string): void {

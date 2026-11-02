@@ -277,6 +277,18 @@ sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone
 funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); carte dei livelli e tomi sono
 solo delle sue due scuole (vedi Abilità). Le statistiche (Vigore, Intelletto, Spirito, Potenza, Critico, Celerità) sono le stesse per
 tutti e nessuna è "la sua": accanto alle medaglie non c'è una statistica principale.
+Note di zona (`src/core/notes-cloud.ts`): «Salva e invia nota» conserva prima la nota in `redentore-notes`,
+poi tenta una sola chiamata a `submit('redentore', note)` del modulo same-origin `/hub/notes.js`, con la sessione
+Mongames. Invia categoria, testo, zona, livello della quest, eroe, posizione `{x, z}`, versione e data originale
+ISO (`createdAt`). Il livello dell'eroe resta nella copia locale e negli export. Il pannello distingue invio
+confermato, mancato accesso e invio non confermato. Senza login, offline, con import fallito o errore del database,
+la copia locale e gli export restano disponibili. Se il salvataggio locale fallisce non parte alcun invio.
+Nessun caricamento delle note storiche, polling o reinvio automatico; eliminare una nota rimuove solo la copia locale.
+Non c'è un pulsante di retry: riscrivere e salvare lo stesso testo crea una nuova nota e può duplicare quella remota,
+anche se una risposta precedente era andata persa dopo l'inserimento. Non viene registrato uno stato di consegna persistente.
+La tabella e le policy richiedono l'applicazione di `supabase/notes.sql` nel progetto hub; le verifiche automatiche
+usano un modulo simulato e non verificano login, schema o RLS sul database live.
+
 Salvataggi nel cloud (`src/core/cloud.ts`): il gioco importa a runtime `/hub/saves.js` dell'hub Mongames (stesso dominio, stesso
 login). Sotto il titolo della squadra e in fondo al menu c'è la riga dell'account (`src/ui/account.ts`): da non connesso il link
 "Accedi per salvare nel cloud" (`/accedi.html?next=/Redentore/`), da connesso l'email e lo stato del cloud. La partita sul

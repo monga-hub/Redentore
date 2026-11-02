@@ -2,6 +2,8 @@
 // version; blank notes and junk in storage are refused; the list puts the zone at hand first and filters by zone;
 // deleting drops just that one; the Markdown and JSON exports carry every note.
 import { KEY, add, json, list, load, markdown, remove, zones } from '../src/core/notes.ts';
+import assert from 'node:assert/strict';
+import { saveAndSubmit } from '../src/core/notes-cloud.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 const mem = (): Storage => {
@@ -43,3 +45,43 @@ junk.setItem(KEY, JSON.stringify([{ id: 1 }, { ...a }]));
 if (load(junk).length !== 1) fail('malformed note kept');
 
 console.log('notes: save, reload, list, filter, delete and export ok');
+
+// Exercise the same local-first path used by the panel with a mocked hub module.
+const input = { ...base, text: '  Porta bloccata  ', category: 'bug' as const, area: 'Pontile', level: 2 };
+for (const outcome of ['sent', 'out', 'database', 'import'] as const) {
+  const store = mem();
+  add({ ...input, text: 'Nota precedente' }, store, 1000);
+  let calls = 0;
+  const client = async () => {
+    assert.equal(load(store).length, 2, 'local note exists before importing');
+    if (outcome === 'import') throw new Error('offline / missing module');
+    return { submit: async (game: string, payload: unknown) => {
+      calls++;
+      assert.equal(game, 'redentore');
+      assert.deepEqual(payload, {
+        category: 'bug', text: 'Porta bloccata', zone: 'Pontile', level: 2,
+        hero: base.hero, position: { x: base.x, z: base.z }, gameVersion: base.version,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      });
+      if (outcome === 'database') throw new Error('database / session error');
+      return outcome === 'sent';
+    } };
+  };
+  const result = saveAndSubmit(input, store, client, Date.parse('2026-01-01T00:00:00Z'))!;
+  assert.ok(result);
+  const localBefore = store.getItem(KEY);
+  assert.equal(await result.delivery, outcome === 'database' || outcome === 'import' ? 'error' : outcome);
+  assert.equal(calls, outcome === 'import' ? 0 : 1, 'only the new note, one attempt');
+  assert.equal(store.getItem(KEY), localBefore, 'delivery must not modify or delete local notes');
+  assert.deepEqual(load(store).find((n) => n.id === result.note.id), result.note);
+  assert.equal(JSON.parse(json(load(store))).length, 2);
+  assert.ok(markdown(load(store)).includes('Porta bloccata'));
+}
+let imports = 0;
+const unusedClient = async () => { imports++; throw new Error('must not import'); };
+const refused = mem();
+refused.setItem = () => { throw new Error('quota'); };
+assert.equal(saveAndSubmit(input, refused, unusedClient), undefined);
+assert.equal(saveAndSubmit({ ...input, text: ' ' }, mem(), unusedClient), undefined);
+assert.equal(imports, 0, 'do not send notes that could not be saved locally');
+console.log('notes hub: success, logged out, database/session failure, import failure, local preservation and no historical resend ok');

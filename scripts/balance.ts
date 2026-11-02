@@ -110,7 +110,7 @@ function picksTo(build: string, lv: number): string[] {
   while (picks.length < lv - 1) picks.push(choose(build, picks));
   return picks;
 }
-/** Past a build's own list, what any player would rather take: with 33 abilities in the offers, often neither card is the build's. */
+/** Past a build's own list, what any player would rather take: with 33 abilities in the offers, often none of the three cards is the build's. */
 const GENERIC = ['veil', 'ward', 'pyre', 'strike', 'drain', 'cero', 'judge', 'hallow', 'spit', 'pillar', 'chain', 'grace', 'toll', 'frost', 'leap', 'whirl', 'furnace',
   'miasma', 'fever', 'blizzard', 'wisp', 'font', 'caligo', 'step', 'charge', 'nova', 'rod', 'orb', 'shield', 'squall', 'hammer', 'bubble', 'untore',
   'dmg', 'hp', 'armor', 'leech', 'potion_big', 'regen', 'mana', 'cdr', 'fury', 'speed'];
@@ -432,6 +432,7 @@ class Run {
   blinkHide(): void {}
   beam(): void {}
   healBurst(): void {}
+  release(): void {} // a spell's ring of light (Forsaken.release): looks only
   summonWisp(): void { const p = this.player.pos; this.wispAt.set(p.x, p.y + 2.2, p.z); this.wisp = 60; }
   strikeTarget(): Mob | undefined {
     if (this.target && this.target.state !== 'dead') return this.target;

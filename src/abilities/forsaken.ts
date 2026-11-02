@@ -1530,7 +1530,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'plague', name: 'Nube di peste', icon: 'plague', mana: 25, charge: 10,
     get cooldown() { return tune.plagueCd * tune.cdr; },
-    get desc() { return `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale larga ${num(tune.plagueR)} m che ristagna per ${tune.plagueLife} s e corrode i nemici che vi restano dentro (${dmg(tune.plagueDps)} danni al secondo).`; },
+    get desc() { return `Getta sul bersaglio (o sul nemico più vicino entro ${PLAGUE_RANGE} m, altrimenti davanti a te) una nube pestilenziale larga ${num(tune.plagueR)} m che ristagna per ${num(tune.plagueLife)} s e corrode i nemici che vi restano dentro (${dmg(tune.plagueDps)} danni al secondo).`; },
     fire(k) {
       k.player.model.play('throw', 0.12);
       playSfx('plague_cast', chest(k));
@@ -1566,7 +1566,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'veil', name: 'Velo spettrale', icon: 'veil', mana: 50, charge: 10,
     get cooldown() { return 30 * tune.cdr; },
-    get desc() { return `Per ${tune.veilTime} s diventi un'ombra sfuggente: i colpi ti attraversano e subisci il ${VEIL_CUT * 100}% di danni in meno.${tune.veilHeal ? ` Intanto recuperi il ${tune.veilHeal * 100}% della salute al secondo.` : ''}`; },
+    get desc() { return `Per ${num(tune.veilTime)} s diventi un'ombra sfuggente: i colpi ti attraversano e subisci il ${VEIL_CUT * 100}% di danni in meno.${tune.veilHeal ? ` Intanto recuperi il ${num(tune.veilHeal * 100)}% della salute al secondo.` : ''}`; },
     fire(k) {
       k.stats.veil = tune.veilTime;
       playSfx('veil', chest(k));
@@ -1591,7 +1591,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     get desc() {
       return `Un fendente di schegge d'ossa davanti a te: ${dmg(tune.fallDmg)} danni a tutti i nemici entro ${num(tune.fallRange)} m.`
         + (tune.fallThird > 1 ? ` Il terzo colpo della combo ne infligge ${dmg(tune.fallDmg * tune.fallThird)}.` : '')
-        + (tune.fallMana ? ` Ogni fendente che colpisce ti ridà ${tune.fallMana} mana.` : '')
+        + (tune.fallMana ? ` Ogni fendente che colpisce ti ridà ${num(tune.fallMana)} mana.` : '')
         + (tune.fxFall ? ' Il terzo colpo semina una nube di peste (al massimo ogni 3 s).' : '');
     },
     fire(k) {
@@ -1653,7 +1653,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'font', name: 'Acquasantiera gelata', icon: 'font', mana: 40, charge: 10,
     get cooldown() { return tune.fontCd * tune.cdr; },
-    get desc() { return `L'acqua santa ghiaccia di colpo attorno a te: ${dmg(tune.fontDmg)} danni a chi è entro 5 m, che resta congelato sul posto per ${tune.fontRoot} s (meno sui più forti, e sempre meno se li congeli di nuovo).`; },
+    get desc() { return `L'acqua santa ghiaccia di colpo attorno a te: ${dmg(tune.fontDmg)} danni a chi è entro 5 m, che resta congelato sul posto per ${num(tune.fontRoot)} s (meno sui più forti, e sempre meno se li congeli di nuovo).`; },
     fire(k) {
       k.player.model.play('spread', 0.15);
       k.player.model.fight();
@@ -1781,7 +1781,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'untore', name: "Unguento dell'untore", icon: 'untore', mana: 30, charge: 10,
     get cooldown() { return 10 * tune.cdr; },
-    get desc() { return `Come gli untori della peste del 1630: ungi il bersaglio, ${dmg(tune.untoreDmg)} danni, e il suo veleno (almeno 2 dosi) passa a ogni nemico che gli sta entro ${tune.untoreR} m.`; },
+    get desc() { return `Come gli untori della peste del 1630: ungi il bersaglio, ${dmg(tune.untoreDmg)} danni, e il suo veleno (almeno 2 dosi) passa a ogni nemico che gli sta entro ${num(tune.untoreR)} m.`; },
     check: (k) => k.magic.why(),
     fire(k) {
       k.player.model.play('throw', BLOW);
@@ -1793,7 +1793,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'miasma', name: 'Fiato della fossa', icon: 'miasma', mana: 45, charge: 12,
     get cooldown() { return tune.miasmaCd * tune.cdr; },
-    get desc() { return `Esala il miasma delle fosse comuni: un anello di peste esplode da te, ${dmg(tune.miasmaDmg)} danni e ${tune.miasmaStacks} dosi di veleno a chi è entro ${tune.miasmaR} m.`; },
+    get desc() { return `Esala il miasma delle fosse comuni: un anello di peste esplode da te, ${dmg(tune.miasmaDmg)} danni e ${tune.miasmaStacks} dosi di veleno a chi è entro ${num(tune.miasmaR)} m.`; },
     fire(k) {
       k.player.model.play('slam', BLOW);
       k.player.model.fight();
@@ -1803,7 +1803,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'fever', name: 'Febbre di palude', icon: 'fever', mana: 30, charge: 10,
     get cooldown() { return 15 * tune.cdr; },
-    get desc() { return `La febbre delle barene: il bersaglio e chi gli sta entro ${tune.feverR} m prendono il ${Math.round(tune.feverK * 100)}% di danni in più da ogni colpo per 12 s (la metà sui più forti).`; },
+    get desc() { return `La febbre delle barene: il bersaglio e chi gli sta entro ${num(tune.feverR)} m prendono il ${Math.round(tune.feverK * 100)}% di danni in più da ogni colpo per 12 s (la metà sui più forti).`; },
     check: (k) => k.magic.why(),
     fire(k) {
       k.player.model.play('push', BLOW);
@@ -1857,7 +1857,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'furnace', name: 'Fornace di Murano', icon: 'furnace', mana: 45, charge: 12,
     get cooldown() { return 14 * tune.cdr; },
-    get desc() { return `Il soffio di una fornace dei vetrai davanti a te, fino a ${tune.furnaceRange} m: ${dmg(tune.furnaceDmg)} danni, e chi colpisce brucia ed è stordito per 2 s (meno sui più forti).`; },
+    get desc() { return `Il soffio di una fornace dei vetrai davanti a te, fino a ${num(tune.furnaceRange)} m: ${dmg(tune.furnaceDmg)} danni, e chi colpisce brucia ed è stordito per 2 s (meno sui più forti).`; },
     fire(k) {
       k.player.model.play('push', 0.12);
       k.player.model.fight();
@@ -1905,7 +1905,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'rod', name: 'Parafulmine', icon: 'rod', mana: 45, charge: 12,
     get cooldown() { return 18 * tune.cdr; },
-    get desc() { return `Pianti un parafulmine ai tuoi piedi: per ${tune.rodTime} s, ogni ${num(tune.rodEvery)} s fulmina il nemico più vicino entro 9 m che vede, ${dmg(tune.rodDmg)} danni.`; },
+    get desc() { return `Pianti un parafulmine ai tuoi piedi: per ${num(tune.rodTime)} s, ogni ${num(tune.rodEvery)} s fulmina il nemico più vicino entro 9 m che vede, ${dmg(tune.rodDmg)} danni.`; },
     fire(k) {
       k.player.model.play('slam', 0.15);
       k.player.model.fight();
@@ -1916,7 +1916,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'squall', name: 'Burrasca', icon: 'squall', mana: 40, charge: 12,
     get cooldown() { return 15 * tune.cdr; },
-    get desc() { return `Un colpo di tuono come una burrasca in laguna: ${dmg(tune.squallDmg)} danni a chi è entro ${tune.squallR} m, sbalzati via di 5 m (i più forti molto meno). I muri li fermano.`; },
+    get desc() { return `Un colpo di tuono come una burrasca in laguna: ${dmg(tune.squallDmg)} danni a chi è entro ${num(tune.squallR)} m, sbalzati via di 5 m (i più forti molto meno). I muri li fermano.`; },
     fire(k) {
       k.player.model.play('slam', BLOW);
       k.player.model.fight();
@@ -1948,7 +1948,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'hammer', name: 'Martello della penitenza', icon: 'hammer', mana: 30, charge: 10,
     get cooldown() { return tune.hammerCd * tune.cdr; },
-    get desc() { return `Istantaneo. Scagli un martello d'oro sul bersaglio: ${dmg(30)} danni e stordito per ${tune.hammerStun} s (un terzo sui boss, e sempre meno se lo stordisci di nuovo).`; },
+    get desc() { return `Istantaneo. Scagli un martello d'oro sul bersaglio: ${dmg(30)} danni e stordito per ${num(tune.hammerStun)} s (un terzo sui boss, e sempre meno se lo stordisci di nuovo).`; },
     check: (k) => k.magic.why(),
     fire(k) {
       k.player.model.play('throw', BLOW);
@@ -2003,7 +2003,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'nova', name: 'Lamento della cripta', icon: 'nova', cooldown: 0, special: true,
-    get desc() { return `Speciale (barra della furia piena). Un'onda di schegge d'ossa esplode da te: ${dmg(tune.novaDmg)} danni a tutti i nemici entro ${tune.novaR} m.`; },
+    get desc() { return `Speciale (barra della furia piena). Un'onda di schegge d'ossa esplode da te: ${dmg(tune.novaDmg)} danni a tutti i nemici entro ${num(tune.novaR)} m.`; },
     fire(k) {
       const p = k.player.pos;
       k.player.model.play('slam', BLOW);
@@ -2014,7 +2014,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'ward', name: 'Patto della tomba', icon: 'ward', cooldown: 0, special: true, offGcd: true,
-    get desc() { return `Speciale (barra della furia piena), fuori dal tempo di recupero globale. Per ${tune.wardTime} s nessun colpo può ferirti.${tune.wardHeal ? ` Alla fine recuperi il ${tune.wardHeal * 100}% della salute.` : ''}`; },
+    get desc() { return `Speciale (barra della furia piena), fuori dal tempo di recupero globale. Per ${num(tune.wardTime)} s nessun colpo può ferirti.${tune.wardHeal ? ` Alla fine recuperi il ${num(tune.wardHeal * 100)}% della salute.` : ''}`; },
     fire(k) {
       k.stats.immune = tune.wardTime;
       playSfx('ward', chest(k));

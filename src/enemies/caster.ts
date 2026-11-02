@@ -133,7 +133,7 @@ export const SACERDOTE: CasterKind = {
 export const REVERENDISSIMO: CasterKind = {
   ...PRIEST,
   name: 'Il Reverendissimo',
-  hp: 12000, // 11000 before the quests paid XP: the hero now walks in a level or two higher
+  hp: 12500, // 11000 before the quests paid XP, 12000 before the three-card ranked level-ups: the hero now walks in a level or two higher, and built to his liking
   xp: 0, // his fall ends the run
   aggro: 15, leash: 60, blind: 15,
   range: 22, keep: 0,

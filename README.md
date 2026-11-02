@@ -196,7 +196,7 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle due carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12, l'Abate a 17), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2, route3 (livelli 1, 2 e 3 di fila: Punta, gondola, isola, Bibliotecario, Abate), boss3, pack3 (un gruppo dell'isola contro chi lancia); `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle tre carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12, l'Abate a 17), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2, route3 (livelli 1, 2 e 3 di fila: Punta, gondola, isola, Bibliotecario, Abate), boss3, pack3 (un gruppo dell'isola contro chi lancia); `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
 npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, SOAK_LEVEL=3 per l'Abate nel Cenacolo, CHROME=... per il binario)
 ```
@@ -230,7 +230,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca, Tizzone per Fra' Tizian, Folgore per Zanetto), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4), Fra' Tizian con Rogo dell'eretico (2), Cero funebre (3) e Preghiera di suffragio (4), Zanetto con Catena di saette (2), Rintocco del campanile (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
 | R | la fiala di linfa tombale (la pozione), su un tasto suo fuori dagli otto |
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
-| 1 / 2 | al passaggio di livello (il gioco si ferma) scegli una delle due carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
+| 1 / 2 / 3 | al passaggio di livello (il gioco si ferma) scegli una delle tre carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un pezzo (secondo tocco su touch) per indossarlo: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
 | C | scheda del personaggio: manichino stile WoW con i nove posti attorno all'eroe a figura intera, vestito com'è (trascinalo per girarlo), e accanto i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
@@ -285,16 +285,18 @@ Si parte con l'attacco base della propria scuola, Preghiera di suffragio (la cur
 Ogni scuola ha il suo **attacco base** (`BASE_ATTACK`), da tenere premuto: istantaneo, fuori dal recupero globale, uno ogni 0,3 s, gratis,
 e un colpo ogni tre è il terzo della combo. Ossa: Caduta d'ossa (la clava, combo a tre colpi); Gelo: Stiletto di ghiaccio (triplo su chi è
 congelato, rallenta del 25% per 2 s, schegge per un terzo entro 2 m); Peste: Spina di peste; Ombra: Strale d'ombra; Fuoco: Tizzone (braci per un terzo entro 2 m); Fulmine: Folgore; Sacro: Castigo (gli ultimi cinque, strali da 8
-danni). Ognuno ha i suoi quattro potenziamenti, come Caduta d'ossa: più danni a colpo (due volte, +3 sugli strali), lo schizzo (metà dei danni entro 2,5 m;
-lo Stiletto: i Frantumi del congelato), il terzo colpo ×2,5, 4 mana a colpo. Chi conosce 3 delle 5 abilità della sua scuola secondaria
+danni). Ognuno ha i suoi quattro potenziamenti, come Caduta d'ossa: più danni a colpo (+40% a rango), lo schizzo (metà dei danni entro 2,5 m;
+lo Stiletto: i Frantumi del congelato), il terzo colpo (+75% a rango), 4 mana a colpo a rango. Chi conosce 3 delle 5 abilità della sua scuola secondaria
 impara da solo anche il suo attacco base ("Hai appreso..."): nel libro *Sul tasto grande* lo scambia col proprio, la scelta resta nel
-salvataggio (`build.main`) e i potenziamenti restano a ciascuno, anche nelle carte. Ai livelli pari fino al 10
-arrivano due carte di nuove abilità, dopo il 10 una nuova abilità contro un potenziamento; agli altri
+salvataggio (`build.main`) e i potenziamenti restano a ciascuno, anche nelle carte. Ogni livello offre tre carte: ai livelli pari fino al 10
+tre nuove abilità, dopo il 10 una nuova abilità, un passivo e un potenziamento; agli altri
 potenziamenti, passivi e fusioni (`src/player/levels.ts`: 33 abilità da sbloccare, cinque per scuola contando quelle iniziali e lasciando a parte gli attacchi base; 99 carte di potenziamento di cui 8 fusioni). Ogni carta
 esce tra quelle non ancora prese pendendo verso le scuole dell'eroe (`LEAN`: metà delle volte dalla primaria, tre su dieci dalla secondaria,
 due su dieci da tutto il resto, pari dentro ciascuna parte; un potenziamento conta per la scuola della sua abilità), qualunque cosa si sia
 scelto prima: nessuna scuola si chiude. Non c'è un livello massimo
-(servono 20 × livello esperienza per salire); finite le carte escono Linfa tombale e due potenziamenti piccoli ripetibili. Le
+(servono 20 × livello esperienza per salire) e non finiscono le carte: abilità nuove, fusioni e i potenziamenti
+che accendono un effetto (lo schizzo, Caligo di gennaio, Processione, Doppio sputo, Rancore) si prendono una volta, tutti gli altri
+potenziamenti e passivi salgono di rango senza limite, ogni rango la stessa percentuale in più (la carta mostra "rango N"). Le
 abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch; con gli otto posti pieni aspettano nel libro.
 
 **Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), insegna subito
@@ -519,7 +521,7 @@ src/
   enemies/control.ts         stati dei nemici: rallentato, congelato, stordito, in fiamme; rendimenti decrescenti e resistenza
   player/levels.ts           livelli d'esperienza: curva, XP dai morti, le carte (nuove abilità,
                              potenziamenti, passivi, fusioni) e l'offerta da due. Nessun DOM/three
-  ui/levelUp.ts              finestra di scelta delle due carte, lampo "Livello N!"
+  ui/levelUp.ts              finestra di scelta delle tre carte, lampo "Livello N!"
   abilities/vfx.ts           effetti di tutti gli incantesimi, in pool e senza allocazioni per
                              frame: particelle su quad da un atlante procedurale (bagliori,
                              scintille stirate, fumo che si erode, schegge, fiamme), scie, decal

@@ -292,7 +292,7 @@ if (hgb.hero !== 'bortolo' || hgb.levels.learned.join() !== 'frost,caligo' || hg
 // has the fog, and the fog's upgrades for the stiletto's. Absent, the big button's choice is the hero's own.
 const older = (hero: string, picks: string[], learned: string[]) => { const g = boot(); deserialize(g, { ...hgs, hero, build: { xp: 400, lv: 6, picks, learned } }); return g; };
 const ob = older('bortolo', ['lance_dmg', 'lance_split', 'hp'], ['frost', 'lance']), obt = tuneOf(ob.levels.picks, ob.levels.learned, HEROES.bortolo.school);
-if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || obt.prim.lance.dmg !== 11 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
+if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || Math.abs(obt.prim.lance.dmg - 11.2) > 1e-9 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
 const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']);
 if (or.levels.learned.join() !== 'caligo' || or.levels.picks.join() !== 'caligo,caligo_big,caligo_freeze,hp' || or.levels.picks.length !== 4) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks}`);
 function hf0() { const g = boot('fosca'); g.levels.learned = ['plague', 'spit']; return JSON.parse(JSON.stringify(serialize(g))); }
@@ -376,9 +376,9 @@ autosave({ ...s, time: 1 }, store);
 mem.set('redentore.save.0', slot(zs)); // a stale key after the migration: never moved again
 migrate(store);
 if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
-// Gelo della cripta (max 2) at level 21: a player's first Risorto, a fresh run to level 21, Gelo taken once, saved, resumed
-// (and, once, an old pre-squad autosave migrated): its offer's badge reads 1/2, the count the offer filters on; taken twice it
-// never comes back, through every save; a save holding it past its max loads, stacks only to the max and never offers it.
+// Gelo della cripta (ranked, once capped at 2) at level 21: a player's first Risorto, a fresh run to level 21, Gelo taken once,
+// saved, resumed (and, once, an old pre-squad autosave migrated): its offer's badge reads "rango 2", from the count the offer
+// filters on; taken twice, or three times (a save past the old cap), it loads with every rank laid on and is still offered, a rank on.
 {
   let sd = 7;
   const r = () => ((sd = (sd * 16807) % 2147483647) - 1) / 2147483646;
@@ -397,14 +397,14 @@ if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
   if (back.levels.picks.join() !== run.levels.picks.join() || lvOf(back.levels.xp).lv !== 21) fail('the migrated run lost or doubled a pick');
   const sch = HEROES.risorto.school, cdr = CARD.get('cdr')!;
   let shown = 0;
-  for (let i = 0; i < 400; i++) for (const c of offer(back.levels.picks, r, back.levels.learned, sch)) if (c.id === 'cdr') { shown++; if (stacks(c, counter(back.levels.picks)) !== '1/2') fail(`Gelo della cripta offered with badge ${stacks(c, counter(back.levels.picks))} after one pick`); }
-  if (!shown || stacks(cdr, counter(back.levels.picks)) !== '1/2') fail('Gelo della cripta, taken once, never offered at level 21');
-  for (const twice of [[...back.levels.picks, 'cdr'], [...back.levels.picks, 'cdr', 'cdr']]) { // taken twice; a save past the max
-    const g = boot();
-    deserialize(g, JSON.parse(JSON.stringify({ ...serialize(back), build: { xp: xp21 + 2000, lv: 23, picks: twice, learned: [] } })));
+  for (let i = 0; i < 400; i++) for (const c of offer(back.levels.picks, r, back.levels.learned, sch)) if (c.id === 'cdr') { shown++; if (stacks(c, counter(back.levels.picks)) !== 'rango 2') fail(`Gelo della cripta offered with badge ${stacks(c, counter(back.levels.picks))} after one pick`); }
+  if (!shown || stacks(cdr, counter(back.levels.picks)) !== 'rango 2') fail('Gelo della cripta, taken once, never offered at level 21');
+  for (const more of [[...back.levels.picks, 'cdr'], [...back.levels.picks, 'cdr', 'cdr']]) { // taken twice; three times, past the old cap
+    const g = boot(), n = more.filter((id) => id === 'cdr').length;
+    deserialize(g, JSON.parse(JSON.stringify({ ...serialize(back), build: { xp: xp21 + 2000, lv: 23, picks: more, learned: [] } })));
     const t = tuneOf(g.levels.picks, g.levels.learned, sch);
-    if (Math.abs(t.cdr - 0.8) > 1e-9 || eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)) fail(`Gelo della cripta x${twice.filter((id) => id === 'cdr').length}: cooldowns ${t.cdr}, still eligible`);
-    for (let i = 0; i < 400; i++) if (offer(g.levels.picks, r, g.levels.learned, sch).includes(cdr)) fail('a maxed Gelo della cripta came back');
+    if (g.levels.picks.length !== more.length || Math.abs(t.cdr - 0.9 ** n) > 1e-9 || !eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)) fail(`Gelo della cripta x${n}: cooldowns ${t.cdr}, eligible ${eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)}`);
+    if (stacks(cdr, counter(g.levels.picks)) !== `rango ${n + 1}`) fail(`Gelo della cripta x${n}: badge ${stacks(cdr, counter(g.levels.picks))}`);
   }
 }
 // A level-up mid-fight: the card picked is kept at once, the hero left where the last calm save stood him. The tab dies

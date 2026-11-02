@@ -4,11 +4,12 @@
 // ~870 (scripts/balance.ts) and ~1020 with the key's and Fra' Bortolo's quest XP, level 10: the boss is tuned for 10-11.
 // Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
 // pays 950 XP in all, ~16 with the side quests done too. There is no cap: the curve goes on, and the risen dead keep feeding it.
-// Each level offers two cards from everything not yet learnt or maxed, leaning to the hero's schools (`LEAN`: half his
+// Each level offers three cards from everything not yet learnt, leaning to the hero's schools (`LEAN`: half his
 // primary school's, a third his secondary's, the rest everything else), whatever was picked before.
-// Even levels up to 10 offer two new abilities (the specials from level 6), past 10 a new ability against an upgrade;
-// the others a modifier of an owned ability (or a fusion) against a stat passive. With the finite cards all taken, small
-// repeatable ones (and the heal) keep coming. Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
+// Even levels up to 10 offer three new abilities (the specials from level 6), past 10 a new ability against a passive and a
+// modifier; the others a modifier of an owned ability (or a fusion), a stat passive and another modifier. New abilities,
+// fusions and the on/off modifiers are taken once; every other modifier and passive is ranked with no cap, each pick a rank
+// adding the same share again (`rank`, `by`), so the progression never runs out. Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
 // Caduta d'ossa for the Ossa, Stiletto di ghiaccio for the Gelo...) and Preghiera di suffragio (the heal), the potion stays as
 // an item; owning 3 of the 5 abilities of his secondary school teaches him that school's base attack too (`SECOND_AT`),
 // which the book can put on the big button instead. The hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
@@ -161,15 +162,23 @@ const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text
 export const SCHOOL: Record<string, School> = { mend: 'holy', ...Object.fromEntries(Object.entries(BASE_ATTACK).map(([s, id]) => [id, s as School])) };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
   ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
-/** A base attack's four upgrades, the shape of Caduta d'ossa's: damage (twice), a wider reach, the third blow, mana back. */
+/** The upgrades with a number to grow have no cap: each pick is a rank more, and each rank adds the same share. */
+export const RANKS = Infinity;
+type Num = { [K in keyof Tune]: Tune[K] extends number ? K : never }[keyof Tune];
+/** A rank's step on field `f`: `k` of its base value more, or with `k` < 0 the value cut by |k| of what is left, so a
+ *  cooldown or a cast never reaches 0 (eight ranks of −15% leave a quarter of it). */
+const by = (f: Num, k: number) => (t: Tune) => { t[f] = k < 0 ? t[f] * (1 + k) : t[f] + BASE[f] * k; };
+const rank = (of: string, id: string, name: string, text: string, ...steps: ((t: Tune) => void)[]): Card =>
+  mod(of, id, name, text, RANKS, (t) => { for (const f of steps) f(t); });
+/** A base attack's four upgrades, the shape of Caduta d'ossa's: damage, the third blow and mana back by ranks, the splash once. */
 const baseMods = (of: string, name: string, n: [string, string, string, string], split = 'il colpo schizza, metà dei danni a chi gli sta entro 2,5 m.'): Card[] => [
-  mod(of, `${of}_dmg`, n[0], `${name}: +3 danni per colpo (base ${PRIM_DMG}).`, 2, (t) => { t.prim[of].dmg += 3; }),
+  rank(of, `${of}_dmg`, n[0], `${name}: +40% ai danni per colpo a ogni rango (base ${PRIM_DMG}).`, (t) => { t.prim[of].dmg += PRIM_DMG * 0.4; }),
   mod(of, `${of}_split`, n[1], `${name}: ${split}`, 1, (t) => { t.prim[of].split = true; }),
-  mod(of, `${of}_third`, n[2], `${name}: un colpo ogni tre ne infligge ×2,5.`, 1, (t) => { t.prim[of].third = 2.5; }),
-  mod(of, `${of}_mana`, n[3], `${name}: ogni colpo che va a segno ti ridà 4 mana.`, 1, (t) => { t.prim[of].mana = 4; }),
+  rank(of, `${of}_third`, n[2], `${name}: un colpo ogni tre infligge il 75% di danni in più a ogni rango.`, (t) => { t.prim[of].third += 0.75; }),
+  rank(of, `${of}_mana`, n[3], `${name}: ogni colpo che va a segno ti ridà 4 mana in più a ogni rango.`, (t) => { t.prim[of].mana += 4; }),
 ];
-const passive = (id: string, name: string, text: string, max: number, apply: (t: Tune) => void, needs?: Card['needs']): Card =>
-  ({ id, kind: 'passive', name, icon: id, text, max, apply, needs });
+const passive = (id: string, name: string, text: string, apply: (t: Tune) => void, needs?: Card['needs']): Card =>
+  ({ id, kind: 'passive', name, icon: id, text, max: RANKS, apply, needs });
 
 export const CARDS: Card[] = [
   ability('step', "Passo d'ombra", 'A', 'shadow', 'Scatto di 8 m nell’ombra: 25 danni a chi attraversi. 40 mana, recupero 12 s.'),
@@ -208,43 +217,44 @@ export const CARDS: Card[] = [
   ability('hammer', 'Martello della penitenza', 'A', 'holy', `Istantaneo: un martello d'oro sul bersaglio, 30 danni e stordito ${BASE.hammerStun} s (molto meno sui più forti). 30 mana, recupero ${BASE.hammerCd} s.`),
   ability('bubble', 'Aureola del redento', 'A', 'holy', `Fuori dal tempo di recupero globale: per 5 s un'aureola ti rende immune a ogni danno. 60 mana, recupero ${BASE.bubbleCd} s.`),
 
-  passive('dmg', 'Ossa più dure', '+8% a tutti i danni che infliggi.', 3, (t) => { t.dmg += 0.08; }),
-  passive('hp', 'Carne di tomba', '+15% di salute massima (+192), e la recuperi subito.', 3, (t) => { t.hp += 0.15; }),
-  passive('armor', 'Pelle di lapide', '−8% ai danni che subisci.', 2, (t) => { t.armor -= 0.08; }),
-  passive('mana', "Pozzo d'anime", '+20% di mana massimo (+80).', 2, (t) => { t.mana += 0.2; }),
-  passive('regen', 'Linfa nera', 'Rigenerazione del mana +1 al secondo (base 3).', 2, (t) => { t.regen += 1; }),
-  passive('speed', 'Passo del morto', '+8% alla velocità di corsa.', 2, (t) => { t.speed += 0.08; }),
-  passive('cdr', 'Gelo della cripta', '−10% ai tempi di recupero (non agli attacchi base).', 2, (t) => { t.cdr -= 0.1; }),
-  passive('leech', "Sete d'anime", 'Ogni nemico che uccidi ti cura del 3% della salute massima.', 2, (t) => { t.leech += 0.03; }),
-  passive('fury', 'Furia del sepolcro', '+30% alla carica della barra della furia.', 2, (t) => { t.fury += 0.3; }, special),
+  passive('dmg', 'Ossa più dure', '+8% a tutti i danni che infliggi, a ogni rango.', by('dmg', 0.08)),
+  passive('hp', 'Carne di tomba', '+15% di salute massima a ogni rango (+192), e la recuperi subito.', by('hp', 0.15)),
+  passive('armor', 'Pelle di lapide', '−8% ai danni che subisci a ogni rango.', by('armor', -0.08)),
+  passive('mana', "Pozzo d'anime", '+20% di mana massimo a ogni rango (+80).', by('mana', 0.2)),
+  passive('regen', 'Linfa nera', 'Rigenerazione del mana +33% a ogni rango (+1 al secondo, base 3).', (t) => { t.regen += 1; }),
+  passive('speed', 'Passo del morto', '+8% alla velocità di corsa a ogni rango.', by('speed', 0.08)),
+  passive('cdr', 'Gelo della cripta', '−10% ai tempi di recupero a ogni rango (non agli attacchi base).', by('cdr', -0.1)),
+  passive('leech', "Sete d'anime", 'Ogni nemico che uccidi ti cura del 3% della salute massima, e del 3% in più a ogni rango.', (t) => { t.leech += 0.03; }),
+  passive('fury', 'Furia del sepolcro', '+30% alla carica della barra della furia a ogni rango.', by('fury', 0.3), special),
 
-  mod('fall', 'fall_dmg', 'Schegge affilate', "Caduta d'ossa: +4 danni per colpo (base 10).", 2, (t) => { t.fallDmg += 4; }),
-  mod('fall', 'fall_reach', 'Braccio della fossa', "Caduta d'ossa: portata da 2,6 a 3,4 m, arco da 125° a 160°.", 1, (t) => { t.fallRange = 3.4; t.fallArc = Math.cos(1.4); }),
-  mod('fall', 'fall_third', 'Colpo del becchino', "Caduta d'ossa: il terzo colpo della combo infligge ×2,5 danni.", 1, (t) => { t.fallThird = 2.5; }),
-  mod('fall', 'fall_mana', 'Ossa avide', "Caduta d'ossa: ogni fendente che colpisce ti ridà 4 mana.", 1, (t) => { t.fallMana = 4; }),
-  mod('plague', 'plague_dps', 'Peste virulenta', 'Nube di peste: +4 danni al secondo (base 12).', 2, (t) => { t.plagueDps += 4; }),
-  mod('plague', 'plague_size', 'Miasma esteso', 'Nube di peste: raggio +25% (base 2,2 m).', 2, (t) => { t.plagueR += 0.55; }),
-  mod('plague', 'plague_cd', 'Contagio', 'Nube di peste: recupero da 5 a 3,5 s.', 1, (t) => { t.plagueCd = 3.5; }),
-  mod('plague', 'plague_long', 'Ristagno', 'Nube di peste: dura 12 s invece di 8.', 1, (t) => { t.plagueLife = 12; }),
-  mod('wisp', 'wisp_dps', 'Fiamma vorace', 'Fuoco fatuo: da 15 a 23 danni al secondo.', 1, (t) => { t.wispDps = 23; }),
-  mod('wisp', 'wisp_still', 'Fuoco inquieto', 'Fuoco fatuo: brucia entro 2,4 m invece di 1,6.', 1, (t) => { t.wispR = 2.4; }),
-  mod('wisp', 'wisp_fast', 'Evocazione rapida', `Fuoco fatuo: si evoca all’istante (era ${it(BASE.wispCast)} s).`, 1, (t) => { t.wispCast = 0; }),
-  mod('veil', 'veil_long', 'Velo più lungo', 'Velo spettrale: dura 8 s invece di 5.', 1, (t) => { t.veilTime = 8; }),
-  mod('veil', 'veil_heal', 'Velo rigenerante', 'Velo spettrale: mentre dura ti cura del 3% della salute al secondo.', 1, (t) => { t.veilHeal = 0.03; }),
-  mod('step', 'step_dmg', 'Passo lacerante', "Passo d'ombra: da 25 a 60 danni.", 1, (t) => { t.stepDmg = 60; }),
-  mod('step', 'step_cd', 'Doppio passo', "Passo d'ombra: recupero da 12 a 7 s.", 1, (t) => { t.stepCd = 7; }),
-  mod('strike', 'strike_dmg', 'Condanna', 'Sentenza del sepolcro: da 50 a 90 danni.', 1, (t) => { t.strikeDmg = 90; }),
-  mod('nova', 'nova_big', 'Lamento profondo', 'Lamento della cripta: raggio da 6 a 8 m, danni da 20 a 35.', 1, (t) => { t.novaR = 8; t.novaDmg = 35; }),
-  mod('ward', 'ward_long', 'Patto eterno', 'Patto della tomba: 7 s invece di 5, e alla fine ti cura del 15%.', 1, (t) => { t.wardTime = 7; t.wardHeal = 0.15; }),
-  mod('potion', 'potion_big', 'Fiala capiente', 'Fiala di linfa tombale: ripristina il 45% invece del 30%.', 1, (t) => { t.potion = 0.45; }),
-  mod('potion', 'potion_cd', 'Fiala rapida', 'Fiala di linfa tombale: recupero da 30 a 20 s.', 1, (t) => { t.potionCd = 20; }),
-  mod('pyre', 'pyre_fast', 'Rogo rapido', `Rogo dell'eretico: lancio da ${it(BASE.pyreCast)} a 0,6 s.`, 1, (t) => { t.pyreCast = 0.6; }),
-  mod('pyre', 'pyre_big', 'Pira', `Rogo dell'eretico: +50 danni (base ${BASE.pyreDmg}), schizzi e fiamme a terra da ${it(BASE.pyreR)} a 3,2 m.`, 1, (t) => { t.pyreDmg += 50; t.pyreR = 3.2; }),
-  mod('frost', 'frost_deep', 'Brina profonda', `Dardo di brina: +15 danni (base ${BASE.frostDmg}) e rallenta del 70% invece del ${pct(1 - BASE.frostSlow)}.`, 1, (t) => { t.frostDmg += 15; t.frostSlow = 0.3; }),
-  mod('frost', 'frost_fast', 'Dardo rapido', `Dardo di brina: lancio da ${it(BASE.frostCast)} a 0,5 s.`, 1, (t) => { t.frostCast = 0.5; }),
-  mod('font', 'font_long', 'Gelo eterno', `Acquasantiera gelata: congela 6 s invece di ${BASE.fontRoot}.`, 1, (t) => { t.fontRoot = 6; }),
-  mod('font', 'font_cd', 'Acquasantiera colma', `Acquasantiera gelata: recupero da ${BASE.fontCd} a 13 s.`, 1, (t) => { t.fontCd = 13; }),
-  mod('caligo', 'caligo_big', 'Caligo fitto', `Caligo gelato: +20 danni (base ${BASE.caligoDmg}), arriva a 11 m.`, 1, (t) => { t.caligoDmg += 20; t.caligoRange = 11; }),
+  rank('fall', 'fall_dmg', 'Schegge affilate', `Caduta d'ossa: +30% ai danni per colpo a ogni rango (base ${BASE.fallDmg}).`, by('fallDmg', 0.3)),
+  rank('fall', 'fall_reach', 'Braccio della fossa', "Caduta d'ossa: portata +15% (base 2,6 m) e arco +20° a ogni rango (base 125°, fino al cerchio intero).",
+    by('fallRange', 0.15), (t) => { t.fallArc = Math.cos(Math.min(Math.PI, Math.acos(t.fallArc) + 0.175)); }),
+  rank('fall', 'fall_third', 'Colpo del becchino', "Caduta d'ossa: il terzo colpo della combo infligge il 75% di danni in più a ogni rango.", (t) => { t.fallThird += 0.75; }),
+  rank('fall', 'fall_mana', 'Ossa avide', "Caduta d'ossa: ogni fendente che colpisce ti ridà 4 mana in più a ogni rango.", (t) => { t.fallMana += 4; }),
+  rank('plague', 'plague_dps', 'Peste virulenta', `Nube di peste: +33% ai danni al secondo a ogni rango (base ${BASE.plagueDps}).`, (t) => { t.plagueDps += 4; }),
+  rank('plague', 'plague_size', 'Miasma esteso', `Nube di peste: raggio +25% a ogni rango (base ${it(BASE.plagueR)} m).`, by('plagueR', 0.25)),
+  rank('plague', 'plague_cd', 'Contagio', `Nube di peste: recupero −25% a ogni rango (base ${BASE.plagueCd} s).`, by('plagueCd', -0.25)),
+  rank('plague', 'plague_long', 'Ristagno', `Nube di peste: dura il 50% in più a ogni rango (base ${BASE.plagueLife} s).`, by('plagueLife', 0.5)),
+  rank('wisp', 'wisp_dps', 'Fiamma vorace', `Fuoco fatuo: +50% ai danni al secondo a ogni rango (base ${BASE.wispDps}).`, by('wispDps', 0.5)),
+  rank('wisp', 'wisp_still', 'Fuoco inquieto', `Fuoco fatuo: brucia il 50% più largo a ogni rango (base ${it(BASE.wispR)} m).`, by('wispR', 0.5)),
+  rank('wisp', 'wisp_fast', 'Evocazione rapida', `Fuoco fatuo: evocazione −50% a ogni rango (base ${it(BASE.wispCast)} s).`, by('wispCast', -0.5)),
+  rank('veil', 'veil_long', 'Velo più lungo', `Velo spettrale: dura il 40% in più a ogni rango (base ${BASE.veilTime} s).`, by('veilTime', 0.4)),
+  rank('veil', 'veil_heal', 'Velo rigenerante', 'Velo spettrale: mentre dura ti cura del 3% della salute al secondo, e del 3% in più a ogni rango.', (t) => { t.veilHeal += 0.03; }),
+  rank('step', 'step_dmg', 'Passo lacerante', `Passo d'ombra: +100% ai danni a ogni rango (base ${BASE.stepDmg}).`, by('stepDmg', 1)),
+  rank('step', 'step_cd', 'Doppio passo', `Passo d'ombra: recupero −30% a ogni rango (base ${BASE.stepCd} s).`, by('stepCd', -0.3)),
+  rank('strike', 'strike_dmg', 'Condanna', `Sentenza del sepolcro: +60% ai danni a ogni rango (base ${BASE.strikeDmg}).`, by('strikeDmg', 0.6)),
+  rank('nova', 'nova_big', 'Lamento profondo', `Lamento della cripta: +50% ai danni (base ${BASE.novaDmg}) e raggio +20% (base ${BASE.novaR} m) a ogni rango.`, by('novaDmg', 0.5), by('novaR', 0.2)),
+  rank('ward', 'ward_long', 'Patto eterno', `Patto della tomba: dura il 30% in più (base ${BASE.wardTime} s) e alla fine ti cura del 15% in più, a ogni rango.`, by('wardTime', 0.3), (t) => { t.wardHeal += 0.15; }),
+  rank('potion', 'potion_big', 'Fiala capiente', `Fiala di linfa tombale: ripristina la metà in più a ogni rango (base il ${pct(BASE.potion)}, +15%).`, by('potion', 0.5)),
+  rank('potion', 'potion_cd', 'Fiala rapida', `Fiala di linfa tombale: recupero −30% a ogni rango (base ${BASE.potionCd} s).`, by('potionCd', -0.3)),
+  rank('pyre', 'pyre_fast', 'Rogo rapido', `Rogo dell'eretico: lancio −35% a ogni rango (base ${it(BASE.pyreCast)} s).`, by('pyreCast', -0.35)),
+  rank('pyre', 'pyre_big', 'Pira', `Rogo dell'eretico: +30% ai danni (base ${BASE.pyreDmg}) e schizzi e fiamme a terra +20% più larghi (base ${it(BASE.pyreR)} m) a ogni rango.`, by('pyreDmg', 0.3), by('pyreR', 0.2)),
+  rank('frost', 'frost_deep', 'Brina profonda', `Dardo di brina: +25% ai danni (base ${BASE.frostDmg}) a ogni rango, e ai rallentati lascia il 30% di velocità in meno (base ${pct(BASE.frostSlow)}).`, by('frostDmg', 0.25), by('frostSlow', -0.3)),
+  rank('frost', 'frost_fast', 'Dardo rapido', `Dardo di brina: lancio −35% a ogni rango (base ${it(BASE.frostCast)} s).`, by('frostCast', -0.35)),
+  rank('font', 'font_long', 'Gelo eterno', `Acquasantiera gelata: congela il 50% più a lungo a ogni rango (base ${BASE.fontRoot} s).`, by('fontRoot', 0.5)),
+  rank('font', 'font_cd', 'Acquasantiera colma', `Acquasantiera gelata: recupero −30% a ogni rango (base ${BASE.fontCd} s).`, by('fontCd', -0.3)),
+  rank('caligo', 'caligo_big', 'Caligo fitto', `Caligo gelato: +35% ai danni (base ${BASE.caligoDmg}) e portata +25% (base ${BASE.caligoRange} m) a ogni rango.`, by('caligoDmg', 0.35), by('caligoRange', 0.25)),
   mod('caligo', 'caligo_freeze', 'Caligo di gennaio', 'Caligo gelato: chi era già rallentato resta congelato sul posto 2 s.', 1, (t) => { t.caligoFreeze = true; }),
   // the base attacks but Caduta d'ossa (its four are above)
   ...baseMods('lance', 'Stiletto di ghiaccio', ['Stiletto affilato', 'Frantumi', 'Stiletto del bravo', 'Brina avida'], 'chi è congelato va in frantumi e le schegge colpiscono per metà chi gli sta entro 3 m.'),
@@ -253,35 +263,38 @@ export const CARDS: Card[] = [
   ...baseMods('ember', 'Tizzone', ['Tizzone rovente', 'Brace sparsa', 'Tizzone del vetraio', 'Brace avida'], 'le braci schizzano più forte: metà dei danni a chi gli sta entro 2,5 m (era un terzo entro 2 m).'),
   ...baseMods('spark', 'Folgore', ['Folgore viva', 'Folgore biforcuta', 'Folgore del campanaro', 'Folgore avida']),
   ...baseMods('smite', 'Castigo', ['Castigo severo', 'Castigo diffuso', 'Castigo trino', 'Castigo grato']),
-  mod('chain', 'chain_long', 'Catena lunga', `Catena di saette: rimbalza su 7 nemici invece di ${BASE.chainHops}.`, 1, (t) => { t.chainHops = 7; }),
-  mod('chain', 'chain_fast', 'Saette rapide', `Catena di saette: lancio da ${it(BASE.chainCast)} a 0,5 s.`, 1, (t) => { t.chainCast = 0.5; }),
-  mod('toll', 'toll_long', 'Rintocco funebre', `Rintocco del campanile: storditi 3,5 s invece di ${it(BASE.tollStun)}.`, 1, (t) => { t.tollStun = 3.5; }),
-  mod('toll', 'toll_big', 'Campane a morto', `Rintocco del campanile: +35 danni (base ${BASE.tollDmg}), raggio da ${it(BASE.tollR)} a 4,5 m.`, 1, (t) => { t.tollDmg += 35; t.tollR = 4.5; }),
-  mod('leap', 'leap_big', 'Balzo devastante', `Balzo del sepolcro: +35 danni (base ${BASE.leapDmg}), raggio da ${BASE.leapR} a 4 m.`, 1, (t) => { t.leapDmg += 35; t.leapR = 4; }),
-  mod('leap', 'leap_cd', 'Balzo leggero', `Balzo del sepolcro: recupero da ${BASE.leapCd} a 7 s.`, 1, (t) => { t.leapCd = 7; }),
-  mod('whirl', 'whirl_dmg', 'Turbine furioso', `Turbine d'ossa: +8 danni ogni mezzo secondo (base ${BASE.whirlDmg}).`, 1, (t) => { t.whirlDmg += 8; }),
-  mod('whirl', 'whirl_long', 'Turbine lungo', `Turbine d'ossa: dura 4,5 s invece di ${BASE.whirlTime}.`, 1, (t) => { t.whirlTime = 4.5; }),
-  mod('grace', 'grace_mul', 'Boia', 'Colpo di grazia: fino a 4,5 volte i danni sui nemici quasi morti (era il triplo).', 1, (t) => { t.graceMul = 3.5; }),
-  mod('grace', 'grace_cd', 'Lama del boia', `Colpo di grazia: recupero da ${BASE.graceCd} a 3,5 s.`, 1, (t) => { t.graceCd = 3.5; }),
-  mod('charge', 'charge_stun', 'Carica brutale', `Carica del dannato: +20 danni (base ${BASE.chargeDmg}), stordito 2,5 s invece di ${it(BASE.chargeStun)}.`, 1, (t) => { t.chargeDmg += 20; t.chargeStun = 2.5; }),
-  mod('charge', 'charge_cd', 'Carica instancabile', `Carica del dannato: recupero da ${BASE.chargeCd} a 9 s.`, 1, (t) => { t.chargeCd = 9; }),
+  rank('chain', 'chain_long', 'Catena lunga', `Catena di saette: due rimbalzi in più a ogni rango (+50%, base ${BASE.chainHops}).`, (t) => { t.chainHops += 2; }),
+  rank('chain', 'chain_fast', 'Saette rapide', `Catena di saette: lancio −35% a ogni rango (base ${it(BASE.chainCast)} s).`, by('chainCast', -0.35)),
+  rank('toll', 'toll_long', 'Rintocco funebre', `Rintocco del campanile: storditi il 40% più a lungo a ogni rango (base ${it(BASE.tollStun)} s).`, by('tollStun', 0.4)),
+  rank('toll', 'toll_big', 'Campane a morto', `Rintocco del campanile: +35% ai danni (base ${BASE.tollDmg}) e raggio +25% (base ${it(BASE.tollR)} m) a ogni rango.`, by('tollDmg', 0.35), by('tollR', 0.25)),
+  rank('leap', 'leap_big', 'Balzo devastante', `Balzo del sepolcro: +55% ai danni (base ${BASE.leapDmg}) e raggio +30% (base ${BASE.leapR} m) a ogni rango.`, by('leapDmg', 0.55), by('leapR', 0.3)),
+  rank('leap', 'leap_cd', 'Balzo leggero', `Balzo del sepolcro: recupero −40% a ogni rango (base ${BASE.leapCd} s).`, by('leapCd', -0.4)),
+  rank('whirl', 'whirl_dmg', 'Turbine furioso', `Turbine d'ossa: +35% ai danni a ogni rango (base ${BASE.whirlDmg} ogni mezzo secondo).`, by('whirlDmg', 0.35)),
+  rank('whirl', 'whirl_long', 'Turbine lungo', `Turbine d'ossa: dura il 50% in più a ogni rango (base ${BASE.whirlTime} s).`, by('whirlTime', 0.5)),
+  rank('grace', 'grace_mul', 'Boia', 'Colpo di grazia: il colpo sui nemici feriti cresce del 75% a ogni rango (base fino al triplo).', by('graceMul', 0.75)),
+  rank('grace', 'grace_cd', 'Lama del boia', `Colpo di grazia: recupero −40% a ogni rango (base ${BASE.graceCd} s).`, by('graceCd', -0.4)),
+  rank('charge', 'charge_stun', 'Carica brutale', `Carica del dannato: +50% ai danni (base ${BASE.chargeDmg}) e +40% allo stordimento (base ${it(BASE.chargeStun)} s) a ogni rango.`, by('chargeDmg', 0.5), by('chargeStun', 0.4)),
+  rank('charge', 'charge_cd', 'Carica instancabile', `Carica del dannato: recupero −30% a ogni rango (base ${BASE.chargeCd} s).`, by('chargeCd', -0.3)),
   mod('spit', 'spit_twin', 'Doppio sputo', 'Sputo di bile: due dosi di veleno a colpo invece di una.', 1, (t) => { t.spitStacks = 2; }),
-  mod('untore', 'untore_far', 'Unzione diffusa', `Unguento dell'untore: il veleno passa entro 10 m (era ${BASE.untoreR}), +20 danni.`, 1, (t) => { t.untoreR = 10; t.untoreDmg += 20; }),
-  mod('miasma', 'miasma_more', 'Fossa comune', `Fiato della fossa: 5 dosi di veleno invece di ${BASE.miasmaStacks}, recupero da ${BASE.miasmaCd} a 9 s.`, 1, (t) => { t.miasmaStacks = 5; t.miasmaCd = 9; }),
-  mod('fever', 'fever_deep', 'Febbre terzana', `Febbre di palude: +35% di danni subiti invece del ${pct(BASE.feverK)}, entro 6 m.`, 1, (t) => { t.feverK = 0.35; t.feverR = 6; }),
-  mod('drain', 'drain_deep', 'Sete del dannato', `Risucchio d'anima: +8 danni ogni mezzo secondo (base ${BASE.drainDmg}), e ognuno ti cura del 3%.`, 1, (t) => { t.drainDmg += 8; t.drainHeal = 0.03; }),
-  mod('pillar', 'pillar_big', "Rogo del Sant'Uffizio", `Colonna di fiamme: +35 danni (base ${BASE.pillarDmg}), raggio da ${it(BASE.pillarR)} a 4,5 m.`, 1, (t) => { t.pillarDmg += 35; t.pillarR = 4.5; }),
+  rank('untore', 'untore_far', 'Unzione diffusa', `Unguento dell'untore: +50% ai danni (base ${BASE.untoreDmg}) e il veleno passa il 40% più lontano (base ${BASE.untoreR} m) a ogni rango.`, by('untoreDmg', 0.5), by('untoreR', 0.4)),
+  rank('miasma', 'miasma_more', 'Fossa comune', `Fiato della fossa: una dose di veleno in più (base ${BASE.miasmaStacks}, fino a ${BASE.venomMax}) e recupero −25% (base ${BASE.miasmaCd} s) a ogni rango.`,
+    (t) => { t.miasmaStacks = Math.min(t.venomMax, t.miasmaStacks + 1); }, by('miasmaCd', -0.25)),
+  rank('fever', 'fever_deep', 'Febbre terzana', `Febbre di palude: i danni subiti crescono del 50% a ogni rango (base +${pct(BASE.feverK)}), e il raggio del 30% (base ${BASE.feverR} m).`, by('feverK', 0.5), by('feverR', 0.3)),
+  rank('drain', 'drain_deep', 'Sete del dannato', `Risucchio d'anima: +40% ai danni (base ${BASE.drainDmg} ogni mezzo secondo) e +40% alla cura (base ${pct(BASE.drainHeal)}) a ogni rango.`, by('drainDmg', 0.4), by('drainHeal', 0.4)),
+  rank('pillar', 'pillar_big', "Rogo del Sant'Uffizio", `Colonna di fiamme: +40% ai danni (base ${BASE.pillarDmg}) e raggio +20% (base ${it(BASE.pillarR)} m) a ogni rango.`, by('pillarDmg', 0.4), by('pillarR', 0.2)),
   mod('cero', 'cero_chain', 'Processione', 'Cero funebre: lo scoppio accende un cero in due dei nemici che colpisce (i loro non si propagano).', 1, (t) => { t.ceroChain = true; }),
-  mod('furnace', 'furnace_hot', 'Maestro vetraio', `Fornace di Murano: +30 danni (base ${BASE.furnaceDmg}), arriva a 11 m.`, 1, (t) => { t.furnaceDmg += 30; t.furnaceRange = 11; }),
-  mod('blizzard', 'blizzard_big', 'Bora scura', `Bufera di bora: +6 danni ogni mezzo secondo (base ${BASE.blizzardDmg}), raggio da ${BASE.blizzardR} a 5,5 m.`, 1, (t) => { t.blizzardDmg += 6; t.blizzardR = 5.5; }),
-  mod('orb', 'orb_slow', 'Globo pigro', `Globo di brina: rotola a 3,5 m/s invece di ${BASE.orbSpeed} (più colpi), +4 danni a colpo.`, 1, (t) => { t.orbSpeed = 3.5; t.orbDmg += 4; }),
-  mod('shield', 'shield_more', 'Corona di saette', `Scudo di saette: 6 saette invece di ${BASE.shieldOrbs}, +10 danni.`, 1, (t) => { t.shieldOrbs = 6; t.shieldDmg += 10; }),
-  mod('rod', 'rod_long', 'Parafulmine di San Marco', `Parafulmine: dura 18 s invece di ${BASE.rodTime} e fulmina ogni 0,7 s.`, 1, (t) => { t.rodTime = 18; t.rodEvery = 0.7; }),
-  mod('squall', 'squall_big', 'Fortunale', `Burrasca: +25 danni (base ${BASE.squallDmg}), raggio da ${BASE.squallR} a 8 m.`, 1, (t) => { t.squallDmg += 25; t.squallR = 8; }),
-  mod('judge', 'judge_dmg', 'Giudizio universale', `Giudizio del Redentore: +30 danni (base ${BASE.judgeDmg}), recupero da ${BASE.judgeCd} a 4,5 s.`, 1, (t) => { t.judgeDmg += 30; t.judgeCd = 4.5; }),
-  mod('hallow', 'hallow_big', 'Sagrato', `Terra consacrata: raggio da ${BASE.hallowR} a 5,5 m, 20 danni al secondo.`, 1, (t) => { t.hallowR = 5.5; t.hallowDps = 20; }),
-  mod('hammer', 'hammer_cd', 'Penitenza severa', `Martello della penitenza: recupero da ${BASE.hammerCd} a 20 s, stordito 5 s.`, 1, (t) => { t.hammerCd = 20; t.hammerStun = 5; }),
-  mod('bubble', 'bubble_cd', 'Santità', `Aureola del redento: recupero da ${BASE.bubbleCd} a 80 s.`, 1, (t) => { t.bubbleCd = 80; }),
+  rank('furnace', 'furnace_hot', 'Maestro vetraio', `Fornace di Murano: +40% ai danni (base ${BASE.furnaceDmg}) e portata +25% (base ${BASE.furnaceRange} m) a ogni rango.`, by('furnaceDmg', 0.4), by('furnaceRange', 0.25)),
+  rank('blizzard', 'blizzard_big', 'Bora scura', `Bufera di bora: +30% ai danni (base ${BASE.blizzardDmg} ogni mezzo secondo) e raggio +25% (base ${BASE.blizzardR} m) a ogni rango.`, by('blizzardDmg', 0.3), by('blizzardR', 0.25)),
+  rank('orb', 'orb_slow', 'Globo pigro', `Globo di brina: +30% ai danni a colpo (base ${BASE.orbDmg}) e rotola il 15% più piano (più colpi; base ${BASE.orbSpeed} m/s, non sotto 2) a ogni rango.`,
+    by('orbDmg', 0.3), (t) => { t.orbSpeed = Math.max(2, t.orbSpeed * 0.85); }),
+  rank('shield', 'shield_more', 'Corona di saette', `Scudo di saette: +25% ai danni (base ${BASE.shieldDmg}) e una saetta in più (base ${BASE.shieldOrbs}, fino a 6) a ogni rango.`,
+    by('shieldDmg', 0.25), (t) => { t.shieldOrbs = Math.min(6, t.shieldOrbs + 1); }),
+  rank('rod', 'rod_long', 'Parafulmine di San Marco', `Parafulmine: dura il 40% in più (base ${BASE.rodTime} s) e fulmina il 20% più spesso (base ogni ${BASE.rodEvery} s) a ogni rango.`, by('rodTime', 0.4), by('rodEvery', -0.2)),
+  rank('squall', 'squall_big', 'Fortunale', `Burrasca: +35% ai danni (base ${BASE.squallDmg}) e raggio +25% (base ${BASE.squallR} m) a ogni rango.`, by('squallDmg', 0.35), by('squallR', 0.25)),
+  rank('judge', 'judge_dmg', 'Giudizio universale', `Giudizio del Redentore: +35% ai danni (base ${BASE.judgeDmg}) e recupero −20% (base ${BASE.judgeCd} s) a ogni rango.`, by('judgeDmg', 0.35), by('judgeCd', -0.2)),
+  rank('hallow', 'hallow_big', 'Sagrato', `Terra consacrata: +35% ai danni al secondo (base ${BASE.hallowDps}) e raggio +25% (base ${BASE.hallowR} m) a ogni rango.`, by('hallowDps', 0.35), by('hallowR', 0.25)),
+  rank('hammer', 'hammer_cd', 'Penitenza severa', `Martello della penitenza: recupero −25% (base ${BASE.hammerCd} s) e stordimento +20% (base ${BASE.hammerStun} s) a ogni rango.`, by('hammerCd', -0.25), by('hammerStun', 0.2)),
+  rank('bubble', 'bubble_cd', 'Santità', `Aureola del redento: recupero −25% a ogni rango (base ${BASE.bubbleCd} s).`, by('bubbleCd', -0.25)),
   { id: 'fury_start', kind: 'mod', name: 'Rancore', icon: 'fury', max: 1, text: 'Dopo una speciale la barra della furia riparte da 30 invece che da 0.',
     needs: special, apply: (t) => { t.furyStart = 30; } },
 
@@ -305,6 +318,7 @@ export const CARDS: Card[] = [
 
   // Repeatable, offered only once the cards above run short.
   { id: 'linfa', kind: 'filler', name: 'Linfa tombale', icon: 'potion', max: Infinity, text: 'Recuperi il 30% della salute e del mana.' },
+  // Retired into Ossa più dure's and Carne di tomba's ranks: never offered, kept so older saves replay them.
   { id: 'ossa_eterne', kind: 'filler', name: 'Ossa eterne', icon: 'dmg', max: Infinity, text: '+2% a tutti i danni che infliggi. Si ripete.', apply: (t) => { t.dmg += 0.02; } },
   { id: 'carne_eterna', kind: 'filler', name: 'Carne eterna', icon: 'hp', max: Infinity, text: '+4% di salute massima. Si ripete.', apply: (t) => { t.hp += 0.04; } },
 ];
@@ -318,11 +332,8 @@ export const counter = (picks: readonly string[]) => {
   return (id: string) => n.get(id) ?? 0;
 };
 
-/**
- * A stacking card's badge on the level-up window: the picks owned of its max, the very count `eligible` offers it under,
- * so an offered card never reads full ("1/2" before the second and last; "2/2" would mean maxed, and is never offered). '' for the rest.
- */
-export const stacks = (c: Card, count: (id: string) => number) => (c.max > 1 && Number.isFinite(c.max) ? `${count(c.id)}/${c.max}` : '');
+/** A ranked card's badge on the level-up window: the rank this pick brings it to ("rango 1" the first time). '' for the one-time cards. */
+export const stacks = (c: Card, count: (id: string) => number) => (c.max === RANKS && c.kind !== 'filler' ? `rango ${count(c.id) + 1}` : '');
 
 /** The abilities of school `s` a slot holds: its five, the base attack apart. */
 export const slotsOf = (s: School) => Object.keys(SCHOOL).filter((id) => SCHOOL[id] === s && !BASES.includes(id));
@@ -358,9 +369,9 @@ export const LEAN = [0.5, 0.3, 0.2];
 export const leanOf = (c: Card, schools: readonly School[]) => { const s = c.school ?? SCHOOL[c.of ?? '']; return s === schools[0] ? 0 : s === schools[1] ? 1 : 2; };
 
 /**
- * The two cards for the next level-up (the one `picks.length + 2` reaches), each drawn from its kind's pool: a share
- * by LEAN (the empty ones' odds go to the rest), then evenly within it; the repeatable ones fill in when the pool runs
- * short. The card passed over goes back into the pool.
+ * The three cards for the next level-up (the one `picks.length + 2` reaches), each drawn from its kind's pool: a share
+ * by LEAN (the empty ones' odds go to the rest), then evenly within it; the heal fills in if the pool ever runs
+ * short. The cards passed over go back into the pool.
  */
 export function offer(picks: readonly string[], rnd: () => number = Math.random, learned: readonly string[] = [], schools: readonly School[] = RISORTO): Card[] {
   const lv = picks.length + 2, ok = eligible(picks, learned, schools), out: Card[] = [];
@@ -380,22 +391,24 @@ export function offer(picks: readonly string[], rnd: () => number = Math.random,
     if (lv === 6 || lv === 8) pick(abilities.filter((c) => c.tier === 'B')); // the specials surface in time
     pick(abilities);
     pick(abilities);
+    pick(abilities);
   } else if (lv % 2 === 0 && abilities.length) { // past 10: keep learning, or grow what is owned
     pick(abilities);
-    pick(rnd() < 0.5 ? passives : mods);
+    pick(passives);
+    pick(mods);
   } else {
     const fusions = mods.filter((c) => c.kind === 'fusion');
     pick(fusions.length && rnd() < 0.5 ? fusions : mods);
     pick(passives);
+    pick(mods);
   }
   pick(mods); // short: fill from the upgrades, then the heal
   pick(passives);
   pick(mods);
   pick(FILLERS);
-  pick(FILLERS);
-  return out.slice(0, 2);
+  return out.slice(0, 3);
 }
-const FILLERS = CARDS.filter((c) => c.kind === 'filler');
+const FILLERS = CARDS.filter((c) => c.id === 'linfa');
 
 /** A merchant's tome: every ability of a school, for gold (ui/vendor.ts). The cost is per ability it would still teach:
  * four or five a school (Preghiera di suffragio, everyone's, aside), less what the hero's kit already gave. */

@@ -316,7 +316,7 @@ let slain = loaded?.build ? loaded.build.xp - questXpIn(loaded) : quest.bossDead
 const sweep = () => mobs.forEach((m, i) => { if (m.state === 'dead') fell[i] = true; }); // after a victory: its dead count for nothing
 let shownLv = 1 + levels.picks.length; // a save from before the levels flashes its level once
 if (sandbox) arena(); // the dragon's sandbox, over whatever was loaded
-/** The next level-up's two cards; the world holds still until one is picked. */
+/** The next level-up's three cards; the world holds still until one is picked. */
 /**
  * The dragon's sandbox (`?drago=1`): a hero under level 18 dealt its cards up to it (an ability whenever one is offered), every
  * slot in Fra' Bortolo's best purple if it beats what is worn, whole, on the Teatro Verde's tiers; the theatre's own pack put to

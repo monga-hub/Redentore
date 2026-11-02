@@ -3,8 +3,8 @@ import { SCHOOL, stacks, type Card } from '../player/levels.ts';
 import { SCHOOL_NAME } from './book.ts';
 import { ICONS } from './icons.ts';
 
-// The level-up window, Vampire Survivors style: the world holds still (main.ts) and two big cards
-// wait for a pick, by click/tap or keys 1 / 2 (←/→ and Enter too). For LOCK s after it opens a press
+// The level-up window, Vampire Survivors style: the world holds still (main.ts) and three big cards
+// wait for a pick, by click/tap or keys 1 / 2 / 3 (←/→ and Enter too). A ranked card's badge names the rank it brings. For LOCK s after it opens a press
 // does nothing, so a player mashing 1 for Caduta d'ossa can't pick blind. A gold flash and "Livello N!"
 // mark the level. Each card names its school (an upgrade its ability's): the offers lean to the hero's. Plain DOM, styled here like the dialogue window, WoW gold or Diablo stone.
 
@@ -17,8 +17,8 @@ const CSS = `
 #levelup .head { text-align: center; font-family: Georgia, serif; text-shadow: 0 2px 4px #000, 0 0 18px rgba(255,200,90,.45); }
 #levelup .head b { display: block; font-size: 34px; letter-spacing: 2px; color: #ffd75e; }
 #levelup .head span { display: block; margin-top: 2px; font-size: 15px; font-style: italic; color: #e8d6b0; }
-#levelup .cards { display: flex; gap: 22px; justify-content: center; width: min(720px, 100%); }
-#levelup .card { position: relative; flex: 1 1 0; max-width: 330px; min-height: 290px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+#levelup .cards { display: flex; gap: 18px; justify-content: center; width: min(1000px, 100%); }
+#levelup .card { position: relative; flex: 1 1 0; min-width: 0; max-width: 310px; min-height: 290px; display: flex; flex-direction: column; align-items: center; gap: 8px;
   padding: 16px 16px 14px; box-sizing: border-box; cursor: pointer; text-align: center; font: 15px/1.4 Georgia, serif; color: #f3e2b0;
   border: 3px solid transparent; border-radius: 8px; background: var(--panel); box-shadow: var(--panel-shadow); transition: transform .12s, box-shadow .12s, filter .12s; }
 #levelup .card:hover, #levelup .card.sel { transform: translateY(-4px); filter: brightness(1.15); box-shadow: var(--panel-shadow), 0 0 22px 4px rgba(255,200,90,.55); }
@@ -47,13 +47,13 @@ body.diablo #levelup .ic .ico { filter: var(--ember); }
 body.diablo #levelup h3 { color: #ff8a5a; text-transform: uppercase; letter-spacing: 1px; font-size: 16px; }
 body.diablo #levelup .tag { border-radius: 1px; }
 @media (max-width: 560px) {
-  #levelup { gap: 12px; justify-content: flex-start; padding-top: calc(104px + env(safe-area-inset-top)); overflow-y: auto; background: rgba(0,0,0,.84); }
+  #levelup { gap: 10px; justify-content: flex-start; padding-top: calc(104px + env(safe-area-inset-top)); overflow-y: auto; background: rgba(0,0,0,.84); }
   #levelup .head b { font-size: 28px; }
-  #levelup .cards { flex: none; flex-direction: column; align-items: stretch; gap: 14px; }
-  #levelup .card { flex: none; max-width: none; min-height: 0; display: grid; grid-template-columns: 72px 1fr; grid-template-areas: "ic tag" "ic h" "p p"; column-gap: 12px; row-gap: 4px;
-    align-items: center; text-align: left; padding: 12px 14px; font-size: 15px; }
+  #levelup .cards { flex: none; flex-direction: column; align-items: stretch; gap: 10px; }
+  #levelup .card { flex: none; max-width: none; min-height: 0; display: grid; grid-template-columns: 60px 1fr; grid-template-areas: "ic tag" "ic h" "p p"; column-gap: 12px; row-gap: 4px;
+    align-items: center; text-align: left; padding: 10px 14px; font-size: 15px; }
   #levelup .tag { grid-area: tag; justify-self: start; }
-  #levelup .ic { grid-area: ic; width: 72px; height: 72px; }
+  #levelup .ic { grid-area: ic; width: 60px; height: 60px; }
   #levelup h3 { grid-area: h; margin: 0; }
   #levelup p { grid-area: p; }
   #levelup .foot { display: none; }
@@ -62,8 +62,9 @@ body.diablo #levelup .tag { border-radius: 1px; }
   #levelup { gap: 8px; }
   #levelup .head b { font-size: 24px; }
   #levelup .head span { font-size: 13px; }
-  #levelup .card { min-height: 0; gap: 4px; padding: 10px 12px; font-size: 14px; }
-  #levelup .ic { width: 56px; height: 56px; }
+  #levelup .cards { gap: 12px; }
+  #levelup .card { min-height: 0; gap: 4px; padding: 8px 10px; font-size: 13px; }
+  #levelup .ic { width: 48px; height: 48px; }
   #levelup h3 { font-size: 16px; }
 }
 #lvflash { position: fixed; inset: 0; z-index: 18; pointer-events: none; opacity: 0;
@@ -111,6 +112,7 @@ export class LevelUp {
       const n = this.cards.length;
       if (e.code === 'Digit1' || e.code === 'Numpad1') this.choose(0);
       else if (e.code === 'Digit2' || e.code === 'Numpad2') this.choose(1);
+      else if (e.code === 'Digit3' || e.code === 'Numpad3') this.choose(2);
       else if (e.code === 'ArrowLeft' || e.code === 'ArrowUp' || e.code === 'KeyA') this.select((this.sel + n - 1) % n);
       else if (e.code === 'ArrowRight' || e.code === 'ArrowDown' || e.code === 'KeyD') this.select((this.sel + 1) % n);
       else if ((e.code === 'Enter' || e.code === 'Space') && this.sel >= 0) this.choose(this.sel);
@@ -148,12 +150,12 @@ export class LevelUp {
     this.cardsEl.querySelectorAll('.card').forEach((b, i) => {
       const c = cards[i], h = b.querySelector('h3')!;
       h.textContent = c.name;
-      const owned = stacks(c, count);
-      if (owned) { // a stacking card: how many of it the hero has, of how many
+      const rank = stacks(c, count);
+      if (rank) { // a ranked card: the rank this pick brings it to
         const n = document.createElement('span');
         n.className = 'n';
-        n.textContent = owned;
-        n.title = `Ne hai ${owned.replace('/', ' su ')}`;
+        n.textContent = rank;
+        n.title = count(c.id) ? `Ne hai ${count(c.id)} ranghi: questo si somma` : 'Si può riprendere: ogni rango si somma';
         h.append(n);
       }
       b.querySelector('p')!.textContent = cards[i].text;

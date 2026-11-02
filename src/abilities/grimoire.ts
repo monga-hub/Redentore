@@ -8,7 +8,7 @@
 // `dash` and the `events` they leave; scripts/balance.ts plays the same rules with no looks at all.
 // No three.js here.
 import type { World } from '../core/physics.ts';
-import { FRIAR } from '../enemies/brain.ts';
+import { FRIAR, engaged } from '../enemies/brain.ts';
 import { chill, chilled, expose, frozen, root, stun, type Control } from '../enemies/control.ts';
 import type { Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
@@ -121,26 +121,28 @@ export class Grimoire {
   }
 
   /**
-   * The selected target if alive, within `range` and in sight, else the nearest living foe in front and in
-   * sight; none when the selected one is hidden behind a wall (WoW: "not in line of sight", see `why`).
+   * The selected target if alive, within `range` and in sight; none when it is out of reach or hidden behind a wall (WoW: "out
+   * of range", "not in line of sight", see `why`): never another foe in its place, else a bolt thrown at a foe too far off went to
+   * whatever pack stood in front instead and pulled it. Nothing selected: the nearest living foe in sight fighting the hero
+   * (brain.ts `engaged`), else the nearest in front.
    */
   target(range = RANGE): Mob | undefined {
     const p = this.host.player.pos, f = this.host.player.facing, fx = -Math.sin(f), fz = -Math.cos(f), w = this.host.player.world;
     const t = this.host.aimed?.();
-    if (t && alive(t) && flat(t, p) <= range) return w.sees(p, t) ? t : undefined;
-    let best: Mob | undefined, bd = range;
+    if (t && alive(t)) return flat(t, p) <= range && w.sees(p, t) ? t : undefined;
+    let best: Mob | undefined, bk = Infinity;
     for (const m of this.host.foes?.() ?? []) {
-      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
-      if (alive(m) && d < bd && (d < 1 || (dx * fx + dz * fz) / d > ARC) && w.sees(p, m)) { bd = d; best = m; }
+      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz), e = engaged(m), k = e ? d : d + range; // a foe at rest only when none fights
+      if (alive(m) && d < range && k < bk && (e || d < 1 || (dx * fx + dz * fz) / d > ARC) && w.sees(p, m)) { bk = k; best = m; }
     }
     return best;
   }
 
-  /** Why a targeted spell can't go now (no target, or the selected one out of sight), or undefined. */
+  /** Why a targeted spell can't go now (no target, the selected one out of reach or out of sight), or undefined. */
   why(range = RANGE): string | undefined {
     if (this.target(range)) return undefined;
     const t = this.host.aimed?.(), p = this.host.player.pos;
-    return t && alive(t) && flat(t, p) <= range ? 'Bersaglio non in vista.' : 'Nessun bersaglio.';
+    return !t || !alive(t) ? 'Nessun bersaglio.' : flat(t, p) > range ? 'Bersaglio fuori portata.' : 'Bersaglio non in vista.';
   }
 
   private hit(m: Mob, n: number): void {

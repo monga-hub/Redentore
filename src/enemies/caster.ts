@@ -6,7 +6,7 @@
 // nova around itself. Pure math on the collision World like brain.ts (friars), whose movement
 // helpers it shares; priests.ts puts models and spell effects on top.
 import type { World } from '../core/physics.ts';
-import { RISE, face, feet, walk, type Target } from './brain.ts';
+import { RISE, crumb, face, feet, retrace, walk, type Target } from './brain.ts';
 import { clear, control, exposed, pace, tick, type Control } from './control.ts';
 
 export interface CasterKind {
@@ -192,12 +192,6 @@ export function spawnApiary(world: World): { all: Priest[]; queen: Priest } {
   return { all, queen: all[0] };
 }
 
-/**
- * s: an evade that hasn't reached home by now is pinned on a well, bench or tree in its
- * straight-line path (mobs don't pathfind) and warps home, WoW-style. The longest honest walk home,
- * across the chiostro grande at `walk`, takes ~8 s.
- */
-const EVADE_MAX = 10;
 const LOS_EVERY = 0.25;
 /** s into the fuso before its threads cut: drawn, they can be read and left. */
 export const SPIN_DRAW = 0.8; // s: tracing a ray through the cloister costs ~0.2 ms
@@ -245,6 +239,7 @@ export interface Priest {
   cc: Control; // slows, roots, stuns laid by the hero's spells (control.ts)
   again?: boolean; // risen again (`rise`): worth less, drops less
   riseAt?: number; // s into its death it rises again (`rise`)
+  trail?: number[]; // x, z crumbs of its walk while pulled, retraced by the evade (brain.ts `crumb`)
 }
 
 export interface Bolt {
@@ -630,6 +625,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
   const dist = Math.hypot(p.x - f.x, p.z - f.z), level = Math.abs(p.y - f.y) < 2.5;
   const toPlayer = Math.atan2(f.x - p.x, f.z - p.z);
   const reach = K.melee ? K.melee.reach + K.radius : 0;
+  if (f.state !== 'pray' && f.state !== 'evade' && f.state !== 'dead' && f.state !== 'dive') crumb(f, world);
 
   switch (f.state) {
     case 'pray':
@@ -706,6 +702,7 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
       if (f.t < V.under) return 0;
       const [x, z] = V.spots[f.diveTo];
       f.x = x; f.z = z; f.y = feet(world, x, z);
+      f.trail = undefined; // came up elsewhere: no walk to retrace
       f.diveCd = V.every;
       f.melee = Math.max(f.melee, 1);
       enter(f, 'chase');
@@ -724,10 +721,8 @@ function act(f: Priest, p: Target, world: World, dt: number, bolts: Bolt[], hast
     }
     case 'evade':
       f.hp = K.hp;
-      walk(f, f.home.x, f.home.z, K.walk, 0, world, dt, K.radius);
       f.move = 1;
-      if (f.t > EVADE_MAX) { f.x = f.home.x; f.z = f.home.z; f.y = feet(world, f.x, f.z); }
-      if (Math.hypot(f.home.x - f.x, f.home.z - f.z) < 0.05) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
+      if (retrace(f, K.walk, world, dt, K.radius)) { enter(f, 'pray'); f.nova = K.nova?.every ?? 0; }
       f.phase = f.fight = 0; // a fresh fight next time
       f.brand = K.phases?.marks?.every ?? 0;
       f.marks.length = 0;
@@ -784,7 +779,7 @@ export function rise(f: Priest, p: Target, world: World, rnd: () => number = Mat
 /** Up again at its own spot, whole, at rest (`rise`; level 3's hidden packs woken, enemies/sangiorgio.ts). */
 export function revive(f: Priest, world: World): void {
   Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: f.kind.hp, cd: 0, melee: 0, blind: 0, backoff: f.kind.backoff,
-    nova: f.kind.nova?.every ?? 0, cc: control(f.kind.resist), los: { ok: false, t: 0 }, riseAt: undefined });
+    nova: f.kind.nova?.every ?? 0, cc: control(f.kind.resist), los: { ok: false, t: 0 }, riseAt: undefined, trail: undefined });
   f.marks.length = f.lines.length = 0;
   Object.assign(f, calm(f.kind));
   enter(f, 'pray');

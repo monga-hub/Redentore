@@ -39,12 +39,54 @@ export interface Friar {
   blind?: number; // s chasing without line of sight
   again?: boolean; // risen again (`rise`): worth less, drops less
   riseAt?: number; // s into its death it rises again (`rise`)
+  trail?: number[]; // x, z crumbs of its walk while pulled (`crumb`), retraced by the evade (`retrace`)
 }
 
 export interface Target { x: number; y: number; z: number }
 
 /** What the shared movement helpers below need; friars and priests (caster.ts) both fit. */
 export interface Mob extends Target { yaw: number; state: string }
+/**
+ * Fighting the hero: pulled, not at rest (hoeing, praying), dead or evading. A cast that picks its own mark (no target
+ * selected) takes these first, so a fight never pulls a fresh pack that happens to stand nearer (ui/target.ts `resolve`,
+ * abilities/grimoire.ts `target`, forsaken.ts `plagueSpot`).
+ */
+export const engaged = (m: { state: string }) => m.state !== 'hoe' && m.state !== 'pray' && m.state !== 'dead' && m.state !== 'evade';
+/** A mob that evades home: friars and every caster kind. */
+export interface Homing extends Mob { t: number; home: { x: number; z: number }; trail?: number[] }
+
+/**
+ * Evading home: the mobs don't pathfind, and a straight walk home from where the fight dragged them runs into
+ * whatever wall they went round to get there (the orto's friars pulled through the door into the convent's
+ * corridor used to evade into the corridor's side wall, immune, for good). So a pulled mob lays a crumb every
+ * CRUMB m it walks (`crumb`) and the evade walks them back in reverse (`retrace`); a crumb it comes back near (in
+ * sight of it) cuts the loop after it, so a long fight round one spot leaves a short way home. Should even that
+ * pin it (shoved by a mate, a body on a stair), past EVADE_MAX s it warps home, WoW-style: never immune out of reach.
+ */
+const CRUMB = 1; // m
+const REACHED = 0.3; // m: a crumb this close is passed
+/** s: the longest honest walk home (across the chiostro grande at `walk`, ~8 s) and then some. */
+export const EVADE_MAX = 10;
+export function crumb(f: Homing, world: World): void {
+  const t = (f.trail ??= []), n = t.length;
+  if (Math.hypot(f.x - (n ? t[n - 2] : f.home.x), f.z - (n ? t[n - 1] : f.home.z)) < CRUMB) return;
+  if (Math.hypot(f.x - f.home.x, f.z - f.home.z) < CRUMB) { t.length = 0; return; } // back at home: no way to remember
+  for (let i = 0; i < n - 2; i += 2) { // ponytail: O(n) per crumb, a few dozen crumbs inside a leash
+    if (Math.hypot(f.x - t[i], f.z - t[i + 1]) < CRUMB && world.sees(f, { x: t[i], y: f.y, z: t[i + 1] }, PLAYER.step + 0.01)) { t.length = i + 2; return; } // at step height: a rim it can't walk over hides it
+  }
+  t.push(f.x, f.z);
+}
+/** One evade step back along the crumbs, then home. Returns true once home. */
+export function retrace(f: Homing, speed: number, world: World, dt: number, r = FRIAR.radius): boolean {
+  const t = f.trail ?? [];
+  while (t.length && Math.hypot(f.x - t[t.length - 2], f.z - t[t.length - 1]) < REACHED) t.length -= 2;
+  if (t.length) walk(f, t[t.length - 2], t[t.length - 1], speed, 0, world, dt, r);
+  else walk(f, f.home.x, f.home.z, speed, 0, world, dt, r);
+  if (f.t > EVADE_MAX) { f.x = f.home.x; f.z = f.home.z; f.y = feet(world, f.x, f.z); t.length = 0; }
+  if (t.length || Math.hypot(f.home.x - f.x, f.home.z - f.z) >= 0.05) return false;
+  f.trail = undefined;
+  return true;
+}
 
 /**
  * Hoeing spots on the earth walks between the raised beds of the orti (see zones/orto.ts
@@ -140,6 +182,7 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
       if (dist < FRIAR.aggro && level && world.sees(f, p)) pull(f); // not through a wall
       return 0;
     case 'chase':
+      crumb(f, world);
       f.blind = dist < FRIAR.aggro * 1.5 && level && world.sees(f, p) ? 0 : (f.blind ?? 0) + dt; // pinned behind a wall: it gives up
       if (fromHome > FRIAR.leash || dist > FRIAR.leash || f.blind > FRIAR.blind) { f.blind = 0; enter(f, 'evade'); return 0; }
       if (dist <= FRIAR.reach && f.cd === 0 && level) { enter(f, 'swing'); f.cd = FRIAR.cooldown; return 0; }
@@ -153,7 +196,7 @@ export function think(f: Friar, p: Target, world: World, dt: number): number {
       return dist <= FRIAR.hit && level ? FRIAR.damage : 0;
     case 'evade':
       f.hp = FRIAR.hp;
-      if (walk(f, f.home.x, f.home.z, FRIAR.walk, 0, world, dt) < 0.05) enter(f, 'hoe');
+      if (retrace(f, FRIAR.walk, world, dt)) enter(f, 'hoe');
       return 0;
     case 'dead': // until the vow raises it again (`rise`), or for good once the Reverendissimo is dead
       return 0;
@@ -171,7 +214,7 @@ export function rise(f: Friar, p: Target, world: World, rnd: () => number = Math
   if (f.state !== 'dead') return false;
   f.riseAt ??= f.t + RISE.after[0] + rnd() * (RISE.after[1] - RISE.after[0]); // a loaded corpse (t past the sink) too: after, from now
   if (f.t < f.riseAt || Math.hypot(p.x - f.home.x, p.z - f.home.z) < RISE.away) return false;
-  Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: FRIAR.hp, cd: 0, blind: 0, again: true, riseAt: undefined });
+  Object.assign(f, { x: f.home.x, z: f.home.z, yaw: f.home.yaw, y: feet(world, f.home.x, f.home.z), hp: FRIAR.hp, cd: 0, blind: 0, again: true, riseAt: undefined, trail: undefined });
   enter(f, 'hoe');
   return true;
 }

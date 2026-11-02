@@ -5,6 +5,7 @@ import type { World } from '../core/physics.ts';
 import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import { BASES, PILLAR_CAST, SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
+import { engaged } from '../enemies/brain.ts';
 import { AbilitySystem, loadBar, type Ability } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
 import { Grimoire, type BaseBolt, type Bolt, type BoltKind, type SpellEvent } from './grimoire.ts';
@@ -1440,17 +1441,18 @@ export function wispFoe(p: { x: number; y: number; z: number }, aimed: Mob | und
 
 /**
  * Where Nube di peste lands: on the selected target if it is alive and within reach, else on the
- * nearest living foe within reach, else on the ground ahead, far enough that the caster stays out of it.
+ * nearest living foe within reach (those fighting the hero first, brain.ts `engaged`: a fight never pulls a fresh pack
+ * standing nearer), else on the ground ahead, far enough that the caster stays out of it.
  * With `world`, only foes in sight count and the lob ahead falls short of a wall.
  */
 export function plagueSpot(p: { x: number; y: number; z: number }, facing: number, aimed: Mob | undefined, foes: Iterable<Mob>, world?: World): { x: number; y: number; z: number } {
   const near = (m: Mob) => m.state !== 'dead' && Math.hypot(m.x - p.x, m.z - p.z) <= PLAGUE_RANGE && (!world || world.sees(p, m));
   let best = aimed && near(aimed) ? aimed : undefined;
   if (!best) {
-    let bestD = Infinity;
+    let bestK = Infinity;
     for (const m of foes) {
-      const d = Math.hypot(m.x - p.x, m.z - p.z);
-      if (near(m) && d < bestD) { bestD = d; best = m; }
+      const k = Math.hypot(m.x - p.x, m.z - p.z) + (engaged(m) ? 0 : PLAGUE_RANGE); // a foe at rest only when none fights
+      if (near(m) && k < bestK) { bestK = k; best = m; }
     }
   }
   if (best) return { x: best.x, y: best.y, z: best.z };

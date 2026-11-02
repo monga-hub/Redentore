@@ -12,7 +12,7 @@ import { ANDITO, ANTIREF, APPRODO, CHOIR_DOOR, CROCE, PUNTA } from '../src/quest
 import { ABATE, BIBLIOTECARIO, NOSTROMO, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { LIB_F } from '../src/level/zones/sangiorgio.ts';
 import { GONDOLIERE, GOVERNATRICE, GOV_AT, MAESTRA, VELO, spawnLevel2 } from '../src/enemies/zitelle.ts';
-import { FRIAR, GROUPS, MORE, RISE, hurt, rise, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
+import { EVADE_MAX, FRIAR, GROUPS, MORE, RISE, hurt, rise, separate, spawnGroups, think, type Friar, type Target } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE, spawnApiary, cloisterPlan, fly, gardenPlan, lagoonPlan, GARDENS, hurt as casterHurt, killAll, spawnChurch, wipe, spawnPriests, think as casterThink, type Bolt, type Priest } from '../src/enemies/caster.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -32,6 +32,39 @@ const fail = (why: string) => { throw new Error(why); };
       if (PATHS_X.some((px) => x > px - 0.5 && x < px + 3.5) || PATHS_Z.some((pz) => z > pz - 0.5 && z < pz + 3.5)) fail(`${at} on a path`);
     }
   }
+}
+
+// The orto's door into the convent corridor (x -37..-31 from z -86, door at x -34): a caster steps into the orto, pulls
+// the friars by the door and backs off down the corridor; they follow, then lose her and evade. Walking straight home
+// from the corridor ran them into its east wall by the door, immune and out of reach for good: the evade retraces the
+// way they came (brain.ts `crumb`, `retrace`), on foot, well before the EVADE_MAX warp.
+{
+  const level = buildLevel(), w = level.world, all = spawnGroups(w).flat(), me: Target = { x: -34, y: 0, z: -80 };
+  const longest = new Map<Friar, number>();
+  let inside = 0;
+  const go = (s: number, x: number, z: number) => {
+    for (let t = 0; t < s; t += 1 / 60) {
+      const dx = x - me.x, dz = z - me.z, d = Math.hypot(dx, dz);
+      if (d > 0.05) { const k = Math.min(6 / 60, d) / d; me.x += dx * k; me.z += dz * k; w.resolve(me, 0); }
+      for (const f of all) {
+        think(f, me, w, 1 / 60);
+        if (f.state === 'evade') longest.set(f, Math.max(longest.get(f) ?? 0, f.t));
+      }
+      separate(all, w);
+      inside = Math.max(inside, all.filter((f) => f.z > -85 && f.state !== 'evade').length);
+    }
+  };
+  go(3, -34, -92); // into the orto: the friars by the door turn on her
+  go(6, -34, -64); // back down the corridor, the pack on her heels
+  go(10, -34, -40); // gone: they give up
+  go(20, -34, -40);
+  if (inside < 2) fail(`corridor pull: only ${inside} friars followed into the corridor`);
+  for (const f of all) {
+    const at = `corridor pull: friar from (${f.home.x}, ${f.home.z})`;
+    if (f.state !== 'hoe' || Math.hypot(f.x - f.home.x, f.z - f.home.z) > 0.1) fail(`${at} stuck ${f.state} at (${f.x.toFixed(2)}, ${f.z.toFixed(2)})`);
+    if ((longest.get(f) ?? 0) > EVADE_MAX - 1) fail(`${at} pinned on its way home (the warp at ${EVADE_MAX} s brought it back)`); // the frame it warps it is home
+  }
+  if (longest.size < 2) fail('corridor pull: nobody evaded');
 }
 
 // Brain on an empty floor.

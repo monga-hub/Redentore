@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Bar } from './hud.ts';
 import type { Control } from '../enemies/control.ts';
+import { engaged } from '../enemies/brain.ts';
 
 /** A targetable mob: brain state from enemies/brain.ts or enemies/caster.ts. */
 export interface Mob { x: number; y: number; z: number; hp: number; state: string; cc?: Control }
@@ -47,14 +48,14 @@ export function pick(kinds: readonly Kind[], camera: THREE.Camera, x: number, y:
 type Pick = { kind: Kind; mob: Mob };
 const live = (m: Mob) => m.state !== 'dead' && m.state !== 'evade';
 
-/** The nearest living enemy to `p` (feet) closer than `range` m that `seen` allows, other than `skip`. */
-export function nearest(kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen: (m: Mob, k: Kind) => boolean = () => true, skip?: Mob): Pick | undefined {
+/** The nearest living enemy to `p` (feet) closer than `range` m that `seen` allows, other than `skip`; only those `only` allows. */
+export function nearest(kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen: (m: Mob, k: Kind) => boolean = () => true, skip?: Mob, only: (m: Mob) => boolean = live): Pick | undefined {
   let best: Pick | undefined, bestD = range;
   for (const kind of kinds) {
     if (!kind.ready()) continue;
     for (const mob of kind.all) {
       const d = Math.hypot(mob.x - p.x, mob.z - p.z);
-      if (!live(mob) || mob === skip || d >= bestD || !seen(mob, kind)) continue;
+      if (!live(mob) || !only(mob) || mob === skip || d >= bestD || !seen(mob, kind)) continue;
       bestD = d;
       best = { kind, mob };
     }
@@ -62,9 +63,12 @@ export function nearest(kinds: readonly Kind[], p: { x: number; z: number }, ran
   return best;
 }
 
-/** The target a cast goes to: the current one while it lives (even out of range: the spell says so), else the nearest within `range`. */
+/**
+ * The target a cast goes to: the current one while it lives (even out of range: the spell says so), else the nearest within
+ * `range` of those fighting the hero, else the nearest of all: a pack at rest is pulled only when nobody is fighting.
+ */
 export function resolve(current: Pick | undefined, kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen?: (m: Mob, k: Kind) => boolean): Pick | undefined {
-  return current && live(current.mob) ? current : nearest(kinds, p, range, seen);
+  return current && live(current.mob) ? current : nearest(kinds, p, range, seen, undefined, engaged) ?? nearest(kinds, p, range, seen);
 }
 
 /**

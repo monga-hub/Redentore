@@ -123,6 +123,24 @@ near(dmg(foes[0]), tune.prim.spark.dmg * 2.5, 'the third blow');
 near(dmg(foes[1]), tune.prim.spark.dmg * 2.5 * 0.5, 'the splash');
 near(host.stats.mana, 4, 'mana back on a hit');
 if (tune.prim.thorn.split) fail('the upgrades follow each base attack');
+// A base attack goes only where it is aimed. Suor Fosca's thorn at a selected foe out of reach is refused ("fuori portata"),
+// never thrown at the pack standing in front instead; with nothing selected it takes a foe already fighting the hero
+// over a nearer pack at rest, else it pulled a fresh pack mid-fight.
+{
+  let picked: Mob | undefined;
+  const sel = foe(0, -40), rest = { ...foe(0, -20), state: 'hoe' }, behind = foe(0, 12);
+  const pick = new Grimoire({ ...host, aimed: () => picked, foes: () => [sel, rest, behind], hurt: (inside: (x: number, z: number, m: Mob) => boolean, n: number) => { for (const m of [sel, rest, behind]) if (inside(m.x, m.z, m)) hits.set(m, (hits.get(m) ?? 0) + n); } }, tune);
+  hits.clear();
+  picked = sel;
+  if (pick.why() !== 'Bersaglio fuori portata.') fail(`a target out of reach: ${pick.why()}`);
+  pick.shoot('thorn', { x: 0, y: 1.3, z: 0 });
+  for (let s = 0; s < 3; s += 1 / 30) pick.update(1 / 30);
+  if (dmg(rest) || dmg(sel)) fail('a base bolt at a target out of reach struck another foe');
+  picked = undefined;
+  if (pick.target() !== behind) fail('nothing selected: the foe fighting the hero, not the pack at rest nearer');
+  behind.state = 'dead';
+  if (pick.target() !== rest) fail('nothing selected, nobody fighting: the pack ahead');
+}
 hits.clear();
 foes = [foe(0, -5), foe(0, 5)];
 book.caligo();

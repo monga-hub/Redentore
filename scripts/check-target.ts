@@ -29,4 +29,10 @@ if (resolve(undefined, [kind], hero, 4)) fail('no foe in reach: nothing should b
 if (resolve({ kind, mob: dead }, [kind], hero, 30)?.mob !== near) fail('dead target: the nearest living foe should be taken');
 if (resolve({ kind, mob: far }, [kind], hero, 4)?.mob !== far) fail('a living target should be kept');
 if (resolve(undefined, [kind], hero, 30, (m) => m !== near)?.mob !== behind) fail('a foe out of sight should be skipped');
+// Mid-fight, nothing selected: the foe fighting the hero, not a nearer pack at rest (hoeing, praying), which a cast would pull.
+const fighting = mob(0, 9, 'chase'), resting = mob(0, -6, 'hoe'), praying = mob(2, -6, 'pray');
+const fight: Kind = { ...kind, all: [resting, praying, fighting] };
+if (resolve(undefined, [fight], hero, 30)?.mob !== fighting) fail('auto-target pulled a pack at rest over the foe fighting');
+fighting.state = 'evade';
+if (resolve(undefined, [fight], hero, 30)?.mob !== resting) fail('nobody fighting: the nearest foe should be taken');
 console.log('target picking ok');

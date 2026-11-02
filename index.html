@@ -129,11 +129,12 @@
       @keyframes lowhp { to { filter: brightness(1.7) } }
 
       /* Minimap (src/ui/minimap.ts): round chart in a bronze ring, top right, zone name on a plate
-         above, N on the rim (pointing to the real north as the chart turns), zoom buttons below right, big-map button below left, camera-distance button above left, zone-notes quill above right. The column right of it stays free for the menu
-         and fullscreen buttons; narrow screens drop it under the player frame. */
+         above, N on the rim (pointing to the real north as the chart turns), zoom buttons below right, big-map button below left, camera-distance button above left, zone-notes quill above right,
+         all just outside the ring (angle --a, size --b) so they never cover the quest marks clinging to the rim. The column right of it stays free for the menu
+         buttons; narrow screens drop it under the player frame. */
       #minimap {
         --m: 150px;
-        position: fixed; right: calc(60px + env(safe-area-inset-right)); top: calc(30px + env(safe-area-inset-top));
+        position: fixed; right: calc(72px + env(safe-area-inset-right)); top: calc(30px + env(safe-area-inset-top));
         width: var(--m); height: var(--m); pointer-events: none;
       }
       #minimap canvas {
@@ -156,16 +157,18 @@
         color: #f3e2b0; font: bold 10px/16px Georgia, serif; text-align: center; text-shadow: 0 1px 1px #000;
       }
       #minimap button {
-        position: absolute; width: 22px; height: 22px; padding: 0; border-radius: 50%; cursor: pointer; pointer-events: auto;
+        --b: 22px; --a: 0deg; --o: calc(var(--m) / 2 + 9px + var(--b) / 2); /* centre: --o from the chart's, past the 8 px ring */
+        position: absolute; left: calc(50% + cos(var(--a)) * var(--o) - var(--b) / 2); top: calc(50% + sin(var(--a)) * var(--o) - var(--b) / 2);
+        width: var(--b); height: var(--b); padding: 0; border-radius: 50%; cursor: pointer; pointer-events: auto;
         border: 2px solid transparent; background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09) padding-box, var(--gilt-ring) border-box; box-shadow: 0 0 0 1px #000, 0 2px 4px #000;
         color: #f3e2b0; font: bold 15px/18px system-ui, sans-serif; text-shadow: 0 1px 1px #000;
       }
       #minimap button:active { filter: brightness(1.4); }
-      #minimap .zin { right: -6px; bottom: 16px; }
-      #minimap .zout { right: 16px; bottom: -6px; }
-      #minimap .wmap { left: -10px; bottom: 12px; width: 34px; height: 34px; }
-      #minimap .view { left: -10px; top: 12px; width: 30px; height: 30px; } /* the camera's three distances (main.ts), opposite the map button */
-      #minimap .note { right: -6px; top: 16px; width: 26px; height: 26px; } /* the zone notes (ui/notes.ts), above the zoom */
+      #minimap .zin { --a: 35deg; }
+      #minimap .zout { --a: 70deg; }
+      #minimap .wmap { --a: 145deg; --b: 34px; }
+      #minimap .view { --a: 215deg; --b: 30px; } /* the camera's three distances (main.ts), opposite the map button */
+      #minimap .note { --a: 325deg; --b: 26px; } /* the zone notes (ui/notes.ts), above the zoom */
       #minimap .note svg { display: block; margin: auto; }
       #minimap .view svg { display: block; margin: auto; fill: none; stroke: currentColor; stroke-width: 2; }
       #minimap .view svg circle, #minimap .view svg path.man { fill: currentColor; stroke: none; }

@@ -16,7 +16,7 @@ const CSS = `
   box-shadow: 0 0 0 1px #000, 0 3px 10px rgba(0,0,0,.7); touch-action: manipulation; }
 #menu-btn:hover, #menu-btn:focus-visible { filter: brightness(1.25); outline: none; }
 body.touch #menu-btn { transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
-body.touch #fullscreen { right: auto; left: calc(12px + env(safe-area-inset-left)); top: calc(20px + 76px * var(--k) + env(safe-area-inset-top)); } /* under the player frame: the right column is the panels' (bag, figure, book) */
+body.touch #fullscreen { right: auto; top: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(168px * var(--k) + env(safe-area-inset-bottom)); } /* above the stick, bottom left: clear of the buffs' row under the player frame however long it grows, and of the right column (bag, figure, book) */
 #menu { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
   background: rgba(0,0,0,.55); font: 15px/1.35 Georgia, serif; color: #f3e2b0; touch-action: auto; user-select: none; }
 #menu.show { display: flex; }

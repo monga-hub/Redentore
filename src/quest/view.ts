@@ -108,7 +108,7 @@ body.touch #epilogue h1 { font-size: 38px; }
 #quests.done span, #quests span.ok { color: #7dff64; }
 #quests span.heads { color: ${QUEST_COLOR}; }
 #quests span.heads.ready { color: #7dff64; }
-body.touch #quests { top: 0; right: calc(100% + 16px); width: 190px; font-size: 12px;
+body.touch #quests { top: 0; right: calc(100% + 32px); width: 190px; font-size: 12px;
   max-height: 42dvh; overflow: hidden; -webkit-mask-image: linear-gradient(#000 85%, transparent); mask-image: linear-gradient(#000 85%, transparent); } /* several side quests: the list fades out above the buttons */
 body.diablo #quests b { color: #e9d6b0; }
 

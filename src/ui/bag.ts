@@ -248,7 +248,7 @@ export class BagPanel {
     this.refresh();
   }
 
-  /** Show `c`'s tooltip beside the panels (above or below the cell when they fill the width); null hides it. */
+  /** Show `c`'s tooltip beside the panels (over the other open panel, or above or below the cell, when they fill the width); null hides it. */
   private select(c: HTMLElement | null, tap = false): void {
     this.sel?.classList.remove('sel');
     this.sel = c ?? undefined;
@@ -272,8 +272,18 @@ export class BagPanel {
     for (const x of t.children) x.classList.toggle('cut', x.scrollHeight > x.clientHeight + 1);
     const b = c.getBoundingClientRect(), w = t.offsetWidth, h = t.offsetHeight;
     const left = p.left - (m === 'split' ? main.offsetWidth : w) - 8, right = p.right + 8, side = beside(m);
-    t.style.left = `${side ? (left >= L ? left : right) : Math.min(Math.max(L, b.left + b.width / 2 - w / 2), R - w)}px`;
-    t.style.top = `${side ? Math.min(Math.max(T, b.top), B - h) : b.top - h - 8 < T ? Math.min(b.bottom + 8, B - h) : b.top - h - 8}px`;
+    const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
+    // No room beside: over another open panel (the shop while selling from the bag, the bag while buying), so the
+    // list being clicked stays in sight, sitting on the edge away from it; alone, above or below the cell.
+    const o = side ? undefined : [...this.row.querySelectorAll('.panel.on')].find((x) => !x.contains(c))?.getBoundingClientRect();
+    const own = c.closest('.panel')!.getBoundingClientRect();
+    if (o) {
+      t.style.left = `${clamp(o.left + o.width / 2 - w / 2, L, R - w)}px`;
+      t.style.top = `${o.bottom <= own.top ? clamp(o.bottom - h, T, B - h) : clamp(o.top, T, B - h)}px`;
+      return;
+    }
+    t.style.left = `${side ? (left >= L ? left : right) : clamp(b.left + b.width / 2 - w / 2, L, R - w)}px`;
+    t.style.top = `${side ? clamp(b.top, T, B - h) : b.top - h - 8 < T ? Math.min(b.bottom + 8, B - h) : b.top - h - 8}px`;
   }
 }
 

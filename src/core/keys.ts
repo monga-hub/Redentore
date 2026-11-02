@@ -1,4 +1,4 @@
-// Rebindable keys (the menu's "Comandi"): movement and the action bar's ten slots. The game keeps reading its
+// Rebindable keys (the menu's "Comandi"): movement and the action bar's eleven slots. The game keeps reading its
 // default codes (KeyW, Digit1, ...); core/input.ts runs each physical key through `translate` first, so a key the
 // player bound stands in for its action's first default, and a default the player moved away does nothing.
 // System keys (Esc, Tab, Invio, M, B, C, K, F) are never taken. Persisted in localStorage like the style;
@@ -17,10 +17,11 @@ export const ACTIONS: readonly Action[] = [
   { id: 'salta', name: 'Salta', keys: ['Space'] },
   { id: 'cammina', name: 'Cammina (tieni premuto)', keys: ['ShiftLeft', 'ShiftRight'] },
   ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ id: `barra${n}`, name: n === 1 ? 'Barra 1 · attacco primario' : `Barra ${n}`, keys: [`Digit${n}`] })),
-  { id: 'pozione', name: 'Barra · pozione', keys: ['KeyR'] },
+  { id: 'pozione', name: 'Barra · fiala di salute', keys: ['KeyR'] },
+  { id: 'pozione-mana', name: 'Barra · fiala di mana', keys: ['KeyT'] },
 ];
 /** The action of each action-bar slot, as abilities/system.ts KEYS. */
-export const SLOT_ACTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `barra${n}`).concat('pozione');
+export const SLOT_ACTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `barra${n}`).concat('pozione', 'pozione-mana');
 /** Keys the menus, the panels and the quests read as they are: never bound. Backspace and Canc clear a key in the menu. */
 export const RESERVED = new Set(['Escape', 'Tab', 'Enter', 'NumpadEnter', 'KeyM', 'KeyB', 'KeyC', 'KeyK', 'KeyF', 'Backspace', 'Delete']);
 
@@ -41,6 +42,11 @@ export function load(store?: Storage): Bindings {
   for (const a of ACTIONS) {
     const k = (raw as Record<string, unknown>)[a.id];
     if (Array.isArray(k) && k.length === a.keys.length && k.every((c) => typeof c === 'string' && !RESERVED.has(c))) b[a.id] = k;
+  }
+  // An older layout may already use T: keep every binding and give the new action a free key.
+  if (!('pozione-mana' in raw)) {
+    const taken = Object.entries(b).filter(([id]) => id !== 'pozione-mana').flatMap(([, keys]) => keys);
+    b['pozione-mana'] = [['KeyT', 'KeyY', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((k) => `Key${k}`), ...'0123456789'.split('').map((k) => `Digit${k}`)].find((k) => !RESERVED.has(k) && !taken.includes(k)) ?? ''];
   }
   const used = Object.values(b).flat().filter(Boolean);
   return new Set(used).size === used.length ? b : defaults();

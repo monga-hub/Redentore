@@ -222,7 +222,7 @@ if ((push.casting!.t as number) !== 0.5) throw new Error('channels are not set b
 const table = new Map(ABILITIES.map((a) => [a.id, a]));
 for (const c of CARDS) if (c.kind === 'ability' && !table.has(c.id)) throw new Error(`card ${c.id} has no ability`);
 for (const a of ABILITIES) {
-  if (a.id !== 'potion' && (!a.school || a.school !== SCHOOL[a.id])) throw new Error(`${a.id} has no school`); // the potion: the shared GCD-free slot
+  if (!['potion', 'mana_potion'].includes(a.id) && (!a.school || a.school !== SCHOOL[a.id])) throw new Error(`${a.id} has no school`); // the potion: the shared GCD-free slot
   if (!(ATLAS as readonly string[]).includes(a.icon)) throw new Error(`${a.id}: icon ${a.icon} not in the atlas`);
   if (/undefined|NaN/.test(a.desc) || !/\d/.test(a.desc)) throw new Error(`${a.id}: tooltip "${a.desc}"`);
   if (!(a.cooldown >= 0) || (a.mana !== undefined && !(a.mana > 0))) throw new Error(`${a.id}: cooldown ${a.cooldown}, mana ${a.mana}`);

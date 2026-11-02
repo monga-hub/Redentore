@@ -1,9 +1,9 @@
-import { CHARGE_MAX, GCD, cdText, KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
+import { CHARGE_MAX, GCD, cdText, KEYS, MANA_POTION, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { ICONS } from './icons.ts';
 import { onKeys, slotLabel } from '../core/keys.ts';
 
 // WoW-style action bar overlay: the primary attack on 1, the eight slots of the ability book (ui/book.ts) on 2..9 and the
-// potion on R, set a little apart; clockwise cooldown sweep
+// health potion on R and mana potion on T, set a little apart; clockwise cooldown sweep
 // (a conic-gradient driven by one CSS variable), remaining seconds, key label, click/tap
 // to cast, tooltip, cast bar, red error line and floating combat text. Plain DOM, styled
 // in index.html; per frame it only writes values that changed.
@@ -24,13 +24,14 @@ import { onKeys, slotLabel } from '../core/keys.ts';
  *  About 20 px of gap between neighbours and between the arcs, so a thumb lands on one button only.
  *  Slots follow the thumb: the inner arc from its bottom-left button up to its top-right one, then the
  *  outer arc the same way, so keys 2..9 and the bar's fill order (SPARE in abilities/system.ts) match.
- *  Jump and the potion sit outside the eight, low on the left where the thumb rests: jump closing the outer arc
- *  (index.html), the potion one step further along the bottom. The ability book's preview reuses this. */
+ *  Jump and both potions sit outside the eight, low on the left where the thumb rests: jump closing the outer arc
+ *  (index.html), the health potion further along the bottom and mana just above it. The ability book's preview reuses this. */
 export const RING: Record<number, [number, number, number]> = {
   0: [0, 0, 96], // the big one, in the corner: the primary attack
   1: [185, 120, 58], 2: [155, 120, 58], 3: [125, 120, 58], 4: [95, 120, 58],
   5: [158, 196, 54], 6: [136, 196, 54], 7: [114, 196, 54], 8: [92, 196, 54], // + jump at 180 (index.html)
   [POTION]: [180, 272, 54],
+  [MANA_POTION]: [164, 272, 54],
 };
 
 interface Slot<C extends Caster> {
@@ -74,6 +75,7 @@ export class ActionBar<C extends Caster> {
     KEYS.forEach((_, i) => {
       const s: Slot<C> = { el: el('button', 'slot'), cd: el('span', 'cd'), key: el('span', 'key'), p: '', text: '', wasCd: false };
       if (i === POTION) s.el.classList.add('potion');
+      if (i === MANA_POTION) s.el.classList.add('mana-potion');
       if (i === PRIMARY) {
         s.el.classList.add('main');
         s.el.insertAdjacentHTML('beforeend', '<svg class="charge" viewBox="0 0 100 100"><path d="M6 50 A44 44 0 0 1 94 50"/><path class="fill" pathLength="100" d="M6 50 A44 44 0 0 1 94 50"/></svg>');
@@ -184,6 +186,7 @@ export class ActionBar<C extends Caster> {
     s.el.querySelector('.icon')?.remove();
     s.el.querySelector('.sweep')?.remove();
     if (a) s.el.insertAdjacentHTML('afterbegin', `<div class="icon">${ICONS[a.icon] ?? ''}</div><div class="sweep"></div>`);
+    s.el.setAttribute('aria-label', a?.name ?? 'Vuoto');
     s.el.classList.toggle('empty', !a);
     s.el.classList.toggle('special', !!a?.special);
     s.el.classList.remove('active', 'casting', 'oom', 'locked');

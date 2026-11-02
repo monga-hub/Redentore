@@ -1,10 +1,10 @@
 // WoW-style ability runner: the primary attack on 1, eight slots the player fills from the ability book on 2..9, the
-// potion on R; per-ability cooldowns, a 1.5 s global
+// health potion on R and mana potion on T; per-ability cooldowns, a 1.5 s global
 // cooldown per school (an ice spell holds back the ice ones, not fire or the club), instant /
 // cast-time / channelled abilities, movement interrupts, cast pushback when the hero is hit. No DOM
 // and no three.js here, so `npm run check` exercises it in Node (scripts/check-abilities.ts).
 
-export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'KeyR'];
+export const KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'KeyR', 'KeyT'];
 export const GCD = 1.5;
 /** The bar's cooldown count: m:ss from a minute up, whole seconds down to 3, tenths below. Rounded up, never whole minutes:
  * "2m" for 67 s read as the base 2 min cooldown, not the 1:08 the upgrades left. */
@@ -23,9 +23,9 @@ let LAYOUT = 'redentore.bar';
 /** Each hero keeps his own bar (main.ts, before the kit reads it): another hero's arrangement never lands on his. */
 export function barFor(hero: string): void { LAYOUT = `redentore.bar.${hero}`; }
 /** The slots the player fills (ability book, drags), in the order a new unlock takes them: the touch fan's thumb order.
- *  The others are fixed: slot 0 the primary attack (the big button), slot 9 the potion; they keep what the default bar puts there. */
+ *  The others are fixed: slot 0 the primary attack (the big button), slots 9 and 10 the health and mana potions; they keep what the default bar puts there. */
 export const SPARE = [1, 2, 3, 4, 5, 6, 7, 8];
-export const PRIMARY = 0, POTION = 9;
+export const PRIMARY = 0, POTION = 9, MANA_POTION = 10;
 
 /** The bar as ability ids (locked ones too), and the abilities the player took off it, which unlocks leave in the book. */
 export interface Layout { bar: (string | null)[]; off: string[] }

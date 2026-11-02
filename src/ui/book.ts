@@ -1,5 +1,5 @@
 import { playSfx } from '../audio/engine.ts';
-import { KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
+import { KEYS, MANA_POTION, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { CARD, SCHOOL, SECOND_AT, type School } from '../player/levels.ts';
 import { RING } from './actionBar.ts';
 import { ICONS } from './icons.ts';
@@ -16,7 +16,7 @@ import { slotLabel } from '../core/keys.ts';
 // row with keys otherwise). Equipaggia lights the eight slots: a tap on one puts the ability there, swapping with an
 // ability already on the bar or sending the one there back to the book. Not armed, a tap on a slot opens its ability.
 // With a mouse, drag an ability (from the list or a slot) onto a slot, or a slot onto the list to take it off.
-// The primary attack and the potion are fixed: the big button and the potion's own button. The big button takes a base
+// The primary attack and the potions are fixed: the big button and the two potion buttons. The big button takes a base
 // attack only: the hero's own, or his secondary school's once he has learnt it (Sul tasto grande).
 
 const CSS = `
@@ -154,13 +154,13 @@ export class AbilityBook<C extends Caster> {
 
   private setMain: (id: string) => void;
   private schools: readonly School[];
-  /** `abilities`: the kit (the potion is left out: it has its own button, and so is every school but the hero's two); `schools`:
+  /** `abilities`: the kit (the potions are left out: each has its own button, and so is every school but the hero's two); `schools`:
    *  his primary and secondary; `picks`: the level-up cards so far; `setMain`: a base attack goes on the big button. */
   constructor(sys: AbilitySystem<C>, abilities: Ability<C>[], schools: readonly School[], picks: () => readonly string[], setMain: (id: string) => void = (id) => sys.setMain(id)) {
     this.sys = sys;
     this.setMain = setMain;
     this.schools = schools;
-    this.all = abilities.filter((a) => a.id !== sys.layout().bar[POTION] && (schools.includes(SCHOOL[a.id] as School) || a.id === 'mend'));
+    this.all = abilities.filter((a) => a.id !== sys.layout().bar[POTION] && a.id !== sys.layout().bar[MANA_POTION] && (schools.includes(SCHOOL[a.id] as School) || a.id === 'mend'));
     this.picks = picks;
     this.sel = sys.slots[PRIMARY]?.id ?? this.all[0].id;
     const style = document.createElement('style');
@@ -295,7 +295,7 @@ export class AbilityBook<C extends Caster> {
       <div class="side">${this.arc()}${acts}</div>`;
   }
 
-  /** The bar in small: its ten buttons where RING puts them (the jump too, greyed, on touch), the selected one lit. */
+  /** The bar in small: its eleven buttons where RING puts them (the jump too, greyed, on touch), the selected one lit. */
   private arc(): string {
     const btn = (i: number) => {
       const a = this.sys.slots[i], [deg, r, d] = RING[i], fixed = !SPARE.includes(i);
@@ -330,7 +330,7 @@ export class AbilityBook<C extends Caster> {
     else if (slot) {
       const i = +slot.dataset.slot!;
       if (this.armed && SPARE.includes(i)) { this.put(this.sel, i); this.armed = false; }
-      else if (this.sys.slots[i] && i !== POTION) { this.sel = this.sys.slots[i]!.id; this.armed = false; }
+      else if (this.sys.slots[i] && i !== POTION && i !== MANA_POTION) { this.sel = this.sys.slots[i]!.id; this.armed = false; }
     } else if (act?.dataset.do === 'equip') this.armed = !this.armed;
     else if (act?.dataset.do === 'main') { this.setMain(this.sel); playSfx('ui_click', null, { ui: true, rate: 0.8 }); }
     else if (act?.dataset.do === 'remove') {

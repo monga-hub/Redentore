@@ -238,7 +238,8 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | rotella | zoom |
 | Q / E | ruota la camera |
 | 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca, Tizzone per Fra' Tizian, Folgore per Zanetto), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4), Fra' Tizian con Rogo dell'eretico (2), Cero funebre (3) e Preghiera di suffragio (4), Zanetto con Catena di saette (2), Rintocco del campanile (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
-| R | la fiala di linfa tombale (la pozione), su un tasto suo fuori dagli otto |
+| R | Fiala di linfa tombale: ripristina il 30% della salute massima |
+| T | Fiala di essenza spettrale: ripristina il 30% del mana massimo |
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 / 3 | al passaggio di livello (il gioco si ferma) scegli una delle tre carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
@@ -250,7 +251,7 @@ Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muove
 trascina sul resto dello schermo per la camera, pizzica per lo zoom; a destra le
 abilità diventano tasti tondi a ventaglio attorno all'angolo (stile action-RPG mobile): l'attacco
 primario grande nell'angolo, gli otto posti attorno, e fuori dagli otto, in basso a sinistra dove
-riposa il pollice, il salto e la pozione. In colonna sotto l'ingranaggio borsa, figura e libro;
+riposa il pollice, il salto e le due fiale. In colonna sotto l'ingranaggio borsa, figura e libro;
 lo schermo intero (solo dove il browser lo permette) sta sotto il riquadro del personaggio.
 
 In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,
@@ -361,9 +362,11 @@ numeri evidenziati, i potenziamenti, le fusioni e i passivi che la toccano, e so
 ventaglio su touch e in Stile Diablo, la fila coi tasti altrimenti). *Equipaggia* (o *Sposta*) illumina gli otto posti:
 toccandone uno l'abilità va lì, scambiandosi con quella che c'era se era sulla barra, o rimandando nel libro quella che
 c'era; *Rimuovi* svuota il suo posto. Col mouse si trascina un'abilità dalla lista o da un posto su un altro posto, o un
-posto sulla lista per toglierlo. L'attacco primario (il tasto grande: solo un attacco base, scelto con *Sul tasto grande*) e la pozione sono fissi; un'abilità tolta resta nel
+posto sulla lista per toglierlo. L'attacco primario (il tasto grande: solo un attacco base, scelto con *Sul tasto grande*) e le due fiale sono fissi; un'abilità tolta resta nel
 libro anche ricaricando, una carta appena scelta va comunque sulla barra. La disposizione resta salvata nel browser e
-quella di prima (dodici tasti con la pozione) si converte da sola.
+quella di prima (dodici tasti con la pozione) si converte da sola. La fiala di mana aggiunge un posto fisso senza spostare gli otto personalizzabili.
+
+Le due fiale sono riutilizzabili, disponibili a ogni eroe e fuori dal recupero globale: ciascuna ha un recupero indipendente di 30 s. *Linfa capiente/rapida* e *Essenza capiente/rapida* potenziano separatamente quantità (+15 punti percentuali per rango) e recupero (−30% del tempo restante per rango). I vecchi ranghi *Fiala capiente/rapida* conservano il beneficio su entrambe le fiale e contano ancora come una sola scelta: nessun livello o progresso si perde e salvare/ricaricare non duplica il bonus. Anche i premi del rito migliorano entrambe le fiale. Il vecchio tasto della pozione resta alla salute; se T era già personalizzato, il mana riceve il primo tasto libero (prima Y), visibile nella barra e rimappabile nei Comandi.
 
 Cinque abilità per scuola (l'attacco base a parte), sul modello di WoW e Diablo, tutte con la stessa forma: **tre a mana** (col loro
 costo, recupero e lancio) e **due speciali** (le carte dal livello 6), istantanee, senza mana né recupero, che si lanciano solo con la
@@ -559,7 +562,7 @@ src/
   fx/occlusion.ts            Stile Diablo: muri abbassati, tetti e prop svaniti, sagome x-ray
   fx/diabloFx.ts             Stile Diablo: numeri di danno, sangue, colonne di luce
   ui/hud.ts                  nome dell'area corrente
-  ui/actionBar.ts            barra abilità stile WoW (primario, 8 posti e pozione, sweep del cooldown, castbar,
+  ui/actionBar.ts            barra abilità stile WoW (primario, 8 posti e due fiale, sweep del cooldown, castbar,
                              tooltip, errori, testo di combattimento); ui/icons.ts icone dipinte
                              (un atlante WebP, `ui/icons.webp`, dipinto e impacchettato da
                              `scripts/icons/build.py`); la pelle stile WoW (pietra e cornici dorate,

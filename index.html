@@ -207,13 +207,13 @@
       /* Action bar: WoW-style buttons on a carved stone bar in a gilded frame, a painted winged lion of San Marco
          on each end (--cap-img), conic cooldown sweep on --p. */
       .actionbar {
-        --s: min(46px, calc((100vw - 48px) / 10 - 4px));
+        --s: min(46px, calc((100vw - 88px) / 11));
         position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%);
         display: flex; flex-direction: column; align-items: center; gap: 10px;
         user-select: none; -webkit-user-select: none; touch-action: none;
       }
       .actionbar .bar {
-        position: relative; display: grid; grid-template-columns: repeat(9, var(--s)) calc(var(--s) + 14px); gap: 5px; padding: 6px 8px;
+        position: relative; display: grid; grid-template-columns: repeat(9, var(--s)) calc(var(--s) + 14px) var(--s); gap: 5px; padding: 6px 8px;
         border: 3px solid transparent; border-radius: 5px; background: var(--panel); box-shadow: var(--panel-shadow);
       }
       .actionbar .bar::before, .actionbar .bar::after { /* the lions, sitting on the bar's ends and facing in */

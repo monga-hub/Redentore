@@ -5,14 +5,14 @@
 // Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
 // pays 950 XP in all, ~16 with the side quests done too. There is no cap: the curve goes on, and the risen dead keep feeding it.
 // Each level offers three cards from everything of the hero's two schools not yet learnt and the cards of no school (`LEAN`:
-// half his primary school's, a third his secondary's, the rest the passives, fusions and the potion's), whatever was picked
+// half his primary school's, a third his secondary's, the rest the passives, fusions and the potions'), whatever was picked
 // before. Every school is the same shape (`specialsOf`): three abilities paid in mana and two specials, instant, spent with a full fury bar.
 // Even levels up to 10 offer three new abilities (the specials from level 6), past 10 a new ability against a passive and a
 // modifier; the others a modifier of an owned ability (or a fusion), a stat passive and another modifier. New abilities,
 // fusions and the on/off modifiers are taken once; every other modifier and passive is ranked with no cap, each pick a rank
 // adding the same share again (`rank`, `by`), so the progression never runs out. Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
-// Caduta d'ossa for the Ossa, Stiletto di ghiaccio for the Gelo...) and Preghiera di suffragio (the heal), the potion stays as
-// an item; owning 3 of the 5 abilities of his secondary school teaches him that school's base attack too (`SECOND_AT`),
+// Caduta d'ossa for the Ossa, Stiletto di ghiaccio for the Gelo...) and Preghiera di suffragio (the heal), the potions stay as
+// items; owning 3 of the 5 abilities of his secondary school teaches him that school's base attack too (`SECOND_AT`),
 // which the book can put on the big button instead. The hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school of his for gold. A save
 // from before the two schools keeps only theirs (`ownSchools`). Everything an
 // upgrade changes is a field of `Tune`, replayed from the picks and the tomes' abilities (`tuneOf`), so a save only needs both lists.
@@ -39,7 +39,7 @@ export interface Tune {
   veilTime: number; veilHeal: number;
   stepDmg: number; stepCd: number;
   strikeDmg: number; novaR: number; novaDmg: number; wardTime: number; wardHeal: number;
-  potion: number; potionCd: number;
+  potion: number; potionCd: number; manaPotion: number; manaPotionCd: number;
   fxWisp: boolean; fxStep: boolean; fxFall: boolean; // fusions: the wisp, the blink, the third swing sow plague clouds
   // fire, frost, lightning and the new blows (abilities/grimoire.ts)
   pyreDmg: number; pyreCast: number; pyreR: number;
@@ -92,8 +92,8 @@ export const SECOND_AT = 3;
 /** The Risorto's: who `tuneOf` and the rest take a hero to be when not told. */
 export const RISORTO: [School, School] = ['bone', 'shadow'];
 
-/** The abilities every run starts with: the hero's base attack, the heal, the potion. */
-export const startOf = (schools: readonly School[] = RISORTO) => [BASE_ATTACK[schools[0]], 'mend', 'potion'];
+/** The abilities every run starts with: the hero's base attack, the heal, both potions. */
+export const startOf = (schools: readonly School[] = RISORTO) => [BASE_ATTACK[schools[0]], 'mend', 'potion', 'mana_potion'];
 export const START = startOf();
 const BASE: Tune = {
   owned: START,
@@ -104,7 +104,7 @@ const BASE: Tune = {
   veilTime: 5, veilHeal: 0,
   stepDmg: 25, stepCd: 12,
   strikeDmg: 120, novaR: 6, novaDmg: 80, wardTime: 5, wardHeal: 0,
-  potion: 0.3, potionCd: 30,
+  potion: 0.3, potionCd: 30, manaPotion: 0.3, manaPotionCd: 30,
   fxWisp: false, fxStep: false, fxFall: false,
   pyreDmg: 140, pyreCast: 1.2, pyreR: 2.5, // casts of a second or so: a caster faces a charging pack too
   frostDmg: 80, frostCast: 1, frostSlow: 0.5,
@@ -160,7 +160,7 @@ const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text
 /** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
 export const SCHOOL: Record<string, School> = { mend: 'holy', ...Object.fromEntries(Object.entries(BASE_ATTACK).map(([s, id]) => [id, s as School])) };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
-  ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
+  ({ id, kind: 'mod', name, icon: of === 'mana_potion' ? 'mana' : of, text, max, of, apply });
 /** The upgrades with a number to grow have no cap: each pick is a rank more, and each rank adds the same share. */
 export const RANKS = Infinity;
 type Num = { [K in keyof Tune]: Tune[K] extends number ? K : never }[keyof Tune];
@@ -245,8 +245,13 @@ export const CARDS: Card[] = [
   rank('strike', 'strike_dmg', 'Condanna', `Sentenza del sepolcro: +60% ai danni a ogni rango (base ${BASE.strikeDmg}).`, by('strikeDmg', 0.6)),
   rank('nova', 'nova_big', 'Lamento profondo', `Lamento della cripta: +50% ai danni (base ${BASE.novaDmg}) e raggio +20% (base ${BASE.novaR} m) a ogni rango.`, by('novaDmg', 0.5), by('novaR', 0.2)),
   rank('ward', 'ward_long', 'Patto eterno', `Patto della tomba: dura il 30% in più (base ${BASE.wardTime} s) e alla fine ti cura del 15% in più, a ogni rango.`, by('wardTime', 0.3), (t) => { t.wardHeal += 0.15; }),
-  rank('potion', 'potion_big', 'Fiala capiente', `Fiala di linfa tombale: ripristina la metà in più a ogni rango (base il ${pct(BASE.potion)}, +15%).`, by('potion', 0.5)),
-  rank('potion', 'potion_cd', 'Fiala rapida', `Fiala di linfa tombale: recupero −30% a ogni rango (base ${BASE.potionCd} s).`, by('potionCd', -0.3)),
+  rank('potion', 'health_potion_big', 'Linfa capiente', `Fiala di linfa tombale: +15 punti percentuali di salute a ogni rango (base ${pct(BASE.potion)}).`, by('potion', 0.5)),
+  rank('potion', 'health_potion_cd', 'Linfa rapida', `Fiala di linfa tombale: recupero −30% a ogni rango (base ${BASE.potionCd} s).`, by('potionCd', -0.3)),
+  rank('mana_potion', 'mana_potion_big', 'Essenza capiente', `Fiala di essenza spettrale: +15 punti percentuali di mana a ogni rango (base ${pct(BASE.manaPotion)}).`, by('manaPotion', 0.5)),
+  rank('mana_potion', 'mana_potion_cd', 'Essenza rapida', `Fiala di essenza spettrale: recupero −30% a ogni rango (base ${BASE.manaPotionCd} s).`, by('manaPotionCd', -0.3)),
+  // Legacy ranks keep both benefits and one pick each: no lost upgrades or extra level-up debt on reload.
+  { ...rank('potion', 'potion_big', 'Fiala capiente', 'Rango precedente: +15 punti percentuali a entrambe le fiale.', by('potion', 0.5), by('manaPotion', 0.5)), kind: 'filler' },
+  { ...rank('potion', 'potion_cd', 'Fiala rapida', 'Rango precedente: recupero −30% per entrambe le fiale.', by('potionCd', -0.3), by('manaPotionCd', -0.3)), kind: 'filler' },
   rank('pyre', 'pyre_fast', 'Rogo rapido', `Rogo dell'eretico: lancio −35% a ogni rango (base ${it(BASE.pyreCast)} s).`, by('pyreCast', -0.35)),
   rank('pyre', 'pyre_big', 'Pira', `Rogo dell'eretico: +30% ai danni (base ${BASE.pyreDmg}) e schizzi e fiamme a terra +20% più larghi (base ${it(BASE.pyreR)} m) a ogni rango.`, by('pyreDmg', 0.3), by('pyreR', 0.2)),
   rank('frost', 'frost_deep', 'Brina profonda', `Dardo di brina: +25% ai danni (base ${BASE.frostDmg}) a ogni rango, e ai rallentati lascia il 30% di velocità in meno (base ${pct(BASE.frostSlow)}).`, by('frostDmg', 0.25), by('frostSlow', -0.3)),
@@ -325,7 +330,7 @@ export const CARD = new Map(CARDS.map((c) => [c.id, c]));
 for (const c of CARDS) if (c.school) SCHOOL[c.id] = c.school;
 /** The specials: two a school, instant, each spending a full fury bar (tier B, offered from level 6). */
 export const SPECIALS = CARDS.filter((c) => c.tier === 'B').map((c) => c.id);
-/** The school a card belongs to: an ability's own, an upgrade its ability's; none for passives, fusions and the potion's. */
+/** The school a card belongs to: an ability's own, an upgrade its ability's; none for passives, fusions and the potions'. */
 export const schoolOf = (c: Card): School | undefined => c.school ?? SCHOOL[c.of ?? ''];
 /** A card a hero of `schools` may have: of his two schools, or of none. */
 export const ours = (c: Card, schools: readonly School[]) => { const s = schoolOf(c); return !s || schools.includes(s); };
@@ -334,7 +339,7 @@ export const ours = (c: Card, schools: readonly School[]) => { const s = schoolO
 export const counter = (picks: readonly string[]) => {
   const n = new Map<string, number>();
   for (const p of picks) n.set(p, (n.get(p) ?? 0) + 1);
-  return (id: string) => n.get(id) ?? 0;
+  return (id: string) => (n.get(id) ?? 0) + (/^(health|mana)_potion_(big|cd)$/.test(id) ? n.get(id.replace(/^(health|mana)_/, '')) ?? 0 : 0);
 };
 
 /** A ranked card's badge on the level-up window: the rank this pick brings it to ("rango 1" the first time). '' for the one-time cards. */
@@ -390,7 +395,7 @@ export function ownSchools(picks: readonly string[], learned: readonly string[],
   return { picks: kept, learned: learnt, refund: lost.reduce((g, id) => g + TOME_PRICE[CARD.get(id)!.tier ?? 'A'], 0) };
 }
 
-/** Odds a card is drawn from the hero's primary school, his secondary, the cards of no school (passives, fusions, the potion's). */
+/** Odds a card is drawn from the hero's primary school, his secondary, the cards of no school (passives, fusions, the potions'). */
 export const LEAN = [0.5, 0.3, 0.2];
 /** Which of LEAN's shares a card falls in for a hero of `schools`: an upgrade goes with its ability's school. */
 export const leanOf = (c: Card, schools: readonly School[]) => { const s = schoolOf(c); return s === schools[0] ? 0 : s === schools[1] ? 1 : 2; };

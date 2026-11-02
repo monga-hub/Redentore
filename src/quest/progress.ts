@@ -120,9 +120,9 @@ export const BERTHS = { punta: { x: PIER.x0 + 1.4, z: (PIER.z0 + PIER.z1) / 2 },
 export const HEADS = { need: 12, rate: 0.5, item: 'testa-frate' } as const;
 /** The rite's boons: laid on the kit after the level-up cards (main.ts levels.apply), for good. */
 export const BOONS = [
-  { id: 'fiala', label: 'Fiala +30%', text: 'la Fiala di linfa tombale ripristina il 30% in più', apply: (t: Tune) => { t.potion *= 1.3; } },
+  { id: 'fiala', label: 'Fiale +30%', text: 'entrambe le fiale ripristinano il 30% in più della propria risorsa', apply: (t: Tune) => { t.potion *= 1.3; t.manaPotion *= 1.3; } },
   { id: 'vigore', label: 'Salute +8%', text: "l'8% di salute massima in più", apply: (t: Tune) => { t.hp *= 1.08; } },
-  { id: 'rapida', label: 'Fiala rapida', text: 'il recupero della Fiala si accorcia del 20%', apply: (t: Tune) => { t.potionCd *= 0.8; } },
+  { id: 'rapida', label: 'Fiale rapide', text: 'il recupero di entrambe le fiale si accorcia del 20%', apply: (t: Tune) => { t.potionCd *= 0.8; t.manaPotionCd *= 0.8; } },
 ] as const;
 
 export const QUESTS = {

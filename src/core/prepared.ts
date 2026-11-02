@@ -15,8 +15,8 @@ export const XP = 1525;
 export const PICKS = ['step', 'hp', 'leap', 'fall_dmg', 'nova', 'fall_third', 'ward', 'leap_big', 'whirl', 'dmg', 'hp'];
 /** Level 1's purple set, one piece a slot. */
 export const GEAR = { testa: 'mitria', amuleto: 'ruta-oro', spalle: 'mantella-peste', torso: 'saio-voto', mani: 'guanti-palladio', gambe: 'cosciali-lazzaretto', piedi: 'zoccoli-redentore', anello: 'anello-1576', arma: 'pastorale' };
-/** The bar: the club on 1, the potion on R, the rest in the touch fan's order. */
-export const BAR: Layout = { bar: ['fall', 'leap', 'whirl', 'step', 'nova', 'ward', 'mend', null, null, 'potion'], off: [] };
+/** The bar: the club on 1, the health potion on R and mana potion on T, the rest in the touch fan's order. */
+export const BAR: Layout = { bar: ['fall', 'leap', 'whirl', 'step', 'nova', 'ward', 'mend', null, null, 'potion', 'mana_potion'], off: [] };
 const UNSEEN = new Set(['giudecca', 'zitelle']); // level 2's zones: not walked yet
 
 /**

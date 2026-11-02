@@ -204,7 +204,7 @@ export const spezialeWait = (n: number, need: number): Talk => ({
 export const SPEZIALE_RITE: Talk = {
   pages: [
     'Eccole. Le conto due volte, come faceva lui con i corpi... no. Lui contava per tenerle, io per restituirle. Mettile qui, tra la ruta e la salvia, e non respirare.',
-    'Scegli cosa vuoi che la terra ti renda: una fiala più forte, un corpo più saldo o una fiala che torna piena prima. Una volta sola, Risorto: il rito non si ripete.',
+    'Scegli cosa vuoi che la terra ti renda: due fiale più forti, un corpo più saldo o due fiale che tornano piene prima. Una volta sola, Risorto: il rito non si ripete.',
   ],
   choices: BOONS,
 };

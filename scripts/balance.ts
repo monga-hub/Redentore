@@ -72,23 +72,23 @@ const FIGHTING = new Set(['chase', 'swing', 'cast', 'nova']);
 // --- builds: card preferences, best first (anything unlisted comes last), each its hero's (`HERO_OF`): a hero is offered only his two schools ---
 export const BUILDS: Record<string, string[]> = {
   // the Risorto (Ossa, Ombra): the club, the blink and the shroud, the specials on the fury
-  melee: ['fall_third', 'fall_dmg', 'step', 'ward', 'strike', 'veil', 'fall_reach', 'dmg', 'hp', 'armor', 'leech', 'fall_mana', 'potion_big', 'ward_long', 'fury',
-    'strike_dmg', 'potion_cd', 'veil_long', 'veil_heal', 'step_dmg', 'step_cd', 'fury_start', 'speed', 'nova', 'cdr', 'regen', 'mana', 'leap'],
+  melee: ['fall_third', 'fall_dmg', 'step', 'ward', 'strike', 'veil', 'fall_reach', 'dmg', 'hp', 'armor', 'leech', 'fall_mana', 'health_potion_big', 'ward_long', 'fury',
+    'strike_dmg', 'health_potion_cd', 'veil_long', 'veil_heal', 'step_dmg', 'step_cd', 'fury_start', 'speed', 'nova', 'cdr', 'regen', 'mana', 'leap'],
   // and his heavy blows: the leap, the whirl, the execute, the drain
-  mixed: ['fall_dmg', 'leap', 'whirl', 'ward', 'grace', 'nova', 'dmg', 'hp', 'fall_third', 'whirl_dmg', 'leap_big', 'armor', 'leech', 'ward_long', 'potion_big',
-    'fury', 'grace_mul', 'nova_big', 'drain', 'fall_reach', 'potion_cd', 'strike', 'step', 'veil', 'regen'],
+  mixed: ['fall_dmg', 'leap', 'whirl', 'ward', 'grace', 'nova', 'dmg', 'hp', 'fall_third', 'whirl_dmg', 'leap_big', 'armor', 'leech', 'ward_long', 'health_potion_big',
+    'fury', 'grace_mul', 'nova_big', 'drain', 'fall_reach', 'health_potion_cd', 'strike', 'step', 'veil', 'regen'],
   // Bortolo (Gelo, Fulmine): the stiletto on the frozen, the bora, the saette
   frost: ['blizzard', 'chain', 'font', 'orb', 'toll', 'lance_split', 'lance_dmg', 'lance_third', 'frost_deep', 'caligo_freeze', 'blizzard_big', 'regen', 'mana', 'frost_fast', 'chain_fast', 'font_long',
-    'orb_slow', 'dmg', 'hp', 'armor', 'caligo_big', 'font_cd', 'lance_mana', 'potion_big', 'cdr', 'fury', 'shield', 'squall', 'rod', 'leech', 'potion_cd'],
+    'orb_slow', 'dmg', 'hp', 'armor', 'caligo_big', 'font_cd', 'lance_mana', 'health_potion_big', 'cdr', 'fury', 'shield', 'squall', 'rod', 'leech', 'health_potion_cd'],
   // Suor Fosca (Peste, Sacro): poison spread, the breath, the fever, and the judgment
   venom: ['untore', 'miasma', 'fever', 'judge', 'hallow', 'spit_twin', 'fx_venomcloud', 'miasma_more', 'untore_far', 'fever_deep', 'plague_dps', 'thorn_dmg', 'regen', 'mana',
-    'plague_size', 'dmg', 'hp', 'armor', 'judge_dmg', 'hallow_big', 'cdr', 'bubble', 'hammer', 'potion_big', 'leech', 'fury', 'bubble_cd', 'potion_cd'],
+    'plague_size', 'dmg', 'hp', 'armor', 'judge_dmg', 'hallow_big', 'cdr', 'bubble', 'hammer', 'health_potion_big', 'leech', 'fury', 'bubble_cd', 'health_potion_cd'],
   // Fra' Tizian (Fuoco, Sacro): the pyre and the candles, the judgment set alight
   fire: ['judge', 'wisp', 'pillar', 'furnace', 'hallow', 'fx_holyfire', 'pyre_fast', 'pyre_big', 'cero_chain', 'ember_split', 'regen', 'mana', 'judge_dmg', 'pillar_big', 'furnace_hot',
-    'wisp_dps', 'dmg', 'hp', 'armor', 'cdr', 'bubble', 'hammer', 'potion_big', 'leech', 'fury', 'hallow_big', 'potion_cd'],
+    'wisp_dps', 'dmg', 'hp', 'armor', 'cdr', 'bubble', 'hammer', 'health_potion_big', 'leech', 'fury', 'hallow_big', 'health_potion_cd'],
   // Zanetto (Fulmine, Ossa): bells and heavy blows
   storm: ['shield', 'leap', 'whirl', 'squall', 'rod', 'grace', 'spark_split', 'spark_dmg', 'spark_third', 'whirl_dmg', 'grace_mul', 'leap_big', 'chain_fast', 'toll_big', 'dmg', 'hp', 'armor', 'regen',
-    'mana', 'chain_long', 'squall_big', 'rod_long', 'shield_more', 'leap_cd', 'whirl_long', 'potion_big', 'leech', 'fury', 'strike', 'nova'],
+    'mana', 'chain_long', 'squall_big', 'rod_long', 'shield_more', 'leap_cd', 'whirl_long', 'health_potion_big', 'leech', 'fury', 'strike', 'nova'],
 };
 /** Whose kit each build plays (player/heroes.ts); HERO=bortolo plays every build on him instead. */
 export const HERO_OF: Record<string, Hero> = { melee: 'risorto', mixed: 'risorto', frost: 'bortolo', venom: 'fosca', fire: 'tizian', storm: 'zanetto' };
@@ -116,7 +116,7 @@ function picksTo(build: string, lv: number): string[] {
 /** Past a build's own list, what any player would rather take: often none of the three cards is the build's. */
 const GENERIC = ['veil', 'ward', 'pyre', 'strike', 'drain', 'cero', 'judge', 'hallow', 'spit', 'pillar', 'chain', 'grace', 'toll', 'frost', 'leap', 'whirl', 'furnace',
   'miasma', 'fever', 'blizzard', 'wisp', 'font', 'caligo', 'step', 'charge', 'nova', 'rod', 'orb', 'shield', 'squall', 'hammer', 'bubble', 'untore',
-  'dmg', 'hp', 'armor', 'leech', 'potion_big', 'regen', 'mana', 'cdr', 'fury', 'speed'];
+  'dmg', 'hp', 'armor', 'leech', 'health_potion_big', 'regen', 'mana', 'cdr', 'fury', 'speed'];
 function choose(build: string, picks: string[]): string {
   const pref = BUILDS[build] ?? [], rank = (id: string) => (pref.includes(id) ? pref.indexOf(id) : GENERIC.includes(id) ? 500 + GENERIC.indexOf(id) : 999), k = kitOf(build);
   const cards = offer(picks, rnd, k.learned, k.schools);
@@ -630,6 +630,7 @@ class Run {
     // Defensive cooldowns first: they are off the GCD or worth it.
     const low = s.hp / s.hpMax;
     if (low < 0.45 || (!engaged.length && low < 0.7)) { if (this.ready('potion') && this.cast('potion')) this.zone(t ? this.zoneOf(t) : 'viaggio').potions++; }
+    if (s.mana / s.manaMax < (engaged.length ? 0.45 : 0.7) && this.ready('mana_potion') && this.cast('mana_potion')) this.zone(t ? this.zoneOf(t) : 'viaggio').potions++;
     if (engaged.length && low < 0.4 && this.ready('ward')) this.cast('ward');
     if (engaged.length && low < 0.3 && this.stats.immune <= 0 && this.ready('bubble')) this.cast('bubble');
     if (engaged.length && low < 0.6 && s.veil <= 0 && this.ready('veil')) this.cast('veil');

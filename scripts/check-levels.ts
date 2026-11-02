@@ -1,4 +1,4 @@
-// Levels check (`npm run check`): the 99 upgrade cards (every ability with a school and its modifiers, five abilities a school: three paid in mana
+// Levels check (`npm run check`): the 101 upgrade cards (every ability with a school and its modifiers, five abilities a school: three paid in mana
 // and two instant specials spent with a full fury bar, in the cards and in the kit alike), the XP curve against the mobs' worth (first level after two friars, the quest
 // route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11, no cap), the three-card offers over many random runs to level 30 (never an owned or maxed card,
 // never a mod for a locked ability, new abilities on even levels with the specials from level 6, one past 10, fusions only
@@ -11,7 +11,7 @@
 import { BASES, BASE_ATTACK, CARD, CARDS, LEAN, RISORTO, SCHOOL, SECOND_AT, SPECIALS, START, TOMES, TOME_PRICE, counter, eligible, manaOf, ours, ownSchools, specialsOf, stacks, leanOf, levelOf, need, offer, slotsOf, startOf, tomeOf, tomesOf, tuneOf, type Card, type School } from '../src/player/levels.ts';
 import { FRIAR, spawnGroups } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from '../src/enemies/caster.ts';
-import { AbilitySystem, KEYS, POTION, PRIMARY, type Ability } from '../src/abilities/system.ts';
+import { AbilitySystem, KEYS, MANA_POTION, POTION, PRIMARY, type Ability } from '../src/abilities/system.ts';
 import { ABILITIES, BAR, barOf } from '../src/abilities/forsaken.ts';
 import { HEROES, HERO_IDS } from '../src/player/heroes.ts';
 import { buildLevel } from '../src/level/index.ts';
@@ -29,7 +29,7 @@ for (const [xp, lv] of [[560, 8], [720, 9], [875, 9], [900, 10], [19, 1], [20, 2
 const l = levelOf(70);
 if (l.lv !== 3 || l.into !== 10 || l.next !== 60) fail(`levelOf(70) = ${JSON.stringify(l)}`);
 if (levelOf(2400 + 5).next !== need(16) || levelOf(2400 + 5).into !== 5) fail('the curve stops at 16');
-if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 99) fail('99 upgrade cards');
+if (CARDS.filter((c) => c.kind !== 'ability' && c.kind !== 'filler').length !== 101) fail('101 upgrade cards');
 // Five abilities a school, the starting ones counted, the base attacks and the potion apart; a base attack a school,
 // each with four upgrades of Caduta d'ossa's shape (damage twice, reach, the third blow, mana back).
 for (const school of ['bone', 'plague', 'shadow', 'fire', 'frost', 'storm', 'holy'] as School[]) {
@@ -179,7 +179,7 @@ if (has(['whirl'], 'fx_frostwhirl') || !has(['whirl', 'font'], 'fx_frostwhirl') 
 if (!has(['pyre', 'blizzard'], 'fx_shatter') || !hasL(['rod'], 'fx_storm')) fail('the new frost and lightning open the old fusions');
 if (hasL([], 'fx_venomcloud') || !hasL(['spit'], 'fx_venomcloud') || !hasL(['miasma'], 'fx_venomcloud') || has(['spit'], 'fx_venomcloud')) fail('Miasma velenoso needs a poison and the plague');
 if (has(['judge'], 'fx_holyfire') || has(['cero'], 'fx_holyfire') || !has(['judge', 'cero'], 'fx_holyfire')) fail('Giudizio ardente needs the judgment and fire');
-if (has([], 'leap_big') || !has(['leap'], 'leap_big') || !has([], 'potion_big')) fail('mods need their ability (the potion is owned)');
+if (has([], 'leap_big') || !has(['leap'], 'leap_big') || !has([], 'health_potion_big') || !has([], 'mana_potion_big')) fail('mods need their ability (the potion is owned)');
 if (has(['wisp'], 'wisp_dps') || eligible([], [], RISORTO).some((c) => c.id === 'pyre' || c.id === 'plague')) fail('the Risorto offered the Fuoco or the Peste');
 
 // Every one-time card taken, every ranked one a few times: the ranks keep coming, three a level, and the retired fillers
@@ -226,7 +226,7 @@ if (tuneOf(['frost'], ['frost']).owned.filter((id) => id === 'frost').length !==
 // its one and unknown ids ignored, order-free, survives JSON.
 const t = tuneOf(['dmg', 'dmg', 'dmg', 'dmg', 'hp', 'plague_size', 'junk', 'nova', 'wisp_fast', 'fury_start', 'fury_start']);
 if (Math.abs(t.dmg - 1.32) > 1e-9 || Math.abs(t.hp - 1.15) > 1e-9 || Math.abs(t.plagueR - 2.75) > 1e-9 || Math.abs(t.wispCast - 0.5) > 1e-9 || t.furyStart !== 30) fail(`tune ${JSON.stringify(t)}`);
-if (t.owned.join() !== 'fall,mend,potion,nova' || t.fury !== 1) fail('owned / fury');
+if (t.owned.join() !== 'fall,mend,potion,mana_potion,nova' || t.fury !== 1) fail('owned / fury');
 if (tuneOf([]).fury !== 0 || tuneOf([]).owned.join() !== START.join()) fail('the start');
 const picks = ['veil', 'armor', 'strike', 'fury', 'ward', 'ward_long'];
 if (JSON.stringify(tuneOf(JSON.parse(JSON.stringify(picks)))) !== JSON.stringify(tuneOf(picks))) fail('replay after JSON');
@@ -253,12 +253,12 @@ if (BAR[PRIMARY] !== 'fall' || BAR[POTION] !== 'potion' || BAR.length !== KEYS.l
 const later = ['nova', 'veil', 'strike', 'step', 'ward'];
 const run = new AbilitySystem([...START, ...later].map(ab), BAR, { player: { pos: { x: 0, y: 0, z: 0 } } }, START);
 for (const id of later) run.unlock(id);
-if (run.layout().bar.join() !== ['fall', 'mend', ...later, null, null, 'potion'].join()) fail(`unlocks out of thumb order: ${run.layout().bar}`);
+if (run.layout().bar.join() !== ['fall', 'mend', ...later, null, null, 'potion', 'mana_potion'].join()) fail(`unlocks out of thumb order: ${run.layout().bar}`);
 // Each hero's kit (player/heroes.ts): abilities of his own school, on a new game's bar between his school's base attack and the heal.
 for (const id of HERO_IDS) {
   const h = HEROES[id], main = BASE_ATTACK[h.school[0]], b = barOf(h.kit, main);
   if (h.kit.some((a) => CARD.get(a)?.kind !== 'ability' || SCHOOL[a] !== h.school[0])) fail(`${id}'s kit ${h.kit} is not of his school`);
-  if (b.length !== KEYS.length || b[PRIMARY] !== main || b[POTION] !== 'potion' || b.slice(1, 2 + h.kit.length).join() !== [...h.kit, 'mend'].join()) fail(`${id}'s bar ${b}`);
+  if (b.length !== KEYS.length || b[PRIMARY] !== main || b[POTION] !== 'potion' || b[MANA_POTION] !== 'mana_potion' || b.slice(1, 2 + h.kit.length).join() !== [...h.kit, 'mend'].join()) fail(`${id}'s bar ${b}`);
   if (tuneOf([], h.kit, h.school).owned.join() !== [...startOf(h.school), ...h.kit].join()) fail(`${id} starts with ${tuneOf([], h.kit, h.school).owned}`);
 }
 if (BASE_ATTACK[HEROES.risorto.school[0]] !== 'fall' || BASE_ATTACK[HEROES.bortolo.school[0]] !== 'lance' || BASE_ATTACK.plague !== 'thorn') fail('the Risorto swings Caduta d\'ossa, Bortolo throws the stiletto, the Peste has its own');
@@ -277,7 +277,7 @@ if (BASE_ATTACK[HEROES.risorto.school[0]] !== 'fall' || BASE_ATTACK[HEROES.borto
 if (START.includes('plague') || !HEROES.bortolo.kit.includes('frost') || HEROES.risorto.kit.length || HEROES.fosca.kit.join() !== 'plague,spit' || HEROES.tizian.kit.join() !== 'pyre,cero' || BASE_ATTACK[HEROES.tizian.school[0]] !== 'ember' || HEROES.zanetto.kit.join() !== 'chain,toll' || BASE_ATTACK[HEROES.zanetto.school[0]] !== 'spark') fail('the Risorto starts in Ossa alone, Bortolo in Gelo, Suor Fosca in Peste, Fra\' Tizian in Fuoco with Tizzone, Zanetto in Fulmine with Folgore');
 // A reload with a full bar and abilities waiting in the book (tomes): replaying them all keeps every slot where it was.
 {
-  const kept = ['fall', 'miasma', 'spit', 'fever', 'pillar', 'furnace', 'blizzard', 'squall', 'hallow', 'potion'], book = ['leap', 'whirl', 'grace', 'untore'];
+  const kept = ['fall', 'miasma', 'spit', 'fever', 'pillar', 'furnace', 'blizzard', 'squall', 'hallow', 'potion', 'mana_potion'], book = ['leap', 'whirl', 'grace', 'untore'];
   const ids = [...new Set([...START, ...kept, ...book])];
   const re = new AbilitySystem(ids.map(ab), kept, { player: { pos: { x: 0, y: 0, z: 0 } } }, START, ['plague', 'mend']);
   re.unlock(...book, ...kept);

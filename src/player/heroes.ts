@@ -19,7 +19,7 @@ export interface HeroDef {
   height: number;
   /** The weapon in his fist on a new game (loot/gear.ts). */
   weapon: string;
-  /** The abilities of his school he starts with, beyond everyone's swing, heal and potion (levels.ts START). */
+  /** The abilities of his school he starts with, beyond everyone's swing, heal and potions (levels.ts START). */
   kit: string[];
 }
 

@@ -359,7 +359,7 @@ PICKS.forEach((id, i) => {
 if (GEAR_SLOTS.some((sl) => GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.rarity !== 'epico' || GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.l2)) fail(`prepared gear ${JSON.stringify(pb.gear.worn)}`);
 if (pb.stats.hp !== pb.stats.hpMax || pb.stats.mana !== pb.stats.manaMax || pb.mobs.some((m) => m.state !== 'dead')) fail('prepared hero not full, or level 1 not cleared');
 if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(-240, -20)) fail('prepared map not level 1 seen');
-const owned = new Set(['fall', 'mend', 'potion', ...PICKS.filter((id) => CARD.get(id)?.kind === 'ability')]);
+const owned = new Set(['fall', 'mend', 'potion', 'mana_potion', ...PICKS.filter((id) => CARD.get(id)?.kind === 'ability')]);
 if (BAR.bar.filter((x) => x).length !== owned.size || BAR.bar.some((x) => x && !owned.has(x)) || BAR.bar[0] !== 'fall' || BAR.bar[9] !== 'potion') fail(`prepared bar ${BAR.bar}`);
 // The old shared saves (autosave, three slots) go once to their heroes, the most advanced one each; every one kept in the
 // backup as it was; the old bar goes to the autosave's hero; a hero who already has a run keeps it; a first launch has nothing to move.
@@ -447,3 +447,19 @@ if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
   if (resume('risorto', ks)?.player.z !== -130) fail('the calm save after the fight did not keep the hero where he stands');
 }
 console.log('save system ok');
+
+// Potion migration replays old IDs in place: benefit for both vials, still one pick per earned level.
+{
+  const old = serialize(a);
+  old.build = { xp: 900, lv: lvOf(900).lv, picks: ['potion_big', 'hp', 'potion_cd', 'potion_big', 'mana'], learned: ['leap'], main: 'fall' };
+  old.player.hp = 700; old.player.mana = 123;
+  for (let round = 0; round < 2; round++) {
+    const loaded = boot(); deserialize(loaded, old);
+    const next = serialize(loaded), t = tuneOf(loaded.levels.picks);
+    if (Math.abs(t.potion - .6) > 1e-8 || Math.abs(t.manaPotion - .6) > 1e-8 || t.potionCd !== 21 || t.manaPotionCd !== 21) fail('old potion benefit lost');
+    for (const field of ['build', 'player', 'bag', 'gear', 'quest', 'dead', 'time', 'fog', 'side'] as const) {
+      if (JSON.stringify(next[field]) !== JSON.stringify(old[field])) fail(`potion migration changed ${field}`);
+    }
+    Object.assign(old, next);
+  }
+}

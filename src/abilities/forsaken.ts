@@ -12,13 +12,13 @@ import { Grimoire, ORB_BURST, type BaseBolt, type Bolt, type BoltKind, type Spel
 import { L, type Shell, type ShellStyle } from './shells.ts';
 import type { Sound } from '../audio/engine.ts';
 
-// The Forsaken kit: thirty-five abilities and a potion, five a school (the base attack apart): three paid in mana and two
+// The Forsaken kit: thirty-five abilities and two potions, five a school (the base attack apart): three paid in mana and two
 // specials, instant, that unlock when the fury bar fills and empty it (system.ts): bone, plague and shadow, fire, frost and lightning, holy (the rules of
 // all but the first few in grimoire.ts). Names are our own; flavour after the undead racials, Diablo's necromancers and
 // WoW's warlocks, mages, shamans and paladins.
 // Each school has its base attack, the big button of a hero of that school (levels.ts BASE_ATTACK): Caduta d'ossa's club,
 // and bolts thrown as fast for the others, Stiletto di ghiaccio first.
-// The run starts with Caduta d'ossa, Nube di peste, Preghiera di suffragio (the long-cast heal) and the potion; level-ups (player/levels.ts) unlock
+// The Risorto starts with Caduta d'ossa, Preghiera di suffragio (the long-cast heal) and both potions; level-ups (player/levels.ts) unlock
 // the rest and change the numbers, which every ability reads live from `tune` (tooltips too).
 // Each one has its own clip on the Reietto (player/undead.ts) and layered effects (vfx.ts); a
 // blow's effects land with the clip's blow, `BLOW` s after the press, while the damage stays
@@ -2049,27 +2049,37 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'potion', name: 'Fiala di linfa tombale', icon: 'potion', offGcd: true,
     get cooldown() { return tune.potionCd * tune.cdr; },
-    get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${Math.round(tune.potion * 100)}% della salute e il ${Math.round(tune.potion * 100)}% del mana.`; },
+    get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${Math.round(tune.potion * 100)}% della salute massima.`; },
     fire(k) {
       const s = k.stats, h = s.heal(s.hpMax * tune.potion);
       playSfx('potion', chest(k));
-      s.restoreMana(s.manaMax * tune.potion);
       k.healBurst(1);
       k.system.notices.push({ kind: 'heal', text: `+${Math.round(h)}` });
+    },
+  },
+  {
+    id: 'mana_potion', name: 'Fiala di essenza spettrale', icon: 'mana', offGcd: true,
+    get cooldown() { return tune.manaPotionCd * tune.cdr; },
+    get desc() { return `Fuori dal tempo di recupero globale. Ripristina il ${Math.round(tune.manaPotion * 100)}% del mana massimo.`; },
+    fire(k) {
+      const s = k.stats, m = s.restoreMana(s.manaMax * tune.manaPotion);
+      playSfx('potion', chest(k));
+      k.healBurst(1);
+      k.system.notices.push({ kind: 'info', text: `+${Math.round(m)} mana` });
     },
   },
 ];
 
 for (const a of ABILITIES) {
   a.school = SCHOOL[a.id]; // each school its own global cooldown
-  if (BASES.includes(a.id) || a.id === 'potion') continue;
+  if (BASES.includes(a.id) || a.id === 'potion' || a.id === 'mana_potion') continue;
   const fire = a.fire; // a skill let go (not its channel's ticks): its school's ring of light round the hero
   a.fire = function (k, tick) { if (!tick) k.release(a.school, !!a.cast); fire.call(this, k, tick); };
 }
 
-/** The starting bar: the primary attack fixed on the big button (slot 0), the potion fixed on its own (slot 9), the starting
+/** The starting bar: the primary attack fixed on the big button (slot 0), the potions fixed on their own (slots 9-10), the starting
  *  kit on the next slots, which on touch run from the bottom-left of the thumb arc up (ui/actionBar.ts RING). Every unlock
  *  takes the next free slot; the ability book (ui/book.ts) rearranges slots 1-8. */
-export const BAR: (string | null)[] = ['fall', 'mend', null, null, null, null, null, null, null, 'potion'];
+export const BAR: (string | null)[] = ['fall', 'mend', null, null, null, null, null, null, null, 'potion', 'mana_potion'];
 /** A new game's bar: the hero's base attack (levels.ts BASE_ATTACK) and his own kit (player/heroes.ts) ahead of the heal. */
-export const barOf = (kit: readonly string[], main = 'fall'): (string | null)[] => [main, ...kit, 'mend', ...Array<null>(7 - kit.length).fill(null), 'potion'];
+export const barOf = (kit: readonly string[], main = 'fall'): (string | null)[] => [main, ...kit, 'mend', ...Array<null>(7 - kit.length).fill(null), 'potion', 'mana_potion'];

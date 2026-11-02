@@ -49,3 +49,16 @@ s.setItem('redentore.keys', JSON.stringify({ ...d, salta: ['KeyW'] })); if (load
 if (ACTIONS.filter((a) => a.id.startsWith('barra')).length !== 9) fail('bar actions missing');
 
 console.log(`keys ok: ${ACTIONS.length} actions, swaps, clears, ${RESERVED.size} reserved, storage`);
+
+// Older bindings keep their customized keys, including a T already taken by health.
+const old = rebind(d, 'pozione', 0, 'KeyT').b;
+delete old['pozione-mana'];
+save(old, s);
+const migrated = load(s);
+if (migrated.pozione[0] !== 'KeyT' || migrated['pozione-mana'][0] !== 'KeyY' || translate(migrated, 'KeyY') !== 'KeyT' || translate(migrated, 'KeyT') !== 'KeyR') fail('new mana key displaced an old binding');
+for (const [id, keys] of Object.entries(old)) if (migrated[id].join() !== keys.join()) fail(`migration changed ${id}`);
+save(migrated, s);
+if (JSON.stringify(load(s)) !== JSON.stringify(migrated)) fail('key migration not stable');
+const moved = rebind(migrated, 'pozione-mana', 0, 'KeyG').b;
+save(moved, s);
+if (load(s)['pozione-mana'][0] !== 'KeyG' || translate(load(s), 'KeyG') !== 'KeyT') fail('mana cannot be rebound');

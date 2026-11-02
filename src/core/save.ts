@@ -6,7 +6,7 @@
 // stray bolts, cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state over the fresh
 // world. iOS reloads a tab it kills for memory, which used to throw the whole run away: the run is kept on the phone. Logged in to the hub, core/cloud.ts mirrors each run to the account. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
-import { BASE_ATTACK, CARD, levelOf } from '../player/levels.ts';
+import { BASE_ATTACK, CARD, levelOf, ownSchools } from '../player/levels.ts';
 import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
 import type { SideState } from '../quest/squero.ts';
 import type { Bag, BagState } from '../loot/bag.ts';
@@ -26,7 +26,7 @@ const STILETTO: Record<string, string> = { lance: 'caligo', lance_dmg: 'caligo_b
 
 export interface GameState {
   v: number;
-  hero?: string; // player/heroes.ts; absent in saves from before the choice: the Risorto, who then started with Nube di peste
+  hero?: string; // player/heroes.ts; absent in saves from before the choice: the Risorto (who then started with Nube di peste, gone with the Peste)
   player: { x: number; y: number; z: number; yaw: number; hp: number; mana: number; charge: number };
   // gates: ids of the open ones. accepted/out: Fra' Zuane's quest taken, back out on the fondamenta after
   // the boss; absent in saves from before him, which load with the quest already taken. blessed/blessLeft:
@@ -48,7 +48,8 @@ export interface GameState {
   // Level-up cards in the order picked, XP and the level it makes (lv is for readers: XP decides). Absent in
   // saves from before the levels: they load at level 1 with the starting kit, and as XP is the worth of the
   // dead, the level-ups their kills earned are offered one after another right after the load.
-  // learned: abilities taught by the merchants' tomes (player/levels.ts TOMES); absent in older saves: none.
+  // learned: abilities taught by the merchants' tomes (player/levels.ts TOMES); absent in older saves: none. Picks and learned
+  // of a school not the hero's (saves from before the two schools) load dropped: picks offered again, tomes paid back.
   // main: the base attack the book put on the big button (player/levels.ts BASE_ATTACK); absent: the hero's own.
   build?: { xp: number; lv: number; picks: string[]; learned?: string[]; main?: string };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
@@ -100,10 +101,13 @@ export function deserialize(g: Game, s: GameState): void {
   g.levels.xp = s.build?.xp ?? 0;
   g.hero = heroOf(s.hero);
   const stiletto = HEROES[g.hero].school.some((k) => BASE_ATTACK[k] === 'lance'), was = (id: string) => (id === 'lance' || !stiletto ? STILETTO[id] ?? id : id);
-  g.levels.picks = (s.build?.picks ?? []).map(was).filter((id) => CARD.has(id)); // a card from another build is dropped
-  g.levels.learned = (s.build?.learned ?? []).map(was).filter((id) => CARD.get(id)?.kind === 'ability');
+  // A card from another build is dropped; one of a school the hero no longer has (every school was open before the two
+  // medals) too, its level-up offered again and a tome's ability paid back (levels.ts ownSchools). The Risorto's old start,
+  // Nube di peste, went with the Peste.
+  const own = ownSchools((s.build?.picks ?? []).map(was).filter((id) => CARD.has(id)), (s.build?.learned ?? []).map(was).filter((id) => CARD.get(id)?.kind === 'ability'), HEROES[g.hero].school);
+  g.levels.picks = own.picks;
+  g.levels.learned = own.learned;
   g.levels.main = typeof s.build?.main === 'string' ? s.build.main : '';
-  if (s.hero === undefined && !g.levels.learned.includes('plague')) g.levels.learned.push('plague'); // the Risorto's old start
   if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
   g.quest.boon = BOONS.some((b) => b.id === s.quest.boon) ? s.quest.boon! : ''; // before the clamp too: the rite's boon may raise it
   g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
@@ -137,6 +141,7 @@ export function deserialize(g: Game, s: GameState): void {
   g.time = s.time;
   if (s.fog) g.fog.decode(s.fog); // a grid from another build's level is dropped: fogged, not garbled
   if (s.bag) g.bag.decode(s.bag);
+  g.bag.gold += own.refund;
   if (s.side) g.quest.side.decode(s.side);
 }
 

@@ -3,7 +3,7 @@
 // falling a beat after the call, the leap and the charge carrying the hero, the crowd control they lay
 // (enemies/control.ts); and the rest of the five a school: poison stacking on a foe and spreading, the fever,
 // the drain, fire pillars, candles and the furnace, the blizzard and the rolling orb, the lightning shield,
-// rods and the squall's knockback, the judgment, the consecrated ground and the hammer. The game's Forsaken kit
+// rods and the squall's knockback (and the plague breath's), the judgment, the consecrated ground and the hammer. The game's Forsaken kit
 // (forsaken.ts) draws every one of them from `bolts`, `fires`, `tolls`, `pillars`, `orbs`, `rods`, `hallows`,
 // `dash` and the `events` they leave; scripts/balance.ts plays the same rules with no looks at all.
 // No three.js here.
@@ -64,12 +64,13 @@ const PILLAR_DELAY = 0.5;
 const CERO = { t: 4, r: 4, chain: 2 };
 const FURNACE = { arc: Math.cos(0.8), stun: 2 };
 const BLIZZARD_CHILL = 0.5;
-const ORB = { range: 15, r: 3.5, tick: 0.5, burst: 40, chill: 0.6 };
+/** Globo di brina's burst at the end of its roll. */
+export const ORB_BURST = 60;
+const ORB = { range: 15, r: 3.5, tick: 0.5, burst: ORB_BURST, chill: 0.6 };
 const SHIELD = { t: 20, r: 3, every: 1 };
 const ROD = { r: 9, top: 2.6, max: 2 };
 const SQUALL_PUSH = 5; // m, × the foe's resist
 const HALLOW = { t: 8, heal: 0.01, max: 2 };
-const HAMMER_DMG = 30;
 const HOLY_FIRE = 1.5; // Giudizio ardente on the burning
 
 /** What the grimoire needs from whoever casts: the hero, the damage dealer, the foes, the plague clouds. */
@@ -160,7 +161,7 @@ export class Grimoire {
     const to = this.target();
     if (!to) { this.events.push({ type: 'fizzle', ...from }); return; }
     const t = this.tune, b = t.prim[kind];
-    const dmg = b ? b.dmg * (third ? b.third : 1) : { pyre: t.pyreDmg, frost: t.frostDmg, venom: t.spitDmg, judge: t.judgeDmg, hammer: HAMMER_DMG }[kind as 'pyre'];
+    const dmg = b ? b.dmg * (third ? b.third : 1) : { pyre: t.pyreDmg, frost: t.frostDmg, venom: t.spitDmg, judge: t.judgeDmg, hammer: t.hammerDmg }[kind as 'pyre'];
     this.bolts.push({ kind, x: from.x, y: from.y, z: from.z, to, speed: SPEED[kind], t: 0, dmg });
   }
 
@@ -255,11 +256,17 @@ export class Grimoire {
     for (const o of this.near(m, t.untoreR)) if (o !== m) { this.envenom(o, n - this.venom(o)); pts.push({ x: o.x, y: o.y + CHEST, z: o.z }); }
     this.events.push({ type: 'spread', pts });
   }
-  /** Fiato della fossa: a ring of miasma from the hero. */
+  /** Fiato della fossa: the plague breath in a cone ahead, poisoning and throwing back whoever it takes. */
   miasma(): void {
-    const p = this.host.player.pos, t = this.tune;
-    for (const m of this.near(p, t.miasmaR)) { this.hit(m, t.miasmaDmg); this.envenom(m, t.miasmaStacks); }
-    this.events.push({ type: 'miasma', ...p, r: t.miasmaR });
+    const h = this.host.player, p = h.pos, fx = -Math.sin(h.facing), fz = -Math.cos(h.facing), t = this.tune;
+    for (const m of this.near(p, t.miasmaR)) {
+      const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
+      if (d > 0.8 && (dx * fx + dz * fz) / d < CALIGO.arc) continue;
+      this.hit(m, t.miasmaDmg);
+      this.envenom(m, t.miasmaStacks);
+      this.shove(m, p, t.miasmaPush);
+    }
+    this.events.push({ type: 'miasma', ...p, r: t.miasmaR, dir: h.facing });
   }
   /** Febbre di palude: the target and those round it take more from every hit for FEVER_T s. */
   fever(): void {
@@ -386,17 +393,18 @@ export class Grimoire {
   }
   /** Burrasca: a thunderclap round the hero, every foe thrown back (by its resist: the bosses barely budge). */
   squall(): void {
-    const p = this.host.player.pos, t = this.tune, w = this.host.player.world;
-    for (const m of this.near(p, t.squallR)) {
-      this.hit(m, t.squallDmg);
-      const d = Math.max(flat(m, p), 1e-3), dx = (m.x - p.x) / d, dz = (m.z - p.z) / d;
-      for (let s = 0; s < SQUALL_PUSH * (m.cc?.resist ?? 1); s += 0.25) { // step by step: a wall, a ledge or the water stops it
-        const x = m.x + dx * 0.25, z = m.z + dz * 0.25, g = w.groundAt(x, z, m.y + 0.6);
-        if (g === -Infinity || Math.abs(g - m.y) > 0.6 || w.blocked(x, z, g)) break;
-        m.x = x; m.z = z; m.y = g;
-      }
-    }
+    const p = this.host.player.pos, t = this.tune;
+    for (const m of this.near(p, t.squallR)) { this.hit(m, t.squallDmg); this.shove(m, p, SQUALL_PUSH); }
     this.events.push({ type: 'squall', ...p, r: t.squallR, big: true });
+  }
+  /** `m` thrown `dist` m (× its resist) straight away from `from`, step by step: a wall, a ledge or the water stops it. */
+  private shove(m: Mob, from: P, dist: number): void {
+    const w = this.host.player.world, d = Math.max(flat(m, from), 1e-3), dx = (m.x - from.x) / d, dz = (m.z - from.z) / d;
+    for (let s = 0; s < dist * (m.cc?.resist ?? 1); s += 0.25) {
+      const x = m.x + dx * 0.25, z = m.z + dz * 0.25, g = w.groundAt(x, z, m.y + 0.6);
+      if (g === -Infinity || Math.abs(g - m.y) > 0.6 || w.blocked(x, z, g)) break;
+      m.x = x; m.z = z; m.y = g;
+    }
   }
 
   // --- holy: Terra consacrata (Giudizio and the hammer are bolts) ---

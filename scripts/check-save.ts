@@ -14,7 +14,7 @@ import { tuneOf } from '../src/player/levels.ts';
 import { HEROES, type Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
 import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
-import { CARD, counter, eligible, levelOf as lvOf, offer, stacks } from '../src/player/levels.ts';
+import { CARD, TOME_PRICE, counter, eligible, levelOf as lvOf, offer, stacks } from '../src/player/levels.ts';
 import { BAR, PICKS, prepared } from '../src/core/prepared.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -268,19 +268,28 @@ if (odd.levels.picks.join() !== 'hp') fail('unknown card kept');
 if (!valid({ ...s, build: undefined }) || valid({ ...s, build: { xp: 1, lv: 1, picks: [3] } }) || valid({ ...s, build: { xp: '1', lv: 1, picks: [] } })) fail('build field validation');
 // The tomes' abilities round-trip; a save from before the tomes loads with none; a card that is no ability is dropped; junk is refused.
 const tl = boot();
-tl.levels.learned = ['pyre', 'wisp'];
+tl.levels.learned = ['leap', 'strike'];
 const ts = JSON.parse(JSON.stringify(serialize(tl))), tb = boot();
 deserialize(tb, ts);
-if (tb.levels.learned.join() !== 'pyre,wisp' || !tuneOf(tb.levels.picks, tb.levels.learned).owned.includes('pyre')) fail(`tomes' abilities after load: ${tb.levels.learned}`);
+if (tb.levels.learned.join() !== 'leap,strike' || !tuneOf(tb.levels.picks, tb.levels.learned).owned.includes('strike')) fail(`tomes' abilities after load: ${tb.levels.learned}`);
 const tOld = boot();
 deserialize(tOld, ls);
 if (tOld.levels.learned.length) fail('a save from before the tomes loads with abilities learnt');
 const tOdd = boot();
-deserialize(tOdd, { ...ts, build: { ...ts.build, learned: ['pyre', 'hp', 'from_the_future'] } });
-if (tOdd.levels.learned.join() !== 'pyre') fail(`tomes' junk kept: ${tOdd.levels.learned}`);
+deserialize(tOdd, { ...ts, build: { ...ts.build, learned: ['leap', 'hp', 'from_the_future'] } });
+if (tOdd.levels.learned.join() !== 'leap') fail(`tomes' junk kept: ${tOdd.levels.learned}`);
+// From when every school was open: the Risorto's cards of other schools go, each pick's level-up offered again (fewer picks
+// than the XP's level-ups: the window opens on the load), each tome ability paid back, whatever leaned on them with them.
+const allSchools = boot();
+deserialize(allSchools, { ...ls, build: { xp: 500, lv: 7, picks: ['pyre', 'fall_dmg', 'pyre_big', 'fx_shatter', 'step', 'hp'], learned: ['frost', 'caligo', 'blizzard', 'orb', 'font', 'leap'] }, bag: { gold: 30, items: [] } });
+if (allSchools.levels.picks.join() !== 'fall_dmg,step,hp' || allSchools.levels.learned.join() !== 'leap' || allSchools.bag.gold !== 30 + 3 * TOME_PRICE.A + 2 * TOME_PRICE.B) fail(`an older Risorto of every school: ${allSchools.levels.picks} ${allSchools.levels.learned} ${allSchools.bag.gold} gold`);
+if (lvOf(allSchools.levels.xp).lv - 1 - allSchools.levels.picks.length !== 3) fail('the dropped picks are not offered again');
+const reopened = boot();
+deserialize(reopened, JSON.parse(JSON.stringify(serialize(allSchools))));
+if (reopened.levels.picks.join() !== allSchools.levels.picks.join() || reopened.bag.gold !== allSchools.bag.gold) fail('converted twice');
 if (!valid(ls) || !valid({ ...ls, build: { ...ls.build, learned: undefined } }) || valid({ ...ts, build: { ...ts.build, learned: [3] } }) || valid({ ...ts, build: { ...ts.build, learned: 'pyre' } })) fail('learned field validation');
-// The hero chosen round-trips with his kit; a save from before the choice is the Risorto's, given back the Nube di peste
-// he started with then; another build's hero is the Risorto; junk is refused.
+// The hero chosen round-trips with his kit; a save from before the choice is the Risorto's (the Nube di peste he started with
+// then went with the Peste, not his school); another build's hero is the Risorto; junk is refused.
 const hg = boot('bortolo');
 hg.levels.learned = ['frost', 'caligo'];
 hg.levels.main = 'spark';
@@ -293,8 +302,8 @@ if (hgb.hero !== 'bortolo' || hgb.levels.learned.join() !== 'frost,caligo' || hg
 const older = (hero: string, picks: string[], learned: string[]) => { const g = boot(); deserialize(g, { ...hgs, hero, build: { xp: 400, lv: 6, picks, learned } }); return g; };
 const ob = older('bortolo', ['lance_dmg', 'lance_split', 'hp'], ['frost', 'lance']), obt = tuneOf(ob.levels.picks, ob.levels.learned, HEROES.bortolo.school);
 if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || Math.abs(obt.prim.lance.dmg - 11.2) > 1e-9 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
-const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']);
-if (or.levels.learned.join() !== 'caligo' || or.levels.picks.join() !== 'caligo,caligo_big,caligo_freeze,hp' || or.levels.picks.length !== 4) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks}`);
+const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']); // the fog then, but the Gelo is no school of his: offered again, paid back
+if (or.levels.learned.length || or.levels.picks.join() !== 'hp' || or.bag.gold !== hgs.bag.gold + TOME_PRICE.A) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks} ${or.bag.gold}`);
 function hf0() { const g = boot('fosca'); g.levels.learned = ['plague', 'spit']; return JSON.parse(JSON.stringify(serialize(g))); }
 const hf = boot('fosca'); // Suor Fosca keeps her Nube di peste and Sputo di bile
 hf.levels.learned = ['plague', 'spit'];
@@ -313,7 +322,7 @@ deserialize(hzb, JSON.parse(JSON.stringify(serialize(hz))));
 if (hzb.hero !== 'zanetto' || hzb.levels.learned.join() !== 'chain,toll') fail(`Zanetto after load: ${hzb.hero} ${hzb.levels.learned}`);
 const hgOld = boot('bortolo');
 deserialize(hgOld, (({ hero: _h, ...o }) => o)(hgs));
-if (hgOld.hero !== 'risorto' || !tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague')) fail('a save from before the choice is not the Risorto with his plague');
+if (hgOld.hero !== 'risorto' || tuneOf(hgOld.levels.picks, hgOld.levels.learned).owned.includes('plague') || hgOld.levels.learned.length) fail('a save from before the choice is not the Risorto, kept to his schools');
 const hgOdd = boot();
 deserialize(hgOdd, { ...hgs, hero: 'anzola' });
 if (hgOdd.hero !== 'risorto' || hgOdd.levels.learned.includes('plague') || valid({ ...hgs, hero: 3 }) || !valid((({ hero: _h, ...o }) => o)(hgs))) fail('hero field validation');
@@ -341,16 +350,16 @@ const ps = JSON.parse(JSON.stringify(prepared(serialize(pg), pg.mobs.length, bui
 if (!valid(ps)) fail('the prepared save is refused');
 const pb = boot();
 deserialize(pb, ps);
-if (pb.hero !== 'risorto' || !pb.levels.learned.includes('plague') || pb.quest.stage !== 'offer' || !pb.quest.found || pb.quest.boon !== 'vigore' || !pb.quest.relicBack || pb.quest.bonusXp !== questXpIn(ps)) fail(`prepared save at ${pb.quest.stage}`);
+if (pb.hero !== 'risorto' || pb.levels.learned.length || pb.quest.stage !== 'offer' || !pb.quest.found || pb.quest.boon !== 'vigore' || !pb.quest.relicBack || pb.quest.bonusXp !== questXpIn(ps)) fail(`prepared save at ${pb.quest.stage}`);
 if (lvOf(pb.levels.xp).lv !== 12 || pb.levels.picks.join() !== PICKS.join() || pb.levels.picks.length !== 11) fail(`prepared level ${lvOf(pb.levels.xp).lv}, picks ${pb.levels.picks}`);
 PICKS.forEach((id, i) => {
-  const c = eligible(PICKS.slice(0, i), ['plague']).find((k) => k.id === id), lv = i + 2;
+  const c = eligible(PICKS.slice(0, i), [], HEROES.risorto.school).find((k) => k.id === id), lv = i + 2;
   if (!c || (c.kind === 'ability') !== (lv % 2 === 0 && lv <= 10)) fail(`card ${id} could not be dealt at level ${lv}`);
 });
 if (GEAR_SLOTS.some((sl) => GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.rarity !== 'epico' || GEAR.find((g) => g.id === pb.gear.worn[sl.id])?.l2)) fail(`prepared gear ${JSON.stringify(pb.gear.worn)}`);
 if (pb.stats.hp !== pb.stats.hpMax || pb.stats.mana !== pb.stats.manaMax || pb.mobs.some((m) => m.state !== 'dead')) fail('prepared hero not full, or level 1 not cleared');
 if (!fogOf(pb).seen(SPAWN.x, SPAWN.z) || !fogOf(pb).seen(-35, -190) || fogOf(pb).seen(-240, -20)) fail('prepared map not level 1 seen');
-const owned = new Set(['fall', 'plague', 'mend', 'potion', ...PICKS.filter((id) => ['step', 'frost', 'nova', 'caligo', 'font'].includes(id))]);
+const owned = new Set(['fall', 'mend', 'potion', ...PICKS.filter((id) => CARD.get(id)?.kind === 'ability')]);
 if (BAR.bar.filter((x) => x).length !== owned.size || BAR.bar.some((x) => x && !owned.has(x)) || BAR.bar[0] !== 'fall' || BAR.bar[9] !== 'potion') fail(`prepared bar ${BAR.bar}`);
 // The old shared saves (autosave, three slots) go once to their heroes, the most advanced one each; every one kept in the
 // backup as it was; the old bar goes to the autosave's hero; a hero who already has a run keeps it; a first launch has nothing to move.

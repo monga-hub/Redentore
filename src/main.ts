@@ -247,12 +247,11 @@ function wake(): void {
 }
 const plates = new Plates(kinds, cam.camera, kit.magic, () => targeting.target?.mob); // WoW nameplates: the hero's debuffs, health, level, casts
 const heroBuffs = new HeroAuras(); // under the player frame
-const BUBBLE = ABILITIES.find((a) => a.id === 'bubble')!;
 const buffs = () => {
-  const p = player.pos, m = kit.magic, bubbleCd = kit.system.cooldown(BUBBLE);
+  const p = player.pos, m = kit.magic;
   return heroAuras({
     bless: { name: BLESSING.name, left: quest.blessLeft },
-    veil: playerStats.veil, immune: playerStats.immune, aureola: bubbleCd > 0 && BUBBLE.cooldown - bubbleCd <= 5.05, // cast in its 5 s: the immunity is Aureola's, not Patto della tomba's
+    veil: playerStats.veil, immune: playerStats.immune, aureola: kit.system.owns('bubble'), // the Sacro's immunity: no hero has both it and the Ombra's Patto della tomba
     sparks: m.sparks, sparkT: m.sparkT, wisp: kit.wisp,
     hallow: m.hallows.reduce((t, z) => (Math.hypot(p.x - z.x, p.z - z.z) < z.r && Math.abs(p.y - z.y) < 1.5 ? Math.max(t, z.t) : t), 0),
   });
@@ -434,13 +433,14 @@ drops.collect = (id) => id === HEADS.item && (questView.head(), true); // Fra' B
 const bagPanel = new BagPanel(bag, gear); // B or the satchel button
 bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
 const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure button: the paper doll
-  name: HEROES[hero].name, lv: levels.lv, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
+  name: HEROES[hero].name, lv: levels.lv, schools: HEROES[hero].school, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
   dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
 const figure = new Figure(renderer, scene, player.mesh, sheet.stage); // the sheet's hero, as dressed, while it is open
 sheet.el.addEventListener('hidden', () => figure.free());
-const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commercia, Mastro Iseppo's; their tomes teach a school
+const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commercia, Mastro Iseppo's; their tomes teach a school of his
   owned: () => tune.owned,
+  schools: HEROES[hero].school,
   learn: (ids) => {
     levels.learned.push(...ids);
     for (const id of ids) kit.system.learn(id);
@@ -451,7 +451,7 @@ const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commerci
   },
 });
 const mains = [BASE_ATTACK[HEROES[hero].school[0]], BASE_ATTACK[HEROES[hero].school[1]]]; // his base attack, and his secondary school's
-const book = new AbilityBook(kit.system, ABILITIES.filter((a) => !a.main || mains.includes(a.id)), () => levels.picks, (id) => { levels.main = id; kit.system.setMain(id); }); // K, the book button or the menu: the ability book
+const book = new AbilityBook(kit.system, ABILITIES.filter((a) => !a.main || mains.includes(a.id)), HEROES[hero].school, () => levels.picks, (id) => { levels.main = id; kit.system.setMain(id); }); // K, the book button or the menu: the ability book
 book.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); };
 const notes = new NotesPanel(() => ({ area: level.areaAt(player.pos.x, player.pos.z)?.label ?? '', level: questLevel(), lv: levels.lv, hero: HEROES[hero].name, x: player.pos.x, z: player.pos.z })); // the minimap's quill: notes on the zone
 notes.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); book.close(); };

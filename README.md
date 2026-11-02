@@ -80,7 +80,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   Benedizione della serra: per 3 minuti lanci il 20% più rapidi e +10% ai danni (icona e conto alla
   rovescia sotto il ritratto). La serra è fuori dalla portata dei frati. È anche un mercante
   (Commercia, in ogni pagina del dialogo): compra tutto quello che c'è nella borsa a un quarto del suo
-  prezzo (con una fila per riacquistare le vendite della visita) e vende i pezzi epici (viola) del livello 1 e i tomi delle scuole (vedi Abilità).
+  prezzo (con una fila per riacquistare le vendite della visita) e vende i pezzi epici (viola) del livello 1 e i tomi delle due scuole dell'eroe (vedi Abilità).
 - **Mastro Iseppo, el proto dello squero** (`src/quest/squero.ts`, modello Meshy): il fantasma del capomastro
   dello squero sul rio, in cortile accanto alla gondola sui cavalletti, fuori dalla portata dei mob. Sua figlia
   Marieta è ancora alle Zitelle; lui vuole finire l'ultima gondola per andarla a prendere. Missioni secondarie a
@@ -206,9 +206,9 @@ dalla Fondamenta San Giacomo alla laguna, con materiali piatti segnaposto.
 npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
-npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle tre carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12, l'Abate a 17), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2, route3 (livelli 1, 2 e 3 di fila: Punta, gondola, isola, Bibliotecario, Abate), boss3, pack3 (un gruppo dell'isola contro chi lancia); `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
+npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (6 build, ciascuna del suo eroe con le offerte delle sue due scuole: melee e mixed il Risorto, frost Bortolo, venom Suor Fosca, fire Fra' Tizian, storm Zanetto, + uno che non schiva; quando nessuna delle tre carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12, l'Abate a 17), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2, route3 (livelli 1, 2 e 3 di fila: Punta, gondola, isola, Bibliotecario, Abate), boss3, pack3 (un gruppo dell'isola contro chi lancia); `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca ogni build su Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
 npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi e loro fusione col cloud (client finto: cloud più avanti, dispositivo più avanti, eroe di prima del cloud contro uno nuovo, offline, non connesso, cloud in errore) + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
-npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, SOAK_LEVEL=3 per l'Abate nel Cenacolo, CHROME=... per il binario)
+npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti con le abilità delle due scuole dell'eroe (speciali comprese), la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, SOAK_LEVEL=3 per l'Abate nel Cenacolo, CHROME=... per il binario)
 ```
 
 Richiede Node ≥ 22.6 (`npm run check` esegue TypeScript direttamente con Node).
@@ -266,15 +266,17 @@ il frate soffiatore delle fornaci di Murano bruciato vivo al forno, con la canna
 (Fulmine, secondaria Ossa), il campanaro del Redentore colto dal fulmine mentre suonava a morto, col martello da campana e le due
 campane sul giogo dietro le spalle. A sinistra la colonna degli eroi (tutti quelli di
 `HEROES`, in ordine): ritratto in un rombo dorato, sotto il livello del suo salvataggio migliore (1 se non ne ha), accanto il nome;
-quello scelto è illuminato e mostra titolo, scuola primaria e secondaria. Al centro l'eroe stesso (`src/ui/selectStage.ts`), il
+quello scelto è illuminato e mostra titolo, scuola primaria (medaglia d'oro) e secondaria (medaglia d'argento): le stesse medaglie
+(`medal` in `src/ui/book.ts`) stanno sotto il nome nella scheda del personaggio e sulle due scuole del libro delle abilità. Al centro l'eroe stesso (`src/ui/selectStage.ts`), il
 suo corpo vero vestito come nel salvataggio, che respira su un'isola-cimitero in laguna di notte (muro di mattoni e cipressi
 come a San Michele, lapidi, colonna caduta e braciere da `gotico.glb`, luna, nebbia, la città controluce oltre l'acqua);
 trascinandolo si gira. In basso a destra "Entra nel mondo" (o Invio) parte con lui; ←/→ ↑/↓ cambiano eroe. La scena ha un
 renderer suo e un modello per volta, e tutto torna libero (GPU compresa) prima che nasca quello del gioco. La scuola va col personaggio: il Risorto parte con le Ossa,
 Bortolo col Gelo (Stiletto di ghiaccio sul tasto grande, Dardo di brina e Caligo gelato), Suor Fosca con la Peste (Spina di peste
 sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone sul tasto grande, Rogo dell'eretico e Cero
-funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); i tomi poi sono gli stessi per tutti, le carte dei
-livelli pendono verso le scuole dell'eroe (vedi Abilità).
+funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); carte dei livelli e tomi sono
+solo delle sue due scuole (vedi Abilità). Le statistiche (Vigore, Intelletto, Spirito, Potenza, Critico, Celerità) sono le stesse per
+tutti e nessuna è "la sua": accanto alle medaglie non c'è una statistica principale.
 Salvataggi nel cloud (`src/core/cloud.ts`): il gioco importa a runtime `/hub/saves.js` dell'hub Mongames (stesso dominio, stesso
 login). Sotto il titolo della squadra e in fondo al menu c'è la riga dell'account (`src/ui/account.ts`): da non connesso il link
 "Accedi per salvare nel cloud" (`/accedi.html?next=/Redentore/`), da connesso l'email e lo stato del cloud. La partita sul
@@ -310,23 +312,36 @@ lo Stiletto: i Frantumi del congelato), il terzo colpo (+75% a rango), 4 mana a 
 impara da solo anche il suo attacco base ("Hai appreso..."): nel libro *Sul tasto grande* lo scambia col proprio, la scelta resta nel
 salvataggio (`build.main`) e i potenziamenti restano a ciascuno, anche nelle carte. Ogni livello offre tre carte: ai livelli pari fino al 10
 tre nuove abilità, dopo il 10 una nuova abilità, un passivo e un potenziamento; agli altri
-potenziamenti, passivi e fusioni (`src/player/levels.ts`: 33 abilità da sbloccare, cinque per scuola contando quelle iniziali e lasciando a parte gli attacchi base; 99 carte di potenziamento di cui 8 fusioni). Ogni carta
-esce tra quelle non ancora prese pendendo verso le scuole dell'eroe (`LEAN`: metà delle volte dalla primaria, tre su dieci dalla secondaria,
-due su dieci da tutto il resto, pari dentro ciascuna parte; un potenziamento conta per la scuola della sua abilità), qualunque cosa si sia
-scelto prima: nessuna scuola si chiude. Non c'è un livello massimo
+potenziamenti, passivi e fusioni (`src/player/levels.ts`: 34 abilità, cinque per scuola contando quelle iniziali e lasciando a parte gli attacchi base; 102 carte di potenziamento di cui 8 fusioni). Escono
+solo carte delle due scuole dell'eroe e quelle di nessuna scuola (passivi; `ours`): una fusione o un potenziamento di un'abilità
+d'altre scuole non esce mai. Ogni carta esce tra quelle non ancora prese pendendo verso la primaria (`LEAN`: metà delle volte dalla
+primaria, tre su dieci dalla secondaria, due su dieci dai passivi, pari dentro ciascuna parte; un potenziamento conta per la scuola
+della sua abilità). Delle 8 fusioni solo due legano le scuole di un eroe: Miasma velenoso (Suor Fosca) e Giudizio ardente (Fra' Tizian);
+le altre sei restano nel codice ma oggi non escono. Non c'è un livello massimo
 (servono 20 × livello esperienza per salire) e non finiscono le carte: abilità nuove, fusioni e i potenziamenti
 che accendono un effetto (lo schizzo, Caligo di gennaio, Processione, Doppio sputo, Rancore) si prendono una volta, tutti gli altri
 potenziamenti e passivi salgono di rango senza limite, ogni rango la stessa percentuale in più (la carta mostra "rango N"). Le
 abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch; con gli otto posti pieni aspettano nel libro.
 
-**Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), insegna subito
-tutte le abilità della scuola che non si conoscono ancora, che vanno nel Libro delle abilità pronte da equipaggiare. Costa 200 oro per
-abilità e 350 per una speciale, solo per quelle che insegna davvero (Ossa completo 1300, Ombra 1150, Peste, Fuoco, Gelo e Fulmine 1000,
-Sacro 800: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 600, Dardo di brina e Caligo gelato li ha già; a Suor Fosca la Peste 600; a Fra' Tizian il Fuoco 600; a Zanetto il Fulmine 600; gli attacchi base non stanno nei tomi); quando non ha più niente da insegnare sparisce. Le abilità dei tomi
-non escono più come carte, i loro potenziamenti sì. Nel salvataggio (`build.learned`; i vecchi si caricano senza).
+**Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), ma il mercante
+vende a ciascuno solo i due delle sue scuole (`tomesOf`). Insegna subito tutte le abilità della scuola che non si conoscono ancora, che
+vanno nel Libro delle abilità pronte da equipaggiare. Costa 200 oro per abilità e 350 per una speciale, solo per quelle che insegna
+davvero (una scuola completa 1300, il Sacro 1100: Preghiera di suffragio si ha dall'inizio; a Bortolo il Gelo 900, a Suor Fosca la
+Peste 900, a Fra' Tizian il Fuoco 900, a Zanetto il Fulmine 900, le due abilità del kit le hanno già; gli attacchi base non stanno nei
+tomi); quando non ha più niente da insegnare sparisce. Le abilità dei tomi non escono più come carte, i loro potenziamenti sì. Nel
+salvataggio (`build.learned`; i vecchi si caricano senza).
+
+**Salvataggi di prima delle scuole per eroe** (`ownSchools` in `src/player/levels.ts`, al caricamento in `src/core/save.ts`): le carte
+prese d'una scuola che l'eroe non ha più si tolgono e i livelli che le avevano date tornano da scegliere (le offerte ripartono dalle
+sue due scuole, `Levels.pending`); le abilità imparate da un tomo d'altre scuole si rimborsano al prezzo del tomo (200 oro, 350 una
+speciale); e cadono anche le carte che senza di loro non reggono (una fusione senza una delle sue abilità, un potenziamento
+dell'abilità tolta, una carta della furia senza nessuna speciale), rimborsate allo stesso modo come livelli da riscegliere. Un
+salvataggio già convertito ricaricato non cambia più.
 
 **Libro delle abilità** (K, il pulsante col libro, o "Libro delle abilità" nel menu; il gioco si ferma), impaginato come
-quello di Diablo Immortal (`src/ui/book.ts`): a sinistra tutte le abilità per scuola, gli attacchi base dell'eroe (il suo e quello della secondaria) a parte in cima,
+quello di Diablo Immortal (`src/ui/book.ts`): a sinistra solo le due scuole dell'eroe, in cima la primaria (medaglia d'oro) e sotto la
+secondaria (medaglia d'argento), ciascuna col suo attacco base, le tre abilità a mana e le due speciali; sotto, a parte, Preghiera
+di suffragio per chi non ha il Sacro. Ogni abilità
 con icona, rango (1 più i potenziamenti scelti per lei) e una spunta se è sulla barra; quelle ancora da imparare restano
 grigie con come si ottengono (le carte dei livelli pari, le speciali dal 6, o il tomo della scuola), così si vede in cosa può crescere
 una build. A destra una pagina di pergamena: icona grande, nome, scuola, costo, lancio, recupero, la descrizione con i
@@ -338,17 +353,23 @@ posto sulla lista per toglierlo. L'attacco primario (il tasto grande: solo un at
 libro anche ricaricando, una carta appena scelta va comunque sulla barra. La disposizione resta salvata nel browser e
 quella di prima (dodici tasti con la pozione) si converte da sola.
 
-Cinque abilità per scuola (l'attacco base a parte), sul modello di WoW e Diablo:
+Cinque abilità per scuola (l'attacco base a parte), sul modello di WoW e Diablo, tutte con la stessa forma: **tre a mana** (col loro
+costo, recupero e lancio) e **due speciali** (le carte dal livello 6), istantanee, senza mana né recupero, che si lanciano solo con la
+barra della furia piena e la svuotano (`special` in `src/abilities/system.ts`; la furia sale coi colpi dell'attacco base):
 
-| Scuola | Abilità |
-|---|---|
-| ossa | Balzo del sepolcro (balzo fino a 12 m, stordisce all'atterraggio) · Turbine d'ossa (3 s di rotazione, anche correndo) · Colpo di grazia (fendente a due mani, fino al triplo sui feriti) · Sentenza e Lamento (speciali) |
-| peste (veleno: Witch Doctor e Necromante di Diablo, veleni del ladro di WoW) | Nube di peste · Sputo di bile (istantaneo, 18 danni e una dose di veleno: 4 al secondo per dose per 8 s, fino a 5 dosi) · Unguento dell'untore (come gli untori del 1630: il veleno del bersaglio, almeno 2 dosi, passa a chi gli sta entro 6 m) · Fiato della fossa (nova di miasma: 30 danni e 3 dosi entro 7 m) · Febbre di palude (Amplifica danno: +20% di danni subiti per 12 s entro 4 m, la metà sui boss) |
-| ombra | Passo d'ombra · Velo spettrale · Carica del dannato (a testa bassa sul nemico, stordisce, riempie la furia) · Risucchio d'anima (Drain Life: canalizzato 3 s, 16 danni ogni mezzo secondo e il 2% della salute a te) · Patto della tomba (speciale) |
-| fuoco (mago) | Fuoco fatuo · Rogo dell'eretico (lancio 1,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) · Colonna di fiamme (Flamestrike: lancio 0,8 s, 70 danni entro 3,5 m sotto il bersaglio, brucia e lascia il pavimento in fiamme) · Cero funebre (Living Bomb: 12 al secondo per 4 s, poi scoppia per 60 entro 4 m) · Fornace di Murano (Dragon's Breath: cono di 8 m, 50 danni, brucia e stordisce 2 s) |
-| gelo (mago) | Dardo di brina (lancio 1 s, rallenta il bersaglio e chi gli sta entro 3 m) · Acquasantiera gelata (congela sul posto chi è vicino) · Caligo gelato (Cone of Cold: la nebbia gelata della laguna in un cono di 8 m, 45 danni, rallenta del 60% per 5 s; recupero 6 s) · Bufera di bora (Blizzard: canalizzato 4 s sul bersaglio, 18 danni ogni mezzo secondo entro 4 m, rallenta) · Globo di brina (Frozen Orb: rotola 15 m, 15 danni ogni mezzo secondo a chi sfiora, poi scoppia) |
-| fulmine (sciamano) | Catena di saette (lancio 1 s, rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) · Scudo di saette (Lightning Shield: 4 saette per 20 s, 45 danni a chi ti arriva entro 3 m) · Parafulmine (un totem: per 12 s fulmina ogni secondo il più vicino entro 9 m, 22 danni) · Burrasca (Thunderstorm: 60 danni entro 6 m e i nemici sbalzati via di 5 m, i boss un terzo) |
-| sacro (paladino) | Preghiera di suffragio (dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, nessun recupero: la limita solo il mana) · Giudizio del Redentore (Judgment: martello di luce, 70 danni, recupero 6 s) · Terra consacrata (Consecration: 14 al secondo per 8 s entro 4 m, e a te l'1% della salute al secondo se ci stai sopra) · Martello della penitenza (Hammer of Justice: 30 danni e stordito 4 s, un terzo sui boss, recupero 30 s) · Aureola del redento (Divine Shield: fuori dal recupero globale, 5 s di immunità, recupero 2 minuti) |
+| Scuola | A mana | Speciali (furia piena) |
+|---|---|---|
+| ossa | Balzo del sepolcro (balzo fino a 12 m, stordisce all'atterraggio) · Turbine d'ossa (3 s di rotazione, anche correndo) · Colpo di grazia (fendente a due mani, fino al triplo sui feriti) | Sentenza del sepolcro (lancia d'ossa da 50) · Lamento della cripta (20 danni entro 6 m) |
+| ombra | Passo d'ombra (scatto di 8 m) · Carica del dannato (a testa bassa sul nemico, stordisce, riempie un quarto della furia; ora 25 mana) · Risucchio d'anima (Drain Life: canalizzato 3 s, 16 danni ogni mezzo secondo e il 2% della salute a te) | Velo spettrale (5 s a metà danni; prima a recupero) · Patto della tomba (5 s di immunità) |
+| peste (veleno: Witch Doctor e Necromante di Diablo, veleni del ladro di WoW) | Nube di peste · Sputo di bile (istantaneo, 18 danni e una dose di veleno: 4 al secondo per dose per 8 s, fino a 5 dosi) · Unguento dell'untore (come gli untori del 1630: il veleno del bersaglio, almeno 2 dosi, passa a chi gli sta entro 6 m) | Fiato della fossa (ora un soffio: il miasma in un cono di 8 m davanti a te, 45 danni, 3 dosi e chi colpisce sbalzato indietro di 5 m, i boss un terzo; si ferma ai muri e ai gradini) · Febbre di palude (Amplifica danno: +30% di danni subiti per 12 s entro 4 m, la metà sui boss) |
+| fuoco (mago) | Fuoco fatuo · Rogo dell'eretico (lancio 1,2 s, globo di fuoco dei ceri, schizzi, bersaglio in fiamme, pavimento che arde) · Cero funebre (Living Bomb: 12 al secondo per 4 s, poi scoppia per 60 entro 4 m) | Colonna di fiamme (Flamestrike, ora istantanea: 100 danni entro 3,5 m sotto il bersaglio, brucia e lascia il pavimento in fiamme) · Fornace di Murano (Dragon's Breath: cono di 8 m, 80 danni, brucia e stordisce 2 s) |
+| gelo (mago) | Dardo di brina (lancio 1 s, rallenta il bersaglio e chi gli sta entro 3 m) · Caligo gelato (Cone of Cold: la nebbia gelata della laguna in un cono di 8 m, 45 danni, rallenta del 60% per 5 s; recupero 6 s) · Bufera di bora (Blizzard: canalizzato 4 s sul bersaglio, 18 danni ogni mezzo secondo entro 4 m, rallenta) | Acquasantiera gelata (40 danni e congela 4 s chi è entro 5 m) · Globo di brina (Frozen Orb: rotola 15 m, 20 danni ogni mezzo secondo a chi sfiora, poi scoppia) |
+| fulmine (sciamano) | Catena di saette (lancio 1 s, rimbalza di nemico in nemico) · Rintocco del campanile (un segno a terra, poi il fulmine: stordisce) · Scudo di saette (Lightning Shield: 4 saette per 20 s, 45 danni a chi ti arriva entro 3 m) | Parafulmine (un totem: per 12 s fulmina ogni secondo il più vicino entro 9 m, 30 danni) · Burrasca (Thunderstorm: 90 danni entro 6 m e i nemici sbalzati via di 5 m, i boss un terzo) |
+| sacro (paladino) | Preghiera di suffragio (di tutti dal primo livello: lancio lungo 3 s, cura il 35% della salute, 120 mana, nessun recupero) · Giudizio del Redentore (Judgment: martello di luce, 70 danni, recupero 6 s) · Terra consacrata (Consecration: 14 al secondo per 8 s entro 4 m, e a te l'1% della salute al secondo se ci stai sopra) | Martello della penitenza (Hammer of Justice: 60 danni e stordito 4 s, un terzo sui boss) · Aureola del redento (Divine Shield: fuori dal recupero globale, 5 s di immunità) |
+
+Diventate speciali, le abilità che prima avevano un recupero lungo cambiano i loro potenziamenti: dove allungavano il recupero ora
+danno più forza (Acquasantiera: +60% danni a rango; Martello: +40% danni e +20% stordimento; Aureola: +30% di durata; Fossa comune:
+una dose e +30% di danni in più). Ossa era già così e non cambia.
 
 Ogni abilità nuova ha un potenziamento (Doppio sputo, Fossa comune, Processione, Bora scura, Corona di saette, Parafulmine di San
 Marco, Giudizio universale, Santità...). Tutte si fermano ai muri come le altre (`World.ray`/`sees`): la Burrasca non sbalza nessuno

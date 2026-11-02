@@ -6,9 +6,11 @@ import { ICONS } from './icons.ts';
 import { slotLabel } from '../core/keys.ts';
 
 // The ability book ("Libro delle abilità"), laid out like Diablo Immortal's: K, the book button under the figure or
-// the game menu open it, and the game pauses. Left, every ability grouped by school (the primary attack apart, on top),
-// with its icon, rank (1 + the upgrades picked for it) and a check when it is on the bar; the ones still to learn are
-// greyed, with how to get them, so the list shows what a build can grow into. Right, a parchment page: big icon, name,
+// the game menu open it, and the game pauses. Left, the hero's two schools only (player/heroes.ts): his primary on top under
+// its gold medal, his secondary below under the silver one, each its base attack, its three mana abilities and its two
+// specials (and the heal everyone has, apart, for a hero not of the Sacro), with its icon, rank (1 + the upgrades picked
+// for it) and a check when it is on the bar; the ones still to learn are greyed, with how to get them, so the list shows
+// what a build can grow into. Right, a parchment page: big icon, name,
 // school, cost, cast and cooldown, the description with its numbers picked out, the upgrades and passives working on it,
 // and Equipaggia / Rimuovi under it, beside a small copy of the bar (the thumb arc on touch and in Stile Diablo, the
 // row with keys otherwise). Equipaggia lights the eight slots: a tap on one puts the ability there, swapping with an
@@ -119,6 +121,16 @@ body.touch #book .keys { display: none; }
 
 const SCHOOLS: [School, string][] = [['bone', 'Ossa'], ['plague', 'Peste'], ['shadow', 'Ombra'], ['fire', 'Fuoco'], ['frost', 'Gelo'], ['storm', 'Fulmine'], ['holy', 'Sacro']];
 export const SCHOOL_NAME = new Map(SCHOOLS);
+/** A hero's school medal, inline (no stylesheet: the select screen shows it before any panel exists): gold on a red ribbon
+ *  for his primary school (`rank` 0), silver on a blue one for his secondary (1). */
+export const medal = (rank: number) => {
+  const [coin, rim, ribbon] = rank ? ['#d9dee6', '#5d6572', '#2f4f8f'] : ['#ecbd3c', '#6b4a10', '#a8283a'];
+  return `<svg class="medal" viewBox="0 0 16 20" width="13" height="16" style="flex:none;vertical-align:-3px" role="img" aria-label="${rank ? 'Medaglia d’argento' : 'Medaglia d’oro'}">`
+    + `<path d="M3.5 0h3.6l1 6.4-2.8 1.6zM12.5 0H8.9l-1 6.4 2.8 1.6z" fill="${ribbon}" stroke="#000" stroke-width=".6"/>`
+    + `<circle cx="8" cy="12.6" r="6.2" fill="${coin}" stroke="${rim}" stroke-width="1.3"/><circle cx="8" cy="12.6" r="3.7" fill="none" stroke="#fff" stroke-width=".9" opacity=".55"/></svg>`;
+};
+/** What each medal says next to its school. */
+export const RANK = ['primaria', 'secondaria'];
 const BOOK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C9.5 4.8 6.5 4.6 3 5.2v13c3.5-.6 6.5-.4 9 1.3 2.5-1.7 5.5-1.9 9-1.3v-13c-3.5-.6-6.5-.4-9 1.3zM12 6.5v13M5.5 8.6c1.8-.2 3.4 0 4.6.6M5.5 11.4c1.8-.2 3.4 0 4.6.6M13.9 9.2c1.2-.6 2.8-.8 4.6-.6M13.9 12c1.2-.6 2.8-.8 4.6-.6"/></svg>';
 const DRAG = 6; // px a mouse press travels before it becomes a drag
 
@@ -141,12 +153,14 @@ export class AbilityBook<C extends Caster> {
   opened = () => {};
 
   private setMain: (id: string) => void;
-  /** `abilities`: the kit (the potion is left out: it has its own button), the hero's base attacks among them; `picks`: the
-   *  level-up cards so far; `setMain`: a base attack goes on the big button. */
-  constructor(sys: AbilitySystem<C>, abilities: Ability<C>[], picks: () => readonly string[], setMain: (id: string) => void = (id) => sys.setMain(id)) {
+  private schools: readonly School[];
+  /** `abilities`: the kit (the potion is left out: it has its own button, and so is every school but the hero's two); `schools`:
+   *  his primary and secondary; `picks`: the level-up cards so far; `setMain`: a base attack goes on the big button. */
+  constructor(sys: AbilitySystem<C>, abilities: Ability<C>[], schools: readonly School[], picks: () => readonly string[], setMain: (id: string) => void = (id) => sys.setMain(id)) {
     this.sys = sys;
     this.setMain = setMain;
-    this.all = abilities.filter((a) => a.id !== sys.layout().bar[POTION]);
+    this.schools = schools;
+    this.all = abilities.filter((a) => a.id !== sys.layout().bar[POTION] && (schools.includes(SCHOOL[a.id] as School) || a.id === 'mend'));
     this.picks = picks;
     this.sel = sys.slots[PRIMARY]?.id ?? this.all[0].id;
     const style = document.createElement('style');
@@ -239,14 +253,15 @@ export class AbilityBook<C extends Caster> {
       <span><b>${esc(a.name)}</b><small>${sub}</small></span>${on ? '<i class="chk" aria-label="Equipaggiata">✓</i>' : ''}</button>`;
   }
 
+  /** His primary school, then his secondary, each with its base attack, its mana abilities and its specials; the heal apart if neither is the Sacro. */
   private list(): string {
-    const mains = this.all.filter((a) => a.main);
-    let html = mains.length ? `<h3>Attacchi primari</h3>${mains.map((a) => this.row(a)).join('')}` : '';
-    for (const [s, name] of SCHOOLS) {
-      const of = this.all.filter((a) => !a.main && SCHOOL[a.id] === s);
-      of.sort((x, y) => +this.sys.owns(y.id) - +this.sys.owns(x.id)); // learnt first
-      if (of.length) html += `<h3>${name}</h3>${of.map((a) => this.row(a)).join('')}`;
-    }
+    const kind = (a: Ability<C>) => (a.main ? 0 : a.special ? 2 : 1);
+    let html = this.schools.map((s, i) => {
+      const of = this.all.filter((a) => SCHOOL[a.id] === s).sort((x, y) => kind(x) - kind(y));
+      return `<h3>${medal(i)}${SCHOOL_NAME.get(s)} · ${RANK[i]}</h3>${of.map((a) => this.row(a)).join('')}`;
+    }).join('');
+    const rest = this.all.filter((a) => !this.schools.includes(SCHOOL[a.id] as School));
+    if (rest.length) html += `<h3>Di tutti gli eroi</h3>${rest.map((a) => this.row(a)).join('')}`;
     return html;
   }
 
@@ -265,7 +280,7 @@ export class AbilityBook<C extends Caster> {
       + (this.all.some((x) => x.main && x !== a && this.sys.owns(x.id)) ? " Al suo posto puoi mettere l'altro attacco base che conosci." : '');
     else if (a.main && !owned) note = `Non ancora appreso. È l'attacco base della scuola ${school}: lo impari da solo quando conosci ${SECOND_AT} delle sue 5 abilità, e allora può prendere il tasto grande.`;
     else if (a.main) acts = `<div class="acts"><button class="btn" data-do="main">Sul tasto grande</button><p class="hint">Prende il posto di ${esc(this.sys.slots[PRIMARY]?.name ?? '')}, che resta nel libro. I potenziamenti restano a ciascuno.</p></div>`;
-    else if (!owned) note = (a.special ? 'Non ancora appresa. Speciale: la sua carta può uscire dal livello 6 in poi, ai passaggi di livello pari.'
+    else if (!owned) note = (a.special ? 'Non ancora appresa. Speciale: si lancia subito, senza mana, con la barra della furia piena, e la svuota. La sua carta può uscire dal livello 6 in poi, ai passaggi di livello pari.'
       : 'Non ancora appresa. Ai passaggi di livello pari una delle carte può insegnarla: scegli la sua.')
       + " Oppure compra il tomo della sua scuola da Fra' Bortolo o da Mastro Iseppo: insegna tutta la scuola.";
     else {

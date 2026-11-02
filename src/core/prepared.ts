@@ -1,7 +1,7 @@
 // A hero ready for level 2, built in: what a player usually has when Fra' Zuane offers La dote delle Zitelle.
 // The Reverendissimo is handed in, Fra' Bortolo found and his heads' rite done, the corona given back (its medal in the
 // bag), level 12 (~1025 XP to the boss with the key's and Bortolo's quests, then the hand-in, the heads and the corona:
-// 1525), every slot in level 1's purple, a frost and bone kit on the bar. The Risorto, with the Nube di peste he used to start with. Standing by Fra' Zuane on the fondamenta.
+// 1525), every slot in level 1's purple, a kit of his two schools on the bar (Ossa and Ombra). The Risorto, standing by Fra' Zuane on the fondamenta.
 // The squad screen (ui/select.ts) offers it as the Risorto's "Dal livello 2"; main.ts keeps it as his run.
 // Plain data over a fresh game's serialize: no three.js, so `npm run check` drives it in Node.
 import { levelOf } from '../player/levels.ts';
@@ -12,11 +12,11 @@ import type { Layout } from '../abilities/system.ts';
 
 export const XP = 1525;
 /** Level-up cards for levels 2..12, as `offer` deals them: an ability on the even levels to 10, an upgrade or passive between. */
-export const PICKS = ['step', 'hp', 'frost', 'plague_dps', 'nova', 'fall_third', 'caligo', 'fx_fallplague', 'font', 'dmg', 'hp'];
+export const PICKS = ['step', 'hp', 'leap', 'fall_dmg', 'nova', 'fall_third', 'ward', 'leap_big', 'whirl', 'dmg', 'hp'];
 /** Level 1's purple set, one piece a slot. */
 export const GEAR = { testa: 'mitria', amuleto: 'ruta-oro', spalle: 'mantella-peste', torso: 'saio-voto', mani: 'guanti-palladio', gambe: 'cosciali-lazzaretto', piedi: 'zoccoli-redentore', anello: 'anello-1576', arma: 'pastorale' };
 /** The bar: the club on 1, the potion on R, the rest in the touch fan's order. */
-export const BAR: Layout = { bar: ['fall', 'frost', 'caligo', 'plague', 'font', 'step', 'nova', 'mend', null, 'potion'], off: [] };
+export const BAR: Layout = { bar: ['fall', 'leap', 'whirl', 'step', 'nova', 'ward', 'mend', null, null, 'potion'], off: [] };
 const UNSEEN = new Set(['giudecca', 'zitelle']); // level 2's zones: not walked yet
 
 /**
@@ -42,7 +42,7 @@ export function prepared(fresh: GameState, fallen: number, areas: readonly { zon
     again: [],
     time: 2 * 3600,
     fog: fog.encode(),
-    build: { xp: XP, lv: levelOf(XP).lv, picks: [...PICKS], learned: ['plague'] },
+    build: { xp: XP, lv: levelOf(XP).lv, picks: [...PICKS], learned: [] },
     bag: { gold: 650, items: [[RELIC_PRIZE, 1]] },
     gear: { ...GEAR },
     side: { taken: [], done: [], kills: {} },

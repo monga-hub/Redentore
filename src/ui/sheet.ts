@@ -4,12 +4,15 @@ import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
 import { itemTip } from './tooltip.ts';
+import { RANK, SCHOOL_NAME, medal } from './book.ts';
+import type { School } from '../player/levels.ts';
 
 // The character sheet, WoW style: C (or the figure button under the satchel) opens a paper doll
 // in the bag's overlay: head, neck, shoulders, chest down the left, hands, legs, feet, ring down the
 // right, the weapon underneath, and between them the hero himself, full length and as dressed now,
 // idling (ui/figure.ts draws him into `stage`; a drag turns him round). Beside it the numbers gear and
-// levels make (health, mana, armor and what it turns aside, damage, crit, cast speed, mana regen).
+// levels make (health, mana, armor and what it turns aside, damage, crit, cast speed, mana regen), under his name and his two
+// schools' medals (gold the primary, silver the secondary).
 // Hover (tap) a slot for its tooltip; click the shown one to take it off into the bag.
 
 const CSS = `
@@ -24,6 +27,9 @@ const CSS = `
 #bag .sheet .wpn { grid-column: 2; grid-row: 5; display: flex; justify-content: center; }
 #bag .sheet .stats { grid-column: 4; grid-row: 1 / 6; min-width: 112px; padding: 16px 0 0 8px; border-left: 1px solid rgba(217,173,82,.25); } /* clear of the ✕ */
 #bag .sheet .lv { margin: 0 0 6px; font: bold 12px/15px Georgia, serif; color: #ffd75e; }
+#bag .sheet .sch { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px; font: 11px/15px Georgia, serif; color: #f3e2b0; }
+#bag .sheet .sch span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+#bag .sheet .sch small { color: #9a8c70; font-style: italic; }
 #bag .sheet dl { display: grid; grid-template-columns: auto auto; gap: 1px 10px; margin: 0; font: 11px/15px system-ui, sans-serif; }
 #bag .sheet dt { color: #c9b48a; } #bag .sheet dd { margin: 0; text-align: right; color: #f3ecd8; white-space: nowrap; }
 #bag .sheet dd.up { color: #3fd84a; }
@@ -36,7 +42,7 @@ const CSS = `
 `;
 
 /** The numbers beside the figure (main.ts reads them off the stats, the cards and the gear). */
-export interface Summary { name: string; lv: number; hp: number; mana: number; armor: number; cut: number; dmg: number; crit: number; haste: number; regen: number }
+export interface Summary { name: string; lv: number; schools: readonly School[]; hp: number; mana: number; armor: number; cut: number; dmg: number; crit: number; haste: number; regen: number }
 
 export class SheetPanel {
   readonly el = document.createElement('div');
@@ -90,6 +96,7 @@ export class SheetPanel {
       <div class="doll">${col(['testa', 'amuleto', 'spalle', 'torso'])}<div class="stage" title="Trascina per girarlo"></div>${col(['mani', 'gambe', 'piedi', 'anello'], 'r')}
         <div class="wpn">${this.cell('arma')}</div>
         <div class="stats"><div class="lv">${n.name} · livello ${n.lv}</div>
+          <div class="sch">${n.schools.map((s, i) => `<span>${medal(i)}${SCHOOL_NAME.get(s)} <small>${RANK[i]}</small></span>`).join('')}</div>
           <dl><dt>Salute</dt><dd>${it(n.hp)}</dd><dt>Mana</dt><dd>${it(n.mana)}</dd>
           <dt>Armatura</dt><dd title="Danni subiti in meno">${it(n.armor)} (−${pct(n.cut)})</dd>
           <dt>Danni</dt><dd class="${n.dmg > 1 ? 'up' : ''}">+${pct(n.dmg - 1)}</dd><dt>Critico</dt><dd>${Math.round(n.crit)}% (×1,5)</dd>

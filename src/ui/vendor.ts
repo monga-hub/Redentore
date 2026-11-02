@@ -1,5 +1,5 @@
 import { ITEM, RARITY, type Bag, type Item } from '../loot/bag.ts';
-import { TOMES, tomeOf } from '../player/levels.ts';
+import { TOMES, tomeOf, tomesOf, type School } from '../player/levels.ts';
 import { buy, buyPrice, sell, sellPrice, type Equipment } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
@@ -10,7 +10,7 @@ import { itemTip } from './tooltip.ts';
 // with the bag beside it. Left, their goods, purple pieces with their price; under them the buyback row of
 // what was sold this visit. While it is open a click on a bag slot sells the whole stack for a
 // quarter of its price (ui/bag.ts `selling`); goods and buyback are bought the same way. Before the goods, the tomes
-// (player/levels.ts TOMES): bought, one teaches at once every ability of its school the hero lacks, into the ability book.
+// (player/levels.ts TOMES), only his two schools' (`tomesOf`): bought, one teaches at once every ability of its school the hero lacks, into the ability book.
 
 const CSS = `
 #bag .vendor { width: min(380px, calc(100vw - 24px)); }
@@ -36,7 +36,8 @@ const BACK = 6; // buyback slots, oldest dropped
 /** A shop: its keeper's name, the line under it and what is on sale. */
 export interface Merchant { name: string; sub: string; goods: () => readonly Item[] }
 /** What the tomes need: the abilities owned, and teaching new ones (main.ts). */
-export interface Learner { owned(): readonly string[]; learn(ids: string[]): void }
+/** The hero at the counter: what he knows, how he learns, his two schools (the only tomes sold to him). */
+export interface Learner { owned(): readonly string[]; learn(ids: string[]): void; schools: readonly School[] }
 const TOME_COLOR = RARITY.leggendario.color;
 
 export class VendorPanel {
@@ -136,7 +137,7 @@ export class VendorPanel {
     };
     this.el.innerHTML = `<h2>${this.who.name}</h2><button class="x" aria-label="Chiudi bottega">✕</button>
       <p class="sub">${this.who.sub}</p>
-      <div class="goods">${TOMES.map((t) => [t, tomeOf(t, this.learner.owned())] as const).filter(([, o]) => o.teaches.length).map(([t, o]) =>
+      <div class="goods">${tomesOf(this.learner.schools).map((t) => [t, tomeOf(t, this.learner.owned())] as const).filter(([, o]) => o.teaches.length).map(([t, o]) =>
         `<div class="good"><button class="cell" data-k="t:${t.school}" style="--c: ${TOME_COLOR}" aria-label="${t.name}">${ICONS[t.icon]}</button><span><em style="color: ${TOME_COLOR}">${t.name}</em>`
         + `<small class="${this.bag.gold < o.price ? 'no' : ''}"><i class="coin"></i>${o.price.toLocaleString('it-IT')}</small></span></div>`).join('')}${this.who.goods().map((it) => {
         const p = buyPrice(it);

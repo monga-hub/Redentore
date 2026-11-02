@@ -4,15 +4,17 @@
 // ~870 (scripts/balance.ts) and ~1020 with the key's and Fra' Bortolo's quest XP, level 10: the boss is tuned for 10-11.
 // Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
 // pays 950 XP in all, ~16 with the side quests done too. There is no cap: the curve goes on, and the risen dead keep feeding it.
-// Each level offers three cards from everything not yet learnt, leaning to the hero's schools (`LEAN`: half his
-// primary school's, a third his secondary's, the rest everything else), whatever was picked before.
+// Each level offers three cards from everything of the hero's two schools not yet learnt and the cards of no school (`LEAN`:
+// half his primary school's, a third his secondary's, the rest the passives, fusions and the potion's), whatever was picked
+// before. Every school is the same shape (`specialsOf`): three abilities paid in mana and two specials, instant, spent with a full fury bar.
 // Even levels up to 10 offer three new abilities (the specials from level 6), past 10 a new ability against a passive and a
 // modifier; the others a modifier of an owned ability (or a fusion), a stat passive and another modifier. New abilities,
 // fusions and the on/off modifiers are taken once; every other modifier and passive is ranked with no cap, each pick a rank
 // adding the same share again (`rank`, `by`), so the progression never runs out. Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
 // Caduta d'ossa for the Ossa, Stiletto di ghiaccio for the Gelo...) and Preghiera di suffragio (the heal), the potion stays as
 // an item; owning 3 of the 5 abilities of his secondary school teaches him that school's base attack too (`SECOND_AT`),
-// which the book can put on the big button instead. The hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school for gold. Everything an
+// which the book can put on the big button instead. The hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school of his for gold. A save
+// from before the two schools keeps only theirs (`ownSchools`). Everything an
 // upgrade changes is a field of `Tune`, replayed from the picks and the tomes' abilities (`tuneOf`), so a save only needs both lists.
 // No DOM and no three.js: `npm run check` drives it in Node (scripts/check-levels.ts).
 
@@ -42,7 +44,7 @@ export interface Tune {
   // fire, frost, lightning and the new blows (abilities/grimoire.ts)
   pyreDmg: number; pyreCast: number; pyreR: number;
   frostDmg: number; frostCast: number; frostSlow: number;
-  fontDmg: number; fontRoot: number; fontCd: number;
+  fontDmg: number; fontRoot: number;
   /** The base attacks but Caduta d'ossa (its own fall* above): each one's upgrades apart. */
   prim: Record<string, Prim>;
   caligoDmg: number; caligoRange: number; caligoFreeze: boolean;
@@ -56,7 +58,7 @@ export interface Tune {
   // five abilities a school: poison, the drain, fire, frost, lightning and holy ones (abilities/grimoire.ts)
   spitDmg: number; spitStacks: number; venomDps: number; venomMax: number;
   untoreDmg: number; untoreR: number;
-  miasmaDmg: number; miasmaR: number; miasmaStacks: number; miasmaCd: number;
+  miasmaDmg: number; miasmaR: number; miasmaStacks: number; miasmaPush: number;
   feverK: number; feverR: number;
   drainDmg: number; drainHeal: number;
   pillarDmg: number; pillarR: number;
@@ -69,8 +71,8 @@ export interface Tune {
   squallDmg: number; squallR: number;
   judgeDmg: number; judgeCd: number;
   hallowDps: number; hallowR: number;
-  hammerStun: number; hammerCd: number;
-  bubbleCd: number;
+  hammerDmg: number; hammerStun: number;
+  bubbleTime: number;
   fxVenomCloud: boolean; fxHolyFire: boolean; // fusions: poison in the plague cloud, the judgment set alight
 }
 
@@ -84,8 +86,6 @@ export const BASE_ATTACK: Record<School, string> = { bone: 'fall', frost: 'lance
 export const BASES = Object.values(BASE_ATTACK);
 /** Damage a hit of a bolt base attack (Caduta d'ossa: fallDmg). */
 export const PRIM_DMG = 8;
-/** Colonna di fiamme's cast (abilities/forsaken.ts). */
-export const PILLAR_CAST = 0.8;
 const prims = (): Record<string, Prim> => Object.fromEntries(BASES.filter((id) => id !== 'fall').map((id) => [id, { dmg: PRIM_DMG, split: false, third: 1, mana: 0 }]));
 /** Abilities of the secondary school owned for its base attack to come by itself. */
 export const SECOND_AT = 3;
@@ -95,7 +95,6 @@ export const RISORTO: [School, School] = ['bone', 'shadow'];
 /** The abilities every run starts with: the hero's base attack, the heal, the potion. */
 export const startOf = (schools: readonly School[] = RISORTO) => [BASE_ATTACK[schools[0]], 'mend', 'potion'];
 export const START = startOf();
-export const SPECIALS = ['strike', 'nova', 'ward'];
 const BASE: Tune = {
   owned: START,
   dmg: 1, hp: 1, mana: 1, armor: 1, regen: 3, speed: 1, cdr: 1, leech: 0, fury: 1, furyStart: 0,
@@ -109,7 +108,7 @@ const BASE: Tune = {
   fxWisp: false, fxStep: false, fxFall: false,
   pyreDmg: 140, pyreCast: 1.2, pyreR: 2.5, // casts of a second or so: a caster faces a charging pack too
   frostDmg: 65, frostCast: 1, frostSlow: 0.5,
-  fontDmg: 25, fontRoot: 4, fontCd: 20,
+  fontDmg: 40, fontRoot: 4,
   prim: prims(),
   caligoDmg: 45, caligoRange: 8, caligoFreeze: false,
   chainDmg: 80, chainHops: 4, chainCast: 1, // under the 1.5 s line too: Fulmine is a caster school
@@ -121,21 +120,21 @@ const BASE: Tune = {
   fxShatter: false, fxStorm: false, fxFrostWhirl: false,
   spitDmg: 18, spitStacks: 1, venomDps: 4, venomMax: 5,
   untoreDmg: 30, untoreR: 6,
-  miasmaDmg: 30, miasmaR: 7, miasmaStacks: 3, miasmaCd: 12,
-  feverK: 0.2, feverR: 4,
+  miasmaDmg: 45, miasmaR: 8, miasmaStacks: 3, miasmaPush: 5,
+  feverK: 0.3, feverR: 4,
   drainDmg: 16, drainHeal: 0.02,
-  pillarDmg: 70, pillarR: 3.5,
+  pillarDmg: 100, pillarR: 3.5,
   ceroDps: 12, ceroDmg: 60, ceroChain: false,
-  furnaceDmg: 50, furnaceRange: 8,
+  furnaceDmg: 80, furnaceRange: 8,
   blizzardDmg: 18, blizzardR: 4,
-  orbDmg: 15, orbSpeed: 5,
+  orbDmg: 20, orbSpeed: 5,
   shieldDmg: 45, shieldOrbs: 4,
-  rodDmg: 22, rodTime: 12, rodEvery: 1,
-  squallDmg: 60, squallR: 6,
+  rodDmg: 30, rodTime: 12, rodEvery: 1,
+  squallDmg: 90, squallR: 6,
   judgeDmg: 70, judgeCd: 6,
   hallowDps: 14, hallowR: 4,
-  hammerStun: 4, hammerCd: 30,
-  bubbleCd: 120,
+  hammerDmg: 60, hammerStun: 4,
+  bubbleTime: 5,
   fxVenomCloud: false, fxHolyFire: false,
 };
 
@@ -182,40 +181,40 @@ const passive = (id: string, name: string, text: string, apply: (t: Tune) => voi
 
 export const CARDS: Card[] = [
   ability('step', "Passo d'ombra", 'A', 'shadow', 'Scatto di 8 m nell’ombra: 25 danni a chi attraversi. 40 mana, recupero 12 s.'),
-  ability('veil', 'Velo spettrale', 'A', 'shadow', 'Per 5 s subisci il 50% di danni in meno. 50 mana, recupero 30 s.'),
+  ability('veil', 'Velo spettrale', 'B', 'shadow', 'Speciale: con la barra della furia piena, per 5 s diventi un’ombra e subisci il 50% di danni in meno.'),
   ability('wisp', 'Fuoco fatuo', 'A', 'fire', 'Per 60 s un fuoco fatuo si avventa su chi combatti e brucia chi sfiora: 15 danni al secondo.'),
   ability('strike', 'Sentenza del sepolcro', 'B', 'bone', 'Speciale: con la barra della furia piena, una lancia d’ossa da 50 danni.'),
   ability('nova', 'Lamento della cripta', 'B', 'bone', 'Speciale: con la barra della furia piena, 20 danni a tutti entro 6 m.'),
   ability('ward', 'Patto della tomba', 'B', 'shadow', 'Speciale: con la barra della furia piena, 5 s di immunità a ogni danno.'),
   ability('pyre', "Rogo dell'eretico", 'A', 'fire', `Lancio ${it(BASE.pyreCast)} s: un globo di fuoco dei ceri votivi da ${BASE.pyreDmg} danni, metà ai vicini; il bersaglio brucia e il pavimento arde. 45 mana.`),
   ability('frost', 'Dardo di brina', 'A', 'frost', `Lancio ${it(BASE.frostCast)} s: un dardo della laguna gelata da ${BASE.frostDmg} danni, e il bersaglio e chi gli sta entro 3 m rallentano del ${pct(1 - BASE.frostSlow)} per 6 s. 22 mana.`),
-  ability('font', 'Acquasantiera gelata', 'A', 'frost', `L'acqua santa ghiaccia attorno a te: ${BASE.fontDmg} danni e chi è entro 5 m resta congelato sul posto ${BASE.fontRoot} s. 40 mana, recupero ${BASE.fontCd} s.`),
+  ability('font', 'Acquasantiera gelata', 'B', 'frost', `Speciale: con la barra della furia piena, l'acqua santa ghiaccia attorno a te: ${BASE.fontDmg} danni e chi è entro 5 m resta congelato sul posto ${BASE.fontRoot} s.`),
   ability('caligo', 'Caligo gelato', 'A', 'frost', `Il caligo, la nebbia gelata della laguna, davanti a te fino a ${BASE.caligoRange} m: ${BASE.caligoDmg} danni e chi colpisce rallenta del 60% per 5 s. 30 mana, recupero 6 s.`),
   ability('chain', 'Catena di saette', 'A', 'storm', `Lancio ${it(BASE.chainCast)} s: una saetta da ${BASE.chainDmg} danni che rimbalza su altri ${BASE.chainHops} nemici. 35 mana, recupero 5 s.`),
   ability('toll', 'Rintocco del campanile', 'A', 'storm', `Un fulmine dal campanile sul bersaglio: ${BASE.tollDmg} danni entro ${it(BASE.tollR)} m e storditi ${it(BASE.tollStun)} s. 45 mana, recupero 18 s.`),
   ability('leap', 'Balzo del sepolcro', 'A', 'bone', `Un balzo fino a 12 m sul nemico: ${BASE.leapDmg} danni entro ${BASE.leapR} m e un attimo di stordimento. 30 mana, recupero ${BASE.leapCd} s.`),
   ability('whirl', "Turbine d'ossa", 'A', 'bone', `Per ${BASE.whirlTime} s giri su te stesso con la clava, anche correndo: ${BASE.whirlDmg} danni ogni mezzo secondo entro 3 m, e paghi il 30% in meno dei colpi. 35 mana, recupero 10 s.`),
   ability('grace', 'Colpo di grazia', 'A', 'bone', `Un fendente a due mani davanti a te: ${BASE.graceDmg} danni, fino al triplo sui nemici già feriti. 20 mana, recupero ${BASE.graceCd} s.`),
-  ability('charge', 'Carica del dannato', 'A', 'shadow', `Ti scagli sul nemico (4-20 m): ${BASE.chargeDmg} danni e stordito ${it(BASE.chargeStun)} s. Riempie la furia. Recupero ${BASE.chargeCd} s.`),
+  ability('charge', 'Carica del dannato', 'A', 'shadow', `Ti scagli sul nemico (4-20 m): ${BASE.chargeDmg} danni e stordito ${it(BASE.chargeStun)} s. Riempie un quarto della furia. 25 mana, recupero ${BASE.chargeCd} s.`),
   // five a school: poison (Diablo's Witch Doctor and Necromancer, WoW's poisons), WoW's warlock drain, mage, shaman and paladin
   ability('plague', 'Nube di peste', 'A', 'plague', `Una nube pestilenziale sul bersaglio, larga ${it(BASE.plagueR)} m: ristagna ${BASE.plagueLife} s e corrode chi ci resta dentro (${BASE.plagueDps} danni al secondo). 25 mana, recupero ${BASE.plagueCd} s.`),
   ability('spit', 'Sputo di bile', 'A', 'plague', `Istantaneo: un grumo di bile velenosa da ${BASE.spitDmg} danni e una dose di veleno (${BASE.venomDps} danni al secondo per dose per 8 s, fino a ${BASE.venomMax} dosi). 18 mana.`),
   ability('untore', "Unguento dell'untore", 'A', 'plague', `Ungi il bersaglio: ${BASE.untoreDmg} danni e il suo veleno (almeno 2 dosi) passa a ogni nemico entro ${BASE.untoreR} m. 30 mana, recupero 10 s.`),
-  ability('miasma', 'Fiato della fossa', 'A', 'plague', `Un anello di miasma esplode da te: ${BASE.miasmaDmg} danni e ${BASE.miasmaStacks} dosi di veleno a chi è entro ${BASE.miasmaR} m. 45 mana, recupero ${BASE.miasmaCd} s.`),
-  ability('fever', 'Febbre di palude', 'A', 'plague', `Il bersaglio e chi gli sta entro ${BASE.feverR} m prendono il ${pct(BASE.feverK)} di danni in più da tutto per 12 s (la metà sui più forti). 30 mana, recupero 15 s.`),
+  ability('miasma', 'Fiato della fossa', 'B', 'plague', `Speciale: con la barra della furia piena, esali il miasma delle fosse davanti a te fino a ${BASE.miasmaR} m: ${BASE.miasmaDmg} danni, ${BASE.miasmaStacks} dosi di veleno e chi colpisce è sbalzato indietro di ${BASE.miasmaPush} m (meno i più forti).`),
+  ability('fever', 'Febbre di palude', 'B', 'plague', `Speciale: con la barra della furia piena, il bersaglio e chi gli sta entro ${BASE.feverR} m prendono il ${pct(BASE.feverK)} di danni in più da tutto per 12 s (la metà sui più forti).`),
   ability('drain', "Risucchio d'anima", 'A', 'shadow', `Canalizzato 3 s: strappi l'anima al bersaglio, ${BASE.drainDmg} danni ogni mezzo secondo, e ognuno ti cura del ${pct(BASE.drainHeal)}. 40 mana, recupero 8 s.`),
-  ability('pillar', 'Colonna di fiamme', 'A', 'fire', `Lancio ${it(PILLAR_CAST)} s: una colonna di fuoco sotto il bersaglio, ${BASE.pillarDmg} danni entro ${it(BASE.pillarR)} m, chi c'è brucia e il pavimento arde. 50 mana, recupero 10 s.`),
+  ability('pillar', 'Colonna di fiamme', 'B', 'fire', `Speciale: con la barra della furia piena, una colonna di fuoco sotto il bersaglio, ${BASE.pillarDmg} danni entro ${it(BASE.pillarR)} m, chi c'è brucia e il pavimento arde.`),
   ability('cero', 'Cero funebre', 'A', 'fire', `Istantaneo: accendi un cero nel bersaglio, ${BASE.ceroDps} danni al secondo per 4 s, poi scoppia: ${BASE.ceroDmg} danni entro 4 m. 30 mana, recupero 3 s.`),
-  ability('furnace', 'Fornace di Murano', 'A', 'fire', `Il soffio della fornace davanti a te, fino a ${BASE.furnaceRange} m: ${BASE.furnaceDmg} danni, chi colpisce brucia ed è stordito 2 s. 45 mana, recupero 14 s.`),
+  ability('furnace', 'Fornace di Murano', 'B', 'fire', `Speciale: con la barra della furia piena, il soffio della fornace davanti a te, fino a ${BASE.furnaceRange} m: ${BASE.furnaceDmg} danni, chi colpisce brucia ed è stordito 2 s.`),
   ability('blizzard', 'Bufera di bora', 'A', 'frost', `Canalizzato 4 s: la bora gelida sul bersaglio, ${BASE.blizzardDmg} danni ogni mezzo secondo entro ${BASE.blizzardR} m e rallentati del 50%. 55 mana, recupero 12 s.`),
-  ability('orb', 'Globo di brina', 'A', 'frost', `Un globo di ghiaccio che rotola per 15 m: ${BASE.orbDmg} danni ogni mezzo secondo a chi passa entro 3,5 m, rallentati, e alla fine scoppia. 50 mana, recupero 16 s.`),
+  ability('orb', 'Globo di brina', 'B', 'frost', `Speciale: con la barra della furia piena, un globo di ghiaccio che rotola per 15 m: ${BASE.orbDmg} danni ogni mezzo secondo a chi passa entro 3,5 m, rallentati, e alla fine scoppia.`),
   ability('shield', 'Scudo di saette', 'A', 'storm', `Per 20 s ${BASE.shieldOrbs} saette ti girano attorno: ognuna fulmina il primo nemico che ti arriva entro 3 m (${BASE.shieldDmg} danni). 40 mana, recupero 20 s.`),
-  ability('rod', 'Parafulmine', 'A', 'storm', `Pianti un parafulmine ai tuoi piedi: per ${BASE.rodTime} s ogni secondo fulmina il nemico più vicino entro 9 m (${BASE.rodDmg} danni). 45 mana, recupero 18 s.`),
-  ability('squall', 'Burrasca', 'A', 'storm', `Un colpo di tuono attorno a te: ${BASE.squallDmg} danni entro ${BASE.squallR} m e i nemici sbalzati via di 5 m (meno i più forti). 40 mana, recupero 15 s.`),
+  ability('rod', 'Parafulmine', 'B', 'storm', `Speciale: con la barra della furia piena, pianti un parafulmine ai tuoi piedi: per ${BASE.rodTime} s ogni secondo fulmina il nemico più vicino entro 9 m (${BASE.rodDmg} danni).`),
+  ability('squall', 'Burrasca', 'B', 'storm', `Speciale: con la barra della furia piena, un colpo di tuono attorno a te: ${BASE.squallDmg} danni entro ${BASE.squallR} m e i nemici sbalzati via di 5 m (meno i più forti).`),
   ability('judge', 'Giudizio del Redentore', 'A', 'holy', `Istantaneo: un martello di luce sul bersaglio, ${BASE.judgeDmg} danni. 25 mana, recupero ${BASE.judgeCd} s.`),
   ability('hallow', 'Terra consacrata', 'A', 'holy', `Consacri il suolo attorno a te per 8 s: ${BASE.hallowDps} danni al secondo ai nemici entro ${BASE.hallowR} m, e finché ci stai sopra recuperi l'1% della salute al secondo. 40 mana, recupero 12 s.`),
-  ability('hammer', 'Martello della penitenza', 'A', 'holy', `Istantaneo: un martello d'oro sul bersaglio, 30 danni e stordito ${BASE.hammerStun} s (molto meno sui più forti). 30 mana, recupero ${BASE.hammerCd} s.`),
-  ability('bubble', 'Aureola del redento', 'A', 'holy', `Fuori dal tempo di recupero globale: per 5 s un'aureola ti rende immune a ogni danno. 60 mana, recupero ${BASE.bubbleCd} s.`),
+  ability('hammer', 'Martello della penitenza', 'B', 'holy', `Speciale: con la barra della furia piena, un martello d'oro sul bersaglio, ${BASE.hammerDmg} danni e stordito ${BASE.hammerStun} s (molto meno sui più forti).`),
+  ability('bubble', 'Aureola del redento', 'B', 'holy', `Speciale: con la barra della furia piena, fuori dal tempo di recupero globale: per ${BASE.bubbleTime} s un'aureola ti rende immune a ogni danno.`),
 
   passive('dmg', 'Ossa più dure', '+8% a tutti i danni che infliggi, a ogni rango.', by('dmg', 0.08)),
   passive('hp', 'Carne di tomba', '+15% di salute massima a ogni rango (+192), e la recuperi subito.', by('hp', 0.15)),
@@ -253,7 +252,7 @@ export const CARDS: Card[] = [
   rank('frost', 'frost_deep', 'Brina profonda', `Dardo di brina: +25% ai danni (base ${BASE.frostDmg}) a ogni rango, e ai rallentati lascia il 30% di velocità in meno (base ${pct(BASE.frostSlow)}).`, by('frostDmg', 0.25), by('frostSlow', -0.3)),
   rank('frost', 'frost_fast', 'Dardo rapido', `Dardo di brina: lancio −35% a ogni rango (base ${it(BASE.frostCast)} s).`, by('frostCast', -0.35)),
   rank('font', 'font_long', 'Gelo eterno', `Acquasantiera gelata: congela il 50% più a lungo a ogni rango (base ${BASE.fontRoot} s).`, by('fontRoot', 0.5)),
-  rank('font', 'font_cd', 'Acquasantiera colma', `Acquasantiera gelata: recupero −30% a ogni rango (base ${BASE.fontCd} s).`, by('fontCd', -0.3)),
+  rank('font', 'font_cd', 'Acquasantiera colma', `Acquasantiera gelata: +60% ai danni a ogni rango (base ${BASE.fontDmg}).`, by('fontDmg', 0.6)), // *_cd: the id of the cooldown card it was before it became a special, kept for the saves (likewise hammer_cd, bubble_cd)
   rank('caligo', 'caligo_big', 'Caligo fitto', `Caligo gelato: +35% ai danni (base ${BASE.caligoDmg}) e portata +25% (base ${BASE.caligoRange} m) a ogni rango.`, by('caligoDmg', 0.35), by('caligoRange', 0.25)),
   mod('caligo', 'caligo_freeze', 'Caligo di gennaio', 'Caligo gelato: chi era già rallentato resta congelato sul posto 2 s.', 1, (t) => { t.caligoFreeze = true; }),
   // the base attacks but Caduta d'ossa (its four are above)
@@ -277,8 +276,8 @@ export const CARDS: Card[] = [
   rank('charge', 'charge_cd', 'Carica instancabile', `Carica del dannato: recupero −30% a ogni rango (base ${BASE.chargeCd} s).`, by('chargeCd', -0.3)),
   mod('spit', 'spit_twin', 'Doppio sputo', 'Sputo di bile: due dosi di veleno a colpo invece di una.', 1, (t) => { t.spitStacks = 2; }),
   rank('untore', 'untore_far', 'Unzione diffusa', `Unguento dell'untore: +50% ai danni (base ${BASE.untoreDmg}) e il veleno passa il 40% più lontano (base ${BASE.untoreR} m) a ogni rango.`, by('untoreDmg', 0.5), by('untoreR', 0.4)),
-  rank('miasma', 'miasma_more', 'Fossa comune', `Fiato della fossa: una dose di veleno in più (base ${BASE.miasmaStacks}, fino a ${BASE.venomMax}) e recupero −25% (base ${BASE.miasmaCd} s) a ogni rango.`,
-    (t) => { t.miasmaStacks = Math.min(t.venomMax, t.miasmaStacks + 1); }, by('miasmaCd', -0.25)),
+  rank('miasma', 'miasma_more', 'Fossa comune', `Fiato della fossa: una dose di veleno in più (base ${BASE.miasmaStacks}, fino a ${BASE.venomMax}) e +30% ai danni (base ${BASE.miasmaDmg}) a ogni rango.`,
+    (t) => { t.miasmaStacks = Math.min(t.venomMax, t.miasmaStacks + 1); }, by('miasmaDmg', 0.3)),
   rank('fever', 'fever_deep', 'Febbre terzana', `Febbre di palude: i danni subiti crescono del 50% a ogni rango (base +${pct(BASE.feverK)}), e il raggio del 30% (base ${BASE.feverR} m).`, by('feverK', 0.5), by('feverR', 0.3)),
   rank('drain', 'drain_deep', 'Sete del dannato', `Risucchio d'anima: +40% ai danni (base ${BASE.drainDmg} ogni mezzo secondo) e +40% alla cura (base ${pct(BASE.drainHeal)}) a ogni rango.`, by('drainDmg', 0.4), by('drainHeal', 0.4)),
   rank('pillar', 'pillar_big', "Rogo del Sant'Uffizio", `Colonna di fiamme: +40% ai danni (base ${BASE.pillarDmg}) e raggio +20% (base ${it(BASE.pillarR)} m) a ogni rango.`, by('pillarDmg', 0.4), by('pillarR', 0.2)),
@@ -293,8 +292,8 @@ export const CARDS: Card[] = [
   rank('squall', 'squall_big', 'Fortunale', `Burrasca: +35% ai danni (base ${BASE.squallDmg}) e raggio +25% (base ${BASE.squallR} m) a ogni rango.`, by('squallDmg', 0.35), by('squallR', 0.25)),
   rank('judge', 'judge_dmg', 'Giudizio universale', `Giudizio del Redentore: +35% ai danni (base ${BASE.judgeDmg}) e recupero −20% (base ${BASE.judgeCd} s) a ogni rango.`, by('judgeDmg', 0.35), by('judgeCd', -0.2)),
   rank('hallow', 'hallow_big', 'Sagrato', `Terra consacrata: +35% ai danni al secondo (base ${BASE.hallowDps}) e raggio +25% (base ${BASE.hallowR} m) a ogni rango.`, by('hallowDps', 0.35), by('hallowR', 0.25)),
-  rank('hammer', 'hammer_cd', 'Penitenza severa', `Martello della penitenza: recupero −25% (base ${BASE.hammerCd} s) e stordimento +20% (base ${BASE.hammerStun} s) a ogni rango.`, by('hammerCd', -0.25), by('hammerStun', 0.2)),
-  rank('bubble', 'bubble_cd', 'Santità', `Aureola del redento: recupero −25% a ogni rango (base ${BASE.bubbleCd} s).`, by('bubbleCd', -0.25)),
+  rank('hammer', 'hammer_cd', 'Penitenza severa', `Martello della penitenza: +40% ai danni (base ${BASE.hammerDmg}) e stordimento +20% (base ${BASE.hammerStun} s) a ogni rango.`, by('hammerDmg', 0.4), by('hammerStun', 0.2)),
+  rank('bubble', 'bubble_cd', 'Santità', `Aureola del redento: dura il 30% in più a ogni rango (base ${BASE.bubbleTime} s).`, by('bubbleTime', 0.3)),
   { id: 'fury_start', kind: 'mod', name: 'Rancore', icon: 'fury', max: 1, text: 'Dopo una speciale la barra della furia riparte da 30 invece che da 0.',
     needs: special, apply: (t) => { t.furyStart = 30; } },
 
@@ -324,6 +323,12 @@ export const CARDS: Card[] = [
 ];
 export const CARD = new Map(CARDS.map((c) => [c.id, c]));
 for (const c of CARDS) if (c.school) SCHOOL[c.id] = c.school;
+/** The specials: two a school, instant, each spending a full fury bar (tier B, offered from level 6). */
+export const SPECIALS = CARDS.filter((c) => c.tier === 'B').map((c) => c.id);
+/** The school a card belongs to: an ability's own, an upgrade its ability's; none for passives, fusions and the potion's. */
+export const schoolOf = (c: Card): School | undefined => c.school ?? SCHOOL[c.of ?? ''];
+/** A card a hero of `schools` may have: of his two schools, or of none. */
+export const ours = (c: Card, schools: readonly School[]) => { const s = schoolOf(c); return !s || schools.includes(s); };
 
 /** How many times each card was picked: what the offers filter on (`eligible`) and the level-up badge shows (`stacks`). */
 export const counter = (picks: readonly string[]) => {
@@ -337,6 +342,9 @@ export const stacks = (c: Card, count: (id: string) => number) => (c.max === RAN
 
 /** The abilities of school `s` a slot holds: its five, the base attack apart. */
 export const slotsOf = (s: School) => Object.keys(SCHOOL).filter((id) => SCHOOL[id] === s && !BASES.includes(id));
+/** School `s`'s specials (two) and its mana abilities (three, the heal counted for the Sacro). */
+export const specialsOf = (s: School) => slotsOf(s).filter((id) => SPECIALS.includes(id));
+export const manaOf = (s: School) => slotsOf(s).filter((id) => !SPECIALS.includes(id));
 
 /**
  * The stats and ability numbers the picks and the tomes' `learned` abilities add up to (unknown ids and stacks past `max`
@@ -357,16 +365,35 @@ export function tuneOf(picks: readonly string[], learned: readonly string[] = []
   return t;
 }
 
-/** Cards that may still be offered after `picks` and the tomes' `learned`: not maxed nor owned, their ability owned, their needs met. */
+/** Cards that may still be offered after `picks` and the tomes' `learned`: of the hero's schools (or none), not maxed nor owned, their ability owned, their needs met. */
 export function eligible(picks: readonly string[], learned: readonly string[] = [], schools: readonly School[] = RISORTO): Card[] {
   const count = counter(picks), owned = tuneOf(picks, learned, schools).owned, owns = (a: string) => owned.includes(a);
-  return CARDS.filter((c) => c.kind !== 'filler' && count(c.id) < c.max && (c.kind === 'ability' ? !owns(c.id) : !c.of || owns(c.of)) && (!c.needs || c.needs(count, owns)));
+  return CARDS.filter((c) => c.kind !== 'filler' && ours(c, schools) && count(c.id) < c.max && (c.kind === 'ability' ? !owns(c.id) : !c.of || owns(c.of)) && (!c.needs || c.needs(count, owns)));
 }
 
-/** Odds a card is drawn from the hero's primary school, his secondary, everything else (cards of no school too). */
+/**
+ * A save's picks and tomes' abilities made a hero of `schools`'s, now that he has only two (older runs took cards of any
+ * school): a card of another school is dropped (an upgrade of a dropped ability with it), and so is whatever leaned on what
+ * went (a fusion missing a parent, a fury card with no special left). A dropped pick leaves its level-up to choose again
+ * (Levels.pending), a dropped tome ability gives back what the tome asked for it (`refund`, gold). Order is kept.
+ */
+export function ownSchools(picks: readonly string[], learned: readonly string[], schools: readonly School[]): { picks: string[]; learned: string[]; refund: number } {
+  const keep = (id: string) => { const c = CARD.get(id); return !!c && ours(c, schools); };
+  const lost = learned.filter((id) => !keep(id) && CARD.get(id)?.kind === 'ability');
+  const learnt = learned.filter(keep);
+  let kept = picks.filter((id) => !CARD.get(id) || keep(id)); // unknown ids are tuneOf's to ignore
+  for (let n = kept.length + 1; kept.length < n;) { // what leaned on a dropped card, until nothing more goes
+    n = kept.length;
+    const count = counter(kept), owned = tuneOf(kept, learnt, schools).owned, owns = (a: string) => owned.includes(a);
+    kept = kept.filter((id) => { const c = CARD.get(id); return !c || ((c.kind === 'ability' || !c.of || owns(c.of)) && (!c.needs || c.needs(count, owns))); });
+  }
+  return { picks: kept, learned: learnt, refund: lost.reduce((g, id) => g + TOME_PRICE[CARD.get(id)!.tier ?? 'A'], 0) };
+}
+
+/** Odds a card is drawn from the hero's primary school, his secondary, the cards of no school (passives, fusions, the potion's). */
 export const LEAN = [0.5, 0.3, 0.2];
 /** Which of LEAN's shares a card falls in for a hero of `schools`: an upgrade goes with its ability's school. */
-export const leanOf = (c: Card, schools: readonly School[]) => { const s = c.school ?? SCHOOL[c.of ?? '']; return s === schools[0] ? 0 : s === schools[1] ? 1 : 2; };
+export const leanOf = (c: Card, schools: readonly School[]) => { const s = schoolOf(c); return s === schools[0] ? 0 : s === schools[1] ? 1 : 2; };
 
 /**
  * The three cards for the next level-up (the one `picks.length + 2` reaches), each drawn from its kind's pool: a share
@@ -410,8 +437,8 @@ export function offer(picks: readonly string[], rnd: () => number = Math.random,
 }
 const FILLERS = CARDS.filter((c) => c.id === 'linfa');
 
-/** A merchant's tome: every ability of a school, for gold (ui/vendor.ts). The cost is per ability it would still teach:
- * four or five a school (Preghiera di suffragio, everyone's, aside), less what the hero's kit already gave. */
+/** A merchant's tome: every ability of a school, for gold (ui/vendor.ts), sold only for the hero's two schools (`tomesOf`). The cost is
+ * per ability it would still teach: five a school (Preghiera di suffragio, everyone's, aside), less what the hero's kit already gave. */
 export interface Tome { school: School; name: string; icon: string }
 export const TOMES: Tome[] = [
   { school: 'bone', name: 'Tomo delle Ossa', icon: 'strike' },
@@ -422,8 +449,10 @@ export const TOMES: Tome[] = [
   { school: 'plague', name: 'Tomo della Peste', icon: 'miasma' },
   { school: 'holy', name: 'Tomo del Sacro', icon: 'judge' },
 ];
+/** The tomes a hero of `schools` is sold: his primary school's, then his secondary's. */
+export const tomesOf = (schools: readonly School[]) => schools.map((s) => TOMES.find((t) => t.school === s)!);
 /** Gold a tome asks for each ability it teaches: a special costs more. */
-export const TOME_PRICE = { A: 200, B: 350 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: Sacro (800) by then, the five-ability ones (1000-1300) a level-2 goal
+export const TOME_PRICE = { A: 200, B: 350 } as const; // ~700 gold walking into the Reverendissimo, ~1200 after: the rest of the kit's school (900) or the Sacro (1100) by then, a whole one (1300) a level-2 goal
 /** What `tome` would teach someone owning `owned`, and its price; a tome with nothing left to teach is not sold. */
 export function tomeOf(tome: Tome, owned: readonly string[]): { teaches: Card[]; price: number } {
   const teaches = CARDS.filter((c) => c.kind === 'ability' && c.school === tome.school && !owned.includes(c.id));

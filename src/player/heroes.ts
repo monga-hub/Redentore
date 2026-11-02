@@ -8,7 +8,8 @@ export type Hero = 'risorto' | 'bortolo' | 'fosca' | 'tizian' | 'zanetto';
 export interface HeroDef {
   name: string;
   title: string;
-  /** The school he starts in and the one he leans to (the select screen shows both). */
+  /** His primary school (the gold medal: he starts in it) and his secondary (silver): the only two whose spells, cards and
+   *  tomes he gets (player/levels.ts), shown on the select screen, the sheet and the ability book (ui/book.ts `medal`). */
   school: [School, School];
   lore: string;
   /** His body under public/models/, and its portrait beside it. */

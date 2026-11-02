@@ -6,7 +6,7 @@
 // the untore, the miasma, the fever and its cap on the bosses, the drain, the pillar, the candle, the furnace, the
 // blizzard, the orb, the lightning shield, the rod, the squall's knockback, the judgment, the consecrated ground, the
 // hammer's stun on the boss, their fusions); and walls: bolts (the hero's and the priests') burst on them, a hidden
-// target refuses the cast, the chain, the novas, the orb and the knockback don't pass them.
+// target refuses the cast, the chain, the novas, the orb and the knockbacks (the squall's, the plague breath's) don't pass them.
 import { World } from '../src/core/physics.ts';
 import { FRIAR, think as friarThink, type Friar } from '../src/enemies/brain.ts';
 import { PRIEST, REVERENDISSIMO, fly as casterFly, think as casterThink, spawnPriests, type Bolt as Shadow } from '../src/enemies/caster.ts';
@@ -248,11 +248,13 @@ fresh();
 foes = [foe(0, -8), foe(3, -8)];
 book.untore({ x: 0, y: 1.3, z: 0 });
 if (book.venom(foes[0]) !== 2 || book.venom(foes[1]) !== 2) fail('the untore passes two doses at least');
-// Fiato della fossa: a ring of doses round the hero
+// Fiato della fossa: the plague breath in a cone ahead, doses and a shove back (by the foe's resist), nobody behind or past its reach
 fresh();
-foes = [foe(0, -3), foe(4, 4), foe(0, -12)];
+foes = [foe(0, -3), foe(1.5, -5), foe(4, 4), foe(0, -12), { ...foe(-1, -4), cc: control(REVERENDISSIMO.resist) }];
 book.miasma();
-if (book.venom(foes[0]) !== tune.miasmaStacks || book.venom(foes[1]) !== tune.miasmaStacks || book.venom(foes[2]) || dmg(foes[0]) !== tune.miasmaDmg) fail('the miasma nova');
+if (book.venom(foes[0]) !== tune.miasmaStacks || book.venom(foes[1]) !== tune.miasmaStacks || book.venom(foes[2]) || book.venom(foes[3]) || dmg(foes[0]) !== tune.miasmaDmg || dmg(foes[2])) fail('the plague breath');
+if (Math.abs(foes[0].z + 3 + tune.miasmaPush) > 0.3 || Math.hypot(foes[1].x, foes[1].z) < Math.hypot(1.5, 5) + tune.miasmaPush - 0.3 || foes[2].z !== 4) fail(`the plague breath throws back: ${foes[0].z}, ${foes[1].x} ${foes[1].z}`);
+if (Math.abs(Math.hypot(foes[4].x, foes[4].z) - Math.hypot(1, 4) - tune.miasmaPush * REVERENDISSIMO.resist!) > 0.3) fail(`a boss barely budges: ${foes[4].x} ${foes[4].z}`);
 // Febbre di palude: +20% on everything near the target, half that at most on the boss
 fresh();
 foes = [foe(0, -8), foe(2, -9), foe(0, -20)];
@@ -439,4 +441,4 @@ near(me.takeDamage(100), 100 * (1 - GUARD_CUT), 'the whirl parries');
 me.update(0.2);
 near(me.takeDamage(100), 100, 'the parry ends with the whirl');
 
-console.log('spells ok (control, diminishing returns, boss resist, brains, bolts, chain, thunderbolt, leap, execute, poison, fever, drain, pillar, candle, furnace, blizzard, orb, shield, rod, squall, judgment, hammer, consecrated ground, fusions, walls, parry)');
+console.log('spells ok (control, diminishing returns, boss resist, brains, bolts, chain, thunderbolt, leap, execute, poison, fever, drain, pillar, candle, furnace, blizzard, orb, shield, rod, squall, plague breath, judgment, hammer, consecrated ground, fusions, walls, parry)');

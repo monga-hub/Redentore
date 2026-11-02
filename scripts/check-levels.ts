@@ -1,15 +1,18 @@
-// Levels check (`npm run check`): the 99 upgrade cards (every ability with a school and its modifiers, five abilities a school), the XP curve against the mobs' worth (first level after two friars, the quest
+// Levels check (`npm run check`): the 99 upgrade cards (every ability with a school and its modifiers, five abilities a school: three paid in mana
+// and two instant specials spent with a full fury bar, in the cards and in the kit alike), the XP curve against the mobs' worth (first level after two friars, the quest
 // route with the apiary, ~875 XP in scripts/balance.ts, level 9, a full clear level 11, no cap), the three-card offers over many random runs to level 30 (never an owned or maxed card,
 // never a mod for a locked ability, new abilities on even levels with the specials from level 6, one past 10, fusions only
 // with both parents, the offers leaning to the hero's schools by LEAN and even within each share), the ranks (abilities, fusions and the
 // on/off mods once, every other upgrade ranked with no cap, the badge naming the rank), offers that never run out, the
 // replay of picks and tomes into numbers (older saves' picks past the old caps and the retired fillers too), the merchants' tomes, each hero's starting kit and base attack, the secondary school's base attack
-// learnt with 3 of its 5, and the bar keeping a slot for an ability until it is unlocked, or finding one.
-import { BASES, BASE_ATTACK, CARD, CARDS, LEAN, RISORTO, SCHOOL, SECOND_AT, SPECIALS, START, TOMES, TOME_PRICE, counter, eligible, stacks, leanOf, levelOf, need, offer, slotsOf, startOf, tomeOf, tuneOf, type Card, type School } from '../src/player/levels.ts';
+// learnt with 3 of its 5, the bar keeping a slot for an ability until it is unlocked, or finding one; and each hero kept to his
+// two schools: the offers and the tomes only his primary's and secondary's (and the cards of no school), an older save's cards of
+// other schools dropped (its picks offered again, its tomes paid back) with whatever leaned on them.
+import { BASES, BASE_ATTACK, CARD, CARDS, LEAN, RISORTO, SCHOOL, SECOND_AT, SPECIALS, START, TOMES, TOME_PRICE, counter, eligible, manaOf, ours, ownSchools, specialsOf, stacks, leanOf, levelOf, need, offer, slotsOf, startOf, tomeOf, tomesOf, tuneOf, type Card, type School } from '../src/player/levels.ts';
 import { FRIAR, spawnGroups } from '../src/enemies/brain.ts';
 import { APE, APETTA, PRIEST, REVERENDISSIMO, SACERDOTE } from '../src/enemies/caster.ts';
 import { AbilitySystem, KEYS, POTION, PRIMARY, type Ability } from '../src/abilities/system.ts';
-import { BAR, barOf } from '../src/abilities/forsaken.ts';
+import { ABILITIES, BAR, barOf } from '../src/abilities/forsaken.ts';
 import { HEROES, HERO_IDS } from '../src/player/heroes.ts';
 import { buildLevel } from '../src/level/index.ts';
 
@@ -34,14 +37,26 @@ for (const school of ['bone', 'plague', 'shadow', 'fire', 'frost', 'storm', 'hol
   if (of.length !== 5 || slotsOf(school).sort().join() !== of.sort().join()) fail(`${school}: ${of.length} abilities (${of}), want 5`);
   const base = BASE_ATTACK[school], mods = CARDS.filter((c) => c.kind === 'mod' && c.of === base);
   if (SCHOOL[base] !== school || CARD.get(base) || mods.length !== 4 || mods.filter((c) => c.max === 1).map((c) => c.id).join() !== (base === 'fall' ? '' : `${base}_split`)) fail(`${school}'s base attack ${base}: ${mods.map((c) => c.id)}`);
+  // 3 + 2: three abilities paid in mana (the Sacro's heal one of them), two specials: tier B cards, and in the kit instant, free and
+  // locked behind the full fury bar, no cooldown of their own; the three cost mana and are no specials.
+  const sp = specialsOf(school), mana = manaOf(school), kit = (id: string) => ABILITIES.find((a) => a.id === id);
+  if (sp.length !== 2 || mana.length !== 3) fail(`${school}: ${mana} in mana and ${sp} at full fury, want 3 + 2`);
+  for (const id of sp) {
+    const a = kit(id);
+    if (CARD.get(id)?.tier !== 'B' || !a?.special || a.mana || a.cast || a.channel || a.cooldown) fail(`${school}'s ${id} is not an instant special at full fury`);
+  }
+  for (const id of mana) {
+    const a = kit(id);
+    if ((id !== 'mend' && CARD.get(id)?.tier !== 'A') || !a || a.special || !(a.mana! > 0)) fail(`${school}'s ${id} is not paid in mana`);
+  }
 }
-// Every ability card has a school, an icon of its own and two modifiers; the new ten are offered from level 2.
+if (SPECIALS.length !== 14 || ABILITIES.filter((a) => a.special).map((a) => a.id).sort().join() !== [...SPECIALS].sort().join()) fail(`specials ${SPECIALS}`);
+// Every ability card has a school, an icon of its own and two modifiers.
 const NEW = ['pyre', 'frost', 'font', 'caligo', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge'];
 for (const c of CARDS.filter((c) => c.kind === 'ability')) {
   if (!c.school || SCHOOL[c.id] !== c.school) fail(`${c.id} has no school`);
   if (CARDS.filter((m) => m.kind === 'mod' && m.of === c.id).length < (NEW.includes(c.id) ? 2 : 1)) fail(`${c.id} lacks modifiers`);
 }
-for (const id of NEW) if (CARD.get(id)?.tier !== 'A') fail(`${id} must be a tier A ability`);
 // Ranks: abilities, fusions and the on/off mods are taken once, every other mod and passive is ranked with no cap; the badge names
 // the rank a pick brings, and a ranked card's numbers grow by the same step each rank (a cut by the same share of what is left).
 const ONCE = ['lance_split', 'thorn_split', 'umbra_split', 'ember_split', 'spark_split', 'smite_split', 'caligo_freeze', 'cero_chain', 'spit_twin', 'fury_start'];
@@ -59,16 +74,15 @@ for (const c of CARDS) {
 }
 
 // Offers over many seeded runs, picking at random among the three, to level 30 (a ranked card's badge is the rank the pick
-// brings, from the count the offer filters on): the Risorto (and the one of older saves, who
-// started with Nube di peste), Bortolo, a Peste-Sacro hero.
+// brings, from the count the offer filters on): every hero with his kit, never a card of a school not his.
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 const fusionsSeen = new Set<string>();
-const HEROS: [readonly School[], string[]][] = [[RISORTO, []], [RISORTO, ['plague']], [['frost', 'storm'], ['frost', 'caligo']], [['plague', 'holy'], []]];
+const HEROS: [readonly School[], string[]][] = HERO_IDS.map((id) => [HEROES[id].school, HEROES[id].kit]);
 let stalled = 0;
 const unlocks = (t: { owned: string[] }, start: string[]) => t.owned.filter((id) => !start.includes(id) && !BASES.includes(id)).length;
 for (let run = 0; run < 600; run++) {
-  const picks: string[] = [], [sc, kit] = HEROS[run % 4], start = tuneOf([], kit, sc).owned;
+  const picks: string[] = [], [sc, kit] = HEROS[run % HEROS.length], start = tuneOf([], kit, sc).owned;
   for (let n = 0; n < 29; n++) {
     const lv = picks.length + 2, cards = offer(picks, rnd, kit, sc), ok = eligible(picks, kit, sc), t = tuneOf(picks, kit, sc);
     const count = (id: string) => picks.filter((p) => p === id).length;
@@ -77,6 +91,7 @@ for (let run = 0; run < 600; run++) {
     for (const c of cards) {
       if (c.kind === 'filler') continue;
       if (!ok.includes(c)) fail(`level ${lv}: ${c.id} offered but not eligible after ${picks}`);
+      if (!ours(c, sc)) fail(`level ${lv}: ${c.id} offered to a hero of ${sc}`);
       if (count(c.id) >= c.max) fail(`level ${lv}: maxed ${c.id} offered`);
       const badge = stacks(c, counter(picks)); // the level-up badge reads the count the offer filtered on: the rank this pick brings
       if (badge !== (c.max === Infinity ? `rango ${count(c.id) + 1}` : '')) fail(`level ${lv}: ${c.id} offered with badge ${badge} after ${count(c.id)} picks`);
@@ -99,7 +114,9 @@ for (let run = 0; run < 600; run++) {
       if (ok.some((c) => c.kind === 'mod' || c.kind === 'fusion') && !kinds.some((k) => k === 'mod' || k === 'fusion')) fail(`level ${lv}: no modifier in ${ids}`);
     }
     picks.push(cards[Math.floor(rnd() * 3)].id);
-    if (lv === 10 && unlocks(tuneOf(picks, kit, sc), start) !== 5) fail(`run ${run}: ${tuneOf(picks, kit, sc).owned} owned at level 10, want 5 unlocks`);
+    // An ability every even level to 10, but level 4 may offer two (Suor Fosca and Fra' Tizian have three mana abilities left
+    // to learn, the specials wait for level 6): a mod picked there leaves four.
+    if (lv === 10 && unlocks(tuneOf(picks, kit, sc), start) < 4) fail(`run ${run}: ${tuneOf(picks, kit, sc).owned} owned at level 10, want 4 unlocks at least`);
     const tt = tuneOf(picks, kit, sc), second = slotsOf(sc[1]).filter((id) => tt.owned.includes(id)).length >= SECOND_AT;
     if (tt.owned.includes(BASE_ATTACK[sc[1]]) !== second) fail(`run ${run}: ${sc[1]}'s base attack ${second ? 'not ' : ''}learnt with ${tt.owned}`);
   }
@@ -108,10 +125,12 @@ for (let run = 0; run < 600; run++) {
   if (t.fury === 0 && SPECIALS.some((s) => t.owned.includes(s))) fail('a special owned but the charge bar off');
 }
 if (stalled > 25) fail(`${stalled} runs learnt no ability past level 10`);
-if (fusionsSeen.size !== 8) fail(`fusions offered: ${[...fusionsSeen]}`);
-// The lean: an offer's first card comes from the hero's primary school, his secondary and the rest by LEAN, whatever was
-// picked; within each share every card is as likely as any other, and off-school cards keep coming.
-for (const [before, lv, sc] of [[['frost', 'dmg'], 4, RISORTO], [['chain', 'dmg'], 4, ['frost', 'storm']], [['frost', 'dmg', 'pyre', 'hp', 'nova', 'regen', 'caligo', 'mana', 'font', 'speed'], 12, RISORTO], [['dmg', 'hp'], 4, ['plague', 'holy']]] as const) {
+// Two schools a hero: only the fusions whose parents are both his come up (Miasma velenoso is all Peste, Giudizio ardente
+// Sacro and Fuoco); the others wait for a hero of their schools.
+if ([...fusionsSeen].sort().join() !== 'fx_holyfire,fx_venomcloud') fail(`fusions offered: ${[...fusionsSeen]}`);
+// The lean: an offer's first card comes from the hero's primary school, his secondary and the rest by LEAN (an ability has
+// no third share: his two split it), whatever was picked; within each share every card is as likely as any other.
+for (const [before, lv, sc] of [[['step', 'dmg'], 4, RISORTO], [['chain', 'dmg'], 4, ['frost', 'storm']], [['step', 'dmg', 'leap', 'hp', 'nova', 'regen', 'grace', 'mana', 'ward', 'speed'], 12, RISORTO], [['dmg', 'hp'], 4, ['plague', 'holy']]] as const) {
   const seen = new Map<string, number>(), share = [0, 0, 0], N = 60000;
   for (let i = 0; i < N; i++) {
     const o = offer(before, rnd, [], sc);
@@ -120,8 +139,9 @@ for (const [before, lv, sc] of [[['frost', 'dmg'], 4, RISORTO], [['chain', 'dmg'
   }
   const open = eligible(before, [], sc).filter((c) => c.kind === 'ability' && (c.tier === 'A' || lv >= 6));
   if (seen.size !== open.length) fail(`level ${lv} after ${before}: abilities offered ${JSON.stringify([...seen])}`);
-  const tot = share.reduce((a, b) => a + b, 0);
-  if (share.some((k, i) => Math.abs(k / tot - LEAN[i]) > 0.015)) fail(`level ${lv} for ${sc}: shares ${share.map((k) => (k / tot).toFixed(3))}, want ${LEAN}`);
+  const tot = share.reduce((a, b) => a + b, 0), w = LEAN.map((k, i) => (open.some((c) => leanOf(c, sc) === i) ? k : 0)), want = w.map((k) => k / w.reduce((a, b) => a + b, 0));
+  if (share.some((k, i) => Math.abs(k / tot - want[i]) > 0.015)) fail(`level ${lv} for ${sc}: shares ${share.map((k) => (k / tot).toFixed(3))}, want ${want}`);
+  if ([...seen.keys()].some((id) => !ours(CARD.get(id)!, sc))) fail(`level ${lv} for ${sc}: an ability of another school offered`);
   for (let i = 0; i < 3; i++) {
     const n = open.filter((c) => leanOf(c, sc) === i).map((c) => seen.get(c.id) ?? 0);
     if (Math.max(...n) > 1.3 * Math.min(...n)) fail(`level ${lv} for ${sc}: share ${i} uneven ${n}`); // ~600 draws a card in the thinnest share: noise
@@ -159,7 +179,8 @@ if (has(['whirl'], 'fx_frostwhirl') || !has(['whirl', 'font'], 'fx_frostwhirl') 
 if (!has(['pyre', 'blizzard'], 'fx_shatter') || !hasL(['rod'], 'fx_storm')) fail('the new frost and lightning open the old fusions');
 if (hasL([], 'fx_venomcloud') || !hasL(['spit'], 'fx_venomcloud') || !hasL(['miasma'], 'fx_venomcloud') || has(['spit'], 'fx_venomcloud')) fail('Miasma velenoso needs a poison and the plague');
 if (has(['judge'], 'fx_holyfire') || has(['cero'], 'fx_holyfire') || !has(['judge', 'cero'], 'fx_holyfire')) fail('Giudizio ardente needs the judgment and fire');
-if (has([], 'wisp_dps') || !has(['wisp'], 'wisp_dps') || !has([], 'potion_big')) fail('mods need their ability (the potion is owned)');
+if (has([], 'leap_big') || !has(['leap'], 'leap_big') || !has([], 'potion_big')) fail('mods need their ability (the potion is owned)');
+if (has(['wisp'], 'wisp_dps') || eligible([], [], RISORTO).some((c) => c.id === 'pyre' || c.id === 'plague')) fail('the Risorto offered the Fuoco or the Peste');
 
 // Every one-time card taken, every ranked one a few times: the ranks keep coming, three a level, and the retired fillers
 // (Ossa eterne, Carne eterna: older saves) still replay but are never offered; the heal waits for a pool that runs short.
@@ -186,15 +207,18 @@ for (const t of TOMES) {
 if (TOMES.length !== 7 || !TOMES.some((t) => t.school === 'plague') || !TOMES.some((t) => t.school === 'holy')) fail('a tome for every school, Peste and Sacro too');
 const gelo = TOMES.find((t) => t.school === 'frost')!;
 if (tomeOf(gelo, [...START, 'frost']).price !== tomeOf(gelo, START).price - TOME_PRICE.A || tomeOf(gelo, [...START, 'frost', 'font', 'caligo', 'blizzard', 'orb']).teaches.length) fail('a tome charges for what is known');
-if (tomeOf(gelo, tuneOf([], HEROES.bortolo.kit, HEROES.bortolo.school).owned).price !== 600 || tomeOf(gelo, START).teaches.some((c) => BASES.includes(c.id))) fail('the Gelo tome: 600 to Bortolo, never a base attack');
+if (tomeOf(gelo, tuneOf([], HEROES.bortolo.kit, HEROES.bortolo.school).owned).price !== 900 || tomeOf(gelo, START).teaches.some((c) => BASES.includes(c.id))) fail('the Gelo tome: 900 to Bortolo (a mana ability and two specials), never a base attack');
+// Each hero is sold his two schools' tomes, the primary's first; a whole one is 1300 (three mana abilities, two specials), the Sacro 1100 (the heal everyone has).
+for (const id of HERO_IDS) if (tomesOf(HEROES[id].school).map((t) => t.school).join() !== HEROES[id].school.join()) fail(`${id} sold ${tomesOf(HEROES[id].school).map((t) => t.school)}`);
+if (TOMES.some((t) => tomeOf(t, START).price !== (t.school === 'holy' ? 1100 : 1300))) fail(`tome prices ${TOMES.map((t) => tomeOf(t, START).price)}`);
 // Learnt from a tome: owned, never offered again, its upgrades open, and the other schools still offered at the same odds.
 const tomed = tuneOf(['dmg'], ['frost', 'font', 'caligo']);
 if (!['frost', 'font', 'caligo'].every((id) => tomed.owned.includes(id)) || tuneOf([], ['hp', 'nope']).owned.join() !== START.join()) fail(`tome abilities owned: ${tomed.owned}`);
 if (tuneOf(['frost'], ['frost']).owned.filter((id) => id === 'frost').length !== 1) fail('an ability picked and learnt counts once');
 {
-  const gelo = ['frost', 'font', 'caligo', 'blizzard', 'orb'], ok = eligible(['dmg'], gelo);
-  if (ok.some((c) => c.school === 'frost') || !ok.some((c) => c.id === 'frost_fast') || !ok.some((c) => c.id === 'orb_slow') || !ok.some((c) => c.id === 'pyre')) fail('tome abilities in the offers');
-  for (let i = 0; i < 500; i++) if (offer(['dmg'], rnd, gelo).some((c) => c.kind === 'ability' && c.school === 'frost')) fail('a learnt ability offered');
+  const gelo = ['frost', 'font', 'caligo', 'blizzard', 'orb'], bortolo = HEROES.bortolo.school, ok = eligible(['dmg'], gelo, bortolo);
+  if (ok.some((c) => c.school === 'frost') || !ok.some((c) => c.id === 'frost_fast') || !ok.some((c) => c.id === 'orb_slow') || !ok.some((c) => c.id === 'chain')) fail('tome abilities in the offers');
+  for (let i = 0; i < 500; i++) if (offer(['dmg'], rnd, gelo, bortolo).some((c) => c.kind === 'ability' && c.school === 'frost')) fail('a learnt ability offered');
   if (has(['pyre'], 'fx_shatter') || !eligible(['pyre'], ['caligo']).some((c) => c.id === 'fx_shatter')) fail('a fusion needs a tome ability');
 }
 
@@ -259,4 +283,19 @@ if (START.includes('plague') || !HEROES.bortolo.kit.includes('frost') || HEROES.
   re.unlock(...book, ...kept);
   if (re.layout().bar.join() !== kept.join()) fail(`a reload scrambled the bar: ${re.layout().bar}`);
 }
-console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 600 runs to level 30 offered three cards cleanly, ranks with no cap, offers leaning by school, ${TOMES.length} tomes)`);
+// An older save, from when every school was open, made the hero's: cards of other schools go (their level-ups offered again,
+// their tomes paid back), and whatever leaned on them, a fusion missing its parent, a fury card with no special left; order kept, and once is enough.
+{
+  const old = ['step', 'hp', 'frost', 'plague_dps', 'nova', 'fall_third', 'caligo', 'fx_fallplague', 'font', 'dmg', 'hp'], r = ownSchools(old, ['plague', 'pyre'], RISORTO);
+  if (r.picks.join() !== 'step,hp,nova,fall_third,dmg,hp' || r.learned.length || r.refund !== 2 * TOME_PRICE.A) fail(`an older Risorto: ${JSON.stringify(r)}`);
+  const b = ownSchools(['nova', 'fury', 'fury_start', 'linfa', 'junk', 'chain_fast'], ['frost', 'caligo', 'hallow'], HEROES.bortolo.school);
+  if (b.picks.join() !== 'linfa,junk' || b.learned.join() !== 'frost,caligo' || b.refund !== TOME_PRICE.A) fail(`an older Bortolo, no special left: ${JSON.stringify(b)}`);
+  if (ownSchools(['nova', 'fury', 'fury_start'], ['squall'], HEROES.bortolo.school).picks.join() !== 'fury,fury_start') fail('the fury cards stay with a special of his');
+  const kept = ownSchools(['spit', 'fx_venomcloud', 'judge', 'fx_holyfire', 'fury'], ['plague'], HEROES.fosca.school);
+  if (kept.picks.join() !== 'spit,fx_venomcloud,judge' || kept.refund) fail(`Suor Fosca's own cards: ${JSON.stringify(kept)}`); // Giudizio ardente needs the Fuoco, the fury a special
+  for (const id of HERO_IDS) {
+    const h = HEROES[id], once = ownSchools(old, ['plague', ...h.kit], h.school), twice = ownSchools(once.picks, once.learned, h.school);
+    if (JSON.stringify(twice) !== JSON.stringify({ ...once, refund: 0 }) || [...once.picks, ...once.learned].some((x) => !ours(CARD.get(x)!, h.school))) fail(`${id}: converting twice ${JSON.stringify(twice)}`);
+  }
+}
+console.log(`levels ok (full clear ${full} XP = level ${levelOf(full).lv}, 600 runs to level 30 offered three cards cleanly, ranks with no cap, offers leaning by school and kept to the hero's two, ${TOMES.length} tomes, three mana abilities and two specials a school, older saves converted)`);

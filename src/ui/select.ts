@@ -2,7 +2,7 @@ import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
 import { levelOf, type School } from '../player/levels.ts';
 import { chapter, forget, resume, type GameState } from '../core/save.ts';
 import { Equipment, starter, type GearState } from '../loot/gear.ts';
-import { SCHOOL_NAME } from './book.ts';
+import { RANK, SCHOOL_NAME, medal } from './book.ts';
 import { SelectStage } from './selectStage.ts';
 import { playTime } from './menu.ts';
 import { accountLine } from './account.ts';
@@ -10,7 +10,8 @@ import type { CloudSync } from '../core/cloud.ts';
 
 // The squad, Diablo Immortal style, shown on every boot: down the left the heroes (player/heroes.ts, every one of them, in
 // order), each his portrait in a gilt diamond, his level under it and his name beside it, and his own run (core/save.ts):
-// the level of the dungeon reached and the time played, or "Nuovo"; the chosen one lit, with his title and his two schools.
+// the level of the dungeon reached and the time played, or "Nuovo"; the chosen one lit, with his title and his two schools,
+// the gold medal on his primary and the silver on his secondary (the only ones he learns spells of).
 // In the middle the chosen hero himself on a cemetery island by night (ui/selectStage.ts), in what his run has him wear;
 // a drag turns him. "Continua" (Enter) resumes his run, "Entra nel mondo" starts a new one; "Ricomincia" asks first and
 // forgets only his. The boot waits for it (main.ts), and the stage is freed before the game's renderer is made. Tap a
@@ -58,7 +59,8 @@ const CSS = `
   border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3a26, #1c140c) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000; }
 #select .ask button.red { background: linear-gradient(#9a2216, #520c07 55%, #2e0503) padding-box, var(--gilt) border-box; }
 #select .who i { color: #d8c8a0; font-size: 15px; text-shadow: 0 1px 2px #000; }
-#select .schools { gap: 8px; font-size: 14px; text-shadow: 0 1px 2px #000; }
+#select .schools { gap: 10px; font-size: 14px; text-shadow: 0 1px 2px #000; }
+#select .schools > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 #select .schools small { color: #9a8c70; font-style: italic; font-size: 12px; }
 #select .hero:hover img { filter: grayscale(.2) brightness(.85); }
 #select .hero.sel img { filter: none; }
@@ -125,7 +127,7 @@ const run = (s: GameState) => `Livello\u00a0${chapter(s)} · ${playTime(s.time).
 /** How the chosen hero enters: his own run, a new game (his run forgotten), or the Risorto ready for level 2 (core/prepared.ts). */
 export type Start = 'run' | 'new' | 'l2';
 
-const school = (s: School, second: boolean) => `<span style="color: ${COLOR[s] ?? '#f3e2b0'}">${SCHOOL_NAME.get(s)} <small>${second ? 'secondaria' : 'primaria'}</small></span>`;
+const school = (s: School, rank: number) => `<span style="color: ${COLOR[s] ?? '#f3e2b0'}">${medal(rank)}${SCHOOL_NAME.get(s)} <small>${RANK[rank]}</small></span>`;
 
 /** Show the squad and wait for a hero to be chosen; the screen and its stage go once he is. */
 export function chooseHero(sync: CloudSync): Promise<{ hero: Hero; start: Start }> {
@@ -140,7 +142,7 @@ export function chooseHero(sync: CloudSync): Promise<{ hero: Hero; start: Start 
   el.innerHTML = `<div class="shade"></div><h1>LA TUA SQUADRA</h1>
     <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id]; return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
       <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv"></span></div>
-      <div class="who"><b>${h.name}</b><span class="run"></span><i>${h.title}</i><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div></div></div>`; }).join('')}</div>
+      <div class="who"><b>${h.name}</b><span class="run"></span><i>${h.title}</i><div class="schools">${school(h.school[0], 0)}${school(h.school[1], 1)}</div></div></div>`; }).join('')}</div>
     <div class="foot"><p class="lore"></p><div class="acts"><button type="button" class="again"></button><button type="button" class="go"></button></div></div>`;
   el.querySelector('h1')!.after(accountLine(sync));
   document.body.append(el);

@@ -1,7 +1,7 @@
 // Boss soak (`npm run soak`; not in `npm run check`: it needs Chrome and plays for minutes). The real
 // game, served by Vite, in headless Chrome emulating an iPhone (390×844 at DPR 3, touch), picks its hero on the new game's
 // screen (whose stage must give back all it held on the GPU on entering), fights the
-// Reverendissimo with every ability on the bar, the church's sacerdoti and priests alive, through all
+// Reverendissimo with his two schools on the bar (the specials first, the fury filling), the church's sacerdoti and priests alive, through all
 // three acts and the berserk, then down the quality ladder one rung at a time mid-fight (the ultra-light ones too) and back to the
 // top, then the kill. On the top rung (before the ladder and after it) the hero changes clothes twice a second (whole sets,
 // mixed ones, nothing on): every piece and weapon built and freed again (player/outfit.ts), and undressed for each sample, so
@@ -25,6 +25,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'vite';
 import { HEROES, HERO_IDS } from '../src/player/heroes.ts';
+import { manaOf, specialsOf } from '../src/player/levels.ts';
 
 const SECONDS = Number(process.env.SOAK_SECONDS ?? 120);
 const LEVEL = Number(process.env.SOAK_LEVEL ?? 1);
@@ -93,8 +94,9 @@ async function rehearse(wardrobe: object[]): Promise<void> {
   gear.decode({});
 }
 
-/** In the page once it has loaded: the church set for the boss, every ability on the bar, a bot that fights him. */
-function fight(seconds: number, level: number, WARDROBE: object[]): void {
+/** In the page once it has loaded: the church set for the boss, the hero's two schools on the bar (`picks`: their specials first,
+ *  then what still fits), a bot that fights him. */
+function fight(seconds: number, level: number, WARDROBE: object[], picks: string[]): void {
   const w = window as any, { quest, priests, zitelle, sangiorgio, player, playerStats, levels, kit, targeting, fx, gear } = w;
   let dressed = 0;
   const boss = level === 3 ? sangiorgio.boss : level === 2 ? zitelle.boss : priests.boss, BERSERK = boss.kind.phases.berserk;
@@ -109,7 +111,7 @@ function fight(seconds: number, level: number, WARDROBE: object[]): void {
     quest.win2(); quest.report2(); quest.accept3(); quest.landed = true; quest.takeKey3();
     quest.open(quest.gate('cenacolo'));
   }
-  levels.picks.push('plague_dps', 'step', 'veil', 'wisp', 'strike', 'nova', 'ward', 'pyre', 'frost', 'font', 'caligo', 'chain', 'toll', 'leap', 'whirl', 'grace', 'charge', 'fx_storm', 'fx_shatter');
+  levels.picks.push(...picks);
   levels.apply();
   player.respawn(level === 3 ? { x: -530, z: 19, yaw: 0 } : level === 2 ? { x: -240, z: -2, yaw: 0 } : { x: 0, z: -28, yaw: 0 });
   const floor = level === 3 ? 30 : level === 2 ? -1.5 : -27.5; // the dodge stays this side of the hall's door
@@ -242,7 +244,9 @@ try {
   for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); // skip the intro
   await sleep(3000);
   await evaluate(`(${rehearse})(${JSON.stringify(WARDROBE)})`);
-  await evaluate(`(${fight})(${SECONDS}, ${LEVEL}, ${JSON.stringify(WARDROBE)})`);
+  const sc = HEROES[HERO as keyof typeof HEROES].school, kit = HEROES[HERO as keyof typeof HEROES].kit;
+  const picks = [...sc.flatMap(specialsOf), ...sc.flatMap(manaOf)].filter((id) => id !== 'mend' && !kit.includes(id)); // the fury's specials fire too
+  await evaluate(`(${fight})(${SECONDS}, ${LEVEL}, ${JSON.stringify(WARDROBE)}, ${JSON.stringify(picks)})`);
   if (LEVEL === 2) { // level 2's bodies load with its quest
     while (!(await evaluate('window.zitelle.root.children.length > 0'))) { if (Date.now() - t0 > 240e3) throw new Error("level 2's bodies never loaded"); await sleep(500); }
   }

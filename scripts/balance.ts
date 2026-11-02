@@ -15,26 +15,26 @@
 //
 // Every run is seeded (the bot's picks and dodges, and Math.random for the mobs), so a run replays exactly.
 //
-//   node scripts/balance.ts [runs]                 every build on the route (3 runs each; arcane and storm take fire/frost and lightning/new blows first), then the boss alone at levels 1, 6, 8, 9 in typical gear, at 8 and 9 in the starter set, at 9 with epics bought and in all of them
+//   node scripts/balance.ts [runs]                 every build on the route (3 runs each; each build is its hero's, HERO_OF: melee and mixed the Risorto, frost Bortolo, venom Suor Fosca, fire Fra' Tizian, storm Zanetto), then the boss alone at levels 1, 6, 8, 9 in typical gear, at 8 and 9 in the starter set, at 9 with epics bought and in all of them
 //   node scripts/balance.ts bosses [runs]          only the boss part of the above
 //   node scripts/balance.ts route melee [runs]     one build on the route (NODODGE=1: the bot that dodges nothing)
-//   node scripts/balance.ts boss plague 9 [runs]   the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks; GEAR=start|typical|buy|epic, default typical)
+//   node scripts/balance.ts boss venom 9 [runs]    the boss alone, a build at a level, dodging and not (DEALT=1: picks, damage dealt and taken; PICKS=a,b,..: those picks; GEAR=start|typical|buy|epic, default typical)
 //   node scripts/balance.ts route2 melee [runs]    one build on the route, on into level 2 (Fra' Zuane, the fondamenta, the Zitelle, the Governatrice)
-//   node scripts/balance.ts boss2 plague 11 [runs] the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, side2 with Mastro Iseppo's epics, epic)
+//   node scripts/balance.ts boss2 venom 11 [runs]  the Governatrice alone (GEAR default typical2: level 1's typical loot and level 2's; typical, buy2, side2 with Mastro Iseppo's epics, epic)
 //   node scripts/balance.ts elite2 [runs]          the Gastaldo and the Maestra with their packs, every build at 9, 10, 11
 //   node scripts/balance.ts route3 melee [runs]    one build on the route, on through level 2 into level 3 (Fra' Zuane, the Punta, the gondola, San Giorgio, the Bibliotecario, the Abate)
-//   node scripts/balance.ts boss3 plague 17 [runs] the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
+//   node scripts/balance.ts boss3 venom 17 [runs]  the Abate alone in the Cenacolo (GEAR default typical3: levels 1 and 2's typical loot and level 3's; buy3 with Fra' Bortolo's level-3 epics; PREPS=faro,calice: the side quests' weakenings on him)
 //   node scripts/balance.ts commissario [runs]     the Commissario delle Arti alone in the cipressi, his granatieri at his half, every build at 16, 17, 18, dodging and not, one life (GEAR default typical3)
 //   node scripts/balance.ts campanaro [runs]       the Campanaro di San Giorgio alone in the bell chamber, 44 m up, likewise
 //   node scripts/balance.ts drago [builds] [runs]   Carpaccio's dragon alone at the Teatro Verde (main.ts's ?drago=1), its drowned at 40% and 20%, builds (melee,arcane; default every one) at 18 and 19, dodging and not, one life (GEAR default typical3)
 //   node scripts/balance.ts incoronazione [runs]   the Cardinale's procession from the altar to the Bacino, its three waves of monaci on him, the bot at his side, every build at 16, 17, 18, three tries (he falls: back to the altar)
-//   node scripts/balance.ts pack3 arcane [runs]    a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
+//   node scripts/balance.ts pack3 frost [runs]     a San Giorgio pack (two monaci and an amanuense, or two marinai and a monaco) pulled at once, the build at 15, 16, 17, one life
 //   node scripts/balance.ts elite [runs]           the minibosses alone (a garden's sacerdote and priests, the giant bee and workers), every build at 6, 7, 8, one life (GEAR as above)
 //   HANDS=0.5 node scripts/balance.ts ...          the bot lands half its damage: a stand-in for a human's rotation
 //   TOMES=plague,holy node scripts/balance.ts ...  the hero starts with those schools' tomes read (every ability of theirs; the cards offer the rest)
-//   HERO=bortolo node scripts/balance.ts ...       another hero (player/heroes.ts): his school's base attack, his kit learned from the start, the offers leaning to his schools (default the Risorto)
+//   HERO=bortolo node scripts/balance.ts ...       every build played on that hero (player/heroes.ts) instead of its own: his school's base attack, his kit learned from the start, the offers of his two schools
 //   SCHOOLS=fire,holy KIT=pyre,pillar node ...     a hero not in HEROES yet: those schools (the base attack of the first) and that kit, over HERO's
-//   node scripts/balance.ts pack arcane [runs]     four friars rush the hero from 16 m on the orto's open path, the build at levels 1, 4, 6, dodging and not, one life (DEALT=1: casts a run)
+//   node scripts/balance.ts pack frost [runs]      four friars rush the hero from 16 m on the orto's open path, the build at levels 1, 4, 6, dodging and not, one life (DEALT=1: casts a run)
 import * as THREE from 'three';
 import { buildLevel } from '../src/level/index.ts';
 import { PLAYER } from '../src/core/physics.ts';
@@ -58,7 +58,7 @@ import { ESCORT } from '../src/quest/escort.ts';
 import type { Target } from '../src/enemies/brain.ts';
 import { BELFRY, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { DRAGO, DRAGO_SPOTS, spawnDrago, waves } from '../src/enemies/drago.ts';
-import { HEROES, heroOf } from '../src/player/heroes.ts';
+import { HEROES, heroOf, type Hero } from '../src/player/heroes.ts';
 import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
 
 const DT = 1 / 30;
@@ -69,36 +69,39 @@ type Mob = Friar | Priest;
 const isCaster = (m: Mob): m is Priest => 'kind' in m;
 const FIGHTING = new Set(['chase', 'swing', 'cast', 'nova']);
 
-// --- builds: card preferences, best first (anything unlisted comes last) ---
+// --- builds: card preferences, best first (anything unlisted comes last), each its hero's (`HERO_OF`): a hero is offered only his two schools ---
 export const BUILDS: Record<string, string[]> = {
-  melee: ['fall_third', 'fall_dmg', 'step', 'veil', 'ward', 'strike', 'fall_reach', 'dmg', 'hp', 'armor', 'leech', 'fall_mana', 'potion_big', 'ward_long', 'fury',
-    'strike_dmg', 'potion_cd', 'veil_long', 'veil_heal', 'step_dmg', 'step_cd', 'fury_start', 'speed', 'nova', 'cdr', 'regen', 'mana', 'wisp'],
-  plague: ['plague_dps', 'wisp', 'plague_size', 'plague_cd', 'nova', 'wisp_still', 'fx_wispplague', 'plague_long', 'wisp_dps', 'regen', 'mana', 'cdr', 'veil',
-    'nova_big', 'dmg', 'fury', 'fx_fallplague', 'hp', 'armor', 'wisp_fast', 'potion_big', 'fury_start', 'veil_heal', 'ward', 'step', 'fx_stepplague'],
-  mixed: ['fall_dmg', 'plague_dps', 'veil', 'wisp', 'ward', 'dmg', 'hp', 'fall_third', 'plague_size', 'armor', 'wisp_still', 'leech', 'ward_long', 'potion_big',
-    'fury', 'plague_cd', 'fx_fallplague', 'veil_heal', 'fall_reach', 'potion_cd', 'strike', 'nova', 'step', 'regen'],
-  // the new schools: a fire-and-frost caster, and a brawler of lightning and heavy blows
-  arcane: ['pyre', 'veil', 'frost', 'ward', 'font', 'caligo', 'fx_shatter', 'pyre_fast', 'regen', 'mana', 'frost_fast', 'pyre_big', 'font_long', 'lance_split', 'caligo_freeze', 'dmg', 'hp', 'armor',
-    'frost_deep', 'font_cd', 'lance_dmg', 'lance_third', 'caligo_big', 'lance_mana', 'potion_big', 'cdr', 'veil_heal', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
-  storm: ['chain', 'veil', 'toll', 'ward', 'leap', 'whirl', 'grace', 'fx_storm', 'charge', 'chain_fast', 'toll_long', 'whirl_dmg', 'grace_mul', 'leap_big', 'dmg', 'hp', 'armor', 'regen',
-    'mana', 'chain_long', 'toll_big', 'leap_cd', 'whirl_long', 'grace_cd', 'charge_stun', 'potion_big', 'leech', 'fury', 'ward_long', 'fall_dmg'],
-  // five a school: a poisoner with the drain, a paladin, and a mage-shaman of the new fire, frost and lightning
-  venom: ['spit', 'fever', 'untore', 'miasma', 'drain', 'veil', 'spit_twin', 'fx_venomcloud', 'miasma_more', 'untore_far', 'fever_deep', 'drain_deep', 'plague_dps', 'regen', 'mana',
-    'plague_size', 'dmg', 'hp', 'armor', 'cdr', 'ward', 'potion_big', 'nova', 'leech', 'fury', 'ward_long', 'potion_cd'],
-  holy: ['judge', 'hallow', 'hammer', 'bubble', 'veil', 'judge_dmg', 'hallow_big', 'hammer_cd', 'bubble_cd', 'ward', 'dmg', 'hp', 'armor', 'regen', 'mana', 'fall_dmg', 'fall_third',
-    'cdr', 'leech', 'potion_big', 'strike', 'fury', 'ward_long', 'potion_cd'],
-  tempest: ['pillar', 'cero', 'blizzard', 'orb', 'shield', 'furnace', 'rod', 'squall', 'veil', 'ward', 'pillar_big', 'cero_chain', 'blizzard_big', 'orb_slow', 'shield_more', 'furnace_hot',
-    'rod_long', 'squall_big', 'regen', 'mana', 'dmg', 'hp', 'armor', 'cdr', 'fx_storm', 'potion_big', 'leech', 'fury', 'ward_long'],
+  // the Risorto (Ossa, Ombra): the club, the blink and the shroud, the specials on the fury
+  melee: ['fall_third', 'fall_dmg', 'step', 'ward', 'strike', 'veil', 'fall_reach', 'dmg', 'hp', 'armor', 'leech', 'fall_mana', 'potion_big', 'ward_long', 'fury',
+    'strike_dmg', 'potion_cd', 'veil_long', 'veil_heal', 'step_dmg', 'step_cd', 'fury_start', 'speed', 'nova', 'cdr', 'regen', 'mana', 'leap'],
+  // and his heavy blows: the leap, the whirl, the execute, the drain
+  mixed: ['fall_dmg', 'leap', 'whirl', 'ward', 'grace', 'nova', 'dmg', 'hp', 'fall_third', 'whirl_dmg', 'leap_big', 'armor', 'leech', 'ward_long', 'potion_big',
+    'fury', 'grace_mul', 'nova_big', 'drain', 'fall_reach', 'potion_cd', 'strike', 'step', 'veil', 'regen'],
+  // Bortolo (Gelo, Fulmine): the stiletto on the frozen, the bora, the saette
+  frost: ['blizzard', 'chain', 'font', 'orb', 'toll', 'lance_split', 'frost_fast', 'caligo_freeze', 'chain_fast', 'font_long', 'regen', 'mana', 'lance_dmg', 'lance_third', 'blizzard_big',
+    'orb_slow', 'dmg', 'hp', 'armor', 'frost_deep', 'caligo_big', 'font_cd', 'lance_mana', 'potion_big', 'cdr', 'fury', 'shield', 'squall', 'rod', 'leech', 'potion_cd'],
+  // Suor Fosca (Peste, Sacro): poison spread, the breath, the fever, and the judgment
+  venom: ['untore', 'miasma', 'fever', 'judge', 'hallow', 'spit_twin', 'fx_venomcloud', 'miasma_more', 'untore_far', 'fever_deep', 'plague_dps', 'thorn_dmg', 'regen', 'mana',
+    'plague_size', 'dmg', 'hp', 'armor', 'judge_dmg', 'hallow_big', 'cdr', 'bubble', 'hammer', 'potion_big', 'leech', 'fury', 'bubble_cd', 'potion_cd'],
+  // Fra' Tizian (Fuoco, Sacro): the pyre and the candles, the judgment set alight
+  fire: ['judge', 'wisp', 'pillar', 'furnace', 'hallow', 'fx_holyfire', 'pyre_fast', 'pyre_big', 'cero_chain', 'ember_split', 'regen', 'mana', 'judge_dmg', 'pillar_big', 'furnace_hot',
+    'wisp_dps', 'dmg', 'hp', 'armor', 'cdr', 'bubble', 'hammer', 'potion_big', 'leech', 'fury', 'hallow_big', 'potion_cd'],
+  // Zanetto (Fulmine, Ossa): bells and heavy blows
+  storm: ['shield', 'leap', 'whirl', 'squall', 'rod', 'grace', 'chain_fast', 'toll_long', 'whirl_dmg', 'grace_mul', 'leap_big', 'spark_split', 'dmg', 'hp', 'armor', 'regen',
+    'mana', 'chain_long', 'toll_big', 'squall_big', 'rod_long', 'shield_more', 'leap_cd', 'whirl_long', 'potion_big', 'leech', 'fury', 'strike', 'nova'],
 };
+/** Whose kit each build plays (player/heroes.ts); HERO=bortolo plays every build on him instead. */
+export const HERO_OF: Record<string, Hero> = { melee: 'risorto', mixed: 'risorto', frost: 'bortolo', venom: 'fosca', fire: 'tizian', storm: 'zanetto' };
 
-/** HERO=bortolo: whose kit the bot plays (a new game's `learned`). */
-const HERO = HEROES[heroOf(process.env.HERO)];
-/** TOMES=plague,holy: the abilities those schools' tomes teach, owned from the start, past the hero's kit. */
-const SCHOOLS = (process.env.SCHOOLS?.split(',') as typeof HERO.school | undefined) ?? HERO.school, START = startOf(SCHOOLS), MAIN = START[0]; // his base attack: Caduta d'ossa's club, or a bolt
-const KIT = process.env.KIT?.split(',').filter(Boolean) ?? HERO.kit;
-const LEARNED = [...KIT, ...(process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, [...START, ...KIT]).teaches.map((c) => c.id))];
-/** m the bot strikes from with its base attack. */
-const reach = () => (MAIN === 'fall' ? tune.fallRange : 25);
+/** A build's hero: his schools, his base attack, the kit he starts with (a new game's `learned`) and TOMES=plague,holy's
+ *  abilities, owned from the start past it; SCHOOLS=fire,holy KIT=pyre,pillar for a hero not in HEROES yet. */
+function kitOf(build: string) {
+  const hero = HEROES[process.env.HERO ? heroOf(process.env.HERO) : HERO_OF[build] ?? 'risorto'];
+  const schools = (process.env.SCHOOLS?.split(',') as typeof hero.school | undefined) ?? hero.school, start = startOf(schools);
+  const kit = process.env.KIT?.split(',').filter(Boolean) ?? hero.kit;
+  const learned = [...kit, ...(process.env.TOMES ?? '').split(',').filter(Boolean).flatMap((s) => tomeOf(TOMES.find((t) => t.school === s)!, [...start, ...kit]).teaches.map((c) => c.id))];
+  return { schools, start, main: start[0], learned }; // main: his base attack, Caduta d'ossa's club or a bolt
+}
 
 let seed = 1;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
@@ -110,13 +113,13 @@ function picksTo(build: string, lv: number): string[] {
   while (picks.length < lv - 1) picks.push(choose(build, picks));
   return picks;
 }
-/** Past a build's own list, what any player would rather take: with 33 abilities in the offers, often none of the three cards is the build's. */
+/** Past a build's own list, what any player would rather take: often none of the three cards is the build's. */
 const GENERIC = ['veil', 'ward', 'pyre', 'strike', 'drain', 'cero', 'judge', 'hallow', 'spit', 'pillar', 'chain', 'grace', 'toll', 'frost', 'leap', 'whirl', 'furnace',
   'miasma', 'fever', 'blizzard', 'wisp', 'font', 'caligo', 'step', 'charge', 'nova', 'rod', 'orb', 'shield', 'squall', 'hammer', 'bubble', 'untore',
   'dmg', 'hp', 'armor', 'leech', 'potion_big', 'regen', 'mana', 'cdr', 'fury', 'speed'];
 function choose(build: string, picks: string[]): string {
-  const pref = BUILDS[build] ?? [], rank = (id: string) => (pref.includes(id) ? pref.indexOf(id) : GENERIC.includes(id) ? 500 + GENERIC.indexOf(id) : 999);
-  const cards = offer(picks, rnd, LEARNED, SCHOOLS);
+  const pref = BUILDS[build] ?? [], rank = (id: string) => (pref.includes(id) ? pref.indexOf(id) : GENERIC.includes(id) ? 500 + GENERIC.indexOf(id) : 999), k = kitOf(build);
+  const cards = offer(picks, rnd, k.learned, k.schools);
   return cards.reduce((a, b) => (rank(b.id) < rank(a.id) ? b : a)).id;
 }
 
@@ -338,12 +341,15 @@ class Run {
 
   readonly build: string;
   readonly dodge: boolean;
+  /** The build's hero (`kitOf`). */
+  readonly hero: ReturnType<typeof kitOf>;
   private worth = new Map<Mob, number>();
 
   constructor(build: string, dodge: boolean) {
     this.build = build;
     this.dodge = dodge;
-    Object.assign(tune, tuneOf([], LEARNED, SCHOOLS));
+    this.hero = kitOf(build);
+    Object.assign(tune, tuneOf([], this.hero.learned, this.hero.schools));
     const c = spawnCasters(this.world, this.level.areas), a = spawnApiary(this.world);
     this.l2 = spawnLevel2(this.world);
     this.l3 = spawnLevel3(this.world);
@@ -354,7 +360,7 @@ class Run {
     for (const m of this.mobs) this.worth.set(m, isCaster(m) ? m.kind.xp : FRIAR.xp);
     for (const h of this.l3.hidden) for (const m of h.members) this.free.add(m); // asleep: dead, worth nothing until woken
     this.quest.side.bag = this.bag;
-    this.system = new AbilitySystem<Forsaken>(ABILITIES, [MAIN, ...BAR.slice(1)], this as unknown as Forsaken, START);
+    this.system = new AbilitySystem<Forsaken>(ABILITIES, [this.hero.main, ...BAR.slice(1)], this as unknown as Forsaken, this.hero.start);
     const s = this.stats; // counts what is spent
     this.system.pool = { get mana() { return s.mana; }, spendMana: (n) => s.spendMana(n) && ((this.spent += n), true) };
     this.player.pos.y = this.world.groundAt(SPAWN.x, SPAWN.z, 0);
@@ -504,7 +510,7 @@ class Run {
     }
   }
   apply(): void {
-    Object.assign(tune, tuneOf(this.picks, LEARNED, SCHOOLS));
+    Object.assign(tune, tuneOf(this.picks, this.hero.learned, this.hero.schools));
     this.worn = effects(this.gear.totals);
     this.stats.grow(tune.hp, tune.mana, this.worn.hp, this.worn.mana);
     this.stats.armor = tune.armor * (1 - this.worn.cut);
@@ -596,6 +602,8 @@ class Run {
     if (moved < 6 * dt * 0.4) this.slow = 1; // a corner clipped: cell by cell for a while
   }
 
+  /** m the bot strikes from with its base attack. */
+  private reach(): number { return this.hero.main === 'fall' ? tune.fallRange : 25; }
   private cast(id: string): boolean {
     const i = this.system.slots.findIndex((a) => a?.id === id);
     this.src = id;
@@ -632,7 +640,7 @@ class Run {
       if (this.system.casting) this.system.cancel();
       this.flee(danger.x, danger.z, dt);
       if (t) this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
-      if (t && Math.hypot(t.x - p.x, t.z - p.z) < reach()) this.cast(MAIN);
+      if (t && Math.hypot(t.x - p.x, t.z - p.z) < this.reach()) this.cast(this.hero.main);
     } else if (t) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       this.player.facing = Math.atan2(-(t.x - p.x), -(t.z - p.z));
@@ -668,10 +676,10 @@ class Run {
         if (this.ready('judge') && d < 28) this.cast('judge');
         if (this.ready('cero') && d < 28 && !this.magic.candles.has(t)) this.cast('cero');
         if (this.ready('orb') && d < 14) this.cast('orb');
+        if (this.ready('pillar') && d < 28) this.cast('pillar'); // a special: instant, on the full fury
         if (this.ready('spit') && d < 28 && (this.magic.venom(t) < tune.venomMax || cool)) this.cast('spit');
         if (this.ready('drain') && d < 24 && (low < 0.8 || cool)) { if (this.cast('drain') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('blizzard') && d < 25 && (big ? d > 5 : nearT(tune.blizzardR) >= 2)) { if (this.cast('blizzard') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } } // a channel: not in a big one's reach
-        if (this.ready('pillar') && d < 28 && (cool || nearT(tune.pillarR) >= 2)) { if (this.cast('pillar') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('chain') && d < 28 && (cool || around(10) >= 2)) { if (this.cast('chain') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('pyre') && d < 28 && cool) { if (this.cast('pyre') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
         if (this.ready('frost') && d < 28 && d > tune.fallRange && cool) { if (this.cast('frost') || this.system.casting) { this.tickWorld(dt, hp0, t); return; } }
@@ -679,8 +687,8 @@ class Run {
         if (this.ready('nova') && (near >= 2 || (big && d < tune.novaR))) this.cast('nova');
         const wait = this.dodge && isCaster(t) && t.state === 'nova'; // don't walk back into a ring still filling
         if (!wait && this.ready('step') && d > 6 && d < 9) this.cast('step');
-        if (!wait && (d > reach() - 0.5 || (MAIN !== 'fall' && !this.world.sees(p, t)))) this.go(t.x, t.z, 1.5, dt);
-        if (d < reach()) this.cast(MAIN);
+        if (!wait && (d > this.reach() - 0.5 || (this.hero.main !== 'fall' && !this.world.sees(p, t)))) this.go(t.x, t.z, 1.5, dt);
+        if (d < this.reach()) this.cast(this.hero.main);
       }
     } else if (low < 0.85 && !this.system.casting && this.ready('mend')) { // between pulls the prayer heals up
       this.cast('mend');
@@ -1343,7 +1351,7 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     console.log(escortTable(rs));
   } else if (mode === 'pack3') {
     const rs: PackResult[] = [];
-    for (const d of [true, false]) for (const lv of [15, 16, 17]) runs(Number(n ?? 6), (s) => rs.push(playPack3(build ?? 'arcane', lv, d, s)));
+    for (const d of [true, false]) for (const lv of [15, 16, 17]) runs(Number(n ?? 6), (s) => rs.push(playPack3(build ?? 'frost', lv, d, s)));
     console.log(packTable(rs));
   } else if (mode === 'route3') {
     const rs: RouteResult[] = [];
@@ -1351,7 +1359,7 @@ if (process.argv[1]?.endsWith('balance.ts')) {
     console.log(routeTable(rs));
   } else if (mode === 'pack') {
     const rs: PackResult[] = [];
-    for (const d of [true, false]) for (const lv of [1, 4, 6]) runs(Number(n ?? 8), (s) => rs.push(playPack(build ?? 'arcane', lv, d, s)));
+    for (const d of [true, false]) for (const lv of [1, 4, 6]) runs(Number(n ?? 8), (s) => rs.push(playPack(build ?? 'frost', lv, d, s)));
     console.log(packTable(rs));
   } else if (mode === 'elite2') {
     const rs: EliteResult[] = [];

@@ -211,6 +211,19 @@ function ospizio(b: LevelBuilder, p: Props): void {
   torch(-198.3, -20, -1, 0); torch(-198.3, -30, -1, 0); torch(-229.4, -26, 1, 0); torch(-206, -11.7, 0, 1); torch(-222, -11.7, 0, 1);
   torch(-281.7, -20, 1, 0); torch(-281.7, -30, 1, 0); torch(-250.6, -26, -1, 0); torch(-258, -11.7, 0, 1); torch(-274, -11.7, 0, 1);
   torch(-281.7, -6, 1, 0); torch(-250.8, -6, -1, 0); torch(-198.3, -6, -1, 0);
+  // The portineria and the lace hall read as the church's aula does: lanterns hung from the beams over the floor and the
+  // lace tables, torches round the walls' dark stretches (each paints its pool even when the pooled lights are elsewhere).
+  torch(-210.3, -10, -1, 0); torch(-229.5, -6, 1, 0); // portineria, by the refettorio's door and on the church's flank
+  torch(-226, -12.3, 0, -1); torch(-206, -12.3, 0, -1); torch(-224, -35.7, 0, 1); torch(-204, -35.7, 0, 1); torch(-229.4, -16, 1, 0); torch(-229.4, -33, 1, 0); // lace hall
+  const lantern = (x: number, z: number) => {
+    p.rod(x, H, z, x, 5.2, z, 0.02, 'iron'); // high under the beams, clear of the follow camera
+    p.box(x - 0.22, x + 0.22, 4.6, 5.2, z - 0.22, z + 0.22, 'lantern');
+    b.lights.push({ x, y: 4.9, z, kind: 'lamp' });
+  };
+  lantern(-224, -6); lantern(-215, -6); // portineria
+  for (const z of [-30, -18]) lantern(-208, z); // over the lace tables
+  for (const z of [-30, -18]) lantern(-222, z); // the mistress's end
+  b.lights.push({ x: -224, y: 1.1, z: -23.5, kind: 'brazier' }); // the girls' scaldino, warming the open floor where the Maestra holds her class
 }
 
 function court(b: LevelBuilder, p: Props): void {

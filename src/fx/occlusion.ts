@@ -229,7 +229,8 @@ export class Occlusion {
     this.caps.count = this.tops.count = 0;
     this.lowered.length = this.lifted.length = 0;
     for (const pass of [0, 1, 2]) for (const g of this.groups) { // walls, roofs, the rest: what rests on a lowered wall or hangs under a hidden roof goes with it
-      const b = g.box, wall = g.solids.length > 0 && b.max.y - b.min.y >= TALL && b.min.y < feet.y + 3; // walls on the church podium too
+      const b = g.box, over = b.min.y > top && feet.x > b.min.x && feet.x < b.max.x && feet.z > b.min.z && feet.z < b.max.z; // a mass over the hero's head (a sotoportego's houses) is a roof, never a wall
+      const wall = !over && g.solids.length > 0 && b.max.y - b.min.y >= TALL && b.min.y < feet.y + 3; // walls on the church podium too
       const roof = !wall && b.min.y > top && b.max.x - b.min.x >= ROOF && b.max.z - b.min.z >= ROOF;
       if (pass !== (wall ? 0 : roof ? 1 : 2)) continue;
       const floor = g.floor = Math.max(b.min.y, feet.y) + STUB, r = REACH + (g.on ? GIVE : 0);

@@ -89,6 +89,8 @@ export function buildGiudecca(b: LevelBuilder): void {
   });
   for (let z = -15; z < 10; z += 2.5) p.box(-90, -86, 3.15, 3.4, z - 0.12, z + 0.12, 'wood');
   b.floor(-90, -86, -16, 10, 'paving', 0, 0.02);
+  // Torches down both sides, staggered, hung low under the beams: the moon never reaches under the houses.
+  for (const [x, z, nx] of [[-90, -11, 1], [-86, -5, -1], [-90, 1, 1], [-86, 6, -1]] as const) b.lights.push({ x: x + nx * 0.32, y: 2.4, z, kind: 'torch', nx, nz: 0 });
   b.area('Campiello de la Croce', -100, -76, -30, -16);
   b.floor(-100, -76, -30, -16, 'paving', 0, 0.02);
   b.well(-88, -23, 0.9, 0.9);
@@ -108,7 +110,7 @@ export function buildGiudecca(b: LevelBuilder): void {
 
   // Lanterns: iron fanali on brackets along the house fronts and on the bridges' crowns.
   for (const x of [-78, -96, -114, -138, -156, -186]) fanale(b, p, x, x === -114 ? -14 : x === -186 ? -26 : 10);
-  for (const [x0, x1] of [RII.croce, RII.squero]) for (const z of [BZ0, BZ1]) lampPost(b, p, (x0 + x1) / 2, z, RISE);
+  for (const [x0, x1] of [RII.croce, RII.squero]) for (const z of [BZ0, BZ1]) lampPost(b, p, (x0 + x1) / 2, z, RISE + 0.95, 1.55); // on the parapets' top
 
   // The Casa dei Tre Oci (1913): a neo-gothic front with its three great windows on the canal.
   treOci(b, p);
@@ -161,12 +163,16 @@ export function fanale(b: LevelBuilder, p: Props, x: number, z: number): void {
   b.lights.push({ x, y, z: zz + 0.85, kind: 'lamp' });
 }
 
-/** A lamp post on a bridge's crown. */
-export function lampPost(b: LevelBuilder, p: Props, x: number, z: number, y0: number): void {
-  p.disc(x, y0 + 0.95, z, 0.08, 1.6, 'iron');
-  p.box(x - 0.18, x + 0.18, y0 + 2.5, y0 + 2.95, z - 0.18, z + 0.18, 'lantern');
-  p.cone(x, y0 + 2.95, z, 0.26, 0.28, 'iron');
-  b.lights.push({ x, y: y0 + 2.7, z, kind: 'lamp' });
+/**
+ * A lamp post whose foot stands at y0 (the paving, or a bridge's parapet top), its lantern h over it: a stone foot, the iron
+ * pole up from it (Props' discs stand on their y, so the pole starts on the foot instead of hanging over it).
+ */
+export function lampPost(b: LevelBuilder, p: Props, x: number, z: number, y0: number, h = 2.5): void {
+  p.disc(x, y0, z, 0.2, 0.3, 'stoneDark');
+  p.disc(x, y0 + 0.3, z, 0.08, h - 0.3, 'iron');
+  p.box(x - 0.18, x + 0.18, y0 + h, y0 + h + 0.45, z - 0.18, z + 0.18, 'lantern');
+  p.cone(x, y0 + h + 0.45, z, 0.26, 0.28, 'iron');
+  b.lights.push({ x, y: y0 + h + 0.2, z, kind: 'lamp' });
 }
 
 /** Santa Croce: a plain stone front with a pediment and a shut door, the convent's blind walls either side. */

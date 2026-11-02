@@ -153,6 +153,11 @@ export const QUESTS = {
   incoronazione: { title: "L'incoronazione", xp: 350, gold: 150 }, // his third: walked from the altar to the Bacino through three waves, and crowned
   sabbia: { title: 'Il libro di sabbia', xp: 200, gold: 0 }, // the secret one: a page off an amanuense, the book in the labyrinth, its shelf in the library
   drago: { title: 'Il drago di Carpaccio', xp: 450, gold: 200 }, // the statue of San Giorgio: his lance off three elites, and the dragon out of the lagoon behind the Teatro Verde, ~level 18
+  // The Redentore's side quests (quest/squero.ts), ~level 5-6: most of a level each and no epic, 230 XP in all, so a hero who
+  // does every errand of level 1 still meets the Reverendissimo where the old side quests left him (level 12 at most).
+  pellegrini: { title: 'Le lettere dei pellegrini', xp: 70, gold: 30 }, // Fra' Anzolo, in the foresteria: three letters about the complex
+  cerca: { title: 'Il pane della cerca', xp: 80, gold: 35 }, // his second: bread off the friars, the refettorio's board, the noviziato's bell
+  pungiglione: { title: 'Il pungiglione della regina', xp: 80, gold: 40 }, // Fra' Lunardo, in the uliveto: the giant bee's sting, the hives smoked
 } as const;
 export type QuestId = keyof typeof QUESTS;
 /** A quest's experience (the shared helper: every completion goes through `Quest.complete`). */
@@ -227,7 +232,7 @@ export class Quest {
     const held = (Object.keys(GIVERS) as Giver[]).map((g) => { const at = GIVERS[g].at; return world.add(at.x, at.z, at.r, at.r, at.y ?? 0, (at.y ?? 0) + 1.8); });
     this.held = held[Object.keys(GIVERS).indexOf('cardinale')];
     this.side.complete = (id) => this.complete(id);
-    this.side.over = (q) => { const g = giverOf(q); return g && !q.lasts ? (GIVERS[g].level === 3 ? this.boss3Dead : this.boss2Dead) : false; }; // a secret is never stranded: it has no one to hand it to; the dragon outlives the Abate
+    this.side.over = (q) => { const g = giverOf(q); return g && !q.lasts ? [this.bossDead, this.boss2Dead, this.boss3Dead][GIVERS[g].level - 1] : false; }; // a secret is never stranded: it has no one to hand it to; the dragon outlives the Abate
   }
 
   get stage(): Stage {
@@ -287,8 +292,8 @@ export class Quest {
       zuane: mark(s === 'report' || s === 'return' || s === 'return3' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer' || s === 'offer3'),
       speziale: mark((this.accepted && !this.found) || this.headsReady(alive),
         !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (this.accepted3 && !this.blessed3 && !this.boss3Dead) || (!this.asked && !this.bossDead && alive > 0)),
-      ...Object.fromEntries((Object.keys(GIVERS) as Giver[]).map((g) => [g, // out of sight until their level opens: the chains fall
-        (GIVERS[g].level === 3 ? this.accepted3 : this.accepted2) ? mark(this.side.handInReady(g), this.side.open(g).length > 0) : undefined])) as Record<Giver, Mark>,
+      ...Object.fromEntries((Object.keys(GIVERS) as Giver[]).map((g) => [g, // out of sight until their level opens: the chains fall (level 1's from the start)
+        [true, this.accepted2, this.accepted3][GIVERS[g].level - 1] ? mark(this.side.handInReady(g), this.side.open(g).length > 0) : undefined])) as Record<Giver, Mark>,
     };
   }
 

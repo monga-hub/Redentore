@@ -9,7 +9,7 @@ import { BORTOLO_OBJECTIVE, DECLINE, GREET, HEADS_TITLE, OBJECTIVE, QUEST2_TITLE
 import { Npc } from './npc.ts';
 import { BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, SECOND, SPEZIALE, THIRD, type Crossing, type Gate, type Quest, type QuestId, type Stage } from './progress.ts';
 import { ITEM, QUEST_COLOR, RELIC_PRIZE } from '../loot/bag.ts';
-import { ARCHIVISTA, CROWNED, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, STATUA, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
+import { ANZOLO, LUNARDO, ARCHIVISTA, CROWNED, FANALISTA, FARI, GIVERS, ISEPPO, ISEPPO_RIVA, SIDE, SIDE_BY, STATUA, VERONESE, giverOf, stepsOf, type Giver, type SideQuest } from './squero.ts';
 import { BELLS, BELL_MOUTH, CENACOLO, FAC } from '../level/zones/sangiorgio.ts';
 
 // What the player sees of the quest: iron grates that slide up into the wall, wooden door
@@ -41,10 +41,13 @@ const FARO = 0xffb347; // the Fanalista's, lamp oil
 const ARCHIVIO = 0x9fc8ff; // Padre Archivista's, his lantern's pale flame
 const BIACCA = 0xffe2a8; // the Veronese's, lead white and gold
 const PORPORA = 0xffb0a0; // the Cardinale's, candlelight on scarlet
+const FORESTERIA = 0xd8c8ff; // Fra' Anzolo's, a night-light's grey lilac
+const CERA = 0xffd84a; // Fra' Lunardo's, beeswax and honey
 /** San Giorgio's statue (no body): the light round him in his niche, his head's glory, and the pool at his foot where he is heard; `y` m up. */
 const NICCHIA = [{ y: 8.8, size: 4.2 }, { y: 10.2, size: 1.5 }] as const;
 /** The givers' portraits: Mastro Iseppo's, Padre Archivista's, the Veronese's and the Cardinale's own, San Giorgio's Carpaccio's; the Fanalista's, Fra' Zuane's picture turned to lamplight. */
-const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' }, cardinale: { file: 'cardinale' }, statua: { file: 'statua', tint: 'sepia(0.3) brightness(1.1)' } }; // the saint's: his head off Carpaccio's San Giorgio e il drago (1516), in San Giorgio Maggiore
+const FACES: Record<Giver, { file: string; tint?: string }> = { iseppo: { file: 'iseppo' }, riva: { file: 'iseppo' }, fanalista: { file: 'zuane', tint: 'sepia(0.9) saturate(2.2) hue-rotate(-12deg) brightness(1.05)' }, archivista: { file: 'archivista' }, veronese: { file: 'veronese' }, cardinale: { file: 'cardinale' }, statua: { file: 'statua', tint: 'sepia(0.3) brightness(1.1)' },
+  anzolo: { file: 'zuane', tint: 'hue-rotate(40deg) saturate(0.6) brightness(1.05)' }, lunardo: { file: 'zuane', tint: 'sepia(0.8) saturate(2.6) hue-rotate(5deg) brightness(1.1)' } }; // two more Capuchin ghosts on Fra' Zuane's face, like Fra' Bortolo // the saint's: his head off Carpaccio's San Giorgio e il drago (1516), in San Giorgio Maggiore
 /** The Nozze di Cana's canvas on the Cenacolo's end wall, over the garden door (zones/sangiorgio.ts cenacolo: inside the gilt frame, before the cut edge). */
 const NOZZE = { x0: -540.4, x1: -519.6, y0: 4.8, y1: 10.6, z: CENACOLO.z0 + 0.7 };
 /** A lighthouse's fire seen from across the lagoon: a soft gold halo on a canvas. */
@@ -178,7 +181,8 @@ export class QuestView {
   constructor(quest: Quest, vfx: Vfx) {
     this.quest = quest;
     this.vfx = vfx;
-    this.givers = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(quest.side.escort.pose, PORPORA, 'cardinale.glb'), statua: new Npc(STATUA, GOLD, '', 10.6) };
+    this.givers = { iseppo: new Npc(ISEPPO, SQUERO, 'iseppo.glb'), riva: new Npc(ISEPPO_RIVA, SQUERO, 'iseppo.glb'), fanalista: new Npc(FANALISTA, FARO, 'marinaio.glb'), archivista: new Npc(ARCHIVISTA, ARCHIVIO, 'archivista.glb'), veronese: new Npc(VERONESE, BIACCA, 'veronese.glb'), cardinale: new Npc(quest.side.escort.pose, PORPORA, 'cardinale.glb'), statua: new Npc(STATUA, GOLD, '', 10.6),
+      anzolo: new Npc(ANZOLO, FORESTERIA), lunardo: new Npc(LUNARDO, CERA) }; // Fra' Zuane's body, glowing their colours
     this.givers.cardinale.root.add(this.tiara);
     const iron = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.55, metalness: 0.75 });
     this.gates = quest.gates.map((g) => this.gate(g, iron));

@@ -115,7 +115,7 @@ for (let t = 0; t <= path.duration; t += DT) {
   prev.copy(at);
 }
 
-const ROUTE = ['Pontile', 'Riva sulla laguna', 'Sale espositive (antiche officine)', 'Orti coltivati', 'Corridoio del convento', 'Chiostro mediano',
+const ROUTE = ['Pontile', 'Riva sulla laguna', 'Sala dei telai', 'Orti coltivati', 'Corridoio del convento', 'Chiostro mediano',
   'Chiostro grande', 'Coro dei frati', 'Crociera e cupola', 'Chiesa del Redentore: navata', 'Sagrato e scalinata', 'Fondamenta San Giacomo'];
 let i = 0;
 for (const v of visited) if (v === ROUTE[i]) i++;

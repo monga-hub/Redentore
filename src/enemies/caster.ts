@@ -318,7 +318,7 @@ export function cloisterPlan(world: World, areas: (Bounds & { label: string; zon
 }
 
 /** The gardens past the orti, by the lagoon (zones/nord.ts): one sacerdote and two priests in each. */
-export const GARDENS = ['Giardino dei pitosfori', 'Giardino del pozzo', 'Prato nord-est'];
+export const GARDENS = ['Giardino dei pitosfori', 'Giardino del pozzo', 'Brolo dei cipressi'];
 export function gardenPlan<A extends Bounds & { label: string }>(world: World, areas: A[]): { area: A; group: [number, number, number][] }[] {
   return GARDENS.map((label) => {
     const area = areas.find((a) => a.label === label)!;
@@ -328,16 +328,16 @@ export function gardenPlan<A extends Bounds & { label: string }>(world: World, a
 
 /**
  * Guards of the buildings by the lagoon (zones/nord.ts): priests on the pontile by the key's
- * chest, in the sale espositive and the caffè, round the altar of the cappella with a sacerdote,
- * in the laboratori and by the frantoio's press with a sacerdote. Each keeps to its room (the
+ * chest, in the sala dei telai and the refettorio, round the altar of the cappella del noviziato with a sacerdote,
+ * in the falegnameria and by the frantoio's press with a sacerdote. Each keeps to its room (the
  * pontile), off the line between its doors, facing `at` (the room's middle, the altar, the press). [x, z, sacerdote?]
  */
 export const LAGOON: { label: string; at: [number, number]; group: [number, number, boolean?][] }[] = [
   { label: 'Pontile', at: [-35, -190], group: [[-37.2, -191.5], [-37.2, -188.5]] },
-  { label: 'Sale espositive (antiche officine)', at: [-34.5, -156], group: [[-37.5, -159], [-37.5, -153], [-31.5, -159]] },
-  { label: 'Caffè', at: [-26, -156], group: [[-28.3, -158.8], [-23.7, -158.8]] },
-  { label: 'Cappella di meditazione', at: [-45, -156], group: [[-42.5, -156, true], [-45, -153], [-45, -159]] },
-  { label: 'Laboratori', at: [-2, -156], group: [[-6, -158.5], [-6, -153.5], [2.5, -158.5]] },
+  { label: 'Sala dei telai', at: [-34.5, -156], group: [[-37.5, -159], [-37.5, -153], [-31.5, -159]] },
+  { label: 'Refettorio dei frati', at: [-26, -156], group: [[-28.3, -158.8], [-23.7, -158.8]] },
+  { label: 'Cappella del noviziato', at: [-45, -156], group: [[-42.5, -156, true], [-45, -153], [-45, -159]] },
+  { label: 'Falegnameria', at: [-2, -156], group: [[-6, -158.5], [-6, -153.5], [2.5, -158.5]] },
   { label: 'Frantoio e sala di smielatura', at: [11, -156], group: [[14.5, -156, true], [16.5, -158.5], [16.5, -153.5]] },
 ];
 export function lagoonPlan<A extends Bounds & { label: string }>(areas: A[]): { area: A; group: [number, number, number][]; kinds: CasterKind[] }[] {

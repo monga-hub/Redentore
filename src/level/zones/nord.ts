@@ -6,31 +6,32 @@ import { groundPatch } from '../ground.ts';
 
 // North transverse body (z -161..-151) with the central androne projecting both ways
 // (x -22..-9, z -168..-140), then the gardens and the lagoon front.
-//   cappella di meditazione x -47..-39 | sale espositive -39..-30 | caffè -30..-22
-//   androne (passage)       x -22..-9  | laboratori -9..5        | frantoio/smielatura 5..19
+//   cappella del noviziato x -47..-39 | sala dei telai -39..-30 | refettorio -30..-22
+//   androne (passage)      x -22..-9  | falegnameria -9..5      | frantoio/smielatura 5..19
 //   giardini dei pitosfori  x -47..-22 (rose pergola on the west wall)
 //   giardino del pozzo      x -22..4
-//   prato nord-est          x 4..28
+//   brolo dei cipressi      x 4..28
 //   riva + pontile on the lagoon, z -186
 
 export function buildNord(b: LevelBuilder): void {
   b.zone('corpo-nord');
   const n = Z.nordNorth, s = Z.ortoNorth, h = 7, trim = 4.4, arch = true;
 
-  b.area('Cappella di meditazione', X.west, -39, n, s);
+  b.area('Cappella del noviziato', X.west, -39, n, s);
   b.room(X.west, -39, n, s, { h, trim, e: false, s: [{ at: -43, arch }], floor: 'paving' });
   b.box(-45.5, -44.5, 0, 1, -157, -155, 'stoneDark'); // altar block
 
-  b.area('Sale espositive (antiche officine)', -39, -30, n, s);
+  b.area('Sala dei telai', -39, -30, n, s);
   b.room(-39, -30, n, s, { h, trim, e: false, w: [{ at: -156, arch }], s: [{ at: -34.5, arch }], n: [{ at: -34.5, arch }], floor: 'paving' });
 
-  b.area('Caffè', -30, -22, n, s);
+  b.area('Refettorio dei frati', -30, -22, n, s);
   b.room(-30, -22, n, s, { h, trim, e: false, w: [{ at: -156, arch }], s: [{ at: -26, arch }], n: [{ at: -26, arch }], floor: 'paving' });
+  b.box(-29.4, -28.4, 0, 0.8, -155, -152, 'wood'); // the friars' board, off the doors' line (Il pane della cerca lays its bread here)
 
   b.area('Androne di passaggio', -22, -9, -168, -140);
   b.room(-22, -9, -168, -140, { h: 8, trim: 4.9, n: [{ at: -15.5, w: 4, h: 4, arch }], s: [{ at: -15.5, w: 4, h: 4, arch }], floor: 'paving' });
 
-  b.area('Laboratori', -9, 5, n, s);
+  b.area('Falegnameria', -9, 5, n, s);
   b.room(-9, 5, n, s, { h, trim, w: false, e: false, s: [{ at: -2, arch }], n: [{ at: -2, arch }], floor: 'paving' });
 
   b.area('Frantoio e sala di smielatura', 5, 19, n, s);
@@ -60,7 +61,7 @@ export function buildNord(b: LevelBuilder): void {
   b.well(-3, -176, 1, 1); // pozzo
   b.wallZ(4, Z.lagoonEdge, n, { h: 2.5, role: 'brick', doors: [{ at: -172, w: 2.5 }] });
 
-  b.area('Prato nord-est', 4, X.east, Z.lagoonEdge, n);
+  b.area('Brolo dei cipressi', 4, X.east, Z.lagoonEdge, n);
   b.wallZ(X.east, Z.riva, -168, { h: 3, role: 'brick' });
 
   b.zone('laguna');

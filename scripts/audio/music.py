@@ -4,7 +4,7 @@ the horns over the orto, in the low brass as the Reverendissimo's motif turned P
 and in D major, at last, when he falls.
 
 The intro cue is laid out on the flythrough's clock (camera/intro.ts, 74.35 s): lagoon 0-5,
-pontile and gardens 5-11, sale espositive 11-16, the orto sweep 16-26.5, corridor and cloisters
+pontile and gardens 5-11, sala dei telai 11-16, the orto sweep 16-26.5, corridor and cloisters
 26.5-42.4 (the grate at 35.35), the choir door at 42.45, the orbit round the boss 47.5-57.75, back
 down the nave to the portone (63.45; the game slams it ~66 s), the fondamenta 66.8 to the end."""
 from dsp import *

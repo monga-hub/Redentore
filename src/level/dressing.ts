@@ -291,7 +291,7 @@ function dressGiardini(b: LevelBuilder): void {
   bench(p, -3, -172.4, 0);
   for (const [x, z] of [[-19, -181], [-8, -181], [-8, -170.5], [2, -181]]) shrub(p, x, z, 0.7, 'olive', true);
 
-  // Prato nord-est: olives on the lawn, cypresses against the east wall.
+  // Brolo dei cipressi: olives on the lawn, cypresses against the east wall.
   for (const [x, z] of [[10, -166], [16, -172], [22, -177], [9, -179]]) olive(p, x, z, 1.25);
   for (const z of [-165, -171, -180]) cypress(p, 26.2, z, p.rand(7, 8.5));
   p.flush();

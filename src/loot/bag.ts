@@ -49,6 +49,12 @@ export const ITEMS: readonly Item[] = [
   { id: 'corona-zuane', name: 'Corona del portinaio', rarity: 'leggendario', icon: 'rosary', lore: 'Grani d’ulivo e una medaglietta consumata dal pollice. Fra’ Zuane la perse nell’orto: riportagliela, sulla fondamenta.', quest: true },
   // Fra' Bortolo's heads (quest/progress.ts HEADS): off the friars while he wants them.
   { id: 'testa-frate', name: 'Testa di frate', rarity: 'comune', icon: 'skull', lore: 'Per il rito della ruta di Fra’ Bortolo. Sorride ancora, sotto il cappuccio.', quest: true },
+  // Fra' Anzolo's and Fra' Lunardo's (quest/squero.ts): the pilgrims' letters, the bread of the cerca off the friars, the giant bee's sting.
+  { id: 'lettera-barcaiolo', name: 'Lettera di un barcaiolo di Chioggia', rarity: 'noncomune', icon: 'relic', lore: '«Cara Nene, el Redentor me varda». Mai spedita. Per Fra’ Anzolo, nella foresteria.', quest: true },
+  { id: 'lettera-vedova', name: 'Lettera di una vedova di Burano', rarity: 'noncomune', icon: 'relic', lore: '«Figli miei, la mamma torna per la Madonna». Piegata in quattro, con un filo di merletto. Per Fra’ Anzolo.', quest: true },
+  { id: 'lettera-tedesco', name: 'Lettera di un pellegrino tedesco', rarity: 'noncomune', icon: 'relic', lore: 'Da Augusta a piedi, oltre i monti. La firma è una croce. Per Fra’ Anzolo, nella foresteria.', quest: true },
+  { id: 'pane-cerca', name: 'Pane della cerca', rarity: 'comune', icon: 'relic', lore: 'Mendicato per la Giudecca nel 1576. Duro come una pietra, e non ammuffisce. Per la tavola del refettorio.', quest: true },
+  { id: 'pungiglione-ape', name: 'Pungiglione della regina', rarity: 'raro', icon: 'nail', lore: 'Lungo come un coltello da pane, ancora caldo di veleno. Per Fra’ Lunardo, nell’uliveto.', quest: true },
   // Mastro Iseppo's quests (quest/squero.ts): off the drowned, the elites, found in the Zitelle and the Redentore.
   { id: 'ferro-iseppo', name: 'Ferro di Mastro Iseppo', rarity: 'noncomune', icon: 'nail', lore: 'Sei denti e una I incisa sotto il collo. Mastro Iseppo li rivuole, allo squero.', quest: true, l2: true },
   { id: 'testa-gastaldo', name: 'Testa del Gastaldo', rarity: 'raro', icon: 'skull', lore: 'Ha ancora il cappello. Mastro Iseppo la vuole appesa al suo tezon.', quest: true, l2: true },

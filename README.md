@@ -10,7 +10,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   non-morti che pregano nei chiostri a gruppi di 3 (1 gruppo nei chiostri piccoli, 2 nel mediano, 3 nel
   grande) e lanciano dardi d'ombra a distanza, indietreggiando se ti avvicini. Altri gruppi di preti
   (2-3, con un sacerdote nella cappella e nel frantoio) presidiano gli edifici verso la laguna: pontile,
-  sale espositive, caffè, cappella di meditazione, laboratori, frantoio. All'apiario un'ape gigante
+  sala dei telai, refettorio dei frati, cappella del noviziato, falegnameria, frantoio. All'apiario un'ape gigante
   (élite tra sacerdote e boss: pungiglione in picchiata e uno sciame velenoso telegrafato a terra da
   cui scappare) con tre api operaie; fuori dalla portata dei sentieri lastricati. In chiesa due sacerdoti
   (bianco e viola, magia + mischia + un anello d'ombra telegrafato a terra) con due preti ciascuno — a
@@ -94,6 +94,16 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   obiettivo, oggetti di missione col raggio dorato; gondolieri e codeghe risorgono come i frati (lontano dall'eroe,
   un quarto dell'esperienza, bottino magro) finché la Governatrice è viva; se cade prima, le missioni di raccolta e
   di uccisione si consegnano lo stesso. Tutto nel salvataggio (i vecchi si caricano senza).
+- **Missioni secondarie del Redentore** (livello 1, stesso motore di Mastro Iseppo, `GIVERS` in `src/quest/squero.ts`; due
+  fantasmi cappuccini col corpo di Fra' Zuane, punto esclamativo dorato fin dall'inizio, missioni chiuse dalla morte del
+  Reverendissimo): Fra' Anzolo, il foresterario, nella **foresteria** sull'uliveto, che la notte del voto lasciò fuori tre
+  pellegrini. *Le lettere dei pellegrini*: tre lettere mai spedite, nel cortile degli ulivi, sulla panca della pergola delle
+  viti e sotto la pergola di rose sulla laguna, in qualunque ordine. Poi *Il pane della cerca*: 4 pani dalle bisacce dei frati
+  non-morti (50%, mai oltre i quattro), la tavola del refettorio dei frati apparecchiata, la campanella sull'altare della
+  cappella del noviziato suonata per chiamarli a cena. Fra' Lunardo, l'apicoltore, nell'uliveto accanto all'apiario: *Il
+  pungiglione della regina*, dall'ape gigante (resta accanto al corpo se è già morta), poi si affumicano gli alveari. 70, 80 e 80
+  esperienza (230 in tutto) e un po' d'oro, nessun epico: chi le fa tutte arriva al Reverendissimo un livello sopra il percorso,
+  non di più. Le note di zona salvate coi vecchi nomi (Caffè, Segreteria...) passano ai nuovi (`src/core/notes.ts` `RENAMED`).
 - **Missioni secondarie di San Giorgio** (stesso motore, `GIVERS` in `src/quest/squero.ts`): *I marinai della Riva*
   da Mastro Iseppo sull'approdo, accanto alla gondola (abbatti 10 marinai annegati, che risorgono finché la missione è
   aperta; il Remo di Marieta); *I fari della darsena* dal Fanalista, un marinaio annegato che brilla color lanterna
@@ -593,12 +603,13 @@ src/
     chiesaInterno.ts         interno in chiave WoW: volta a cassettoni, paraste, vetrate e
                              fasci di luna, baldacchino, tappeto, stendardi, lampadari
     convento.ts              ingresso, cortile degli ulivi, chiostrino, corridoio, 3 chiostri
-    orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est
+    orto.ts                  pergola viti, orti, vasca, frutteto, apiario, uliveto, serra, ala est (foresteria)
     giudecca.ts              livello 2: fondamenta fino alle Zitelle, rii e ponti, campo, squero, Tre Oci, skyline
     zitelle.ts               livello 2: chiesa delle Zitelle, ospizio, cortile, orto
     sangiorgio.ts            livello 3: fondamenta San Giovanni e Punta, l'isola di San Giorgio Maggiore
-    nord.ts                  corpo nord (cappella, sale, caffè, androne, laboratori,
-                             frantoio), giardini (pitosfori, rose, pozzo), riva, pontile
+    nord.ts                  corpo nord (cappella del noviziato, sala dei telai, refettorio,
+                             androne, falegnameria, frantoio), giardini (pitosfori, rose, pozzo,
+                             brolo dei cipressi), riva, pontile
 scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del player, per fase della quest
 scripts/check-abilities.ts   GCD per scuola, pushback, cooldown, lanci, canali e interruzioni del sistema abilità
 scripts/check-spells.ts      stati dei nemici e loro effetto sulle IA, regole degli incantesimi nuovi e delle fusioni
@@ -645,6 +656,6 @@ scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e car
 Fondamenta San Giacomo → sagrato/scalinata → chiesa (navata unica + cupola +
 presbiterio) → convento con chiostri (cortile degli ulivi, ingresso a ovest) →
 muro → Orto (vasca delle ninfee al centro, pergole di viti, orti a griglia,
-frutteto, apiario, uliveto a est, serra) → corpo nord trasversale (laboratori,
-frantoio/smielatura, sale espositive, cappella di meditazione, caffè,
-segreteria) → giardini dei pitosfori, pergola di rose, pozzo → laguna.
+frutteto, apiario, uliveto a est con la foresteria nell'ala est, serra) → corpo nord
+trasversale (falegnameria, frantoio/smielatura, sala dei telai, cappella del noviziato,
+refettorio dei frati) → giardini dei pitosfori, pergola di rose, pozzo, brolo dei cipressi → laguna.

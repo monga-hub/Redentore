@@ -20,6 +20,11 @@ export interface Note {
 
 export const KEY = 'redentore-notes';
 export const NO_AREA = 'Senza nome';
+/** Level 1's rooms that sounded like today (a café, an office...), renamed: notes saved under the old names file under the new. */
+export const RENAMED: Record<string, string> = {
+  'Caffè': 'Refettorio dei frati', 'Segreteria': 'Foresteria', 'Sale espositive (antiche officine)': 'Sala dei telai',
+  'Cappella di meditazione': 'Cappella del noviziato', 'Laboratori': 'Falegnameria', 'Prato nord-est': 'Brolo dei cipressi',
+};
 
 const valid = (n: Partial<Note>): n is Note => typeof n?.id === 'string' && typeof n.text === 'string' && n.text.trim() !== ''
   && CATEGORIES.includes(n.category as Category) && typeof n.area === 'string' && typeof n.at === 'number' && Number.isFinite(n.x) && Number.isFinite(n.z);
@@ -27,7 +32,7 @@ const valid = (n: Partial<Note>): n is Note => typeof n?.id === 'string' && type
 export function load(store: Storage = localStorage): Note[] {
   try {
     const raw = JSON.parse(store.getItem(KEY) ?? '[]');
-    return Array.isArray(raw) ? raw.filter(valid) : [];
+    return Array.isArray(raw) ? raw.filter(valid).map((n) => (RENAMED[n.area] ? { ...n, area: RENAMED[n.area] } : n)) : [];
   } catch { return []; } // blocked storage or junk
 }
 

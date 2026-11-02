@@ -19,7 +19,7 @@ import { SPAWN } from '../src/level/plan.ts';
 import { ANDITO, ANTIREF, APPRODO, BERTHS, CHEST, CHOIR_DOOR, CROCE, PUNTA, Quest, SPEZIALE } from '../src/quest/progress.ts';
 import { BELFRY, BELLS, CAMPANILE, CENACOLO, LABIRINTO, SCANSIE, SG } from '../src/level/zones/sangiorgio.ts';
 import { ZCX, ZF } from '../src/level/zones/zitelle.ts';
-import { PROCESSION } from '../src/quest/squero.ts';
+import { ALVEARI, ANZOLO, CAMPANELLA, LETTERE, LUNARDO, PROCESSION, REFETTORIO } from '../src/quest/squero.ts';
 import { PACKS as PACKS3 } from '../src/enemies/sangiorgio.ts';
 
 // Physics sanity: a rotated wall pushes the player out along its normal.
@@ -109,6 +109,12 @@ const start = flood();
 const near = [[0, 0.8], [-0.8, 0], [0.8, 0], [0, -0.8]].some(([dx, dz]) => at(start, CHEST.x + dx * 1.2, CHEST.z + dz * 1.2));
 if (!near) fail('quest      the key chest on the pontile is out of reach');
 if (![[0, -1.2], [0.8, -1], [-0.8, -1]].some(([dx, dz]) => at(start, SPEZIALE.x + dx, SPEZIALE.z + dz))) fail("serra      no room to talk to Fra' Bortolo");
+// The Redentore's side quests are walked before the key: Fra' Anzolo, Fra' Lunardo, the letters, the board, the bell and the hives.
+{
+  const off = [ANZOLO, LUNARDO, ...LETTERE.map((l) => l.at), REFETTORIO, CAMPANELLA, ALVEARI]
+    .filter((p) => ![[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]].some(([dx, dz]) => at(start, p.x + dx, p.z + dz)));
+  if (off.length) fail(`quest      a level-1 side quest is out of reach at ${off.map((p) => `(${p.x}, ${p.z})`).join(' ')}`);
+}
 console.log('-- gates shut (start of the game)');
 const seen = new Set<string>();
 for (const a of level.areas) {

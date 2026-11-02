@@ -1,4 +1,4 @@
-// Zone notes check (`npm run check`): a note saved comes back after a "reload" with its zone, level, hero, spot and
+// Zone notes check (`npm run check`): a note saved comes back after a "reload" with its zone (a renamed one's new name), level, hero, spot and
 // version; blank notes and junk in storage are refused; the list puts the zone at hand first and filters by zone;
 // deleting drops just that one; the Markdown and JSON exports carry every note.
 import { KEY, add, json, list, load, markdown, remove, zones } from '../src/core/notes.ts';
@@ -21,16 +21,16 @@ if (add({ ...base, text: 'x', category: 'boh' as never, area: 'X' }, s)) fail('u
 const back = load(s); // as after a reload
 if (back.length !== 3) fail(`${back.length} notes after reload`);
 const r = back.find((n) => n.id === a.id)!;
-if (r.text !== 'Il nome "Segreteria" non suona veneziano' || r.area !== 'Segreteria' || r.level !== 1 || r.hero !== 'Il Risorto' || r.x !== 12.34 || r.z !== -56.7 || r.version !== 'abc1234' || r.at !== 1000 || r.category !== 'nome') fail(`note restored as ${JSON.stringify(r)}`);
+if (r.text !== 'Il nome "Segreteria" non suona veneziano' || r.area !== 'Foresteria' || r.level !== 1 || r.hero !== 'Il Risorto' || r.x !== 12.34 || r.z !== -56.7 || r.version !== 'abc1234' || r.at !== 1000 || r.category !== 'nome') fail(`note restored as ${JSON.stringify(r)}`);
 
-const here = list(back, 'Segreteria');
+const here = list(back, 'Foresteria'); // saved under the old name, filed under the new (notes.ts RENAMED)
 if (here.map((n) => n.id).join() !== [c.id, a.id, b.id].join()) fail('the zone at hand is not first, newest first');
-if (list(back, 'Segreteria', 'Pontile della Punta').map((n) => n.id).join() !== b.id) fail('zone filter');
-if (zones(back, 'Pontile della Punta').join() !== 'Pontile della Punta,Segreteria') fail('zones order');
+if (list(back, 'Foresteria', 'Pontile della Punta').map((n) => n.id).join() !== b.id) fail('zone filter');
+if (zones(back, 'Pontile della Punta').join() !== 'Pontile della Punta,Foresteria') fail('zones order');
 
 const md = markdown(back);
 for (const n of back) if (!md.includes(n.text)) fail(`markdown lacks ${n.text}`);
-if (!md.includes('## Segreteria') || !md.includes('## Pontile della Punta') || !md.includes('livello 2') || !md.includes('v abc1234')) fail('markdown lacks zone/where');
+if (!md.includes('## Foresteria') || !md.includes('## Pontile della Punta') || !md.includes('livello 2') || !md.includes('v abc1234')) fail('markdown lacks zone/where');
 if ((JSON.parse(json(back)) as unknown[]).length !== 3) fail('json export');
 
 remove(a.id, s);

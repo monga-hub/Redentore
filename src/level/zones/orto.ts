@@ -13,7 +13,7 @@ import { front } from '../facades.ts';
 //   frutteto      x -5..4    apiario inside it (z -133..-127)
 //   uliveto       x 4..19
 //   serra         x -5..3    z -91..-86 (against the convent wall)
-//   ala est       x 19..28   segreteria room, the rest closed
+//   ala est       x 19..28   foresteria (guest rooms), the rest closed
 
 export const BASIN = { x: -13.5, z: -117.5, r: 2.5 };
 /** Paved 3 m paths: west edges of the N-S ones, north edges of the E-W ones. */
@@ -68,14 +68,15 @@ export function buildOrto(b: LevelBuilder): void {
   b.area('Serra', -5, 3, -91, Z.conventNorth);
   b.room(-5, 3, -91, Z.conventNorth, { h: 3, role: 'glass', roofRole: 'glass', s: false, n: [{ at: -1, w: 2 }], floor: 'paving' });
 
-  // East wing along the orto: segreteria open, the rest closed.
+  // East wing along the orto: the foresteria open, the rest closed.
   b.box(19, X.east, 0, 9, -98, -54, 'mass');
   b.box(19, X.east, 0, 9, -168, -112, 'mass');
-  b.area('Segreteria', 19, X.east, -112, -98);
+  b.area('Foresteria', 19, X.east, -112, -98);
   b.room(19, X.east, -112, -98, { h: 6, w: [{ at: -105 }], floor: 'paving' });
+  for (const z0 of [-111.2, -100.8]) b.box(26.4, 27.6, 0, 0.45, z0, z0 + 2, 'wood'); // the pilgrims' pallets, against the far wall
   b.box(19, X.east, 6.4, 9, -112, -98, 'mass', { collide: false });
   b.hipRoof(19, X.east, -168, -54, 9);
-  // Its front on the uliveto: a convent's range in ochre, stone-framed windows, the segreteria's door (facades.ts).
+  // Its front on the uliveto: a convent's range in ochre, stone-framed windows, the foresteria's door (facades.ts).
   const p = new Props(b, 23);
   front(b, p, 18.7, X.east, Z.ortoNorth, Z.conventNorth, 'w', 8.75, 31, { convent: true, roof: 9, cornice: true, tint: 0xffd49a, openings: [{ at: -105, w: 2.4, h: 3.2 }] });
   p.flush();

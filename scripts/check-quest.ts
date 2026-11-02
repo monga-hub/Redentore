@@ -7,6 +7,8 @@ import { SPAWN } from '../src/level/plan.ts';
 import { BERTHS, BLESSING, BOONS, CHEST, HEADS, NPC, QUESTS, Quest, RELIC_DROP, SPEZIALE, questXp, type Stage } from '../src/quest/progress.ts';
 import { BORTOLO_OBJECTIVE, OBJECTIVE, RELIC_TALK, SPEZIALE_AGAIN, SPEZIALE_DONE, SPEZIALE_HEADS, SPEZIALE_RITE, SPEZIALE_TALK, spezialeWait, SPEZIALE_SANGIORGIO, SPEZIALE_SANGIORGIO_AGAIN, SPEZIALE_ZITELLE, SPEZIALE_ZITELLE_AGAIN, TALK } from '../src/quest/dialogue.ts';
 import { FRIAR, GROUPS, MORE } from '../src/enemies/brain.ts';
+import { ALVEARI, CAMPANELLA, LETTERE, PANE, PUNGIGLIONE, REFETTORIO } from '../src/quest/squero.ts';
+import { spawnApiary, spawnCasters } from '../src/enemies/caster.ts';
 import { FRAMMENTI, PALCO, RAISED, STATUA, PAGE_DROP, SCANSIA, CARDINALE, CROWNED, DITALE, ONDATE, PROCESSION, EXVOTO, GEMME, SCHEDA, SPILLA, FARI, FARI_LIT, GIVERS, LAVABI, MUTE, POZZO, STRUMENTI, TELA, VINO, ISEPPO, LETTER_DROP, SIDE as ALL_SIDE, SIDE_BY, giverOf, stepsOf, type Giver, type SideId } from '../src/quest/squero.ts';
 import { ABATE, CAMPANARO, COMMISSARIO, GRANATIERE, MONACO, PACKS as PACKS3, due, lull, prepare, rouse, spawnLevel3 } from '../src/enemies/sangiorgio.ts';
 import { BELFRY, BELLS, CAMPANILE, LABIRINTO, LIB_F, SCANSIE } from '../src/level/zones/sangiorgio.ts';
@@ -149,7 +151,7 @@ if (quest.done.join() !== 'chiave,bortolo,reverendissimo,zitelle,sangiorgio') fa
   if (fresh.canvas !== true || new Quest(level.world).canvas) fail('the Nozze are not back exactly when La tela tagliata is handed in');
 }
 // Every quest is worth most of a level where it lands, and a boss handed in more than one (player/levels.ts need: 20 × level).
-for (const [id, lv] of [['chiave', 5], ['bortolo', 5], ['teste', 7], ['relic', 8], ['reverendissimo', 10], ['zitelle', 14], ['sangiorgio', 17]] as const) {
+for (const [id, lv] of [['chiave', 5], ['bortolo', 5], ['pellegrini', 5], ['cerca', 6], ['pungiglione', 6], ['teste', 7], ['relic', 8], ['reverendissimo', 10], ['zitelle', 14], ['sangiorgio', 17]] as const) {
   if (QUESTS[id].xp < 0.6 * 20 * lv || QUESTS[id].gold <= 0) fail(`${id} pays ${QUESTS[id].xp} XP, under most of level ${lv}`);
 }
 if (!quest.prompt(facing)?.talk) fail("Fra' Zuane has nothing to say once it is over");
@@ -706,7 +708,92 @@ g0.t = RISE.after[0] + 1;
 if (rise(g0, near, level.world)) fail("a gondoliere rose in the hero's way");
 if (!rise(g0, far, level.world) || g0.state !== 'pray' || g0.hp !== GONDOLIERE.hp || g0.x !== g0.home.x || !g0.again) fail('a dead gondoliere did not rise at his spot, marked as risen');
 
-console.log(`quest ok: corona by kill 20 in ${runs / 10}% of runs; `
+// The Redentore's givers (quest/squero.ts): Fra' Anzolo in the foresteria and Fra' Lunardo in the uliveto, each with room in front of
+// him out of every friar's, priest's and bee's pull and his "!" up from the start; Le lettere dei pellegrini found in any order, each
+// spot standable and in its named area; Il pane della cerca after it, bread only off the friars (never past the four), the board and
+// the bell in order, the board wanting the bread; Il pungiglione della regina's sting laid at the giant bee's body, then the hives
+// smoked; each paid once through Quest.complete, kept across a save mid-step, and none stranded once the Reverendissimo is dead.
+{
+  const q = new Quest(level.world), s = q.side, b = new Bag(), casters = spawnCasters(level.world, level.areas), bees = spawnApiary(level.world);
+  s.bag = b;
+  const mobs: [number, number, number][] = [...[...GROUPS, ...MORE].flat().map(([x, z]): [number, number, number] => [x, z, FRIAR.aggro]),
+    ...[...casters.all, casters.boss, ...bees.all].map((m): [number, number, number] => [m.home.x, m.home.z, m.kind.aggro])];
+  for (const [g, area] of [['anzolo', 'Foresteria'], ['lunardo', 'Uliveto']] as const) {
+    const at = GIVERS[g].at, by = feet(at.x + Math.sin(at.yaw) * -1.2, at.z + Math.cos(at.yaw) * -1.2);
+    if (GIVERS[g].level !== 1 || level.areaAt(at.x, at.z)?.label !== area) fail(`${g} is not a level-1 giver in the ${area}`);
+    if (level.world.blocked(by.x, by.z, by.y) || q.prompt(by)?.talk !== g) fail(`no room to talk to ${g} in front of him`);
+    for (const [x, z, r] of mobs) if (Math.hypot(x - at.x, z - at.z) < r + 0.5) fail(`a mob at (${x.toFixed(1)}, ${z.toFixed(1)}) is within its pull of ${g}`);
+    if (q.marks(0)[g] !== 'offer') fail(`${g} shows no "!" at the start of the game`);
+  }
+  const spot = (at: { x: number; y: number; z: number }, what: string) => {
+    const f = [[0, 0], [1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]].map(([dx, dz]) => feet(at.x + dx, at.z + dz)).find((p) => !level.world.blocked(p.x, p.z, p.y) && Math.abs(p.y - at.y) < 1.5);
+    if (!f) fail(`no room by ${what}`);
+    return f ?? { ...at };
+  };
+  const take = (g: Giver) => { const t = s.talk(g); if (!t.accept) fail(`${g} offers nothing`); t.accept?.(); return t.talk.title; };
+  const hand = (g: Giver, id: SideId) => { const xp = q.bonusXp, t = s.talk(g); if (t.paid?.id !== id || q.bonusXp !== xp + QUESTS[id].xp || !q.done.includes(id)) fail(`${id} is not handed in to ${g} with its XP`); };
+  for (const g of ['anzolo', 'lunardo'] as Giver[]) for (const t of [...SIDE_BY.values()].filter((sq) => giverOf(sq) === g).flatMap((sq) => [...sq.offer, sq.busy, ...sq.done]).concat([GIVERS[g].greet, GIVERS[g].bye])) {
+    if (t.length > 260) fail(`a page of ${g} is ${t.length} characters, too long for the window on a phone`);
+  }
+  // Fra' Anzolo: the letters.
+  if (take('anzolo') !== QUESTS.pellegrini.title || s.open('anzolo').length) fail('Fra\' Anzolo does not offer the letters first, alone');
+  const where = ['Cortile degli ulivi', 'Pergola delle viti', 'Pergola di rose'];
+  [...LETTERE].reverse().forEach((l, i) => {
+    if (level.areaAt(l.at.x, l.at.z)?.label !== where[LETTERE.length - 1 - i]) fail(`${l.label} is not in the ${where[LETTERE.length - 1 - i]}`);
+    const p = q.side.prompt(spot(l.at, l.label));
+    if (p?.text !== `Raccogli ${l.label}` || p.act?.() !== `Hai trovato ${l.label}`) fail(`${l.label} cannot be picked up`);
+  });
+  hand('anzolo', 'pellegrini');
+  if (LETTERE.some((l) => b.count(l.item))) fail('the letters stay in the bag once handed in');
+  // His second: the bread, the board, the bell.
+  const cerca = SIDE_BY.get('cerca')!;
+  if (take('anzolo') !== QUESTS.cerca.title) fail('Il pane della cerca does not follow the letters');
+  if (s.loot('ape', () => 0, false, () => 0) === PANE) fail('bread off the giant bee');
+  for (let i = 0; i < 20 && b.count(PANE) < 4; i++) { const it = s.loot('frate', () => 0, false, () => 0); if (it) b.add(it); }
+  if (b.count(PANE) !== 4 || s.loot('frate', () => 0, false, () => 0)) fail('the friars do not drop exactly the four loaves wanted');
+  s.update();
+  if (s.step(cerca) !== 1) fail('four loaves do not move Il pane della cerca on to the board');
+  const bell = q.side.prompt(spot(CAMPANELLA, 'the noviziato\'s bell'));
+  if (bell?.act) fail('the bell rings before the board is laid');
+  const copy = new Quest(level.world);
+  copy.side.bag = b;
+  copy.side.decode(JSON.parse(JSON.stringify(s.encode())));
+  if (copy.side.step(cerca) !== 1 || !copy.side.done.includes('pellegrini')) fail('Il pane della cerca does not keep its step across a save');
+  b.remove(PANE, 1);
+  if (q.side.prompt(spot(REFETTORIO, 'the refettorio\'s board'))?.act) fail('the board is laid with three loaves');
+  b.add(PANE);
+  if (level.areaAt(REFETTORIO.x, REFETTORIO.z)?.label !== 'Refettorio dei frati' || level.areaAt(CAMPANELLA.x, CAMPANELLA.z)?.label !== 'Cappella del noviziato') fail('the board or the bell is not in its room');
+  q.side.prompt(spot(REFETTORIO, 'the refettorio\'s board'))?.act?.();
+  if (b.count(PANE) || s.step(cerca) !== 2) fail('laying the board does not take the bread and move on');
+  if (s.ready(cerca)) fail('Il pane della cerca is ready before the bell');
+  q.side.prompt(spot(CAMPANELLA, 'the noviziato\'s bell'))?.act?.();
+  if (!s.ready(cerca) || q.marks(0).anzolo !== 'ready') fail('the bell rung does not make Il pane della cerca ready');
+  hand('anzolo', 'cerca');
+  if (s.open('anzolo').length || q.marks(0).anzolo) fail('Fra\' Anzolo still has something once his chain is done');
+  // Fra' Lunardo: the sting off the giant bee (laid at her body by main.ts), then the hives.
+  const pung = SIDE_BY.get('pungiglione')!;
+  take('lunardo');
+  if (s.tokens().map((t) => `${t.from}:${t.item}`).join() !== `ape:${PUNGIGLIONE}`) fail('the sting is not wanted off the giant bee');
+  b.add(PUNGIGLIONE);
+  s.update();
+  if (s.tokens().length || s.step(pung) !== 1) fail('the sting in the bag does not move on to the hives');
+  if (level.areaAt(ALVEARI.x, ALVEARI.z)?.label !== 'Apiario') fail('the hives are not smoked from the apiario');
+  const smoke = q.side.prompt(spot(ALVEARI, 'the hives'));
+  if (smoke?.text !== 'Affumica gli alveari') fail(`the hives say ${smoke?.text}`);
+  smoke?.act?.();
+  hand('lunardo', 'pungiglione');
+  if (b.count(PUNGIGLIONE)) fail('the sting stays in the bag once handed in');
+  // None of them stranded by the Reverendissimo's death; none ready before it with nothing done.
+  const late = new Quest(level.world);
+  late.side.bag = new Bag();
+  late.side.taken.push('pellegrini', 'pungiglione');
+  if (late.side.handInReady('anzolo') || late.side.handInReady('lunardo')) fail('a level-1 quest is ready with nothing done');
+  late.bossDead = true;
+  if (!late.side.handInReady('anzolo') || !late.side.handInReady('lunardo')) fail('a level-1 quest is stranded once the Reverendissimo is dead');
+  if (late.side.handInReady('iseppo')) fail('the Reverendissimo\'s death readies a level-2 quest');
+}
+
+console.log(`quest ok: Fra' Anzolo's chain (Le lettere dei pellegrini, Il pane della cerca) and Fra' Lunardo's sting for ${QUESTS.pellegrini.xp + QUESTS.cerca.xp + QUESTS.pungiglione.xp} XP; corona by kill 20 in ${runs / 10}% of runs; `
   + `Mastro Iseppo's ${SIDE.length} quests (${order.join(', ')}, La lettera di Marieta) for ${total} XP; San Giorgio's ${ALL_SIDE.length - SIDE.length} (I marinai della Riva, I fari della darsena in 4 steps, Acqua di San Benedetto in 5, Rintocchi muti up the campanile in 4, I musici di Cana in any order, La tela tagliata, Le schede del conclave, La tiara di cartapesta in any order, L'incoronazione escorted through 3 waves, Il libro di sabbia unmarked, Il drago di Carpaccio from the statue); `
   + `talk -> key -> grate -> boss -> leave -> report -> offer -> route -> ospizio -> church -> boss2 -> return -> offer3 -> route3 -> biblioteca -> veronese -> cenacolo -> boss3 -> return3 -> done, Fra' Bortolo blesses once and takes ${HEADS.need} heads`);
 if (failed) {

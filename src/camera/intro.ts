@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CHURCH_FLOOR as F } from '../level/plan.ts';
 
 // The opening shot: one continuous take over the real level, no cuts. From the lagoon over the
-// pontile, through the sale espositive, a sweep across the whole orto, down the convent corridor,
+// pontile, through the sala dei telai, a sweep across the whole orto, down the convent corridor,
 // the chiostro mediano (through the grate), the chiostro grande, up the back stairs into the choir,
 // a turn around the Reverendissimo under the dome, then backwards down the nave and out of the
 // portone, which shuts in front of the lens, landing on the follow camera behind the player.
@@ -26,7 +26,7 @@ export const KEYS: Key[] = [
   { at: [-34.5, 2.6, -199], look: [-33, 1.8, -180], v: 7 }, // low over the pontile and its chest
   { at: [-33, 2.4, -186], look: [-32.5, 3, -168], v: 6 }, // the riva
   { at: [-32.2, 4, -174], look: [-34.5, 1.9, -160], v: 5 }, // over the garden walk and its priests
-  { at: [-34.5, 1.9, -161], look: [-34.5, 1.9, -151], v: 4 }, // door of the sale espositive
+  { at: [-34.5, 1.9, -161], look: [-34.5, 1.9, -151], v: 4 }, // door of the sala dei telai
   { at: [-34.5, 2.2, -156], look: [-34.5, 2, -145], v: 3.5 },
   { at: [-34.5, 1.9, -151], look: [-30, 4, -140], v: 4 }, // out into the orto
   { at: [-31, 5, -144], look: [-20, 6, -125], v: 7 },
@@ -75,7 +75,7 @@ export interface Caption { at: number; to: number; where: string[]; text: string
 export const CAPTIONS: Caption[] = [
   { at: 0.6, to: 5, where: [], kind: 'title', text: 'Il Voto Spezzato', sub: 'Giudecca, Venezia', vo: 'intro-00' },
   { at: 5.4, to: 10.6, where: ['Pontile', 'Riva sulla laguna', 'Giardino dei pitosfori'], text: "Anno del Signore 1576. La peste divora Venezia: un'anima su tre finisce nelle fosse.", vo: 'intro-01' },
-  { at: 11, to: 16.2, where: ['Sale espositive (antiche officine)'], text: 'Il Doge fa voto al Redentore: una chiesa, se il morbo cesserà. Palladio la innalza sulla Giudecca.', vo: 'intro-02' },
+  { at: 11, to: 16.2, where: ['Sala dei telai'], text: 'Il Doge fa voto al Redentore: una chiesa, se il morbo cesserà. Palladio la innalza sulla Giudecca.', vo: 'intro-02' },
   { at: 16.6, to: 21.8, where: ['Orti coltivati', 'Frutteto', 'Uliveto'], text: "I frati cappuccini ne custodiscono l'orto. Di notte vi seppelliscono i morti che nessuno reclama.", vo: 'intro-03' },
   { at: 22.2, to: 27, where: ['Orti coltivati'], text: 'Venezia rende grazie. Ma il Reverendissimo non crede nella grazia: crede nel prezzo.', vo: 'intro-04' },
   { at: 27.4, to: 31.6, where: ['Corridoio del convento'], text: 'Sotto la prima pietra mura un secondo voto, scritto col sangue degli appestati.', vo: 'intro-05' },

@@ -21,6 +21,11 @@
 // up the campanile, to the bell chamber 44 m over the lagoon. The statue of San Giorgio on the basilica's front speaks too (no body, only light
 // and voice): the three pieces of his lance off three elites, raised on the Teatro Verde's stage, call Carpaccio's dragon out of the lagoon. A quest may run in steps (`want` a list: collect, then use-points that burn what
 // was collected, then a token), and one may weaken the Abate (`prep`, enemies/sangiorgio.ts PREPS).
+//
+// Level 1 (the Redentore's convent and orto) has two of its own: Fra' Anzolo, the foresterario, in the foresteria off the uliveto, who
+// turned three pilgrims away from his door the night of the vow (their letters, in three corners of the complex, then the bread of the
+// cerca off the friars, laid on the refettorio's board, and the noviziato's bell rung to call them to supper); and Fra' Lunardo, the
+// beekeeper, in the uliveto by the apiary, who wants the giant bee's sting and the hives smoked. Their quests end with the Reverendissimo.
 import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
 import { BELLS, FAC, LABIRINTO, LIB_F, SCANSIE } from '../level/zones/sangiorgio.ts';
@@ -47,14 +52,32 @@ export const CARDINALE = { x: -543, y: 0.6, z: 102, yaw: -Math.PI / 2, r: 0.35, 
  */
 export const STATUA = { x: FAC + 2, z: 97.1, yaw: Math.PI / 2, r: 0.2, name: 'San Giorgio', y: 0 } as const;
 
-/** The mob kinds a quest counts or loots, by name (main.ts maps them to enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
-export type Foe = 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro' | 'drago';
+/** Fra' Anzolo, the foresterario, in the foresteria (zones/orto.ts east wing) between the pilgrims' pallets, facing its door on the uliveto. */
+export const ANZOLO = { x: 24.5, z: -105, yaw: Math.PI / 2, r: 0.35, name: "Fra' Anzolo" } as const;
+/** Fra' Lunardo, the beekeeper, between the uliveto's olive rows, facing the apiary (out of the giant bee's and the workers' pull). */
+export const LUNARDO = { x: 10.5, z: -121.5, yaw: Math.atan2(10.5 - 0.5, -121.5 + 132.6), r: 0.35, name: "Fra' Lunardo" } as const;
+/** Le lettere dei pellegrini: one in the convent's cortile degli ulivi, one on the pergola delle viti's bench, one under the pergola di rose by the lagoon. */
+export const LETTERE: readonly Find[] = [
+  { item: 'lettera-barcaiolo', at: { x: -29, y: 0, z: -30 }, label: 'la lettera del barcaiolo' },
+  { item: 'lettera-vedova', at: { x: -43.6, y: 0, z: -105 }, label: 'la lettera della vedova' },
+  { item: 'lettera-tedesco', at: { x: -44.5, y: 0, z: -170 }, label: 'la lettera del pellegrino tedesco' },
+];
+/** Il pane della cerca: the refettorio's board (zones/nord.ts), then the bell on the cappella del noviziato's altar. */
+export const REFETTORIO = { x: -27.6, y: 0, z: -153.5 };
+export const CAMPANELLA = { x: -43.6, y: 0, z: -156 };
+export const PANE = 'pane-cerca';
+/** Il pungiglione della regina: the giant bee's sting, then the hives (zones/orto.ts apiario) smoked from in front. */
+export const PUNGIGLIONE = 'pungiglione-ape';
+export const ALVEARI = { x: 0.25, y: 0, z: -128.6 };
 
-export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione' | 'sabbia' | 'drago'; // their ids in QUESTS
+/** The mob kinds a quest counts or loots, by name (main.ts maps them to the friars, the giant bee, enemies/zitelle.ts and enemies/sangiorgio.ts kinds). */
+export type Foe = 'frate' | 'ape' | 'gondoliere' | 'codega' | 'zitella' | 'gastaldo' | 'maestra' | 'monaco' | 'amanuense' | 'marinaio' | 'nostromo' | 'bibliotecario' | 'commissario' | 'campanaro' | 'drago';
+
+export type SideId = 'ferri' | 'lumi' | 'gastaldo' | 'ditale' | 'maestra' | 'exvoto' | 'lettera' | 'marinai' | 'fari' | 'acqua' | 'musici' | 'tela' | 'schede' | 'rintocchi' | 'tiara' | 'incoronazione' | 'sabbia' | 'drago' | 'pellegrini' | 'cerca' | 'pungiglione'; // their ids in QUESTS
 
 /** Who gives side quests, where, and what he says around them. `level`: his quests end with that level's boss (`over`). */
-export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale' | 'statua';
-export interface GiverSpec { at: { x: number; y?: number; z: number; yaw: number; r: number; name: string }; level: 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
+export type Giver = 'iseppo' | 'riva' | 'fanalista' | 'archivista' | 'veronese' | 'cardinale' | 'statua' | 'anzolo' | 'lunardo';
+export interface GiverSpec { at: { x: number; y?: number; z: number; yaw: number; r: number; name: string }; level: 1 | 2 | 3; where: string; greet: string; bye: string; decline: string; full: string }
 
 /**
  * What a quest wants. collect: `n` of `item`, dropped by `from` at `chance` while it is wanted; kill: `n` of
@@ -485,6 +508,59 @@ export const SIDE: readonly SideQuest[] = [
       'Tieni la lancia, Risorto. A me basta la pietra, e la porta da guardare. Tu porti la lancia dove serve: dove il buio sale dall\'acqua.',
     ],
   },
+  // The Redentore (level 1): Fra' Anzolo's two, in a chain, and Fra' Lunardo's.
+  {
+    id: 'pellegrini', giver: 'anzolo',
+    want: { kind: 'finds', finds: LETTERE },
+    line: (n) => `Lettere dei pellegrini: ${n}/3 (cortile degli ulivi, pergola delle viti, pergola di rose)`,
+    offer: [
+      'Fermo sulla soglia, fratello: è l\'ultima cosa che so fare. Fra\' Anzolo, foresterario. Qui dormivano i pellegrini della festa, su questi pagliericci: barcaioli, vedove, tedeschi venuti a piedi oltre i monti.',
+      'La notte del voto il Reverendissimo fece sbarrare la foresteria: «chi viene da fuori porta il morbo». Io obbedii. Tre bussarono fino all\'alba, poi smisero. Ognuno aveva una lettera per casa, mai spedita.',
+      'Il barcaiolo di Chioggia aspettò nel cortile degli ulivi. La vedova di Burano sotto la pergola delle viti, sulla panca. Il tedesco arrivò fino alla laguna, sotto le rose. Portami le loro lettere, fratello.',
+    ],
+    busy: 'Tre lettere: il cortile degli ulivi, all\'ingresso del convento; la panca della pergola delle viti, nell\'orto; la pergola di rose, nei giardini sulla laguna.',
+    done: [
+      '«Cara Nene, el Redentor me varda». «Figli miei, la mamma torna per la Madonna». E questa, in tedesco: non la so leggere, ma so cosa dice. Dicono tutte la stessa cosa: aspettatemi.',
+      'Le spedisco io, fratello. Ai morti la posta arriva sempre. Prendi queste monete della foresteria: i pellegrini le lasciavano per la candela. Ma ho ancora un debito con loro.',
+    ],
+  },
+  {
+    id: 'cerca', giver: 'anzolo', after: 'pellegrini',
+    want: [
+      { kind: 'collect', item: PANE, n: 4, from: 'frate', chance: 0.5 },
+      { kind: 'use', at: REFETTORIO, label: 'la tavola del refettorio', needs: { item: PANE, n: 4 }, say: ['Apparecchia la tavola del refettorio', 'Il pane della cerca è sulla tavola: quattro pani, quattro posti'] },
+      { kind: 'use', at: CAMPANELLA, label: 'la campanella del noviziato', say: ['Suona la campanella del noviziato', 'La campanella chiama a cena: dal refettorio, un rumore di panche'] },
+    ],
+    line: (n, step) => [`Pani della cerca dalle bisacce dei frati non-morti: ${n}/4`, 'Apparecchia la tavola nel refettorio dei frati, sulla laguna',
+      'Suona la campanella sull\'altare della cappella del noviziato'][step],
+    offer: [
+      'Fratello. Quella notte avevo il pane della cerca nella dispensa: quello che i frati mendicavano per la Giudecca, una bisaccia a testa. Bastava per tre pellegrini e per cento. Non l\'ho dato a nessuno.',
+      'I frati dell\'orto lo portano ancora nelle bisacce, mentre zappano le fosse. Prendine quattro pani. Apparecchia la tavola del refettorio, quello sulla laguna, e suona la campanella del noviziato: si cenava al suo tocco.',
+    ],
+    busy: 'Quattro pani dalle bisacce dei frati, poi la tavola nel refettorio, poi la campanella nella cappella del noviziato, accanto. Ai pellegrini basta un posto apparecchiato.',
+    done: [
+      'Li ho sentiti, fratello. Le panche del refettorio, il pane spezzato, il barcaiolo che bestemmia piano e la vedova che lo sgrida. Quattrocento anni che la foresteria non aveva ospiti.',
+      'Tieni, per la strada. Io adesso posso chiudere la porta, ma da dentro, con loro. Un foresterario che non ha nessuno da accogliere è solo un portinaio.',
+    ],
+  },
+  {
+    id: 'pungiglione', giver: 'lunardo',
+    want: [
+      { kind: 'token', item: PUNGIGLIONE, from: 'ape' },
+      { kind: 'use', at: ALVEARI, label: 'gli alveari', say: ['Affumica gli alveari', 'Il fumo scende negli alveari: il ronzio si fa basso, poi tace'] },
+    ],
+    line: (_n, step) => ['Abbatti l\'ape gigante dell\'apiario e prendi il suo pungiglione', 'Affumica gli alveari dell\'apiario, nel frutteto'][step],
+    offer: [
+      'Piano, fratello, che mi spaventi le api. Fra\' Lunardo, apicoltore. La cera delle candele del Redentore era la mia: ogni luglio, mille candele per la festa, tutte da questi alveari.',
+      'Ma le api vanno dove ci sono fiori, e i fiori più belli dell\'orto crescono sopra le fosse. Hanno mangiato il miele dei morti. Una è diventata regina, grande come un vitello: la vedi, laggiù nel frutteto.',
+      'Abbattila e portami il pungiglione. Poi affumica gli alveari, come ti insegnerei se avessi tempo: col fumo le operaie dormono, e senza la regina si scordano di cosa hanno mangiato.',
+    ],
+    busy: 'La regina sta nel frutteto, sopra gli alveari. Quando ronza forte e la terra diventa verde, scappa: il suo sciame non perdona. Poi il fumo, davanti alle arnie.',
+    done: [
+      'Il pungiglione. Lungo come un coltello da pane, e ancora caldo di veleno. Lo appendo in sacrestia, accanto alle candele: che si ricordino da dove viene la loro cera.',
+      'Senti che silenzio, nell\'apiario. Dormono. L\'anno prossimo faranno miele di ulivo, come una volta. Prendi queste monete della cera, fratello: le candele, quest\'anno, le accendo per te.',
+    ],
+  },
 ];
 export const SIDE_BY = new Map(SIDE.map((q) => [q.id, q]));
 
@@ -521,6 +597,14 @@ export const GIVERS: Record<Giver, GiverSpec> = {
     bye: 'Il drago è in fondo alla laguna e la lancia è in mani buone. Io torno pietra, Risorto: chi entra in chiesa mi passi davanti.',
     decline: 'Va bene. Sono stato quattrocento anni in questa nicchia: posso aspettare ancora.',
     full: 'Hai la borsa piena, Risorto. Fa\' spazio: una lancia non si appoggia per terra.' },
+  anzolo: { at: ANZOLO, level: 1, where: 'nella foresteria, sull\'uliveto', greet: 'Fratello. Entra pure: la foresteria è aperta, adesso. È stata chiusa abbastanza.',
+    bye: 'Le lettere sono partite e i pellegrini hanno cenato. Va\', fratello: la porta resta aperta, per chi viene dopo di te.',
+    decline: 'Va bene. Sono abituato a dire di no, io: posso anche sentirmelo dire.',
+    full: 'Hai la borsa piena, fratello. Fa\' spazio e torna: qui c\'è sempre posto, ma non nella tua bisaccia.' },
+  lunardo: { at: LUNARDO, level: 1, where: "nell'uliveto, accanto all'apiario", greet: 'Fratello. Parla piano: le api sentono la voce, e non tutte sono di buon umore.',
+    bye: 'L\'apiario dorme e la regina è in sacrestia. Va\', fratello: io resto qui, ad aspettare la fioritura degli ulivi.',
+    decline: 'Come vuoi. Le api aspettano, io pure: col miele non si ha fretta.',
+    full: 'Hai la borsa piena, fratello. Fa\' spazio e torna.' },
 };
 export const giverOf = (q: SideQuest): Giver | undefined => (q.secret ? undefined : q.giver ?? 'iseppo');
 /** A quest's steps, one for a single want. */

@@ -195,10 +195,11 @@ scene.add(dragon.root);
 const ferry = new Ferry(); // Mastro Iseppo's gondola between the Punta and San Giorgio
 const ISLAND_VIEW = { x: -545, z: 108 }; // between the dome and the campanile: what the crossing's camera looks at
 scene.add(ferry.root);
-/** The kinds the side quests count and loot (quest/squero.ts), and the elites whose token they lay at the body. */
-const FOE = new Map<object, Foe>([[GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra'],
+/** The kinds the side quests count and loot (quest/squero.ts), and the elites whose token they lay at the body; the friars, kindless, by `foeOf`. */
+const FOE = new Map<object, Foe>([[APE, 'ape'], [GONDOLIERE, 'gondoliere'], [CODEGA, 'codega'], [ZITELLA, 'zitella'], [GASTALDO, 'gastaldo'], [MAESTRA, 'maestra'],
   [MONACO, 'monaco'], [AMANUENSE, 'amanuense'], [MARINAIO, 'marinaio'], [NOSTROMO, 'nostromo'], [BIBLIOTECARIO, 'bibliotecario'], [COMMISSARIO, 'commissario'], [CAMPANARO, 'campanaro'], [DRAGO, 'drago']]);
-const ELITE: Partial<Record<Foe, { x: number; y: number; z: number; state: string; t: number }>> = { gastaldo: l2.gastaldo, maestra: l2.maestra, nostromo: l3.nostromo, bibliotecario: l3.bibliotecario, commissario: l3.commissario };
+const ELITE: Partial<Record<Foe, { x: number; y: number; z: number; state: string; t: number }>> = { ape: bees.queen, gastaldo: l2.gastaldo, maestra: l2.maestra, nostromo: l3.nostromo, bibliotecario: l3.bibliotecario, commissario: l3.commissario };
+const foeOf = (m: object): Foe | undefined => (friars.all.includes(m as never) ? 'frate' : FOE.get((m as { kind?: object }).kind ?? FOE));
 const ofKind = (k: typeof L2_KINDS[number][1]) => zitelle.all.filter((f) => f.kind === k);
 const kinds: Kind[] = [ // the levels are only shown, on the nameplates
   { name: 'Frate non-morto', max: FRIAR.hp, height: 1.95, all: friars.all, ready: () => friars.root.children.length > 0, lv: 3 },
@@ -419,7 +420,7 @@ const standing = () => friars.all.reduce((n, f) => n + (f.state === 'dead' ? 0 :
 questView.friars = standing;
 const ground = (id: string) => drops.loose.filter((l) => l.id === id).length; // one quest item lying loose
 const drops: Drops = new Drops([ // gold and items out of the dead, walked over into the bag (after a load, so its dead drop nothing)
-  { all: friars.all, tier: 'friar', quest: () => (quest.headDrop(standing(), drops.loose.filter((l) => l.id === HEADS.item).length) ? HEADS.item : undefined) }, // Fra' Bortolo's heads
+  { all: friars.all, tier: 'friar', quest: () => (quest.headDrop(standing(), drops.loose.filter((l) => l.id === HEADS.item).length) ? HEADS.item : quest.side.loot('frate', ground, quest.key2)) }, // Fra' Bortolo's heads, else Fra' Anzolo's bread
   { all: priests.all.filter((f) => f.kind === PRIEST), tier: 'priest' },
   { all: priests.all.filter((f) => f.kind === SACERDOTE), tier: 'elite' },
   { all: [priests.boss], tier: 'boss' },
@@ -558,7 +559,7 @@ const sidePin = (q: (typeof SIDE)[number]): { x: number; z: number } | undefined
   if (w.kind === 'finds') return quest.side.spots().filter((s) => s.q === q).map((s) => s.at).sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0] ?? giver; // the nearest still to find
   if (w.kind === 'token') return drops.loose.find((l) => l.id === w.item) ?? ELITE[w.from];
   if (w.kind === 'collect' || w.kind === 'kill') {
-    return [...zitelle.all, ...sangiorgio.all, drago.boss].filter((m) => FOE.get(m.kind) === w.from && m.state !== 'dead' && (w.kind !== 'kill' || !w.woken || wokeBy.get(m) === q.id)).sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
+    return [...friars.all, bees.queen, ...zitelle.all, ...sangiorgio.all, drago.boss].filter((m) => foeOf(m) === w.from && m.state !== 'dead' && (w.kind !== 'kill' || !w.woken || wokeBy.get(m) === q.id)).sort((a, b) => Math.hypot(a.x - player.pos.x, a.z - player.pos.z) - Math.hypot(b.x - player.pos.x, b.z - player.pos.z))[0];
   }
   return giver; // the letter: hand it in
 };
@@ -811,7 +812,7 @@ renderer.setAnimationLoop(() => {
       if (m.state !== 'dead') fell[i] = false; // risen again: its next death counts
       else if (!fell[i]) {
         fell[i] = true; slain += worthOf(i); fresh++;
-        const f = FOE.get((m as { kind?: object }).kind ?? FOE);
+        const f = foeOf(m);
         if (f) quest.side.killed(f, wokeBy.get(m)); // the side quests' kill quests
       }
     });

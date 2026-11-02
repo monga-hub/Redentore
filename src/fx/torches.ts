@@ -97,12 +97,12 @@ function layout(spots: LightSpot[]): Emitter[] {
     wall(-24, -56.3, 0, -1), wall(-24, -79.7, 0, 1), // chiostro mediano
     wall(-16.7, -64, 1, 0), wall(-16.7, -78, 1, 0), wall(12.7, -66, -1, 0), wall(12.7, -80, -1, 0), // chiostro grande
     wall(-13, -85.7, 0, 1), wall(6, -85.7, 0, 1),
-    wall(27.7, -107, -1, 0), wall(27.7, -103, -1, 0), // segreteria
+    wall(27.7, -107, -1, 0), wall(27.7, -103, -1, 0), // foresteria
     // Corpo nord: north walls at z -161 (face -160.7).
     wall(-46.7, -158.5, 1, 0), wall(-46.7, -153.5, 1, 0), // cappella, flanking the altar
-    wall(-37, -160.7, 0, 1), wall(-32, -160.7, 0, 1), // sale espositive
-    wall(-28, -160.7, 0, 1), wall(-24, -160.7, 0, 1), // caffè
-    wall(-6, -160.7, 0, 1), wall(2, -160.7, 0, 1), // laboratori
+    wall(-37, -160.7, 0, 1), wall(-32, -160.7, 0, 1), // sala dei telai
+    wall(-28, -160.7, 0, 1), wall(-24, -160.7, 0, 1), // refettorio dei frati
+    wall(-6, -160.7, 0, 1), wall(2, -160.7, 0, 1), // falegnameria
     wall(8, -160.7, 0, 1), wall(16, -160.7, 0, 1), // frantoio
     basket(-39.5, -184.6), basket(-30.5, -184.6), // the riva, either side of the pontile and its chest
 

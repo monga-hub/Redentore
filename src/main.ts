@@ -35,6 +35,7 @@ import { QuestView } from './quest/view.ts';
 import { RELIC_OBJECTIVE, RELIC_TITLE } from './quest/dialogue.ts';
 import { checkVersion } from './ui/version.ts';
 import { Minimap } from './ui/minimap.ts';
+import { NotesPanel, QUILL } from './ui/notes.ts';
 import { Menu } from './ui/menu.ts';
 import { Discovery } from './core/discovery.ts';
 import { FogLayer } from './ui/fog.ts';
@@ -444,6 +445,9 @@ const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commerci
 const mains = [BASE_ATTACK[HEROES[hero].school[0]], BASE_ATTACK[HEROES[hero].school[1]]]; // his base attack, and his secondary school's
 const book = new AbilityBook(kit.system, ABILITIES.filter((a) => !a.main || mains.includes(a.id)), () => levels.picks, (id) => { levels.main = id; kit.system.setMain(id); }); // K, the book button or the menu: the ability book
 book.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); };
+const notes = new NotesPanel(() => ({ area: level.areaAt(player.pos.x, player.pos.z)?.label ?? '', level: questLevel(), lv: levels.lv, hero: HEROES[hero].name, x: player.pos.x, z: player.pos.z })); // the minimap's quill: notes on the zone
+notes.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); book.close(); };
+{ const q = document.querySelector<HTMLButtonElement>('#minimap .note')!; q.innerHTML = QUILL; q.addEventListener('click', () => { if (!menu.paused) notes.toggle(); }); }
 bagPanel.keys.KeyK = () => book.show();
 questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(quest.accepted3) }); // San Giorgio's purple pieces once the third quest is taken
 questView.board = (c) => { kit.system.cancel(); dctl.stop(); ferry.board(c, player); };
@@ -556,11 +560,12 @@ const questLog = () => questView.log().map((e) => ({
   ...e,
   at: e.id === 'main' ? goal() : e.id === 'relic' ? NPC : e.id === 'bortolo' || e.id === 'teste' ? SPEZIALE : sidePin(SIDE.find((q) => q.id === e.id)!),
 }));
+const questLevel = () => THIRD.includes(quest.stage) && quest.stage !== 'offer3' ? 3 : SECOND.includes(quest.stage) && quest.stage !== 'offer' ? 2 : 1;
 function openMap(): void {
   if (menu.paused) return;
   kit.system.cancel();
   input.consume();
-  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), also: sidePins(), npcs: questView.pins(), quests: questLog(), level: THIRD.includes(quest.stage) && quest.stage !== 'offer3' ? 3 : SECOND.includes(quest.stage) && quest.stage !== 'offer' ? 2 : 1 });
+  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), also: sidePins(), npcs: questView.pins(), quests: questLog(), level: questLevel() });
 }
 const pressed = (code: string) => input.pressed(code);
 /**
@@ -633,13 +638,13 @@ renderer.setAnimationLoop(() => {
   const real = Math.min(timer.getDelta(), 0.05);
   const since = FALLEN - dying; // s since the hero fell, while dying
   const dt = dying > 0 && since < SLOW_FOR ? real * (SLOW + (1 - SLOW) * since / SLOW_FOR) : real; // slow motion as the hero falls
-  if (menu.paused || worldMap.open || bagPanel.open || book.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open || bagPanel.open || book.open || notes.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
     if (sheet.shown) { player.model.animate(dt, 0, true); figure.draw(); } // he idles on the sheet (and in the world behind it)
     input.consume();
     input.endFrame();
-    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open, pressed); // the dialogue window ducks the music itself
+    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open || notes.open, pressed); // the dialogue window ducks the music itself
     fx.render();
     return;
   }
@@ -850,6 +855,7 @@ renderer.setAnimationLoop(() => {
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);
   fog.update(dt);
+  minimap.notes = notes.pins;
   minimap.update(dt, player.pos, player.facing, diablo ? dcam.yaw : cam.yaw, area, foes, goal(), sidePins(), questView.pins()); // and the side quests'
   hud.setStats(playerStats);
   fx.update(dt, player.pos);

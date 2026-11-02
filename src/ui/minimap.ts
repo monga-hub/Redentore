@@ -64,6 +64,8 @@ export class Minimap {
   private size = 0; // css px of the round window, read from the layout
   private wait = 0;
   private label = '';
+  /** Where zone notes were left (ui/notes.ts): small pale-blue squares, only within the window. */
+  notes: Pin[] = [];
 
   /** `root`: the level's meshes (after flush). `openMap`: the book button. */
   constructor(root: THREE.Object3D, fog: FogLayer, openMap: () => void) {
@@ -155,6 +157,13 @@ export class Minimap {
       c.arc(x, y, 2.6, 0, Math.PI * 2);
       c.fill();
       c.stroke();
+    }
+    c.fillStyle = '#9fe3ff';
+    for (const n of this.notes) {
+      const [x, y] = at(n);
+      if (Math.hypot(x - r, y - r) > r - 4) continue;
+      c.fillRect(x - 2.5, y - 2.5, 5, 5);
+      c.strokeRect(x - 2.5, y - 2.5, 5, 5);
     }
     c.restore();
 

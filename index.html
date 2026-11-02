@@ -3,14 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- No manifest and no standalone metas: installing yields the Mongames hub app (one app), which runs this page. -->
     <meta name="theme-color" content="#222" />
-    <meta name="apple-mobile-web-app-title" content="Redentore" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
     <!-- Revalidate this page; hashed bundles can cache forever. src/ui/version.ts catches what slips through. -->
     <meta http-equiv="Cache-Control" content="no-cache" />
     <title>Redentore Dungeon</title>

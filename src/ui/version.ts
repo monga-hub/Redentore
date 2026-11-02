@@ -21,12 +21,20 @@ async function remote(): Promise<Build | undefined> {
   }
 }
 
-/** Drop Cache Storage and any service worker (none today, but one left by an old deploy would pin it), then reload past the HTTP cache. */
+/** Prefix any Cache Storage cache of ours must carry (none today); the Mongames hub on the same origin keeps its own. */
+export const CACHE_PREFIX = 'redentore';
+/** True for a service worker registration of ours: the hub's /sw.js shares the origin and must survive our updates. */
+export const ownScope = (scope: string, root: string): boolean => scope.startsWith(root);
+/** True for a Cache Storage cache of ours. */
+export const ownCache = (name: string): boolean => name.startsWith(CACHE_PREFIX);
+
+/** Drop our Cache Storage and service worker (none today, but one left by an old deploy would pin it), then reload past the HTTP cache. */
 async function hardReload(b: Build): Promise<void> {
   try {
+    const root = location.origin + import.meta.env.BASE_URL; // https://monga-hub.github.io/Redentore/
     const regs = (await navigator.serviceWorker?.getRegistrations()) ?? [];
-    await Promise.all(regs.map((r) => r.unregister()));
-    if ('caches' in window) await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
+    await Promise.all(regs.filter((r) => ownScope(r.scope, root)).map((r) => r.unregister()));
+    if ('caches' in window) await Promise.all((await caches.keys()).filter(ownCache).map((k) => caches.delete(k)));
   } catch { /* best effort: the URL below still bypasses the HTTP cache */ }
   const url = new URL(location.href);
   url.searchParams.set('v', `${b.sha}-${b.time}`); // new URL, so neither browser nor CDN has it cached

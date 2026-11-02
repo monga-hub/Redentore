@@ -4,7 +4,7 @@
 // the hero stays where the last calm save left him, his health and mana with him (`keeper`), so a resume never lands in the pull. The squad screen (ui/select.ts) shows them all; the hero
 // picked resumes his own run or starts afresh, and switching heroes reloads the page so every system boots clean (no
 // stray bolts, cooldowns, damage over time or half-swung gates), then `deserialize` lays the saved state over the fresh
-// world. iOS reloads a tab it kills for memory, which used to throw the whole run away: the run is kept on the phone. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
+// world. iOS reloads a tab it kills for memory, which used to throw the whole run away: the run is kept on the phone. Logged in to the hub, core/cloud.ts mirrors each run to the account. No three.js and no DOM beyond Storage, so `npm run check` drives it in Node.
 import { killAll } from '../enemies/caster.ts';
 import { BASE_ATTACK, CARD, levelOf } from '../player/levels.ts';
 import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
@@ -54,6 +54,7 @@ export interface GameState {
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
   gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
   side?: SideState; // the side quests taken, handed in, their kill counts and steps; absent in saves from before Mastro Iseppo: none (steps absent: the first)
+  at?: number; // ms since the epoch the run was kept (autosave), which the cloud copy is weighed by (core/cloud.ts); absent in older saves: 0
 }
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
@@ -162,7 +163,7 @@ export function valid(s: unknown): s is GameState {
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')
       && (o.build.learned === undefined || (Array.isArray(o.build.learned) && o.build.learned.every((x) => typeof x === 'string')))))
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
-    && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')))
+    && (o.at === undefined || num(o.at)) && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')))
     && (o.side === undefined || (!!o.side && [o.side.taken, o.side.done].every((a) => Array.isArray(a) && a.every((x) => typeof x === 'string'))
       && [o.side.kills, o.side.steps].every((r) => r === undefined || (!!r && typeof r === 'object' && Object.values(r).every(num)))));
 }
@@ -174,9 +175,9 @@ function read(store: Storage, key: string): unknown {
 /** Each hero's own run: his world, quests, bag, gear and level, kept apart so playing one never touches another's. */
 const RUN = (hero: string) => `redentore.hero.${hero}`;
 
-/** Keep `s` as its hero's run. False when storage is full or blocked. */
-export function autosave(s: GameState, store: Storage = localStorage): boolean {
-  try { store.setItem(RUN(heroOf(s.hero)), JSON.stringify(s)); return true; } catch { return false; }
+/** Keep `s` as its hero's run, stamped `at` (now; the cloud's own stamp when core/cloud.ts brings it down). False when storage is full or blocked. */
+export function autosave(s: GameState, store: Storage = localStorage, at = Date.now()): boolean {
+  try { store.setItem(RUN(heroOf(s.hero)), JSON.stringify({ ...s, at })); return true; } catch { return false; }
 }
 
 /**

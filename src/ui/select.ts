@@ -5,6 +5,8 @@ import { Equipment, starter, type GearState } from '../loot/gear.ts';
 import { SCHOOL_NAME } from './book.ts';
 import { SelectStage } from './selectStage.ts';
 import { playTime } from './menu.ts';
+import { accountLine } from './account.ts';
+import type { CloudSync } from '../core/cloud.ts';
 
 // The squad, Diablo Immortal style, shown on every boot: down the left the heroes (player/heroes.ts, every one of them, in
 // order), each his portrait in a gilt diamond, his level under it and his name beside it, and his own run (core/save.ts):
@@ -12,7 +14,8 @@ import { playTime } from './menu.ts';
 // In the middle the chosen hero himself on a cemetery island by night (ui/selectStage.ts), in what his run has him wear;
 // a drag turns him. "Continua" (Enter) resumes his run, "Entra nel mondo" starts a new one; "Ricomincia" asks first and
 // forgets only his. The boot waits for it (main.ts), and the stage is freed before the game's renderer is made. Tap a
-// portrait (or ←/→, ↑/↓) to change hero; the last one played is lit at first.
+// portrait (or ←/→, ↑/↓) to change hero; the last one played is lit at first. Under the title, the account line
+// (ui/account.ts); a hero brought down from the account (core/cloud.ts) shows up as soon as the merge is over.
 
 const COLOR: Partial<Record<School, string>> = { bone: '#d9c8ff', shadow: '#b27cff', frost: '#8fdcff', storm: '#bcd2ff', plague: '#a8e05a', holy: '#ffe9a0', fire: '#ff9a4a' };
 
@@ -25,6 +28,7 @@ const CSS = `
   background: linear-gradient(90deg, rgba(3,4,7,.85), rgba(3,4,7,.45) 22%, transparent 40%), linear-gradient(0deg, rgba(3,4,7,.6), transparent 22%); }
 #select h1 { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: calc(22px + env(safe-area-inset-right)); margin: 0; pointer-events: none;
   font: bold 18px Georgia, serif; letter-spacing: 3px; color: rgba(224,181,90,.75); text-shadow: 0 2px 4px #000; }
+#select .account { position: absolute; top: calc(40px + env(safe-area-inset-top)); right: calc(22px + env(safe-area-inset-right)); max-width: 46vw; margin: 0; text-align: right; }
 #select .roster { position: absolute; top: 0; bottom: 0; left: 0; display: flex; flex-direction: column; justify-content: center; gap: 14px;
   padding: calc(18px + env(safe-area-inset-top)) 16px calc(18px + env(safe-area-inset-bottom)) calc(26px + env(safe-area-inset-left));
   overflow-y: auto; scrollbar-width: none; max-width: 46vw; box-sizing: border-box; }
@@ -75,6 +79,7 @@ const CSS = `
 body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px rgba(220,50,25,.6), 0 4px 14px rgba(0,0,0,.9); }
 @media (max-height: 520px) { /* a phone on its side */
   #select h1 { font-size: 13px; letter-spacing: 2px; top: calc(8px + env(safe-area-inset-top)); }
+  #select .account { top: calc(28px + env(safe-area-inset-top)); font-size: 11px; }
   #select .roster { gap: 4px; padding-top: calc(6px + env(safe-area-inset-top)); padding-bottom: calc(6px + env(safe-area-inset-bottom)); padding-left: calc(12px + env(safe-area-inset-left)); justify-content: safe center; }
   #select .hero { --gem: 44px; gap: 8px; }
   #select .gem { height: calc(var(--gem) * 1.42 + 6px); }
@@ -123,27 +128,36 @@ export type Start = 'run' | 'new' | 'l2';
 const school = (s: School, second: boolean) => `<span style="color: ${COLOR[s] ?? '#f3e2b0'}">${SCHOOL_NAME.get(s)} <small>${second ? 'secondaria' : 'primaria'}</small></span>`;
 
 /** Show the squad and wait for a hero to be chosen; the screen and its stage go once he is. */
-export function chooseHero(): Promise<{ hero: Hero; start: Start }> {
+export function chooseHero(sync: CloudSync): Promise<{ hero: Hero; start: Start }> {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.append(style);
-  const games = saved();
+  let games = saved();
   const el = document.createElement('div');
   el.id = 'select';
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-label', 'La tua squadra');
   el.innerHTML = `<div class="shade"></div><h1>LA TUA SQUADRA</h1>
-    <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id], g = games.get(id); return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
-      <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv">${g?.lv ?? ''}</span></div>
-      <div class="who"><b>${h.name}</b><span class="run${g ? '' : ' new'}">${g ? run(g.s) : 'Nuovo'}</span><i>${h.title}</i><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div></div></div>`; }).join('')}</div>
+    <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id]; return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
+      <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv"></span></div>
+      <div class="who"><b>${h.name}</b><span class="run"></span><i>${h.title}</i><div class="schools">${school(h.school[0], false)}${school(h.school[1], true)}</div></div></div>`; }).join('')}</div>
     <div class="foot"><p class="lore"></p><div class="acts"><button type="button" class="again"></button><button type="button" class="go"></button></div></div>`;
+  el.querySelector('h1')!.after(accountLine(sync));
   document.body.append(el);
   const stage = new SelectStage(el);
   const rows = [...el.querySelectorAll<HTMLElement>('.hero')], lore = el.querySelector('.lore')!;
   const go = el.querySelector<HTMLButtonElement>('.go')!, again = el.querySelector<HTMLButtonElement>('.again')!;
+  /** Each row's level and run, from `games`. */
+  const fill = () => rows.forEach((c, i) => {
+    const g = games.get(HERO_IDS[i]), r = c.querySelector('.run')!;
+    c.querySelector('.lv')!.textContent = g ? String(g.lv) : '';
+    r.textContent = g ? run(g.s) : 'Nuovo';
+    r.classList.toggle('new', !g);
+  });
+  fill();
   let sel = -1;
-  const select = (i: number) => {
-    if (i === sel) return;
+  const select = (i: number, force = false) => {
+    if (i === sel && !force) return;
     sel = i;
     const id = HERO_IDS[i], g = games.get(id);
     rows.forEach((c, k) => { c.classList.toggle('sel', k === i); c.setAttribute('aria-selected', String(k === i)); });
@@ -157,12 +171,19 @@ export function chooseHero(): Promise<{ hero: Hero; start: Start }> {
   let last = 0;
   try { last = Math.max(0, HERO_IDS.indexOf(localStorage.getItem(LAST) as Hero)); } catch { /* blocked storage: the first */ }
   select(last);
+  let ask: HTMLElement | undefined;
+  sync.on(() => { // a merge may have brought runs down from the account
+    if (!el.isConnected) return false;
+    if (sync.status !== 'ok') return;
+    games = saved();
+    fill();
+    if (!ask) select(sel, true);
+  });
   return new Promise((done) => {
-    let ask: HTMLElement | undefined;
     const finish = (start: Start) => {
       if (!el.isConnected) return;
       const hero = HERO_IDS[sel];
-      if (start === 'new') forget(hero); // confirmed: only his run goes
+      if (start === 'new') { forget(hero); sync.forget(hero); } // confirmed: only his run goes, here and in the account
       try { localStorage.setItem(LAST, hero); } catch { /* not remembered */ }
       removeEventListener('keydown', key, true);
       stage.dispose(); el.remove(); style.remove();

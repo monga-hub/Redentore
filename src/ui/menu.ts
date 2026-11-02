@@ -6,7 +6,8 @@ import { ICONS } from './icons.ts';
 
 // Game menu: a gear button in the top-right corner opens a framed panel that pauses the game, big buttons for a thumb:
 // Riprendi, Cambia eroe (the run is kept, core/save.ts, and the page reloads onto the squad screen, ui/select.ts),
-// audio, the view and the graphics, the keys (Comandi, core/keys.ts), credits. Each hero's run saves itself, so there is no save or load here.
+// audio, the view and the graphics, the keys (Comandi, core/keys.ts), credits. Each hero's run saves itself, so there is no save or load here;
+// under the buttons, the account line (ui/account.ts): the login link, or the email and the cloud copy's state.
 // Its DOM is styled here, like quest/view.ts.
 
 const CSS = `
@@ -57,6 +58,7 @@ body.touch #menu [data-go="keys"] { display: none; } /* the phone plays by touch
 #menu .key:hover, #menu .key:focus-visible { filter: brightness(1.35); outline: none; }
 #menu .key.wait { color: #fff; background: linear-gradient(#9a2216, #520c07); animation: blink 1s infinite; }
 @keyframes blink { 50% { filter: brightness(1.5); } }
+#menu .account { margin: 14px 0 0; text-align: center; }
 #menu .note { min-height: 2.6em; margin: 10px 0 0; font: 13px/1.3 system-ui, sans-serif; color: #ffb27a; }
 #menu .hint { margin: 0 0 8px; font: 12px/1.35 system-ui, sans-serif; color: #c9b48a; }
 #menu .credits { font: 13px/1.45 system-ui, sans-serif; color: #e8dcc0; }
@@ -106,6 +108,7 @@ export const playTime = (s: number) => {
 export interface MenuHooks {
   opened?(): void; // the game is about to pause
   leave(): void; // "Cambia eroe": keep the run, back to the squad screen
+  account?(): HTMLElement; // the account line, under the main panel's buttons
 }
 
 export class Menu {
@@ -170,6 +173,7 @@ export class Menu {
     this.wait = null;
     this.el.classList.add('show');
     this.el.innerHTML = this.render(v);
+    if (v === 'main' && this.hooks.account) this.el.querySelector('.panel')!.append(this.hooks.account());
     this.el.querySelector<HTMLElement>('.btn:not(:disabled), input')?.focus({ preventScroll: true });
   }
 

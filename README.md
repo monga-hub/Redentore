@@ -197,7 +197,7 @@ npm install
 npm run dev      # http://localhost:5173/Redentore/
 npm run build    # typecheck (tsc) + bundle in dist/
 npm run balance  # banco di bilanciamento headless: un bot gioca la missione e poi il livello 2 fino alla Governatrice (8 build: tre storiche, fuoco/gelo, fulmini/colpi, veleno, paladino, mago-sciamano delle abilità nuove, + uno che non schiva; con 33 abilità nelle offerte, quando nessuna delle tre carte è della build il bot sceglie come un giocatore qualunque) e i boss da soli (il Reverendissimo ai livelli 1/6/8/9, la Governatrice a 10/11/12, l'Abate a 17), tabella per zona; il bot indossa il bottino migliore e vende il resto, i boss da soli in set iniziale, tipico, con epici comprati o tutto epico. Modi: route2, boss2, elite2, route3 (livelli 1, 2 e 3 di fila: Punta, gondola, isola, Bibliotecario, Abate), boss3, pack3 (un gruppo dell'isola contro chi lancia); `TOMES=plague,holy` parte coi tomi di quelle scuole letti, `HERO=bortolo` gioca Bortolo (il suo attacco base, il suo kit, le offerte delle sue scuole; vedi scripts/balance.ts)
-npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
+npm run check    # verifica headless: raggiungibilità per fase della quest (chiesa e chiostro grande chiusi all'inizio, tutto aperto con la chiave; la Giudecca e le Zitelle chiuse fino alla seconda missione, la loro chiesa fino alla chiave della Maestra) + sistema abilità + incantesimi e stati (rallentato, congelato, stordito) + IA di frati, preti, sacerdoti, boss e api, e del livello 2 (gondolieri, linee di merletto, velo, fuso) + salvataggi e loro fusione col cloud (client finto: cloud più nuovo, dispositivo più nuovo, offline, non connesso, cloud in errore) + livelli e carte + volo dell'intro senza compenetrazioni + bottino, borsa, equipaggiamento e mercante
 npm run soak     # il gioco vero in Chrome headless su un iPhone emulato: un bot combatte il Reverendissimo per tutti gli atti, la furia e il calo di qualità forzato; l'eroe si cambia due volte al secondo (set interi, misti, niente); nessun errore, niente che cresca, buffer GPU entro 200 MB (SOAK_SECONDS=600 per uno più lungo, SOAK_LEVEL=2 per la Governatrice sotto la cupola delle Zitelle, SOAK_LEVEL=3 per l'Abate nel Cenacolo, CHROME=... per il binario)
 ```
 
@@ -265,6 +265,14 @@ Bortolo col Gelo (Stiletto di ghiaccio sul tasto grande, Dardo di brina e Caligo
 sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone sul tasto grande, Rogo dell'eretico e Cero
 funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); i tomi poi sono gli stessi per tutti, le carte dei
 livelli pendono verso le scuole dell'eroe (vedi Abilità).
+Salvataggi nel cloud (`src/core/cloud.ts`): il gioco importa a runtime `/hub/saves.js` dell'hub Mongames (stesso dominio, stesso
+login). Sotto il titolo della squadra e in fondo al menu c'è la riga dell'account (`src/ui/account.ts`): da non connesso il link
+"Accedi per salvare nel cloud" (`/accedi.html?next=/Redentore/`), da connesso l'email e lo stato del cloud. La partita sul
+dispositivo resta quella giocata; da connesso ogni eroe ha uno slot suo (`slot` = id dell'eroe), mandato al massimo ogni 15 s
+dopo i salvataggi automatici, quando la scheda va in background e a "Cambia eroe". All'avvio e a ogni accesso dispositivo e
+account si fondono eroe per eroe: vince la partita col timbro `at` più recente, in tutte e due le direzioni; una partita del
+dispositivo sostituita resta in `redentore.replaced.<eroe>`. Offline, in `npm run dev`, senza hub o con un errore del cloud
+tutto resta sul dispositivo come prima; "Ricomincia" cancella anche lo slot dell'eroe.
 La scelta resta nel salvataggio (`hero`; i salvataggi di prima e quello pronto per il livello 2 sono il Risorto) e il
 gioco carica solo il corpo dell'eroe scelto. I cinque sono corpi Meshy sullo stesso scheletro a 24 ossa, ciascuno con la sua
 sagoma, la sua altezza (`HEROES.height`: dai 2,25 m del gigante gelato Bortolo agli 1,68 del tozzo Fra' Tizian) e il suo bagliore

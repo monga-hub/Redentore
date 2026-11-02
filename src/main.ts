@@ -62,12 +62,17 @@ import { VendorPanel } from './ui/vendor.ts';
 import { DeathScreen } from './ui/death.ts';
 import { HEROES } from './player/heroes.ts';
 import { chooseHero } from './ui/select.ts';
+import { CloudSync } from './core/cloud.ts';
+import { accountLine } from './ui/account.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
 initAudio(); // before the intro, whose first press unlocks the sound
 migrate(); // once: the old shared saves go to their heroes (core/save.ts)
-const { hero, start } = await chooseHero(); // the squad: whose run this boot plays (ui/select.ts)
+const cloud = new CloudSync(); // the runs mirrored to the hub account, merged in the background (core/cloud.ts)
+const { hero, start } = await chooseHero(cloud); // the squad: whose run this boot plays (ui/select.ts)
+await Promise.race([cloud.ready, new Promise((r) => setTimeout(r, 3e3))]); // a pick before the boot merge is over waits for it, 3 s at most
+cloud.playing = hero; // from here on, a late merge leaves his device run alone: his uploads win
 barFor(hero); // his own bar
 const ahead = start === 'run' ? resume(hero) : undefined; // his run, laid over the fresh world below
 if (start === 'new') saveBar({ bar: barOf(HEROES[hero].kit, BASE_ATTACK[HEROES[hero].school[0]]), off: [] }); // his school's base attack and kit on the bar, before the kit reads it
@@ -394,7 +399,8 @@ const audio = new Director({ // sound and music, read off the world every frame
 });
 const menu = new Menu({
   opened: () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); },
-  leave: () => { keep(); location.reload(); }, // the run kept (mid-fight: the hero where the last calm save left him), the squad screen on the reload
+  leave: () => { keep(); void cloud.flush().finally(() => location.reload()); }, // the run kept (mid-fight: the hero where the last calm save left him) and sent, the squad screen on the reload
+  account: () => accountLine(cloud),
 });
 const dfx = new DiabloFx([ // blood and pools in both views; damage numbers, loot beams in Diablo's (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.95 },
@@ -629,8 +635,8 @@ const PACK = 12, CALM = 22; // m: three fighting foes this close widen the frami
 const BOSSES = [priests.boss, zitelle.boss, sangiorgio.boss, bees.queen]; // framed wide in their fight, like the dragon
 let kept = KEEP;
 const save = keeper(serialize(game).player); // until a calm save this boot: where the load (or the new game) put him
-const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && !ferry.trip) save(serialize(game), dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state))); };
-addEventListener('visibilitychange', () => { if (document.hidden) keep(); });
+const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && !ferry.trip && save(serialize(game), dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state)))) cloud.push(hero); };
+addEventListener('visibilitychange', () => { if (document.hidden) { keep(); void cloud.flush(); } }); // the account gets it too: iOS may kill the tab
 
 const timer = new THREE.Timer();
 renderer.setAnimationLoop(() => {

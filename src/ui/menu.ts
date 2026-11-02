@@ -1,11 +1,12 @@
 import attribution from '../../ATTRIBUTION.md?raw';
 import { getAudio, setAudio, type AudioSettings } from '../audio/engine.ts';
+import { ACTIONS, bindings, defaults, label, rebind, setBindings } from '../core/keys.ts';
 import { getQuality, isDiablo, QUALITIES, setDiablo, setQuality } from '../core/style.ts';
 import { ICONS } from './icons.ts';
 
 // Game menu: a gear button in the top-right corner opens a framed panel that pauses the game, big buttons for a thumb:
 // Riprendi, Cambia eroe (the run is kept, core/save.ts, and the page reloads onto the squad screen, ui/select.ts),
-// audio, the view and the graphics, credits. Each hero's run saves itself, so there is no save or load here.
+// audio, the view and the graphics, the keys (Comandi, core/keys.ts), credits. Each hero's run saves itself, so there is no save or load here.
 // Its DOM is styled here, like quest/view.ts.
 
 const CSS = `
@@ -46,6 +47,18 @@ body.touch #fullscreen { right: auto; left: calc(12px + env(safe-area-inset-left
 #menu label .name { flex: none; width: 5.2em; }
 #menu input[type=checkbox] { width: 26px; height: 26px; accent-color: #c9a45c; }
 #menu output { min-width: 3em; text-align: right; font: 13px system-ui, sans-serif; }
+body.touch #menu [data-go="keys"] { display: none; } /* the phone plays by touch */
+#menu .binds { width: 100%; border-collapse: collapse; font: 14px system-ui, sans-serif; }
+#menu .binds td { padding: 3px 4px; border-bottom: 1px solid #3a2c1c; }
+#menu .binds td:first-child { color: #e8dcc0; }
+#menu .binds tr.sep td { border-bottom: 1px solid #c9a45c; padding-top: 10px; color: #ffd75e; font: bold 13px Georgia, serif; }
+#menu .key { width: 96px; min-height: 34px; padding: 4px 6px; cursor: pointer; font: bold 13px system-ui, sans-serif; color: #ffd75e;
+  border: 1px solid #c9a45c; border-radius: 4px; background: linear-gradient(#3a2a1a, #140e08); }
+#menu .key:hover, #menu .key:focus-visible { filter: brightness(1.35); outline: none; }
+#menu .key.wait { color: #fff; background: linear-gradient(#9a2216, #520c07); animation: blink 1s infinite; }
+@keyframes blink { 50% { filter: brightness(1.5); } }
+#menu .note { min-height: 2.6em; margin: 10px 0 0; font: 13px/1.3 system-ui, sans-serif; color: #ffb27a; }
+#menu .hint { margin: 0 0 8px; font: 12px/1.35 system-ui, sans-serif; color: #c9b48a; }
 #menu .credits { font: 13px/1.45 system-ui, sans-serif; color: #e8dcc0; }
 #menu .credits h3 { margin: 14px 0 6px; font: bold 14px Georgia, serif; color: #ffd75e; }
 #menu .credits p { margin: 4px 0; }
@@ -55,7 +68,7 @@ body.touch #fullscreen { right: auto; left: calc(12px + env(safe-area-inset-left
 `;
 
 
-type View = 'main' | 'audio' | 'credits';
+type View = 'main' | 'audio' | 'keys' | 'credits';
 
 /** The audio panel's sliders: master, then each bus (audio/engine.ts). */
 const SLIDERS: Record<Exclude<keyof AudioSettings, 'muted'>, string> = { volume: 'Generale', music: 'Musica', sfx: 'Effetti', ambience: 'Ambiente', voice: 'Voci' };
@@ -99,6 +112,8 @@ export class Menu {
   private el = document.createElement('div');
   private view: View | null = null;
   private hooks: MenuHooks;
+  /** The key cell waiting for a press in Comandi. */
+  private wait: { id: string; slot: number } | null = null;
 
   constructor(hooks: MenuHooks) {
     this.hooks = hooks;
@@ -121,7 +136,8 @@ export class Menu {
     addEventListener('keydown', (e) => { // capture: while the menu is up, game keys (Tab targeting, abilities) stay out of it
       if (!this.view) return;
       e.stopPropagation();
-      if (e.code === 'Escape' && !e.repeat) this.toggle();
+      if (this.wait) { e.preventDefault(); if (!e.repeat) this.bind(e.code); }
+      else if (e.code === 'Escape' && !e.repeat) this.toggle();
     }, true);
     document.body.append(btn, this.el);
   }
@@ -140,6 +156,7 @@ export class Menu {
 
   close(): void {
     this.view = null;
+    this.wait = null;
     this.el.classList.remove('show');
     this.el.innerHTML = '';
   }
@@ -150,6 +167,7 @@ export class Menu {
       if (document.pointerLockElement) document.exitPointerLock();
     }
     this.view = v;
+    this.wait = null;
     this.el.classList.add('show');
     this.el.innerHTML = this.render(v);
     this.el.querySelector<HTMLElement>('.btn:not(:disabled), input')?.focus({ preventScroll: true });
@@ -163,6 +181,7 @@ export class Menu {
         <button class="btn" data-do="close">Riprendi</button>
         <button class="btn" data-do="leave">Cambia eroe<small>Salva e torna alla squadra</small></button><hr>
         <button class="btn" data-go="audio">Audio</button>
+        <button class="btn" data-go="keys">Comandi<small>Cambia i tasti di movimento e della barra</small></button>
         ${styleBtn()}${qualityBtn()}
         <button class="btn quiet" data-go="credits">Crediti</button></div>`;
       case 'audio': {
@@ -173,6 +192,8 @@ export class Menu {
           ${(Object.keys(SLIDERS) as (keyof typeof SLIDERS)[]).map(row).join('')}
           <label><input type="checkbox" name="muted" ${a.muted ? 'checked' : ''}> Disattiva audio</label>${back}</div>`;
       }
+      case 'keys': return `<div class="panel wide"><h2>Comandi</h2>${x}${this.keysTable()}<p class="note" role="status"></p>
+        <button class="btn quiet" data-do="reset">Ripristina predefiniti</button>${back}</div>`;
       case 'credits': return `<div class="panel wide"><h2>Crediti</h2>${x}<div class="credits">
         <h3>Redentore Dungeon</h3>
         <p>Un dungeon nella Chiesa del Redentore e nell'Orto dei Frati, Giudecca, Venezia. Ispirato a World of Warcraft; nessun asset o logo Blizzard.</p>
@@ -181,11 +202,48 @@ export class Menu {
     }
   }
 
+  private keysTable(): string {
+    const b = bindings();
+    const cell = (id: string, slot: number) => {
+      const w = this.wait?.id === id && this.wait.slot === slot;
+      return `<button class="key${w ? ' wait' : ''}" data-key="${id}" data-slot="${slot}" aria-label="Cambia tasto">${w ? 'Premi un tasto…' : esc(label(b[id][slot]))}</button>`;
+    };
+    const rows = ACTIONS.map((a, i) => `${i === 0 ? '<tr class="sep"><td colspan="3">Movimento</td></tr>' : a.id === 'barra1' ? '<tr class="sep"><td colspan="3">Barra delle azioni</td></tr>' : ''}
+      <tr><td>${a.name}</td><td>${cell(a.id, 0)}</td><td>${a.keys.length > 1 ? cell(a.id, 1) : ''}</td></tr>`).join('');
+    return `<div class="binding"><p class="hint">Clic su un tasto, poi premi quello nuovo. Esc annulla, Backspace lo toglie. Un tasto già usato si scambia.
+      Esc, Tab, Invio, M, B, C, K e F restano fissi; le carte del livello si scelgono sempre con 1, 2, 3.</p><table class="binds">${rows}</table></div>`;
+  }
+
+  /** A press while a key cell waits: Esc gives up, Backspace/Canc clears, anything else is bound (or refused). */
+  private bind(code: string): void {
+    const w = this.wait!;
+    this.wait = null;
+    let note = '';
+    if (code !== 'Escape') {
+      const r = rebind(bindings(), w.id, w.slot, code === 'Backspace' || code === 'Delete' ? '' : code);
+      note = r.note;
+      if (r.b !== bindings()) setBindings(r.b);
+    }
+    this.redrawKeys(note, w);
+  }
+
+  private redrawKeys(note: string, focus?: { id: string; slot: number }): void {
+    this.el.querySelector('.binding')!.outerHTML = this.keysTable();
+    this.el.querySelector('.note')!.textContent = note;
+    if (focus) this.el.querySelector<HTMLElement>(`[data-key="${focus.id}"][data-slot="${focus.slot}"]`)?.focus({ preventScroll: true });
+  }
+
   private act(e: Event): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>('button');
     if (!b) return;
     const { go, do: d } = b.dataset;
-    if (go) this.show(go as View);
+    if (b.dataset.key) {
+      this.wait = { id: b.dataset.key, slot: Number(b.dataset.slot) };
+      this.redrawKeys('');
+      this.el.querySelector<HTMLElement>('.key.wait')?.focus({ preventScroll: true });
+    }
+    else if (d === 'reset') { setBindings(defaults()); this.wait = null; this.redrawKeys('Tasti predefiniti ripristinati.'); }
+    else if (go) this.show(go as View);
     else if (d === 'close') this.close();
     else if (d === 'leave') this.hooks.leave();
     else if (d === 'style') {

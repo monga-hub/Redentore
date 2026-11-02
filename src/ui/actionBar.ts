@@ -1,5 +1,6 @@
 import { CHARGE_MAX, GCD, KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem, type Caster } from '../abilities/system.ts';
 import { ICONS } from './icons.ts';
+import { onKeys, slotLabel } from '../core/keys.ts';
 
 // WoW-style action bar overlay: the primary attack on 1, the eight slots of the ability book (ui/book.ts) on 2..9 and the
 // potion on R, set a little apart; clockwise cooldown sweep
@@ -71,7 +72,7 @@ export class ActionBar<C extends Caster> {
     this.root.append(this.castbar, bar);
     document.body.append(this.root, this.errors, this.tip);
 
-    KEYS.forEach((code, i) => {
+    KEYS.forEach((_, i) => {
       const s: Slot<C> = { el: el('button', 'slot'), cd: el('span', 'cd'), key: el('span', 'key'), p: '', text: '', wasCd: false };
       if (i === POTION) s.el.classList.add('potion');
       if (i === PRIMARY) {
@@ -85,7 +86,7 @@ export class ActionBar<C extends Caster> {
         s.el.style.cssText = `--a:${ring[0]}deg;--r:${ring[1]}px;--d:${ring[2]}px`;
       }
       s.el.tabIndex = -1; // keys belong to the game, not to focus navigation
-      s.key.textContent = code.replace(/^(Digit|Key)/, '');
+      s.key.textContent = slotLabel(i);
       let hold = 0, held = false;
       s.el.addEventListener('pointerdown', (e) => {
         e.preventDefault(); // no focus, no text selection, no double-tap zoom
@@ -115,11 +116,8 @@ export class ActionBar<C extends Caster> {
       this.paint(i);
     });
 
-    // Physical-key labels: on an Italian keyboard Minus is ' and Equal is ì.
-    (navigator as Navigator & { keyboard?: { getLayoutMap(): Promise<Map<string, string>> } }).keyboard
-      ?.getLayoutMap()
-      .then((m) => this.slots.forEach((s, i) => { const k = m.get(KEYS[i]); if (k) s.key.textContent = k.toUpperCase(); }))
-      .catch(() => {});
+    // The player's keys (menu's Comandi), in the keyboard's own labels once the browser tells them (core/keys.ts).
+    onKeys(() => this.slots.forEach((s, i) => { s.key.textContent = slotLabel(i); }));
   }
 
   render(dt: number, pressed: (code: string) => boolean): void {

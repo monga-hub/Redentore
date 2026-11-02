@@ -1,4 +1,5 @@
 import { duck, playSfx, unduck } from '../audio/engine.ts';
+import { bindings, translate } from '../core/keys.ts';
 
 // The quest-giver's window, WoW style: a parchment page in a gold frame with the speaker's portrait,
 // name and greeting over the list of what he has for the hero: yellow "!" a quest on offer, gold "?"
@@ -126,7 +127,7 @@ export class Dialogue {
       if (!this.open) return;
       e.stopPropagation();
       if (e.repeat) return;
-      if (e.code === 'Escape' || MOVE.includes(e.code)) this.close(); // walking away
+      if (e.code === 'Escape' || MOVE.includes(translate(bindings(), e.code))) this.close(); // walking away
       else if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyF') {
         e.preventDefault(); // the first quest on the list, or the page's first button; never a boon, which wants a deliberate click
         const b = this.el.querySelector<HTMLElement>(this.detail ? '.btns button' : 'li button');

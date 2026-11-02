@@ -2,6 +2,8 @@
 // turns the character (WoW style), both buttons = run forward, wheel = zoom.
 // Touch pointers are ignored here: TouchControls (ui/touch.ts) feeds the stick,
 // camera deltas, pinch zoom and virtual keys instead.
+import { bindings, onKeys, translate } from './keys.ts';
+
 export class Input {
   private keys = new Set<string>();
   private hits = new Set<string>(); // keys that went down since the last endFrame()
@@ -16,12 +18,16 @@ export class Input {
   orbit = true;
 
   constructor(el: HTMLElement) {
+    // Physical keys go through the player's bindings (core/keys.ts): the game reads its default codes.
     addEventListener('keydown', (e) => {
-      this.keys.add(e.code);
-      if (!e.repeat) this.hits.add(e.code);
-      if (e.code === 'Space') e.preventDefault();
+      const code = translate(bindings(), e.code);
+      if (e.code === 'Space' || code === 'Space') e.preventDefault();
+      if (!code) return;
+      this.keys.add(code);
+      if (!e.repeat) this.hits.add(code);
     });
-    addEventListener('keyup', (e) => this.keys.delete(e.code));
+    addEventListener('keyup', (e) => this.keys.delete(translate(bindings(), e.code)));
+    onKeys(() => this.keys.clear()); // a key held across a rebind would never come up
     addEventListener('blur', () => { this.keys.clear(); this.buttons = 0; });
     el.addEventListener('contextmenu', (e) => e.preventDefault());
     el.addEventListener('pointerdown', (e) => {

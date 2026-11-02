@@ -3,6 +3,7 @@ import { KEYS, POTION, PRIMARY, SPARE, saveBar, type Ability, type AbilitySystem
 import { CARD, SCHOOL, SECOND_AT, type School } from '../player/levels.ts';
 import { RING } from './actionBar.ts';
 import { ICONS } from './icons.ts';
+import { slotLabel } from '../core/keys.ts';
 
 // The ability book ("Libro delle abilità"), laid out like Diablo Immortal's: K, the book button under the figure or
 // the game menu open it, and the game pauses. Left, every ability grouped by school (the primary attack apart, on top),
@@ -269,7 +270,7 @@ export class AbilityBook<C extends Caster> {
       + " Oppure compra il tomo della sua scuola da Fra' Bortolo o da Mastro Iseppo: insegna tutta la scuola.";
     else {
       const hint = this.armed ? `<p class="hint go">${touch ? 'Tocca' : 'Clic su'} un tasto illuminato per metterla lì.</p>`
-        : at >= 0 ? `<p class="hint">Sulla barra${touch ? '' : `, tasto ${KEYS[at].replace(/^(Digit|Key)/, '')}`}.</p>` : `<p class="hint">Nel libro: non è sulla barra.${touch ? '' : ' Trascinala su un tasto.'}</p>`;
+        : at >= 0 ? `<p class="hint">Sulla barra${touch ? '' : `, tasto ${slotLabel(at)}`}.</p>` : `<p class="hint">Nel libro: non è sulla barra.${touch ? '' : ' Trascinala su un tasto.'}</p>`;
       acts = `<div class="acts"><button class="btn${this.armed ? ' on' : ''}" data-do="equip">${at >= 0 ? 'Sposta' : 'Equipaggia'}</button>
         ${at >= 0 ? '<button class="btn dim" data-do="remove">Rimuovi</button>' : ''}${hint}</div>`;
     }
@@ -284,7 +285,7 @@ export class AbilityBook<C extends Caster> {
     const btn = (i: number) => {
       const a = this.sys.slots[i], [deg, r, d] = RING[i], fixed = !SPARE.includes(i);
       return `<button class="ps${fixed ? ' fixed' : ''}${i === POTION ? ' potion' : ''}${a && a.id === this.sel ? ' cur' : ''}" data-slot="${i}"
-        style="--a:${deg}deg;--r:${r}px;--d:${d}px" aria-label="${a ? esc(a.name) : 'Vuoto'}">${a ? ICONS[a.icon] ?? '' : ''}<span class="k">${KEYS[i].replace(/^(Digit|Key)/, '')}</span></button>`;
+        style="--a:${deg}deg;--r:${r}px;--d:${d}px" aria-label="${a ? esc(a.name) : 'Vuoto'}">${a ? ICONS[a.icon] ?? '' : ''}<span class="k">${slotLabel(i)}</span></button>`;
     };
     return `<div class="arc${this.armed ? ' armed' : ''}">${KEYS.map((_, i) => btn(i)).join('')}
       <span class="ps jump" style="--a:180deg;--r:196px;--d:54px">${ICONS.ui_jump}</span></div>`;

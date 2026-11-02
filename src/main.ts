@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildLevel } from './level/index.ts';
 import { SPAWN } from './level/plan.ts';
+import { bands } from './level/stream.ts';
 import { Input } from './core/input.ts';
 import { PlayerController } from './player/controller.ts';
 import { EYE, STEPS as WOW_STEPS, ThirdPersonCamera } from './camera/thirdPersonCamera.ts';
@@ -575,10 +576,8 @@ function openMap(): void {
 }
 const pressed = (code: string) => input.pressed(code);
 /**
- * Zone streaming, by the hero's x: past the Ponte de la Croce (-X) the Redentore's complex and its dead are skipped
- * (frustum culling already drops their draw calls, this spares the scene walk: ~1 ms a frame on a laptop, more on
- * a phone), level 2 on the church's side of it and on San Giorgio, level 3 short of the Tre Oci. ponytail: bands on one
- * axis; per-zone bounds if a level ever doubles back.
+ * Zone streaming, by where the hero stands (level/stream.ts bands): the zones and the dead out of sight are skipped
+ * (frustum culling already drops their draw calls, this spares the scene walk: ~1 ms a frame on a laptop, more on a phone).
  */
 const LEVEL1 = ['chiesa', 'convento', 'orto', 'corpo-nord', 'giardini', 'laguna', 'calle'].map((z) => level.zones.get(z)!), LEVEL2 = ['giudecca', 'zitelle'].map((z) => level.zones.get(z)!);
 const LEVEL3 = ['punta', 'sangiorgio'].map((z) => level.zones.get(z)!);
@@ -600,8 +599,8 @@ function release(zones: THREE.Object3D[]): void {
   walk(scene);
   for (const t of drop) if (!keep.has(t)) t.dispose();
 }
-function stream(x: number, high = false): void {
-  const one = x > -100, two = x < -50 && x > -430, three = x < -250;
+function stream(x: number, z: number, high = false): void {
+  const { one, two, three } = bands(x, z);
   for (const g of LEVEL1) g.visible = one || high; // from the bell chamber the Redentore and the Giudecca are in view, not their dead
   friars.root.visible = priests.root.visible = bees.root.visible = one;
   for (const g of LEVEL2) g.visible = two || high;
@@ -856,7 +855,7 @@ renderer.setAnimationLoop(() => {
   targeting.update(dt, player.pos);
   plates.update(dt, player.pos, lv.lv);
   heroBuffs.update(dt, buffs);
-  stream(player.pos.x, aloft());
+  stream(player.pos.x, player.pos.z, aloft());
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;
   hud.setArea(area);
   discovery.reveal(player.pos.x, player.pos.z);

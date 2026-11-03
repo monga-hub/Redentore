@@ -5,7 +5,7 @@ export const CLOTH_SLOTS = ['testa', 'spalle', 'torso', 'mani', 'gambe', 'piedi'
 export type ClothSlot = typeof CLOTH_SLOTS[number];
 export type Finish = 'green' | 'blue' | 'epic';
 
-export const HERO_OUTFIT_HEROES: readonly Hero[] = ['tizian', 'bortolo', 'zanetto'];
+export const HERO_OUTFIT_HEROES: readonly Hero[] = ['tizian', 'bortolo', 'zanetto', 'fosca'];
 export function hasHeroOutfits(hero: Hero): boolean { return HERO_OUTFIT_HEROES.includes(hero); }
 
 /** Appearance follows the item's origin, independently of the current map or hero level. */

@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import * as gearCatalogue from '../loot/gear.ts';
+import { wholeOutfitKey, type OutfitSelection } from './whole-outfit-key.ts';
 import { hasHeroOutfits } from './hero-outfit-key.ts';
 import { HeroOutfits } from './hero-outfits.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -796,6 +798,9 @@ export class Outfit {
   private readonly body: THREE.SkinnedMesh;
   private readonly paint?: Paint;
   private readonly heroOutfits?: HeroOutfits;
+  private readonly hero: Hero;
+  private whole = false;
+  private selectionKey = '';
   private readonly guard: Guard;
   private readonly own: Body;
   /** Shared with the body's shader (and the pieces': uGlow). */
@@ -809,6 +814,7 @@ export class Outfit {
   /** `root`: the stood body's scene (core/models.ts `stand`), `hero`'s. */
   constructor(root: THREE.Group, body: THREE.SkinnedMesh, hero: Hero) {
     this.root = root;
+    this.hero = hero;
     this.body = body;
     this.own = BODIES[hero];
     this.fit = new Fit(root, body);
@@ -819,7 +825,7 @@ export class Outfit {
     const region = this.mark(), m = body.material as THREE.MeshStandardMaterial;
     if (this.own.paint) this.paint = new Paint(body, region);
     else m.metalness = METAL; // his own maps, made like the painted ones
-    if (hasHeroOutfits(hero)) this.heroOutfits = new HeroOutfits(hero, body, (material) => {
+    if (hasHeroOutfits(hero) || hero === 'risorto') this.heroOutfits = new HeroOutfits(hero, body, (material) => {
       material.onBeforeCompile = (sh) => {
         sh.uniforms.uFist = this.uniforms.uFist;
         sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aFist;\nuniform float uFist;')
@@ -827,6 +833,12 @@ export class Outfit {
         lit(sh, this.uniforms.uGlow);
       };
       material.customProgramCacheKey = () => 'hero-outfit-glove';
+    }, (whole) => {
+      if (!whole) return;
+      for (const piece of this.pieces.values()) dispose(piece);
+      this.pieces.clear();
+      this.guard.pieces.delete('testa'); this.guard.pieces.delete('spalle');
+      this.uniforms.uHat.value = this.uniforms.uBeak.value = this.uniforms.uPad.value = 0;
     });
     this.guard = new Guard(root, this.fit);
     const yoke = this.own.yoke;
@@ -938,19 +950,27 @@ export class Outfit {
     this.body.geometry.setAttribute('aBeak', new THREE.BufferAttribute(out, 3));
   }
 
-  wear(worn: GearState): void {
+  wear(worn: GearState, selection?: OutfitSelection): void {
+    // Optional until the canonical catalogue lands; legacy callers retain their exact behavior.
+    const select = (gearCatalogue as unknown as { outfitSelection?: (hero: Hero, worn: GearState) => OutfitSelection }).outfitSelection;
+    selection ??= select?.(this.hero, worn);
+    const whole = !!wholeOutfitKey(this.hero, selection), key = whole ? JSON.stringify(selection) : '';
+    const changedSelection = key !== this.selectionKey;
+    this.selectionKey = key;
+    const wasWhole = this.whole;
+    this.whole = whole;
     if (!('arma' in this.worn) || worn.arma !== this.worn.arma) this.arm((this.worn.arma = worn.arma));
-    let changed = false;
+    let changed = changedSelection;
     for (const slot of ['testa', 'spalle', 'torso', 'mani', 'gambe', 'piedi'] as const) {
       const id = worn[slot];
-      if (slot in this.worn && id === this.worn[slot]) continue;
+      if (slot in this.worn && id === this.worn[slot] && !(wasWhole && !whole)) continue;
       const was = this.worn[slot] && lookOf(this.worn[slot]!);
       this.worn[slot] = id;
       changed = true;
-      if (!this.heroOutfits && (slot === 'testa' || slot === 'spalle') && (!this.pieces.has(slot) || was !== (id && lookOf(id)))) this.piece(slot);
+      if (!whole && !hasHeroOutfits(this.hero) && (slot === 'testa' || slot === 'spalle') && (!this.pieces.has(slot) || was !== (id && lookOf(id)))) this.piece(slot);
     }
-    if (changed) this.paint?.paint(REGION_SLOT.map((s) => { const id = this.worn[s]; return id ? lookOf(id) : undefined; }));
-    if (changed) this.heroOutfits?.wear(this.worn);
+    if (changed && !whole) this.paint?.paint(REGION_SLOT.map((s) => { const id = this.worn[s]; return id ? lookOf(id) : undefined; }));
+    if (changed) this.heroOutfits?.wear(this.worn, selection);
   }
 
   showAura(material: THREE.ShaderMaterial, visible: boolean): void {
@@ -969,7 +989,7 @@ export class Outfit {
     if (!p) return;
     loadModel(`${DIR}${look}-${slot}.glb`, 256).then((gltf) => {
       const now = this.worn[slot];
-      if (this.pieces.has(slot) || !now || lookOf(now) !== look) { dispose(gltf.scene); return; } // swapped again meanwhile
+      if (this.whole || this.pieces.has(slot) || !now || lookOf(now) !== look) { dispose(gltf.scene); return; } // swapped again meanwhile
       const m = this.bake(slot, p, gltf.scene);
       this.pieces.set(slot, m);
       if (slot === 'spalle') this.uniforms.uPad.value = 1;

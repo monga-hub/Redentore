@@ -139,3 +139,12 @@ Downloaded by `scripts/audio/build.py` into `node_modules/.cache/audio` (never c
 | 3 | `01a19d86-3c6a-7409-b43b-842b0640a91d` | `01a19d9a-679e-71f0-94c1-37bb800627da` | `01a19d9a-7d67-738a-8883-ca1ec9abf36b` |
 
 The master’s original material supplies the epic detail source. All nine palettes were reworked: furnace ash/copper/amber, lagoon petrol/ivory/brass, and charcoal/oxblood/antique gold. Roughness, metalness and restricted glass glow distinguish quality within each world. `provenance.json` records input hashes and the source3 shoe provenance. Material atlases combine the approved source maps with projected original-surface maps. Existing original-model and generated-asset attribution above continues to apply.
+
+Whole-outfit build appearances (2026-11-03): reuse the four heroes' existing approved
+production outfit masters and original rigs. The Risorto's three coordinated appearances
+reuse the original body retextures and original fitted Arsenale, Chierico and Voto
+head/shoulder assets; original skeletal anatomy and hand weights are retained. These
+are derivatives, not fifteen newly sculpted character models. Build palettes and chapter
+finishing are applied at runtime. `public/models/hero-outfits/whole-icons.webp` contains
+fifteen original painted empty full-garment illustrations generated using OpenAI's
+built-in ImageGen on 2026-11-03; no character screenshots or paid Meshy calls were used.

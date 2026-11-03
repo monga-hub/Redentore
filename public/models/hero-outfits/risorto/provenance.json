@@ -1,0 +1,10 @@
+{
+  "hero": "risorto",
+  "authored": "2026-11-03",
+  "source": "Original reietto.glb topology/24-bone weights, approved original outfit body maps and fitted original helm/pauldron assets",
+  "appearances": ["arsenale: fossore", "chierico: divoratore", "voto: predatore"],
+  "method": "Original runtime Fit/hood/pauldron deformation baked in bind coordinates, original hands/forearms and bone indices preserved; coordinated single-atlas complete six-part source",
+  "maps": "One 1024x1024 base/normal/ORM atlas per build; rarity and chapter surface finishing is runtime, not duplicate textures",
+  "newMeshyCalls": 0,
+  "limits": ["Original exposed ribcage and skeletal forearms/shins remain", "Three matched original head/shoulder silhouettes, not three newly sculpted full armor silhouettes", "Not claimed to meet supplied reference's full sculpted plate/cloth quality"]
+}

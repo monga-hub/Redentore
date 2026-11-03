@@ -4,9 +4,11 @@ import { PHONE } from '../core/device.ts';
 import type { GearState } from '../loot/gear.ts';
 import type { Hero } from './heroes.ts';
 import { CLOTH_SLOTS, heroOutfitKey, type Finish } from './hero-outfit-key.ts';
+import { finishWholeMaterial, wholeMaterialKey } from './whole-outfit-material.ts';
+import { wholeOutfitKey, type OutfitSelection } from './whole-outfit-key.ts';
 import { copyFist } from './hero-outfit-fist.ts';
 
-interface Master { geometries: THREE.BufferGeometry[]; cover: number[][]; seams: number[][]; materials: Map<Finish, THREE.MeshStandardMaterial> }
+interface Master { geometries: THREE.BufferGeometry[]; cover: number[][]; seams: number[][]; materials: Map<string, THREE.MeshStandardMaterial> }
 
 /** Each slot owns a fitted piece, all sharing the hero's original skeleton and animations. */
 export class HeroOutfits {
@@ -17,21 +19,25 @@ export class HeroOutfits {
   private parts: THREE.SkinnedMesh[] = [];
   private shells: THREE.SkinnedMesh[] = [];
   private wanted: GearState = {};
+  private selection?: OutfitSelection;
   private version = 0;
   private busy = false;
   private disposed = false;
+  private readonly onApply: (whole: boolean) => void;
   private readonly configureMaterial: (material: THREE.MeshStandardMaterial) => void;
 
-  constructor(hero: Hero, body: THREE.SkinnedMesh, configureMaterial: (material: THREE.MeshStandardMaterial) => void = () => {}) {
+  constructor(hero: Hero, body: THREE.SkinnedMesh, configureMaterial: (material: THREE.MeshStandardMaterial) => void = () => {}, onApply: (whole: boolean) => void = () => {}) {
     this.hero = hero;
     this.body = body;
     this.original = body.geometry.index!.clone();
     this.configureMaterial = configureMaterial;
+    this.onApply = onApply;
   }
 
-  wear(worn: GearState): void {
+  wear(worn: GearState, selection?: OutfitSelection): void {
     if (this.disposed) return;
     this.wanted = { ...worn };
+    this.selection = selection;
     this.version++;
     if (!this.busy) void this.refresh();
   }
@@ -64,22 +70,23 @@ export class HeroOutfits {
       if (!mesh?.isMesh || !mesh.geometry.index || !['position', 'normal', 'uv', 'skinIndex', 'skinWeight'].every((a) => mesh.geometry.hasAttribute(a))) throw new Error(`Invalid outfit slot ${slot}`);
       const g = mesh.geometry;
       g.applyMatrix4(mesh.matrixWorld);
-      if (slot === 'mani') copyFist(this.body.geometry, g);
+      if (slot === 'mani' || this.hero === 'risorto') copyFist(this.body.geometry, g);
       else g.setAttribute('aFist', new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 3), 3));
       for (const a of ['aHat', 'aBeak']) g.setAttribute(a, new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count * 3), 3));
       for (const material of [mesh.material].flat()) material.dispose();
       return g;
     });
-    const master = { geometries, cover: coverage.slots, seams: coverage.seams, materials: new Map<Finish, THREE.MeshStandardMaterial>() };
+    const master = { geometries, cover: coverage.slots, seams: coverage.seams, materials: new Map<string, THREE.MeshStandardMaterial>() };
     this.masters.set(world, master);
     return master;
   }
 
-  private async material(master: Master, world: number, finish: Finish): Promise<THREE.MeshStandardMaterial> {
-    const cached = master.materials.get(finish);
+  private async material(master: Master, world: number, finish: Finish, selection?: OutfitSelection): Promise<THREE.MeshStandardMaterial> {
+    const cacheKey = wholeMaterialKey(finish, selection);
+    const cached = master.materials.get(cacheKey);
     if (cached) return cached;
     const loader = new THREE.TextureLoader();
-    const dir = `${import.meta.env.BASE_URL}models/hero-outfits/${this.hero}/${world}/${finish}`;
+    const dir = `${import.meta.env.BASE_URL}models/hero-outfits/${this.hero}/${world}/${this.hero === 'risorto' ? 'outfit' : finish}`;
     const maps: THREE.Texture[] = [];
     try {
       for (const kind of ['base', 'normal', 'orm']) {
@@ -100,7 +107,8 @@ export class HeroOutfits {
     const material = new THREE.MeshStandardMaterial({ map: maps[0], normalMap: maps[1], roughnessMap: maps[2], metalnessMap: maps[2], metalness: .5, roughness: 1, emissiveMap: maps[0], emissive: new THREE.Color(.18, .18, .18), side: THREE.DoubleSide });
     material.normalScale.set(1, -1);
     this.configureMaterial(material);
-    master.materials.set(finish, material);
+    if (selection && !selection.legacy) finishWholeMaterial(material, selection);
+    master.materials.set(cacheKey, material);
     return material;
   }
 
@@ -111,16 +119,19 @@ export class HeroOutfits {
       for (;;) {
         const version = this.version;
         attempted = version;
-        const keys = CLOTH_SLOTS.map((s) => heroOutfitKey(this.hero, this.wanted[s]));
+        const selection = this.selection;
+        const whole = wholeOutfitKey(this.hero, selection);
+        const keys = CLOTH_SLOTS.map((s) => whole ?? heroOutfitKey(this.hero, this.wanted[s]));
         const ready: { slot: number; master: Master; material: THREE.MeshStandardMaterial }[] = [];
         for (let slot = 0; slot < keys.length; slot++) {
           const key = keys[slot];
           if (!key) continue;
           const master = await this.master(key.world);
-          ready.push({ slot, master, material: await this.material(master, key.world, key.finish) });
+          ready.push({ slot, master, material: await this.material(master, key.world, key.finish, whole ? selection : undefined) });
         }
         if (this.disposed) break;
         if (version !== this.version) continue;
+        this.onApply(!!whole);
         for (const part of this.parts) part.removeFromParent();
         for (const shell of this.shells) shell.removeFromParent();
         this.shells = [];
@@ -151,7 +162,7 @@ export class HeroOutfits {
         this.body.geometry.setDrawRange(0, visible.length);
         // Keep only currently worn worlds and finishes; changing gear must not accumulate GPU textures.
         for (const [world, master] of this.masters) {
-          const finishes = new Set(keys.filter((k) => k?.world === world).map((k) => k!.finish));
+          const finishes = new Set(keys.filter((k) => k?.world === world).map((k) => wholeMaterialKey(k!.finish, whole ? selection : undefined)));
           for (const [finish, material] of master.materials) if (!finishes.has(finish)) {
             for (const t of new Set([material.map, material.normalMap, material.roughnessMap])) if (t) {
               if (typeof ImageBitmap !== 'undefined' && t.image instanceof ImageBitmap) t.image.close();

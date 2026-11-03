@@ -1,20 +1,21 @@
 import * as THREE from 'three';
 import { T, type Style, type Vfx } from '../abilities/vfx.ts';
+import { fountain, NUMBER_LIFE, projectedAnchor } from './fountain.ts';
 import type { Mob } from '../ui/target.ts';
 
 // Impacts and "Stile Diablo" flourishes, all visual: it only watches the enemies' health and state,
 // so combat itself is untouched. In both views hits spray blood away from the hero, with a red mist,
 // heavy blows give the lens a light kick, the floor takes splashes that dry away and every body
 // leaves a pool that spreads out under it over a couple of seconds (one instanced draw, pooled and
-// capped). In the Diablo view only: damage numbers pop over whoever is hit (damage over time is
+// capped). In both views damage and healing numbers spout from the moving health bar (damage over time is
 // summed into a number every half second, big blows come out large and orange), and a fallen enemy
-// goes up in a beam of light like a legendary drop. The quest chest wears the same beam until opened.
+// in Diablo goes up in a beam of light like a legendary drop. The quest chest wears the same beam until opened.
 
 const POOLS = 12, SPLASHES = 44, DECALS = POOLS + SPLASHES; // pools under the dead, splashes from hits: the oldest give way
 const DRY = 24, POOL_DRY = 32; // s each one lasts
 const SPREAD = 2.4, SPREAD_AFTER = 0.35; // s a pool takes to spread out, s after the fall it starts
 const BEAMS = 6, BEAM_LIFE = 3.2;
-const NUMBERS = 28, NUMBER_LIFE = 0.95;
+const NUMBERS = 28;
 const TICK = 0.45; // s: damage over time is shown this often
 const BIG = 25; // a single blow this strong is a "critical" number
 const GORE = 0x6e0a07, LOOT = 0xff7a12;
@@ -25,8 +26,8 @@ const loot: Style = { life: 1.4, size: 0.08, color: LOOT, hdr: 3, tex: T.spark, 
 /** Watched enemies: the brains (enemies/brain.ts, caster.ts) and their model height. */
 export interface Watched { all: readonly Mob[]; height: number }
 
-interface Track { mob: Mob; height: number; hp: number; acc: number; t: number; dead: boolean }
-interface Float { el: HTMLElement; x: number; y: number; z: number; t: number }
+interface Track { mob: Mob; height: number; hp: number; acc: number; t: number; heal: number; healT: number; dead: boolean }
+interface Float { el: HTMLElement; mob: Mob; height: number; t: number; lane: number; delay: number }
 interface Beam { mesh: THREE.Mesh; disc: THREE.Mesh; t: number }
 
 // Splats painted once: a 2×2 atlas of irregular drops and smears, white on black (the shader tints).
@@ -155,6 +156,7 @@ export class DiabloFx {
   private numbers: Float[] = [];
   private layer = document.createElement('div');
   private time = 0;
+  private lanes = new WeakMap<Mob, number>();
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private v = new THREE.Vector3();
@@ -165,6 +167,8 @@ export class DiabloFx {
   private readonly camera: THREE.Camera;
   private readonly hero: { x: number; z: number };
 
+  anchor: (mob: Mob) => { x: number; y: number } | null | undefined = () => undefined;
+
   /** `hero`: the hero's feet, live; blood flies away from them. */
   constructor(watched: Watched[], vfx: Vfx, camera: THREE.Camera, chest: { x: number; y: number; z: number }, hero: { x: number; z: number }) {
     this.vfx = vfx;
@@ -173,7 +177,7 @@ export class DiabloFx {
     this.root.name = 'fx:impacts';
     this.flourish.visible = false;
     this.root.add(this.flourish);
-    this.tracks = watched.flatMap((w) => w.all.map((mob) => ({ mob, height: w.height, hp: mob.hp, acc: 0, t: 0, dead: mob.state === 'dead' })));
+    this.tracks = watched.flatMap((w) => w.all.map((mob) => ({ mob, height: w.height, hp: mob.hp, acc: 0, t: 0, heal: 0, healT: 0, dead: mob.state === 'dead' })));
 
     const plane = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.state = new THREE.InstancedBufferAttribute(new Float32Array(DECALS * 3), 3).setUsage(THREE.DynamicDrawUsage);
@@ -227,8 +231,6 @@ export class DiabloFx {
     const c = this.chest;
     c.mesh.visible = c.disc.visible = chestShut;
     if (chestShut) this.beam(c, 0.5 + Math.sin(this.time * 2.2) * 0.04, true);
-
-    this.place();
   }
 
   private watch(k: Track, dt: number): void {
@@ -240,10 +242,17 @@ export class DiabloFx {
       if (d >= 1) this.hit(m, k.height, d);
     }
     if (k.acc >= 1 && (d >= 4 || k.t >= TICK || m.state === 'dead')) {
-      if (this.enabled) this.number(m.x, m.y + k.height + 0.2, m.z, Math.round(k.acc), d >= BIG ? 'big' : d >= 4 ? '' : 'dot');
+      this.number(m, k.height, Math.round(k.acc), d >= BIG ? 'big' : d >= 4 ? '' : 'dot');
       k.acc = 0;
       k.t = 0;
     }
+    k.healT += dt;
+    if (d < 0 && m.state !== 'dead' && m.state !== 'evade' && !k.dead) k.heal -= d;
+    if (k.heal >= 1 && (d <= -4 || k.healT >= TICK)) {
+      this.number(m, k.height, Math.round(k.heal), 'heal');
+      k.heal = k.healT = 0;
+    }
+    if (m.state === 'dead' || m.state === 'evade') k.heal = 0;
     const dead = m.state === 'dead';
     if (dead && !k.dead) this.fall(m, k);
     k.dead = dead;
@@ -313,33 +322,41 @@ export class DiabloFx {
     this.born[i] = this.time;
   }
 
-  private number(x: number, y: number, z: number, n: number, kind: string): void {
-    let f = this.numbers.find((u) => this.time - u.t > NUMBER_LIFE);
+  private number(mob: Mob, height: number, n: number, kind: string): void {
+    const siblings = this.numbers.filter((f) => f.mob === mob && this.time - f.t < NUMBER_LIFE);
+    const lane = -(this.lanes.get(mob) ?? -1);
+    this.lanes.set(mob, lane);
+    const delay = Math.min(0.12, siblings.filter((f) => this.time - f.t < 0.12).length * 0.04);
+    let f = this.numbers.find((u) => this.time - u.t > NUMBER_LIFE + u.delay);
     if (!f) {
       if (this.numbers.length >= NUMBERS) f = this.numbers.reduce((a, c) => (c.t < a.t ? c : a));
       else {
-        f = { el: document.createElement('span'), x: 0, y: 0, z: 0, t: 0 };
+        f = { el: document.createElement('span'), mob, height, t: 0, lane, delay };
         this.layer.append(f.el);
         this.numbers.push(f);
       }
     }
-    Object.assign(f, { x: x + (Math.random() - 0.5) * 0.6, y, z, t: this.time });
-    f.el.textContent = String(n);
+    Object.assign(f, { mob, height, t: this.time, lane, delay });
+    f.el.textContent = `${kind === 'heal' ? '+' : ''}${n}`;
     f.el.className = kind;
-    f.el.style.animation = 'none';
-    void f.el.offsetWidth; // restart the pop
-    f.el.style.animation = '';
+    f.el.style.visibility = 'hidden';
   }
 
-  /** Numbers follow their spot in the world as the camera moves, rising as they fade. */
-  private place(): void {
+  /** After nameplates and camera: a short screen-space arc from the moving bar's top. */
+  placeNumbers(): void {
     for (const f of this.numbers) {
-      const age = this.time - f.t;
-      if (age > NUMBER_LIFE) { if (f.el.style.visibility !== 'hidden') f.el.style.visibility = 'hidden'; continue; }
-      this.p.set(f.x, f.y + age * 0.9, f.z).project(this.camera);
-      const off = this.p.z > 1;
-      f.el.style.visibility = off ? 'hidden' : 'visible';
-      if (!off) f.el.style.transform = `translate3d(${((this.p.x + 1) / 2) * innerWidth}px, ${((1 - this.p.y) / 2) * innerHeight}px, 0)`;
+      const age = this.time - f.t - f.delay;
+      if (age < 0 || age >= NUMBER_LIFE) { f.el.style.visibility = 'hidden'; continue; }
+      let at = this.anchor(f.mob);
+      if (at === undefined) {
+        this.p.set(f.mob.x, f.mob.y + f.height + 0.3, f.mob.z).project(this.camera);
+        at = projectedAnchor(this.p, innerWidth, innerHeight);
+      }
+      f.el.style.visibility = at ? 'visible' : 'hidden';
+      if (!at) continue;
+      const arc = fountain(age, f.lane);
+      f.el.style.transform = `translate3d(${at.x + arc.x}px,${at.y + arc.y}px,0) translate(-50%,-100%) scale(${arc.scale})`;
+      f.el.style.opacity = String(arc.opacity);
     }
   }
 }

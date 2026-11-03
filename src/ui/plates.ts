@@ -133,6 +133,7 @@ class Row {
 /** One foe's plate; the box is the health bar, the icons and the name sit above it, the cast bar under it. */
 class Plate {
   readonly el = document.createElement('div');
+  anchor: { x: number; y: number } | null = null;
   kind!: Kind;
   mob!: Mob;
   readonly row = new Row(ICONS_MAX, 3);
@@ -184,6 +185,7 @@ class Plate {
 
   /** Moved to screen point (x, y) at scale `s`, or out of sight with NaN; `at` is the transform as last written. */
   place(x: number, y: number, s: number): void {
+    this.anchor = Number.isNaN(x) ? null : { x, y: y - 12 * s };
     const at = Number.isNaN(x) ? '' : `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0) scale(${s.toFixed(3)}) translate(-50%,-100%)`;
     if (at === this.state.at) return;
     if (!at !== !this.state.at) this.el.style.visibility = at ? '' : 'hidden';
@@ -249,6 +251,12 @@ export class Plates {
     this.target = target;
     this.layer.id = 'plates';
     document.body.prepend(this.layer);
+  }
+
+  /** Final displayed bar top, including stacking; null means its plate is hidden. */
+  combatAnchor(mob: Mob): { x: number; y: number } | null | undefined {
+    const p = this.on.get(mob);
+    return p && !p.kind.ownBar?.() ? p.anchor : undefined;
   }
 
   /** Per frame, after the camera moved. `hero`: the hero's feet; `heroLv` colours the levels. */

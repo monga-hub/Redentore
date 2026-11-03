@@ -405,7 +405,7 @@ const menu = new Menu({
   leave: () => { keep(); void cloud.flush().finally(() => location.reload()); }, // the run kept (mid-fight: the hero where the last calm save left him) and sent, the squad screen on the reload
   account: () => accountLine(cloud),
 });
-const dfx = new DiabloFx([ // blood and pools in both views; damage numbers, loot beams in Diablo's (after a load, so its dead don't fall again)
+const dfx = new DiabloFx([ // blood, pools and combat numbers in both views; loot beams in Diablo's (after a load, so its dead don't fall again)
   { all: friars.all, height: 1.95 },
   { all: priests.all.filter((f) => f.kind === PRIEST), height: 1.85 },
   { all: priests.all.filter((f) => f.kind === SACERDOTE), height: 2.5 },
@@ -416,6 +416,7 @@ const dfx = new DiabloFx([ // blood and pools in both views; damage numbers, loo
   ...L3_KINDS.map(([, kind, height]) => ({ all: ofKind3(kind), height })),
   { all: [drago.boss], height: 8 }, { all: drago.sailors, height: 1.85 },
 ], kit.vfx, cam.camera, CHEST, player.pos);
+dfx.anchor = (mob) => plates.combatAnchor(mob);
 scene.add(dfx.root);
 const standing = () => friars.all.reduce((n, f) => n + (f.state === 'dead' ? 0 : 1), 0); // friars left to give a head
 questView.friars = standing;
@@ -857,6 +858,7 @@ renderer.setAnimationLoop(() => {
   occlusion.update(dt, player.pos, cam.camera);
   targeting.update(dt, player.pos);
   plates.update(dt, player.pos, lv.lv);
+  dfx.placeNumbers();
   heroBuffs.update(dt, buffs);
   stream(player.pos.x, player.pos.z, aloft());
   const area = level.areaAt(player.pos.x, player.pos.z)?.label;

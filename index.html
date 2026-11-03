@@ -402,16 +402,16 @@
       body.diablo #minimap button, body.diablo #minimap .north { color: #e9d6b0; }
       body.diablo .castbar .fill { background: linear-gradient(#ff9a3a, #a8300c); }
 
-      /* Damage numbers over the enemies (src/fx/diabloFx.ts, Stile Diablo): placed by transform each frame, popped by scale. */
+      /* Combat numbers spout from the live health bars in both camera styles. */
       #dmg { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
       #dmg span {
-        position: absolute; left: 0; top: 0; translate: -50% -100%; white-space: nowrap; will-change: transform;
+        position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform;
         font: bold 19px Georgia, serif; color: #fff1dc; text-shadow: 0 0 3px #000, 0 2px 2px #000, 0 0 10px rgba(0,0,0,.8);
-        animation: dmgpop .95s ease-out forwards;
+        -webkit-text-stroke: .7px #000; paint-order: stroke fill;
       }
       #dmg span.big { color: #ffb43a; font-size: 29px; text-shadow: 0 0 4px #000, 0 2px 3px #000, 0 0 14px rgba(255,90,10,.75); }
+      #dmg span.heal { color: #5cff4a; }
       #dmg span.dot { color: #d2ff9a; font-size: 14px; }
-      @keyframes dmgpop { 0% { scale: .4; opacity: 0 } 12% { scale: 1.35; opacity: 1 } 28% { scale: 1 } 72% { opacity: 1 } 100% { scale: .9; opacity: 0 } }
 
       /* Build id and new-version prompt (src/ui/version.ts). */
       #version {

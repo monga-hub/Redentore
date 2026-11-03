@@ -176,6 +176,8 @@ export class HeroOutfits {
     this.disposed = true;
     for (const part of [...this.parts, ...this.shells]) part.removeFromParent();
     this.parts = []; this.shells = [];
+    // A pending material still belongs to its master; refresh's finally releases it when the load settles.
+    if (this.busy) return;
     for (const master of this.masters.values()) {
       for (const geometry of master.geometries) geometry.dispose();
       for (const material of master.materials.values()) {

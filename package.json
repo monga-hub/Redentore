@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "balance": "node scripts/balance.ts",
     "soak": "node scripts/soak-boss.ts",
-    "check": "node scripts/check-walkable.ts && node scripts/check-abilities.ts && node scripts/check-potions.ts && node scripts/check-spells.ts && node scripts/check-enemies.ts && node scripts/check-target.ts && node scripts/check-plates.ts && node scripts/check-save.ts && node scripts/check-levels.ts && node scripts/check-intro.ts && node scripts/check-quest.ts && node scripts/check-ferry.ts && node scripts/check-loot.ts && node scripts/check-keys.ts && node scripts/check-notes.ts && node scripts/check-cloud.ts && node scripts/check-one-app.ts && node scripts/check-stream.ts && node scripts/check-outfit-fist.ts && node scripts/check-tizian-outfits.ts"
+    "check": "node scripts/check-walkable.ts && node scripts/check-abilities.ts && node scripts/check-potions.ts && node scripts/check-spells.ts && node scripts/check-enemies.ts && node scripts/check-target.ts && node scripts/check-plates.ts && node scripts/check-save.ts && node scripts/check-levels.ts && node scripts/check-intro.ts && node scripts/check-quest.ts && node scripts/check-ferry.ts && node scripts/check-loot.ts && node scripts/check-keys.ts && node scripts/check-notes.ts && node scripts/check-cloud.ts && node scripts/check-one-app.ts && node scripts/check-stream.ts && node scripts/check-outfit-fist.ts && node scripts/check-tizian-outfits.ts && node scripts/check-bortolo-outfits.ts"
   },
   "dependencies": {
     "three": "^0.186.1"

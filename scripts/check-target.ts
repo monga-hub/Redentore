@@ -129,3 +129,5 @@ assert.equal(staleRing.visible, false);
 Object.assign(selection, { target: { kind, mob: behind } });
 Targeting.prototype.update.call(selection, 0, new THREE.Vector3());
 assert.equal(selection.target, undefined, 'removed target clears without a button press');
+
+await import("./check-target-input.ts");

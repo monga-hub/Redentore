@@ -133,8 +133,19 @@ export class Targeting {
       e.preventDefault(); // keep focus off the browser chrome
       if (!e.repeat) this.cycle();
     });
-    document.getElementById('target-cycle')!.addEventListener('click', () => this.cycle(heroSeen));
-    document.getElementById('target-nearest')!.addEventListener('click', () => this.nearest(heroSeen));
+    for (const [id, select] of [
+      ['target-cycle', () => this.cycle(heroSeen)],
+      ['target-nearest', () => this.nearest(heroSeen)],
+    ] as const) {
+      const button = document.getElementById(id)!;
+      // A second touch (while the stick is held) has pointer events but no primary-touch click.
+      button.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch') return;
+        e.preventDefault();
+        select();
+      });
+      button.addEventListener('click', (e) => { if (e.pointerType !== 'touch') select(); });
+    }
   }
 
   /** Select only, within Tab's existing 40 m bound; spell range is still checked when casting. */

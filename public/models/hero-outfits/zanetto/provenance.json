@@ -1,0 +1,294 @@
+{
+  "hero": "zanetto",
+  "source": "Existing author-owned Meshy outputs; no new generation in this delivery",
+  "rig": "Original zanetto.glb, 24 bones and original animations unchanged",
+  "fitting": "Authored torso/sleeve and continuous lower garment weights; original animated hand topology with opaque finish. World 3 shifted onto original skeleton without changing source silhouette.",
+  "icons": "Original painted fantasy item illustrations generated with the built-in imagegen tool on 2026-11-03: isolated empty clothing objects, alpha preserved, packed into the existing 73-item atlas. No model screenshots are used, including the six common starter cells.",
+  "worlds": [
+    {
+      "world": 1,
+      "masterSha256": "a30f71d10a4c7f267c614038d450852a06516152166d740f79d8bac2052546cd",
+      "tasks": {
+        "master": "01a19d86-47f2-76f5-b3b1-dc40355ad477",
+        "green": "01a19d9c-6dd3-7574-918e-a5796a2b8ac3",
+        "blue": "01a19d9c-8969-7596-886d-68a91d8831b4"
+      }
+    },
+    {
+      "world": 2,
+      "masterSha256": "2f50eabd2b69fde2c395f844fefd5e7a4432aff3741945524ac1490326d5311a",
+      "tasks": {
+        "master": "01a19d86-542c-7214-9602-a3d6c6d2a79d",
+        "green": "01a19d9c-a520-76a2-ba4d-6289ec878066",
+        "blue": "01a19d9c-b9fd-7160-b8ac-09d262244387"
+      }
+    },
+    {
+      "world": 3,
+      "masterSha256": "d012c52e29d2ec5a6a9891dc42e4628785a4b06a8a2d6639af16873121b49205",
+      "tasks": {
+        "master": "01a19d86-5f4a-70d1-8d41-9b53a31c34e1",
+        "green": "01a19d9c-ce95-718f-a5d5-93873f86c6a1",
+        "blue": "01a19d9c-e4fe-71be-9f4e-d93a5fc3b4ca"
+      }
+    }
+  ],
+  "world3OpaqueTrousersTask": "01a19db2-eaff-7358-938d-e7cc7a72a100",
+  "iconSources": [
+    {
+      "world": 1,
+      "sha256": "f79b4de5168a673387eb5e778f9e95e9c4c4360b9c94cd7dc00a4b8c60f0ba56",
+      "rows": 4,
+      "columns": 6
+    },
+    {
+      "world": 2,
+      "sha256": "b830daee53105d1de31c8b16b2313127135fa167b447d797d55ed9864bddd2fe",
+      "rows": 3,
+      "columns": 6
+    },
+    {
+      "world": 3,
+      "sha256": "e45a2b3e047de76b50a4718879ee9e6cb15db56e329c83b6c502652f5c9a5771",
+      "rows": 3,
+      "columns": 6
+    }
+  ],
+  "materialPalettes": [
+    {
+      "world": 1,
+      "finish": "green",
+      "palette": {
+        "cloth": [
+          79,
+          64,
+          49
+        ],
+        "trim": [
+          94,
+          86,
+          73
+        ],
+        "cord": [
+          69,
+          51,
+          36
+        ],
+        "hand": [
+          83,
+          56,
+          36
+        ]
+      }
+    },
+    {
+      "world": 1,
+      "finish": "blue",
+      "palette": {
+        "cloth": [
+          105,
+          28,
+          33
+        ],
+        "trim": [
+          103,
+          77,
+          44
+        ],
+        "cord": [
+          107,
+          34,
+          27
+        ],
+        "hand": [
+          98,
+          55,
+          31
+        ]
+      }
+    },
+    {
+      "world": 1,
+      "finish": "epic",
+      "palette": {
+        "cloth": [
+          110,
+          27,
+          45
+        ],
+        "trim": [
+          151,
+          113,
+          58
+        ],
+        "cord": [
+          137,
+          42,
+          31
+        ],
+        "hand": [
+          115,
+          64,
+          35
+        ]
+      }
+    },
+    {
+      "world": 2,
+      "finish": "green",
+      "palette": {
+        "cloth": [
+          66,
+          74,
+          78
+        ],
+        "trim": [
+          99,
+          103,
+          101
+        ],
+        "cord": [
+          81,
+          72,
+          53
+        ],
+        "hand": [
+          75,
+          57,
+          40
+        ]
+      }
+    },
+    {
+      "world": 2,
+      "finish": "blue",
+      "palette": {
+        "cloth": [
+          34,
+          105,
+          94
+        ],
+        "trim": [
+          119,
+          112,
+          88
+        ],
+        "cord": [
+          152,
+          106,
+          48
+        ],
+        "hand": [
+          111,
+          71,
+          38
+        ]
+      }
+    },
+    {
+      "world": 2,
+      "finish": "epic",
+      "palette": {
+        "cloth": [
+          27,
+          94,
+          84
+        ],
+        "trim": [
+          168,
+          155,
+          114
+        ],
+        "cord": [
+          147,
+          74,
+          33
+        ],
+        "hand": [
+          116,
+          75,
+          42
+        ]
+      }
+    },
+    {
+      "world": 3,
+      "finish": "green",
+      "palette": {
+        "cloth": [
+          58,
+          55,
+          52
+        ],
+        "trim": [
+          91,
+          77,
+          58
+        ],
+        "cord": [
+          79,
+          56,
+          38
+        ],
+        "hand": [
+          74,
+          53,
+          36
+        ]
+      }
+    },
+    {
+      "world": 3,
+      "finish": "blue",
+      "palette": {
+        "cloth": [
+          151,
+          83,
+          24
+        ],
+        "trim": [
+          125,
+          88,
+          46
+        ],
+        "cord": [
+          146,
+          42,
+          28
+        ],
+        "hand": [
+          129,
+          72,
+          37
+        ]
+      }
+    },
+    {
+      "world": 3,
+      "finish": "epic",
+      "palette": {
+        "cloth": [
+          102,
+          25,
+          39
+        ],
+        "trim": [
+          155,
+          110,
+          53
+        ],
+        "cord": [
+          163,
+          45,
+          31
+        ],
+        "hand": [
+          155,
+          93,
+          39
+        ]
+      }
+    }
+  ],
+  "rarityAppearance": "Colors follow hero/world identity rather than rarity borders. Original local luminance and garment relief are retained. Low has restrained ornament, matte roughness and reduced normal relief; rare separates rich cloth, parchment and aged metal; epic retains full relief and precious-metal response. Source ORM red (occlusion) is converted to the game red (animated glow): zero for low/rare, 4/255 on epic metal trim only, preserving the existing subtle breathing effect. Existing spell aura remains compatible."
+}

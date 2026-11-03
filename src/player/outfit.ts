@@ -22,8 +22,9 @@ import type { Hero } from './heroes.ts';
 // slots over them wear: one set of three textures, repainted in place, so cloth and armour bend with the body. On top, as
 // sculpted Meshy pieces baked onto the bones, the helm or hat on the hood and a pauldron on each shoulder (the body's own
 // bone pauldrons pulled in under them); in the fist the weapon, a Meshy prop. Only what is worn is loaded; what is taken
-// off is freed. The other heroes (player/heroes.ts) keep their own painted body under every set (the looks are painted on
-// the Risorto's UVs) and wear its helms and pauldrons, fitted to them (`BODIES`), and their own fist.
+// off is freed. Registered hero outfits use six independent world/rarity pieces through HeroOutfits on their original
+// skeleton. Heroes without that registration keep their own painted body and wear fitted legacy helms and pauldrons
+// (`BODIES`); every hero keeps the original weapon/fist behavior.
 
 type Look = 'becchino' | 'chierico' | 'arsenale' | 'murano' | 'voto' | 'gondola' | 'merletto' | 'broccato';
 /** Body regions, painted by the slot that covers them. */

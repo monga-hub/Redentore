@@ -308,7 +308,9 @@ braccia di Fra' Tizian, il verderame di Zanetto), e con le sue clip (idle, passo
 reazioni, morte) prese dalla libreria di animazioni Meshy e ritagliate sugli stessi nomi e tempi del gioco (colpi, capriola, la
 finestra in aria del salto), così il gioco è identico per tutti. Ognuno ha la sua arma di partenza in un file suo
 (`arma-<eroe>.glb`: la clava di femore, il remo da guerra gelato, lo stiletto al veleno, la canna da vetraio con la goccia fusa,
-il martello da campana). Il Risorto indossa gli otto set ridipinti sul suo corpo (il fuoco viola di costole e occhi arde attraverso ognuno); gli altri ne portano solo elmi, cappelli e
+il martello da campana). Zanetto dispone inoltre di tre abiti del campanaro, uno per mondo di origine degli oggetti, con tre gradi di finitura, senza legare il colore del tessuto alla rarità: cappuccio, ornamenti delle spalle, abito con maniche, guanti, gambali e stivali sono indipendenti e possono appartenere a mondi diversi. Mantiene lo scheletro, le animazioni, il martello e il giogo originali; le icone illustrate dei singoli oggetti seguono borsa, scheda e mercanti. I colori passano dal panno sobrio al vino e bronzo del primo mondo, dal grigio al petrolio e ottone del secondo, dal carbone allo zafferano e all’oro del terzo; aumentano rilievi e finiture con la rarità. Gli asset e la provenienza sono in `public/models/hero-outfits/zanetto/`; `node scripts/check-zanetto-outfits.ts` verifica mesh, pesi, coperture e associazioni agli oggetti.
+
+Il Risorto indossa gli otto set ridipinti sul suo corpo (il fuoco viola di costole e occhi arde attraverso ognuno); Fosca ne porta solo elmi, cappelli e
 spallacci (misurati su ciascuno: al Risorto, a Fra' Tizian e a Zanetto il cappuccio, a Bortolo la paglietta, a lei il velo si
 ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua); ognuno
 stringe le armi col proprio pugno. Le campane di Zanetto stanno su un giogo fissato al petto,

@@ -6,9 +6,12 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { OUTFIT_APPEARANCES, wholeOutfitKey } from '../src/player/whole-outfit-key.ts';
 import { wholeMaterialKey, finishWholeMaterial } from '../src/player/whole-outfit-material.ts';
 import type { Hero } from '../src/player/heroes.ts';
+import { buildsFor } from '../src/loot/builds.ts';
+import { copyFist } from '../src/player/hero-outfit-fist.ts';
 import { CLOTH_SLOTS } from '../src/player/hero-outfit-key.ts';
 
 for (const [hero, builds] of Object.entries(OUTFIT_APPEARANCES) as [Hero, readonly string[]][]) {
+  assert.deepEqual(builds, buildsFor(hero).map(b => b.id), 'Visual identities match canonical catalogue');
   const sources = new Set<number>();
   for (const build of builds) for (const chapter of [1, 2, 3] as const) for (const rarity of ['comune', 'noncomune', 'raro', 'epico'] as const) {
     const selection = { build, chapter, rarity, legacy: false };
@@ -27,6 +30,12 @@ for (const [hero, builds] of Object.entries(OUTFIT_APPEARANCES) as [Hero, readon
   assert.equal(sources.size, 3, `${hero}: three distinct complete source appearances`);
 }
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+loader.register(parser => ({ name: 'without-images', beforeRoot() { parser.json.materials = parser.json.materials?.map(() => ({})); return null; } }));
+const originalBytes = fs.readFileSync('public/models/reietto.glb');
+const originalScene = await loader.parseAsync(originalBytes.buffer.slice(originalBytes.byteOffset, originalBytes.byteOffset + originalBytes.byteLength), '');
+let originalBody: THREE.SkinnedMesh | undefined;
+originalScene.scene.traverse(o => { if (o instanceof THREE.SkinnedMesh) originalBody ??= o; });
+originalBody!.geometry.setAttribute('aFist', new THREE.Float32BufferAttribute(new Float32Array(originalBody!.geometry.getAttribute('position').count * 3).fill(.1), 3));
 for (const world of [1, 2, 3]) {
   const dir = `public/models/hero-outfits/risorto/${world}`;
   const bytes = fs.readFileSync(`${dir}/master.glb`);
@@ -38,6 +47,7 @@ for (const world of [1, 2, 3]) {
   for (const slot of CLOTH_SLOTS) {
     const mesh = gltf.scene.getObjectByName(slot) as THREE.Mesh;
     assert.ok(mesh?.geometry.index?.count);
+    if (slot === 'mani') assert.equal(copyFist(originalBody!.geometry, mesh.geometry), mesh.geometry.getAttribute('position').count, 'Risorto original hand/forearm bind positions and weights unchanged');
     const g = mesh.geometry, p = g.getAttribute('position'), j = g.getAttribute('skinIndex'), w = g.getAttribute('skinWeight');
     for (let i = 0; i < p.count; i++) {
       assert.ok([p.getX(i), p.getY(i), p.getZ(i)].every(Number.isFinite));

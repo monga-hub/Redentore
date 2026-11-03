@@ -1,11 +1,10 @@
 import * as THREE from 'three';
-import * as gearCatalogue from '../loot/gear.ts';
 import { wholeOutfitKey, type OutfitSelection } from './whole-outfit-key.ts';
 import { hasHeroOutfits } from './hero-outfit-key.ts';
 import { HeroOutfits } from './hero-outfits.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { arm, loadModel, shaft } from '../core/models.ts';
-import { GEAR, type GearState, type Slot } from '../loot/gear.ts';
+import { GEAR, outfitSelection, type GearState, type Slot } from '../loot/gear.ts';
 import type { Hero } from './heroes.ts';
 
 // What the hero wears, on the hero (WoW's paper doll): every visible slot shows its piece, and a full set reads as one
@@ -951,9 +950,7 @@ export class Outfit {
   }
 
   wear(worn: GearState, selection?: OutfitSelection): void {
-    // Optional until the canonical catalogue lands; legacy callers retain their exact behavior.
-    const select = (gearCatalogue as unknown as { outfitSelection?: (hero: Hero, worn: GearState) => OutfitSelection }).outfitSelection;
-    selection ??= select?.(this.hero, worn);
+    selection ??= outfitSelection(this.hero, worn);
     const whole = !!wholeOutfitKey(this.hero, selection), key = whole ? JSON.stringify(selection) : '';
     const changedSelection = key !== this.selectionKey;
     this.selectionKey = key;

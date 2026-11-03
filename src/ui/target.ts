@@ -129,9 +129,9 @@ export class Targeting {
     this.target = nearest(this.kinds, this.player, TAB_RANGE, (m, k) => this.seen(m, k), this.target?.mob) ?? this.target;
   }
 
-  /** A targeted cast with no living target picks the nearest enemy in sight within `range` m, as if tapped. */
-  ensure(range: number): void {
-    this.target = resolve(this.target, this.kinds, this.player, range, (m, k) => this.seen(m, k));
+  /** Auto-target a cast using its line of sight; pointer picking keeps the camera ray. */
+  ensure(range: number, seen: (m: Mob, k: Kind) => boolean = (m, k) => this.seen(m, k)): void {
+    this.target = resolve(this.target, this.kinds, this.player, range, seen);
   }
 
   /** The living, visible enemy under screen point (x, y), if any. */

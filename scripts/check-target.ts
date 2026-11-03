@@ -1,6 +1,7 @@
 // Target picking check (`npm run check`): a click on a mob's body selects it, the closer of two
 // overlapping mobs wins, empty ground, dead mobs and mobs behind the camera select nothing.
 import * as THREE from 'three';
+import assert from 'node:assert/strict';
 import { pick, resolve, type Kind, type Mob } from '../src/ui/target.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -36,3 +37,46 @@ if (resolve(undefined, [fight], hero, 30)?.mob !== fighting) fail('auto-target p
 fighting.state = 'evade';
 if (resolve(undefined, [fight], hero, 30)?.mob !== resting) fail('nobody fighting: the nearest foe should be taken');
 console.log('target picking ok');
+
+// Fosca's base cast: the camera is screened by scenery, the hero faces away, but a foe is 4 m away
+// with a clear spell ray. Camera-based ensure used to leave it unselected and report no target.
+const { Targeting } = await import('../src/ui/target.ts');
+const { World } = await import('../src/core/physics.ts');
+const { Grimoire } = await import('../src/abilities/grimoire.ts');
+const { AbilitySystem } = await import('../src/abilities/system.ts');
+const { tuneOf } = await import('../src/player/levels.ts');
+const world = new World();
+const close = mob(0, -4), selected = mob(1, -8);
+const castKind = { ...kind, all: [close, selected] };
+const selection = { player: new THREE.Vector3(), kinds: [castKind], target: undefined, seen: () => false } as unknown as InstanceType<typeof Targeting>;
+const host = { player: { pos: new THREE.Vector3(), facing: Math.PI, world }, aimed: () => selection.target?.mob, foes: () => castKind.all };
+const magic = new Grimoire(host, tuneOf([]));
+let fired: Mob | undefined;
+const base = { id: 'thorn', name: 'Spina del contagio', icon: 'thorn', desc: '', cooldown: 0.3, offGcd: true, main: true,
+  check: () => magic.why(), fire: () => { fired = magic.target(); } };
+const sys = new AbilitySystem([base], ['thorn'], host);
+const reset = () => { sys.update(1, () => false); sys.notices.length = 0; fired = undefined; };
+sys.aim = () => Targeting.prototype.ensure.call(selection, 30);
+assert.equal(sys.tryCast(0), false);
+assert.equal(sys.notices.at(-1)?.text, 'Nessun bersaglio.');
+sys.aim = () => Targeting.prototype.ensure.call(selection, 30, (m) => world.sees(host.player.pos, m));
+reset();
+assert.equal(sys.tryCast(0), true);
+assert.equal(fired, close);
+assert.equal(selection.target?.mob, close);
+assert.equal(sys.tryCast(0), false, 'cooldown still applies');
+selection.target = { kind: castKind, mob: selected }; reset();
+assert.equal(sys.tryCast(0), true);
+assert.equal(fired, selected, 'manual selection is kept over the nearer foe');
+selected.z = -40; reset();
+assert.equal(sys.tryCast(0), false);
+assert.equal(sys.notices.at(-1)?.text, 'Bersaglio fuori portata.');
+assert.equal(selection.target?.mob, selected, 'out-of-range manual selection is not silently replaced');
+selected.z = -8;
+world.add(0, -2, 20, 0.5, 0, 4); reset();
+assert.equal(sys.tryCast(0), false);
+assert.equal(sys.notices.at(-1)?.text, 'Bersaglio non in vista.');
+selection.target = undefined; reset();
+assert.equal(sys.tryCast(0), false, 'auto-target never crosses a physical wall');
+assert.equal(selection.target, undefined);
+console.log('base cast auto-target: hero LOS, facing away, manual choice, range, walls and cooldown ok');

@@ -56,7 +56,7 @@ import { Director } from './audio/director.ts';
 import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
-import { Equipment, shop2, crit, damageMultiplier, effects, shop, starter, worth as value } from './loot/gear.ts';
+import { Equipment, outfitChoices, shop2, crit, damageMultiplier, effects, shop, starter, worth as value } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
 import { VendorPanel } from './ui/vendor.ts';
@@ -341,7 +341,7 @@ function arena(): void {
     if (c.kind === 'ability') kit.system.learn(c.id);
   }
   const worn = { ...gear.worn };
-  for (const it of shop(true, hero)) { const cur = ITEM.get(worn[it.slot!] ?? ''); if (!cur || value(it) > value(cur)) worn[it.slot!] = it.id; }
+  for (const it of [...shop(true, hero).filter(it => it.slot), ...outfitChoices(hero, 3)]) { const cur = ITEM.get(worn[it.slot!] ?? ''); if (!cur || value(it) > value(cur)) worn[it.slot!] = it.id; }
   booted = false; // its base attacks learnt quietly: the book isn't up yet
   gear.decode(worn); // and the stats laid on
   booted = true;

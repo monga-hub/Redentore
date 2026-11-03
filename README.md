@@ -18,8 +18,8 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   nova d'ombra da cui scappare, sotto il 60% marchi cremisi a terra (uno sotto i piedi, due ai lati:
   un passo di lato e li eviti), sotto il 30% furia (tutto più rapido), dopo 4 minuti di lotta ogni
   colpo triplica. Pensato per il livello 8-9: circa 3 minuti con una build sensata che schiva e
-  l'equipaggiamento raccolto per strada (col solo set di canapa si perde spesso, con qualche epico comprato
-  si fa prima); con il kit iniziale è quasi impossibile. Una morte ti risveglia al checkpoint senza perdere carte.
+  l’equipaggiamento raccolto e assemblato per strada (col solo abito iniziale si perde spesso;
+  le vecchie misure del bot con epici comprati non rappresentano la nuova economia); con il kit iniziale è quasi impossibile. Una morte ti risveglia al checkpoint senza perdere carte.
 - Progressione (missione "La chiave del portinaio"): il portone della chiesa è sbarrato. Sulla
   fondamenta Fra' Zuane, il fantasma incatenato del portinaio dei cappuccini (punto esclamativo
   dorato), affida la missione in una finestra di dialogo stile WoW (ritratto, testo scritto a
@@ -50,9 +50,9 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   ciascuna volta che le tengono il velo (finché vivono incassa l'80% in meno), sotto il 25% il fuso (fili
   incrociati che le girano attorno: si corre con loro, negli spazi), dopo 5 minuti e mezzo ogni colpo triplica.
   Morta lei, tutti i suoi cadono e il portone delle Zitelle si apre sul sagrato; Fra' Zuane chiude la missione
-  (300 esperienza, 200 oro) e accenna a chi ha teso il filo. Bottino di livello 2: le tre famiglie di abiti del proprio eroe con budget e livello oggetto maggiori,
-  oltre ad armi, gioielli e più oro; gli abiti verdi ed epici si comprano anche da
-  Mastro Iseppo nello squero (vedi sotto), e Fra' Bortolo dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
+  (300 esperienza, 200 oro) e accenna a chi ha teso il filo. Bottino di livello 2: componenti per assemblare una delle tre famiglie del proprio eroe,
+  oltre ad armi, gioielli e più oro; Mastro Iseppo vende componenti comuni, non comuni e rari di capitolo 2,
+  mai epici o abiti completi (vedi sotto), e Fra' Bortolo dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
   Croce, poi nell'andito dietro l'altare. Il salvataggio tiene la nuova missione (i salvataggi vecchi si caricano:
   a livello 1 finito si riparte dal rapporto a Fra' Zuane, la nebbia di guerra resta al suo posto).
 - **Livello 3, "Le nozze di San Giorgio"** (l'ultimo): morta la Governatrice, Fra' Zuane manda il Risorto a
@@ -67,9 +67,9 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   (ha la chiave del Cenacolo); boss l'Abate, alto il doppio dell'eroe, nel Cenacolo: Calice di Cana (cono di vino
   che versa: si esce di lato), Rintocchi (anelli di campana che corrono sul pavimento: si saltano), Acqua alta (il
   pavimento si allaga, restano asciutte poche isole: ci si sale), tre atti con onda dorata, rintocco e scossa a
-  ogni cambio d'atto e tre rintocchi quando cade. Bottino di livello 3 con livello oggetto più alto: pezzi verdi e blu,
-  sette epici (Mitra e Baculo dell'Abate, Piviale delle nozze, Cocolla di Cana, Guanti del Bibliotecario...) e il
-  leggendario Anello della Sensa (solo dall'Abate); presa la missione, Fra' Bortolo vende gli epici del livello 3.
+  ogni cambio d'atto e tre rintocchi quando cade. Bottino di livello 3: componenti delle quattro rarità per gli abiti del nuovo capitolo,
+  armi e gioielli, e il leggendario Anello della Sensa (solo dall’Abate); presa la missione, Fra’ Bortolo vende
+  componenti comuni, non comuni e rari del livello 3, oltre alle precedenti armi e gioielli.
   Al ritorno Fra' Zuane chiude la storia (420 esperienza, 320 oro): i tre nodi sciolti, il voto del 1576 compiuto,
   lui libero di varcare la soglia; poi l'epilogo a tutto schermo e "Fine" (si continua a vagare). Il salvataggio tiene
   la missione e l'approdo (i salvataggi vecchi si caricano); i corpi del livello 3 si caricano con la missione e le
@@ -80,7 +80,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   Benedizione della serra: per 3 minuti lanci il 20% più rapidi e +10% ai danni (icona e conto alla
   rovescia sotto il ritratto). La serra è fuori dalla portata dei frati. È anche un mercante
   (Commercia, in ogni pagina del dialogo): compra tutto quello che c'è nella borsa a un quarto del suo
-  prezzo (con una fila per riacquistare le vendite della visita) e vende i pezzi epici (viola) del livello 1 e i tomi delle due scuole dell'eroe (vedi Abilità).
+  prezzo (con una fila per riacquistare le vendite della visita) e vende componenti comuni, non comuni e rari del capitolo sbloccato, le precedenti armi e gioielli epici, e i tomi delle due scuole dell'eroe (vedi Abilità).
 - **Mastro Iseppo, el proto dello squero** (`src/quest/squero.ts`, modello Meshy): il fantasma del capomastro
   dello squero sul rio, in cortile accanto alla gondola sui cavalletti, fuori dalla portata dei mob. Sua figlia
   Marieta è ancora alle Zitelle; lui vuole finire l'ultima gondola per andarla a prendere. Missioni secondarie a
@@ -89,8 +89,8 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   ucciso), *Il ditale di Marieta* (sotto l'ultimo letto del dormitorio, un luccichio dorato), *Le forbici della
   Maestra*, *L'ex voto del Redentore* (si torna nella chiesa del livello 1, terza cappella a destra); e *La lettera
   di Marieta*, che parte raccogliendo un drop raro delle zitelle (sicuro dopo la chiave della Maestra). Ognuna
-  paga esperienza e oro (tabella `QUESTS`, banner "Missione completata") e un epico del livello 2; Iseppo vende
-  anche tutti gli epici del livello 2 e i tomi (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
+  paga esperienza e oro (tabella `QUESTS`, banner "Missione completata") conservando solo i precedenti premi diversi dall’armatura; Iseppo vende
+  componenti comuni, non comuni e rari del livello 2, armi e gioielli precedenti e i tomi (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
   obiettivo, oggetti di missione col raggio dorato; gondolieri e codeghe risorgono come i frati (lontano dall'eroe,
   un quarto dell'esperienza, bottino magro) finché la Governatrice è viva; se cade prima, le missioni di raccolta e
   di uccisione si consegnano lo stesso. Tutto nel salvataggio (i vecchi si caricano senza).
@@ -128,7 +128,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
 - **La catena del Veronese**, obbligatoria prima del Cenacolo: il fantasma di Paolo Veronese aspetta
   nell'Antirefettorio (corpo Meshy `veronese.glb`, Idle e Talk). *I musici di Cana*: la viola in Biblioteca, il violino
   nel Presbiterio, il violone nel Coro e il flauto sul palco del Teatro Verde, in qualunque ordine, ognuno vicino al suo
-  branco; paga il Mantello di Caliari. *La tela tagliata*: sveglia il Commissario delle Arti nel chiostro dei Cipressi
+  branco; paga 200 PE e 80 oro. *La tela tagliata*: sveglia il Commissario delle Arti nel chiostro dei Cipressi
   (corpo Meshy `commissario.glb`, ~7000 PV, resistenza 0.5; lo Squarcio, un fendente lungo e stretto a terra;
   l'Inventario, croci di gesso che esplodono; a metà vita chiama 3 granatieri, branco nascosto che torna a dormire se
   lui torna a riposo). Dal suo corpo la tela arrotolata: consegnata, paga la Sciabola del Commissario (`sciabola.glb`)
@@ -148,8 +148,8 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   (barra nel tracker) e si ferma tre volte: sotto la cupola, a metà navata e sul sagrato, dove si svegliano tre branchi
   nascosti di monaci neri (3, 4 e 4) che attaccano lui, non l'eroe. Aspetta l'eroe che resta indietro e, mentre cammina,
   recupera salute pregando. Se cade si rialza davanti all'altare e la processione ricomincia (anche dopo un
-  caricamento). Sul Bacino si posa sul capo la tiara (un lampo d'oro); la consegna è lì e paga 350 PE, 150 oro, la
-  Tiara di cartapesta (testa, epico unico) e la *Benedizione apostolica*: i colpi dell'eroe sull'Abate fanno il 10% in
+  caricamento). Sul Bacino si posa sul capo la tiara (un lampo d'oro); la consegna è lì e paga 350 PE, 150 oro
+  e la *Benedizione apostolica*: i colpi dell'eroe sull'Abate fanno il 10% in
   più (`PREPS=benedizione`). `node scripts/balance.ts incoronazione` la gioca con il bot.
 - **Il libro di sabbia**, la missione segreta: nessun "!" e nessun segnalino. La avvia una drop rara da un amanuense
   qualunque, *una pagina senza numero* (3% che sale dell'1% a uccisione), che manda «al centro del giardino dei sentieri
@@ -175,9 +175,25 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   console `drago()` lo rimette in piedi. `node scripts/balance.ts drago melee,arcane` lo gioca con il bot.
 - Equipaggiamento (`src/loot/builds.ts`, `src/loot/gear.ts`): quattro posti, abito completo, arma, amuleto e anello.
   Ogni eroe ha tre famiglie (prima scuola, seconda scuola, ibrido), ciascuna nei tre capitoli: 45 definizioni prima delle
-  rarità comune, non comune, rara ed epica. Si parte con un abito comune e l’arma del proprio eroe. Negozi e bottino
-  offrono abiti compatibili col personaggio e col capitolo; i negozi hanno tre alternative verdi e tre epiche allo stesso
-  tier. Le ricompense d’armatura delle missioni fanno scegliere uno dei tre abiti equivalenti nel dialogo esistente.
+  rarità comune, non comune, rara ed epica. Si parte con un abito comune e l’arma del proprio eroe.
+  I nuovi abiti si assemblano: raccogli sei componenti diversi (testa, spalle, torso, mani, gambe, piedi) dello stesso
+  capitolo, rarità ed eroe. In borsa il progresso è `0–6/6`: **Unisci** avvia una breve animazione, poi tre carte illustrate
+  mostrano le build equivalenti, ruolo, priorità e statistiche. Scegli e conferma: solo allora i sei pezzi diventano un abito.
+  Annullare o ricaricare prima della conferma conserva tutto; una borsa cambiata richiede una nuova verifica.
+  La borsa deve poter contenere l’abito dopo il consumo. I componenti si impilano fino a 20, non si indossano.
+  Botteghe: sei componenti comuni, sei non comuni e sei rari del capitolo sbloccato; nessun componente epico e nessun
+  abito completo. Armi e gioielli conservano economia e premi precedenti. Le missioni non regalano armature o abiti:
+  mantengono PE, oro, premi diversi dall’armatura e completamento una tantum. Nessun premio viene riaccreditato.
+  Pezzi di capitoli o rarità diversi non si uniscono e non si potenziano automaticamente. I vecchi pezzi, privi di
+  metadati espliciti di componente/eroe, restano conservabili e vendibili ma non sono ingredienti; gli abiti già ottenuti restano tuoi.
+  Drop componenti provvisori: worker 1 tiro al 50%, frate 1 al 75%, prete 1 all’85%, élite 2 al 100%/50%, boss 2 al
+  100%/100%. Nel tiro riuscito, comune/noncomune/raro/epico: worker e frate 50/25/19/6, prete 45/26/21/8,
+  élite 40/26/24/10, boss 35/26/27/12 (denominatore 100). Epici per morte attesi: 0,03/0,045/0,068/0,15/0,24.
+  Dopo aver estratto la rarità si sceglie uniformemente una parte mancante in borsa per la stessa ricetta, se presente;
+  altrimenti una delle sei. Nessun aumento garantito degli epici: sfortuna sulla rarità e duplicati dopo il set completo
+  rimangono; ritardare la raccolta può produrre parti duplicate a terra. Nemici risorti: tabella worker, fino al boss;
+  ricaricare un morto non rigenera bottino. `node scripts/simulate-components.ts` riproduce le simulazioni seeded dei
+  roster reali, p50/p90/p99, ripetizioni e pressione della borsa: le stime non misurano minuti reali di gioco.
   Ruolo, statistiche consigliate e incantesimi suggeriti si leggono nei tooltip: le abilità vanno sempre apprese,
   nessuna viene concessa o bloccata dall’abito. Armatura e statistiche agiscono
   davvero: Vigore (+10 salute), Intelletto (+10 mana), Spirito (rigenerazione), Potenza (+% danni),
@@ -253,7 +269,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 / 3 | al passaggio di livello (il gioco si ferma) scegli una delle tre carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
-| B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un pezzo (secondo tocco su touch) per indossarlo: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
+| B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un equipaggiamento (secondo tocco su touch) per indossarlo; i componenti si uniscono con Unisci: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
 | C | scheda del personaggio: manichino stile WoW con i quattro posti (abito, arma, amuleto e anello) attorno all'eroe a figura intera, vestito com'è (trascinalo per girarlo), e accanto i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 

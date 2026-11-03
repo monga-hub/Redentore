@@ -11,7 +11,7 @@
 // Six quests in a loose chain (each opens when the one it follows is done, so two can run at once), WoW and
 // Diablo style: collect off the drowned gondolieri, kill the codeghe, the Gastaldo's head, a thimble under a bed
 // in the Zitelle's dormitory, the Maestra's shears, an ex voto back in the Redentore; and a seventh started by a
-// rare drop, Marieta's letter. Each pays XP, gold and one of level 2's epics; he sells the rest of them.
+// rare drop, Marieta's letter. Each pays XP/gold; non-armor keepsakes remain, outfits are assembled.
 //
 // Level 3 (San Giorgio) brings more givers on the same engine (GIVERS): Iseppo again, by his gondola on the approdo,
 // the Fanalista of the darsena, Padre Archivista in Longhena's passage, and the ghost of Paolo Veronese in the antirefettorio, whose
@@ -26,8 +26,8 @@
 // turned three pilgrims away from his door the night of the vow (their letters, in three corners of the complex, then the bread of the
 // cerca off the friars, laid on the refettorio's board, and the noviziato's bell rung to call them to supper); and Fra' Lunardo, the
 // beekeeper, in the uliveto by the apiary, who wants the giant bee's sting and the hives smoked. Their quests end with the Reverendissimo.
-import { isLegacyArmor, outfitChoices } from '../loot/gear.ts';
-import { ITEM, levelOfItem, type Bag } from '../loot/bag.ts';
+import { isLegacyArmor } from '../loot/gear.ts';
+import { ITEM, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
 import { BELLS, FAC, LABIRINTO, LIB_F, SCANSIE } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
@@ -204,7 +204,6 @@ export const SIDE: readonly SideQuest[] = [
   {
     id: 'ferri',
     want: { kind: 'collect', item: 'ferro-iseppo', n: 6, from: 'gondoliere', chance: 0.5 },
-    reward: 'zoccoli-voga',
     line: (n) => `Ferri di Mastro Iseppo dai gondolieri annegati: ${n}/6`,
     offer: [
       'Ehi, tu. Sì, tu che cammini e non galleggi. Mastro Iseppo, proto di questo squero. Quaranta gondole ho varato su questo scalo, e ognuna portava il mio ferro a prua: sei denti e una I incisa sotto il collo.',
@@ -213,13 +212,12 @@ export const SIDE: readonly SideQuest[] = [
     busy: 'Sei ferri, Risorto. I gondolieri li tengono stretti, ma l\'acqua ha mangiato le loro dita prima delle mie.',
     done: [
       'Fammi vedere... questo è del Toni, questo del Bepi. Questo l\'ho battuto la settimana del voto. Li conosco tutti, come figli.',
-      'Tieni questi zoccoli: erano di un gondoliere che pagava a ferri invece che a ducati. Camminano sull\'acqua bassa meglio di te.',
+      'Prendi queste monete per la strada. I ferri torneranno a prua: ogni gondola avrà di nuovo il suo nome.',
     ],
   },
   {
     id: 'lumi',
     want: { kind: 'kill', n: 6, from: 'codega' },
-    reward: 'collare-puntoaria',
     line: (n) => `Codeghe abbattute lungo la fondamenta: ${n}/6`,
     offer: [
       'Le vedi, quelle lanterne lungo la riva? Le codeghe. Una volta per due soldi ti accompagnavano a casa di notte. Adesso accompagnano i morti, ma dalla parte sbagliata: verso le Zitelle.',
@@ -228,13 +226,12 @@ export const SIDE: readonly SideQuest[] = [
     busy: 'Ne vedo ancora, di lumi, sulla fondamenta. Sei, ho detto. Le codeghe non si fanno pagare, ma tu fatti pagare da me.',
     done: [
       'La riva è più buia. Bene. Al buio un morto si siede e aspetta; con un lume davanti cammina, e cammina dove vuole lei.',
-      'Questo colletto l\'ho tolto a una codega che bussava allo squero. Punto in aria delle Zitelle: tienilo tu, che hai il collo ancora caldo.',
+      'Prendi queste monete. Le lanterne non fanno più luce agli annegati, ma chi torna a casa troverà la strada.',
     ],
   },
   {
     id: 'gastaldo', after: 'ferri',
     want: { kind: 'token', item: 'testa-gastaldo', from: 'gastaldo' },
-    reward: 'cosciali-gastaldo',
     line: () => 'Porta la testa del Gastaldo dei gondolieri a Mastro Iseppo',
     offer: [
       'I ferri sono a posto, ma la gondola non va da nessuna parte finché lui comanda il traghetto. Il Gastaldo dei gondolieri. È là sotto il mio tezon, col remo in mano, come fosse suo.',
@@ -243,7 +240,7 @@ export const SIDE: readonly SideQuest[] = [
     busy: 'Il Gastaldo è sotto il tezon. Attento al remo: quando lo fa girare, sta\' lontano, che non è voga da cristiani.',
     done: [
       'Eccolo qua, il Gastaldo. Da vivo non mi ha mai guardato negli occhi, da morto non può fare altro. La appendo al tezon: che la vedano tutti, i suoi annegati.',
-      'Le sue gambiere: cuoio buono di Rialto, comprato coi soldi degli altri. Mettitele tu. Almeno una volta servono a qualcuno che rema per sé.',
+      'Prendi queste monete: almeno una volta i soldi del Gastaldo serviranno a qualcuno che rema per sé.',
     ],
   },
   {
@@ -264,7 +261,6 @@ export const SIDE: readonly SideQuest[] = [
   {
     id: 'maestra', after: 'gastaldo',
     want: { kind: 'token', item: 'forbici-maestra', from: 'maestra' },
-    reward: 'guanti-maestra',
     line: () => 'Porta le forbici della Maestra del merletto a Mastro Iseppo',
     offer: [
       'La Maestra del merletto. Teneva le ragazze ai tavoli dall\'alba al vespro, e chi sbagliava un punto lo rifaceva al buio. Marieta aveva le dita piene di tagli. Quelle forbici le ha tagliate tutte, le sue figlie.',
@@ -273,7 +269,7 @@ export const SIDE: readonly SideQuest[] = [
     busy: 'La sala del merletto è nell\'ala a ponente dell\'ospizio. Quando la Maestra stende il filo per terra, fa\' un passo di lato.',
     done: [
       'Forbici da merletto, fine come un ago. Le ho tenute in mano un momento e ho sentito il filo tirare, Risorto. Dall\'altra parte c\'è lei. C\'è Marieta.',
-      'I guanti della Maestra. Non hanno mai smesso di contare. Ora conteranno per te.',
+      'Prendi queste monete per la fatica. La Maestra non conterà più le dita delle mie ragazze.',
     ],
   },
   {
@@ -294,14 +290,13 @@ export const SIDE: readonly SideQuest[] = [
   {
     id: 'lettera',
     want: { kind: 'letter', item: 'lettera-marieta' },
-    reward: 'busto-broccato',
     line: () => 'Porta la lettera a Mastro Iseppo, nello squero',
     offer: [],
     busy: '',
     done: [
       'Una lettera? Con la ceralacca delle Zitelle... «Caro padre». È la sua mano, Risorto. La mano di Marieta. Non sapevo nemmeno che avesse imparato a scrivere.',
       '«Non venite a prendermi: la Governatrice dice che la dote non basta mai. Ma io conto i punti, e ogni sera ne cucio uno sbagliato, apposta, perché il velo non si finisca». Ha resistito, la mia ragazza. Quattrocento anni.',
-      'Tieni questo busto di broccato: era il corredo della Pia Casa, la dote che non le hanno mai dato. Io ho la lettera. Mi basta.',
+      'Prendi queste monete: erano per la dote di Marieta. Io ho la lettera. Mi basta.',
     ],
   },
   // San Giorgio (level 3).
@@ -369,7 +364,6 @@ export const SIDE: readonly SideQuest[] = [
   {
     id: 'musici', giver: 'veronese',
     want: { kind: 'finds', finds: STRUMENTI },
-    reward: 'mantello-caliari',
     line: (n) => `Strumenti di Cana: ${n}/4 (Biblioteca, Presbiterio, Coro, Teatro Verde)`,
     offer: [
       'Non spaventarti, ragazzo: sono solo un pittore. Paolo Caliari, da Verona. In Venezia mi chiamano il Veronese. Quella porta l\'ho varcata ogni mattina per quindici mesi, con i pennelli: là dentro ho dipinto le Nozze di Cana, sessanta metri quadri di tela.',
@@ -379,7 +373,7 @@ export const SIDE: readonly SideQuest[] = [
     busy: 'Quattro strumenti, ragazzo: viola, violino, violone, flauto. Senza musica, una festa di nozze è solo gente seduta che mangia. E sulla tavola c\'è una clessidra: il tempo corre.',
     done: [
       'La viola! L\'ho accordata io, nel sessantadue. E il violone di Tiziano, che pesava più di lui. Senti? Suonano da soli, appena si toccano. Le nozze hanno di nuovo la loro musica.',
-      'Prendi questo mantello: è il mio, quello che porto nel quadro, bianco e oro. Ma la musica non basta, ragazzo. Manca la tela.',
+      'Prendi queste monete, per la strada. Ma la musica non basta, ragazzo. Manca la tela.',
     ],
   },
   {
@@ -457,7 +451,6 @@ export const SIDE: readonly SideQuest[] = [
       { kind: 'escort', to: 5 }, { kind: 'kill', n: 4, from: 'monaco', woken: true },
       { kind: 'escort', to: 6 },
     ],
-    reward: 'tiara-cartapesta',
     prep: 'benedizione',
     back: 'Parla con il Cardinale benedettino: la tiara è sul suo capo',
     line: (n, step) => ['Scorta il Cardinale sotto la cupola', `Difendi il Cardinale sotto la cupola: ${n}/3`, 'Scorta il Cardinale lungo la navata', `Difendi il Cardinale nella navata: ${n}/4`,
@@ -470,7 +463,7 @@ export const SIDE: readonly SideQuest[] = [
     busy: 'Cammina con me, figlio. Se resti indietro ti aspetto: una processione non lascia indietro nessuno. Ma i monaci neri non aspettano.',
     done: [
       'Il Bacino. San Marco là in fondo, la Salute, la Giudecca. Duecento anni fa li ho sentiti suonare da dietro una porta chiusa. Adesso le campane le sento da qui, e la laguna mi vede.',
-      'Tieni la tiara, figlio: la cartapesta l\'ho portata io, le pietre le hai portate tu. E prendi la mia benedizione. Quando l\'Abate alza il pastorale, ogni tuo colpo peserà di più: urbi et orbi, e un poco anche alla laguna.',
+      'Prendi le monete e la mia benedizione. Quando l’Abate alza il pastorale, ogni tuo colpo peserà di più: urbi et orbi, e un poco anche alla laguna.',
     ],
   },
   // The secret one, Borges's: a page off an amanuense sends the hero to the labyrinth's middle, the book found there goes on its shelf.
@@ -811,18 +804,16 @@ export class SideQuests {
   }
 
   /** Its items out of the bag (every step's), the reward in; false (nothing changed) when the bag has no room for the reward. */
-  rewardChoices(q: SideQuest) {
+  rewardItem(q: SideQuest): string | undefined {
     const it = ITEM.get(q.reward ?? '');
-    return it && this.bag?.hero && isLegacyArmor(it) ? outfitChoices(this.bag.hero, levelOfItem(it), it.rarity) : [];
+    return it && (isLegacyArmor(it) || it.slot === 'abito') ? undefined : q.reward;
   }
 
-  handIn(q: SideQuest, choice?: string): boolean {
+  handIn(q: SideQuest, _choice?: string): boolean {
     const bag = this.bag;
-    if (!bag || this.done.includes(q.id)) return false;
+    if (!bag || this.done.includes(q.id) || !this.ready(q)) return false;
     const items = [...new Set([...(q.secret ? [q.secret.drop] : []), ...stepsOf(q).flatMap((w) => (w.kind === 'kill' || w.kind === 'escort' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item]))])].map((id) => [id, this.have(id)] as const);
-    const choices = this.rewardChoices(q);
-    if (choices.length && !choices.some((it) => it.id === choice)) return false;
-    const reward = choices.length ? choice! : q.reward;
+    const reward = this.rewardItem(q);
     for (const [id, n] of items) if (n) bag.remove(id, n);
     if (reward && !bag.add(reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);

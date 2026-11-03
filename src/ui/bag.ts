@@ -1,3 +1,5 @@
+import { assemblyProgress } from '../loot/assembly.ts';
+import { AssemblyPanel } from './assembly.ts';
 import { playSfx } from '../audio/engine.ts';
 import { Bag, ITEM, RARITY } from '../loot/bag.ts';
 import { isLegacyArmor, sellPrice, type Equipment } from '../loot/gear.ts';
@@ -53,6 +55,8 @@ body.touch #sheet-btn { top: calc(12px + 88px * var(--k) / .72 + env(safe-area-i
 #bag .cell b { position: absolute; z-index: 1; right: 4px; bottom: 2px; font: bold 11px system-ui, sans-serif; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 body.diablo #bag .cell .ico { filter: var(--ember); }
 #bag .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; font: 12px/16px system-ui, sans-serif; color: #c9b48a; }
+#bag .assembly-progress button { padding:3px 9px; color:#f3e2b0; background:linear-gradient(#4a3420,#140e08); border:1px solid #c9a45c; border-radius:4px; cursor:pointer; }
+#bag .assembly-progress button:disabled { opacity:.45; cursor:default; }
 #bag .gold { color: #ffd75e; font: bold 16px Georgia, serif; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 #bag .gold i, #bag .coin { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, #fff3b0, #ffcf4a 45%, #8a5a00); box-shadow: 0 0 0 1px #000; }
@@ -81,6 +85,8 @@ export class BagPanel {
   private sayT = 0;
   private btn = document.createElement('button');
   readonly sheetBtn = document.createElement('button');
+  private assembly: AssemblyPanel;
+  private progress: HTMLElement;
   private seen = '';
   private sel?: HTMLElement;
   private readonly bag: Bag;
@@ -124,6 +130,18 @@ export class BagPanel {
     this.gold = this.el.querySelector('.gold')!;
     this.tip = this.el.querySelector('.tip')!;
     this.sayEl = this.el.querySelector('.say')!;
+    this.progress = document.createElement('div');
+    this.progress.className = 'assembly-progress';
+    this.progress.style.cssText = 'max-height: min(150px, 25dvh); overflow:auto; margin-top:8px; font:12px/1.4 Georgia;';
+    this.panel.append(this.progress);
+    this.assembly = new AssemblyPanel(this.el, bag, message => { this.refresh(); if (message) this.say(message, true); });
+    this.progress.addEventListener('click', e => {
+      const button = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-join]');
+      if (!button || button.disabled) return;
+      this.select(null);
+      const progress = assemblyProgress(this.bag)[Number(button.dataset.join)];
+      if (progress) this.assembly.show(progress);
+    });
     this.el.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
       if (t === this.el || t === this.row) return this.close();
@@ -155,6 +173,7 @@ export class BagPanel {
     addEventListener('keydown', (e) => { // capture: while the overlay is up, game keys stay out of it (main.ts opens it on B and C)
       if (!this.open) return;
       e.stopPropagation();
+      if (this.assembly.open) return this.assembly.key(e);
       if (e.repeat) return;
       if (e.code === 'Escape') this.close();
       else this.keys[e.code]?.();
@@ -184,6 +203,7 @@ export class BagPanel {
   /** Show or hide one panel; the overlay follows (and the game pauses with it). */
   show(panel: HTMLElement = this.panel, on = true): void {
     if (panel.classList.contains('on') === on) return;
+    if (!on && this.assembly.open) this.assembly.close();
     const was = this.open;
     panel.classList.toggle('on', on);
     const n = this.row.querySelectorAll('.panel.on').length;
@@ -233,6 +253,7 @@ export class BagPanel {
   /** Redraw every panel (after a wear, a sale, a purchase). */
   refresh(): void {
     this.seen = JSON.stringify(this.bag.encode());
+    this.progress.innerHTML = assemblyProgress(this.bag).map((p, i) => `<div style="margin:4px 0;color:${RARITY[p.rarity].color}">Capitolo ${p.chapter} · ${RARITY[p.rarity].name} · ${p.parts.length}/6 pezzi <button data-join="${i}" ${p.parts.length === 6 ? '' : 'disabled'}>Unisci</button><br><small>${['testa', 'spalle', 'torso', 'mani', 'gambe', 'piedi'].map(part => `${p.parts.includes(part as typeof p.parts[number]) ? '✓' : '○'} ${part}`).join(' · ')}</small></div>`).join('');
     this.gold.innerHTML = `<i></i>${this.bag.gold.toLocaleString('it-IT')} oro`;
     this.grid.innerHTML = Array.from({ length: Math.max(Bag.SLOTS, this.bag.items.length) }, (_, i) => {
       const s = this.bag.items[i], it = s && ITEM.get(s.id);

@@ -8,7 +8,7 @@ import { ICONS } from './icons.ts';
 // does nothing, so a player mashing 1 for Caduta d'ossa can't pick blind. A gold flash and "Livello N!"
 // mark the level. Each card names its school (an upgrade its ability's): the offers lean to the hero's. Plain DOM, styled here like the dialogue window, WoW gold or Diablo stone.
 
-const CSS = `
+export const CHOICE_CSS = `
 #levelup { position: fixed; inset: 0; z-index: 19; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
   padding: calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom)); box-sizing: border-box;
   background: radial-gradient(ellipse at 50% 45%, rgba(40,20,60,.55), rgba(0,0,0,.82)); user-select: none; touch-action: manipulation; }
@@ -90,7 +90,7 @@ export class LevelUp {
 
   constructor() {
     const style = document.createElement('style');
-    style.textContent = CSS;
+    style.textContent = CHOICE_CSS;
     document.head.append(style);
     this.el.id = 'levelup';
     this.el.setAttribute('role', 'dialog');

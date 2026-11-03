@@ -233,17 +233,27 @@ export const OUTFITS: readonly Item[] = BUILDS.flatMap((b) => ([1, 2, 3] as cons
     return { id: outfitId(b.id, chapter, rarity), name: `Abito · ${b.name} · ${['Redentore', 'Zitelle', 'San Giorgio'][chapter - 1]}`, rarity, icon: 'chest', lore: b.description, slot: 'abito', hero: b.hero, build: b.id, chapter, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(chapter === 2 ? { l2: true } : chapter === 3 ? { l3: true } : {}) };
   })));
 export function outfitId(build: BuildId, chapter: 1 | 2 | 3, rarity: Rarity): string { return `abito-${build}-${chapter}-${rarity}`; }
-export const GEAR: readonly Item[] = [...LEGACY_GEAR, ...OUTFITS];
-const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
-/** Every purple piece on sale: level 1's from Fra' Bortolo (and level 3's once the third quest is taken), level 2's from Mastro Iseppo. */
-export const SHOP = LEGACY_GEAR.filter((g) => g.rarity === 'epico' && !g.unique);
-export const shop = (level3: boolean, hero?: Hero) => hero ? [...SHOP.filter((g) => !isLegacyArmor(g) && !g.l2 && (level3 || !g.l3)), ...outfitChoices(hero, level3 ? 3 : 1, 'noncomune'), ...outfitChoices(hero, level3 ? 3 : 1, 'epico')] : SHOP.filter((g) => !g.l2 && (level3 || !g.l3));
-export const outfitChoices = (hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity = 'epico') => OUTFITS.filter((g) => g.hero === hero && g.chapter === chapter && g.rarity === rarity);
-export const shop2 = (hero: Hero) => [...SHOP2.filter((g) => !isLegacyArmor(g)), ...outfitChoices(hero, 2, 'noncomune'), ...outfitChoices(hero, 2)];
 export const ARMOR_SLOTS = ['testa', 'spalle', 'torso', 'mani', 'gambe', 'piedi'] as const;
+export type ArmorPart = typeof ARMOR_SLOTS[number];
 export const isLegacyArmor = (it: Item) => (ARMOR_SLOTS as readonly string[]).includes(it.slot ?? '');
-/** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
+export function componentId(hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity, part: ArmorPart): string { return `pezzo-${hero}-${chapter}-${rarity}-${part}`; }
+/** New ingredients carry proven metadata; old armor is never silently converted. */
+export const COMPONENTS: readonly Item[] = (Object.keys(HEROES) as Hero[]).flatMap(hero => ([1, 2, 3] as const).flatMap(chapter =>
+  (['comune', 'noncomune', 'raro', 'epico'] as const).flatMap(rarity => ARMOR_SLOTS.map((part): Item => ({
+    id: componentId(hero, chapter, rarity, part), hero, chapter, rarity, component: part,
+    name: `${SLOT.get(part)!.name} · Capitolo ${chapter} · ${rarity} · ${HEROES[hero].name}`,
+    icon: SLOT.get(part)!.icon, illustration: LEGACY_GEAR.find(g => g.slot === part && g.rarity === rarity && !g.l2 && !g.l3)!.id,
+    lore: 'Componente: unisci testa, spalle, torso, mani, gambe e piedi dello stesso capitolo, rarità ed eroe. Scegli la build dopo l’unione.',
+    ...(chapter === 2 ? { l2: true } : chapter === 3 ? { l3: true } : {}),
+  })))));
+export const GEAR: readonly Item[] = [...LEGACY_GEAR, ...OUTFITS, ...COMPONENTS];
+const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
+export const SHOP = LEGACY_GEAR.filter((g) => g.rarity === 'epico' && !g.unique);
 export const SHOP2 = SHOP.filter((g) => g.l2);
+export const componentShop = (hero: Hero, chapter: 1 | 2 | 3) => COMPONENTS.filter(it => it.hero === hero && it.chapter === chapter && it.rarity !== 'epico');
+export const shop = (level3: boolean, hero?: Hero) => hero ? [...SHOP.filter(g => !isLegacyArmor(g) && !g.l2 && (level3 || !g.l3)), ...componentShop(hero, level3 ? 3 : 1)] : SHOP.filter(g => !g.l2 && (level3 || !g.l3));
+export const outfitChoices = (hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity = 'epico') => OUTFITS.filter(g => g.hero === hero && g.chapter === chapter && g.rarity === rarity);
+export const shop2 = (hero: Hero) => [...SHOP2.filter(g => !isLegacyArmor(g)), ...componentShop(hero, 2)];
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club (not the other heroes' own weapons). */
 export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(LEGACY_GEAR.filter((g) => g.rarity === 'comune' && !['remo-gelato', 'stiletto-osso', 'canna-vetraio', 'martello-campana'].includes(g.id)).map((g) => [g.slot, g.id]));
 /** A new game's set: the hemp and the hero's own weapon (player/heroes.ts). */
@@ -259,7 +269,7 @@ export function outfitSelection(hero: Hero, worn: GearState): { build: BuildId; 
 }
 
 /** Gold Fra' Bortolo asks for it. */
-export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w * (it.l3 ? L3.buy : it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);
+export const buyPrice = (it: Item) => ((it.slot || it.component) ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot ?? it.component!)!.w * (it.l3 ? L3.buy : it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);
 /** Gold he gives for one: a quarter of his price. */
 export const sellPrice = (it: Item) => Math.floor(buyPrice(it) / 4);
 /** Share of a blow armor turns aside. */
@@ -316,7 +326,7 @@ export class Equipment {
   /** Wear the item in bag slot `i`, the piece it replaces going into that bag slot. Returns why not, or ''. */
   wear(bag: Bag, i: number): string {
     const s = bag.items[i], it = s && BY_ID.get(s.id);
-    if (!it) return 'Non si può indossare.';
+    if (!it?.slot) return 'Non si può indossare.';
     if (this.hero && it.hero && it.hero !== this.hero) return 'Questo abito appartiene a un altro eroe.';
     if (this.hero && isLegacyArmor(it)) return 'Pezzo del vecchio corredo: conservalo o vendilo. Ora si indossa un abito completo.';
     if (it.slot === 'abito') {

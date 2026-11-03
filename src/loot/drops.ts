@@ -198,7 +198,7 @@ export class Drops {
     for (const k of this.tracks) {
       const dead = k.mob.state === 'dead';
       if (dead && !k.dead && !k.quiet?.()) {
-        const d = roll((k.mob as { again?: boolean }).again ? 'worker' : k.tier, Math.random, k.level, this.bag.hero), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body; a risen friar: a worker's purse
+        const d = roll((k.mob as { again?: boolean }).again ? 'worker' : k.tier, Math.random, k.level, this.bag.hero, this.bag), m = k.mob, far = k.tier === 'boss' ? 2.4 : k.tier === 'elite' ? 1.5 : 1; // out from under a big body; a risen friar: a worker's purse
         for (const g of d.gold) this.spawn(m.x, m.y, m.z, g, '', far);
         for (const id of d.items) this.spawn(m.x, m.y, m.z, 0, id, far);
         for (const x of [this.extra?.(), k.quest?.()]) if (x) this.spawn(m.x, m.y, m.z, 0, x, far);

@@ -13,7 +13,7 @@ import { PlayerStats } from '../src/player/stats.ts';
 import { tuneOf } from '../src/player/levels.ts';
 import { HEROES, type Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
-import { Equipment, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
+import { Equipment, componentId, ARMOR_SLOTS, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
 import { CARD, TOME_PRICE, counter, eligible, levelOf as lvOf, offer, stacks } from '../src/player/levels.ts';
 import { BAR, PICKS, prepared } from '../src/core/prepared.ts';
 
@@ -482,7 +482,7 @@ for (const hero of Object.keys(HEROES) as Hero[]) {
   const source = boot(hero);
   source.gear = new Equipment(hero);
   source.bag.hero = hero;
-  source.bag.decode({ gold: 9876, items: [['unknown-old-piece', 2], ['canapa-mani', 1]] });
+  source.bag.decode({ gold: 9876, items: [['unknown-old-piece', 2], ['canapa-mani', 1], ...ARMOR_SLOTS.map(part => [componentId(hero, 2, 'epico', part), 3] as [string, number])] });
   const encoded = JSON.parse(JSON.stringify(serialize(source)));
   if (!valid(encoded)) fail(`whole outfit save invalid for ${hero}`);
   const target = boot(hero); target.gear = new Equipment(hero);

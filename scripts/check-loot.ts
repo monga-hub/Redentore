@@ -51,7 +51,7 @@ if (back.gold !== 1234 || JSON.stringify(back.encode()) !== JSON.stringify(bag.e
 back.decode({ gold: -5, items: [['from_the_future', 3], ['mozzicone', 2]] });
 if (back.gold !== 0 || back.items.length !== 2 || back.count('from_the_future') !== 3 || back.count('mozzicone') !== 2) fail('unknown ids lost or negative gold kept');
 // --- gear ---
-if (GEAR.some((g) => !g.slot || !g.stats || !Object.keys(g.stats).length) || shop(false).length !== 9 || shop(true).length !== 15 || shop(true).some((g) => g.l2) || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
+if (GEAR.some((g) => !g.component && (!g.slot || !g.stats || !Object.keys(g.stats).length)) || shop(false).length !== 9 || shop(true).length !== 15 || shop(true).some((g) => g.l2) || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
 if (Object.keys(STARTER).length !== 7 || STARTER.amuleto || STARTER.anello) fail('starter set');
 const t = totals(['canapa-torso', 'saio-voto', 'nope', undefined]), hemp = ITEM.get('canapa-torso')!.stats!, torso = ITEM.get('saio-voto')!.stats!;
 if (t.vigore !== hemp.vigore! + torso.vigore! || t.armatura !== hemp.armatura! + torso.armatura! || t.potenza !== torso.potenza) fail(`totals ${JSON.stringify(t)}`);

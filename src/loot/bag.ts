@@ -3,7 +3,7 @@
 // with an id, a rarity and a line of lore: vendor junk) and, on its own roll, a piece of gear
 // (loot/gear.ts). The bag keeps gold and stacks by item id; gear doesn't stack. No three.js and no
 // DOM, so `npm run check` drives it in Node.
-import { GEAR, isLegacyArmor, type Slot, type Stats } from './gear.ts';
+import { GEAR, isLegacyArmor, componentId, ARMOR_SLOTS, type ArmorPart, type Slot, type Stats } from './gear.ts';
 import type { Hero } from '../player/heroes.ts';
 import type { BuildId } from './builds.ts';
 
@@ -21,7 +21,7 @@ export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | '
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
 /** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it (the friars' heads aren't even bagged: loot/drops.ts collect). */
-export interface Item { hero?: Hero; build?: BuildId; chapter?: 1 | 2 | 3; recovered?: true; id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true; pages?: readonly string[] }
+export interface Item { component?: ArmorPart; illustration?: string; hero?: Hero; build?: BuildId; chapter?: 1 | 2 | 3; recovered?: true; id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true; pages?: readonly string[] }
 /** The level an item drops in (`l2`, `l3`). */
 export const levelOfItem = (x: Item): 1 | 2 | 3 => (x.l3 ? 3 : x.l2 ? 2 : 1);
 /** Quest items' colour, on the ground and in the tracker. */
@@ -123,23 +123,48 @@ const GOLD2 = 1.6, GOLD3 = 2.2;
 export interface Drop { gold: number[]; items: string[] }
 
 /** What one death drops: the gold piles and the item ids. `rnd` in [0, 1). `level` 2, 3: that level's gear and junk, more gold. */
-export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 | 3 = 1, hero?: Hero): Drop {
+export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 | 3 = 1, hero?: Hero, bag?: Pick<Bag, 'count'>): Drop {
   const t = TABLES[tier], [lo, hi] = t.gold, k = level === 3 ? GOLD3 : level === 2 ? GOLD2 : 1, mine = (x: Item) => levelOfItem(x) === level;
   const gold = Array.from({ length: t.piles }, () => Math.round((lo + Math.floor(rnd() * (hi - lo + 1))) * k));
   const prize = level === 3 ? BOSS3_PRIZE : level === 2 ? BOSS2_PRIZE : BOSS_PRIZE;
   const items: string[] = tier === 'boss' ? [prize] : [];
   for (let i = 0; i < t.items; i++) {
     if (rnd() >= t.chance) continue;
-    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && !x.unique && (mine(x) || (level > 1 && levelOfItem(x) === 1 && r === 'comune')));
+    const r = pick(t.weights, rnd), pool = ITEMS.filter((x) => x.rarity === r && !x.slot && !x.component && x.id !== prize && x.id !== BOSS_PRIZE && x.id !== BOSS2_PRIZE && !x.quest && !x.unique && (mine(x) || (level > 1 && levelOfItem(x) === 1 && r === 'comune')));
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   const g = t.gear;
   for (let i = 0; i < g.rolls; i++) {
     if (rnd() >= g.chance[Math.min(i, 1)]) continue;
-    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x) && x.id !== BOSS3_PRIZE && !x.unique && (hero ? !isLegacyArmor(x) && (!x.hero || x.hero === hero) : !x.hero));
-    if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
+    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && !x.component && mine(x) && x.id !== BOSS3_PRIZE && !x.unique && (hero ? !isLegacyArmor(x) && (!x.hero || x.hero === hero) : !x.hero));
+    if (pool.length) {
+      const it = pool[Math.floor(rnd() * pool.length)];
+      if (it.slot !== 'abito') items.push(it.id);
+    }
   }
+  if (hero) items.push(...rollComponents(tier, rnd, level, hero, bag));
   return { gold, items };
+}
+
+/** Independent component rolls. Weights sum to 100; repeats use worker through Drops. */
+export const COMPONENT_TABLES: Record<Tier, { chances: number[]; weights: Weights }> = {
+  worker: { chances: [.5], weights: { comune: 50, noncomune: 25, raro: 19, epico: 6 } },
+  friar: { chances: [.75], weights: { comune: 50, noncomune: 25, raro: 19, epico: 6 } },
+  priest: { chances: [.85], weights: { comune: 45, noncomune: 26, raro: 21, epico: 8 } },
+  elite: { chances: [1, .5], weights: { comune: 40, noncomune: 26, raro: 24, epico: 10 } },
+  boss: { chances: [1, 1], weights: { comune: 35, noncomune: 26, raro: 27, epico: 12 } },
+};
+export function rollComponents(tier: Tier, rnd: () => number, chapter: 1 | 2 | 3, hero: Hero, bag?: Pick<Bag, 'count'>): string[] {
+  const table = COMPONENT_TABLES[tier], out: string[] = [];
+  for (const chance of table.chances) if (rnd() < chance) {
+    // Protection changes only the part of an already-won rarity, never rarity or chapter.
+    const rarity = pick(table.weights, rnd);
+    const all = ARMOR_SLOTS.map(part => componentId(hero, chapter, rarity, part));
+    const missing = bag ? all.filter(id => bag.count(id) === 0 && !out.includes(id)) : [];
+    const pool = missing.length ? missing : all;
+    out.push(pool[Math.floor(rnd() * pool.length)]);
+  }
+  return out;
 }
 
 function pick(w: Partial<Record<Rarity, number>>, rnd: () => number): Rarity {

@@ -25,7 +25,7 @@ for (const hero of HERO_IDS) {
       assert.equal(choices.length, 3);
       assert.equal(new Set(choices.map((it) => JSON.stringify(it.stats))).size, 3);
       for (const it of choices) {
-        if (rarity === 'noncomune' || rarity === 'epico') assert(goods.some((g) => g.id === it.id));
+        assert(!goods.some(g => g.id === it.id));
         assert.equal(levelOfItem(it), chapter);
         assert(it.stats!.intelletto! > 0 && it.stats!.spirito! > 0);
         if (chapter > 1) {
@@ -56,11 +56,12 @@ for (const hero of HERO_IDS) {
     const rnd = () => ((seed = seed * 16807 % 2147483647) / 2147483647), found = new Set<string>();
     for (let i = 0; i < 400; i++) for (const id of roll('elite', rnd, chapter, hero).items) {
       const it = ITEM.get(id)!;
+      if (it.component) { assert.equal(it.hero, hero); assert.equal(it.chapter, chapter); found.add(it.component); continue; }
       if (!it.slot) continue;
       assert(!ARMOR_SLOTS.includes(it.slot as typeof ARMOR_SLOTS[number]));
       if (it.build) { assert.equal(it.hero, hero); assert.equal(it.chapter, chapter); found.add(it.build); }
     }
-    assert.equal(found.size, 3);
+    assert.equal(found.size, 6);
   }
   const other = OUTFITS.find((it) => it.hero !== hero)!;
   bag.add(other.id);
@@ -102,20 +103,11 @@ assert.deepEqual(unknown.encode(), { torso: 'future-armor' });
 assert.equal(unknown.totals.armatura, 0);
 console.log('builds ok: 15 families, 45 chapter definitions, hero shops/drops, atomic legacy swap and lossless round trips');
 
-// Existing dialogue choice path consumes one eligible reward and preserves the other two as choices only.
-const side = new SideQuests();
-const rewards = new Bag(); rewards.hero = 'fosca'; side.bag = rewards;
-const quest = [...SIDE_BY.values()].find((q) => q.reward === 'busto-broccato')!;
-const options = side.rewardChoices(quest);
-assert.equal(options.length, 3);
-assert(options.every((it) => it.hero === 'fosca' && it.chapter === 2 && it.rarity === 'epico'));
-const untouched = JSON.stringify(rewards.encode());
-assert.equal(side.handIn(quest, 'wrong-hero-reward'), false);
-assert.equal(JSON.stringify(rewards.encode()), untouched);
-
-side.taken.push(quest.id);
-assert(side.handIn(quest, options[2].id));
-assert.equal(rewards.count(options[2].id), 1);
-assert.equal(rewards.count(options[0].id), 0);
-assert.equal(side.handIn(quest, options[2].id), false);
-assert.equal(rewards.count(options[2].id), 1);
+// Armor quest now pays its existing XP/gold once, without any outfit or component grant.
+const side = new SideQuests(), rewards = new Bag(); rewards.hero = 'fosca'; side.bag = rewards;
+const quest = SIDE_BY.get('lettera')!;
+assert.equal(quest.reward, undefined);
+side.taken.push(quest.id); rewards.add('lettera-marieta');
+assert(side.handIn(quest));
+assert.equal(rewards.items.length, 0);
+assert.equal(side.handIn(quest), false);

@@ -1,0 +1,79 @@
+{
+  "hero": "fosca",
+  "authored": "2026-11-03",
+  "worlds": [
+    {
+      "world": 1,
+      "masterSourceTask": "01a19d69-23ae-762f-bb97-ab702cd3fcd3",
+      "finishNames": [
+        "green",
+        "blue",
+        "epic"
+      ],
+      "paletteByQuality": [
+        "charcoal and unbleached linen",
+        "wine, ivory and aged bronze",
+        "black/wine, ivory and antique gold"
+      ]
+    },
+    {
+      "world": 2,
+      "masterSourceTask": "01a19d80-b31e-7413-b98d-41c5f22260a9",
+      "finishNames": [
+        "green",
+        "blue",
+        "epic"
+      ],
+      "paletteByQuality": [
+        "olive and natural flax",
+        "emerald, warm ivory and copper",
+        "deep lagoon teal, ivory lace and gold"
+      ]
+    },
+    {
+      "world": 3,
+      "masterSourceTask": "01a19d86-1abe-7130-893e-3705406be8f9",
+      "finishNames": [
+        "green",
+        "blue",
+        "epic"
+      ],
+      "paletteByQuality": [
+        "umber and parchment",
+        "crimson, ivory and bronze",
+        "oxblood, ivory and polished gold"
+      ]
+    }
+  ],
+  "source": "Existing approved Meshy-generated outfit sources owned by the game author; no new Meshy requests.",
+  "originalBodySHA256": "fb2185a0f8ac36b47ab0874c04d7ad7d942d81a8c6b3cb9b01429ab1e3c3b923",
+  "geometry": "New source bodices, shoulder ornaments, open veils and layered habit panels. Original animated sleeve, glove, leg and boot surfaces retain exact bind positions and bone weights; new material atlases are packed onto their UVs. Independent six-slot coverage preserves the original plague mask and wimple.",
+  "textures": {
+    "size": [
+      1536,
+      768
+    ],
+    "base": "sRGB WebP",
+    "normal": "Original normals, glTF orientation",
+    "orm": "R: sparse epic jewel/vial glow only, zero for low/rare; G: roughness; B: metalness"
+  },
+  "icons": {
+    "method": "Original OpenAI-generated painted isolated clothing illustrations, three world sheets with six columns and three quality rows; packed into73 existing item IDs, six common icons reused from the original painted atlas.",
+    "atlas": [
+      1280,
+      1024
+    ],
+    "grid": [
+      10,
+      8
+    ],
+    "source3Background": "Removed with OpenAI image editing before packing."
+  },
+  "animation": "Original skeleton and clips; natural idle-hand correction retained, glove aFist transferred from unchanged bind topology.",
+  "footwear": "World3 has low and rare footwear IDs. A full epic world3 example uses the actual equipped world2 epic footwear; no synthetic epic world3 item ID.",
+  "knownVisualLimits": [
+    "Rigid hip-weighted long cloth panels can intersect animated legs during deep bends and the late death fall.",
+    "Some source trim and tasset boundaries remain visibly segmented at close range.",
+    "Painted icons are stylized inventory illustrations, not exact model renders."
+  ]
+}

@@ -50,8 +50,8 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   ciascuna volta che le tengono il velo (finché vivono incassa l'80% in meno), sotto il 25% il fuso (fili
   incrociati che le girano attorno: si corre con loro, negli spazi), dopo 5 minuti e mezzo ogni colpo triplica.
   Morta lei, tutti i suoi cadono e il portone delle Zitelle si apre sul sagrato; Fra' Zuane chiude la missione
-  (300 esperienza, 200 oro) e accenna a chi ha teso il filo. Bottino di livello 2: pezzi verdi, blu e nove epici
-  nuovi con livello oggetto più alto (Velo della Governatrice, Scettro della Governatrice...), più oro; li vende
+  (300 esperienza, 200 oro) e accenna a chi ha teso il filo. Bottino di livello 2: le tre famiglie di abiti del proprio eroe con budget e livello oggetto maggiori,
+  oltre ad armi, gioielli e più oro; gli abiti verdi ed epici si comprano anche da
   Mastro Iseppo nello squero (vedi sotto), e Fra' Bortolo dà una seconda infusione di ruta. Checkpoint: oltre il Ponte de la
   Croce, poi nell'andito dietro l'altare. Il salvataggio tiene la nuova missione (i salvataggi vecchi si caricano:
   a livello 1 finito si riparte dal rapporto a Fra' Zuane, la nebbia di guerra resta al suo posto).
@@ -254,7 +254,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | 1 / 2 / 3 | al passaggio di livello (il gioco si ferma) scegli una delle tre carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
 | B | borsa: oro e oggetti raccolti dai nemici (camminaci sopra; l'oro viene attirato), con descrizione al passaggio o al tocco; anche il pulsante sotto l'ingranaggio. Clic su un pezzo (secondo tocco su touch) per indossarlo: quello che toglie prende il suo posto nella borsa; dal mercante il clic vende |
-| C | scheda del personaggio: manichino stile WoW con i nove posti attorno all'eroe a figura intera, vestito com'è (trascinalo per girarlo), e accanto i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
+| C | scheda del personaggio: manichino stile WoW con i quattro posti (abito, arma, amuleto e anello) attorno all'eroe a figura intera, vestito com'è (trascinalo per girarlo), e accanto i numeri (salute, mana, armatura, danni, critico, celerità, mana/s); clic su un pezzo per toglierlo. Anche il pulsante sotto la borsa; si apre accanto alla borsa |
 | F | interagisci (parla con Fra' Zuane, apri baule, grate, porte); su touch tocca il riquadro che appare. Nel dialogo F, Spazio o Invio proseguono, Esc chiude |
 
 Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muoversi,
@@ -330,13 +330,24 @@ braccia di Fra' Tizian, il verderame di Zanetto), e con le sue clip (idle, passo
 reazioni, morte) prese dalla libreria di animazioni Meshy e ritagliate sugli stessi nomi e tempi del gioco (colpi, capriola, la
 finestra in aria del salto), così il gioco è identico per tutti. Ognuno ha la sua arma di partenza in un file suo
 (`arma-<eroe>.glb`: la clava di femore, il remo da guerra gelato, lo stiletto al veleno, la canna da vetraio con la goccia fusa,
-il martello da campana). Zanetto dispone inoltre di tre abiti del campanaro, uno per mondo di origine degli oggetti, con tre gradi di finitura, senza legare il colore del tessuto alla rarità: cappuccio, ornamenti delle spalle, abito con maniche, guanti, gambali e stivali sono indipendenti e possono appartenere a mondi diversi. Mantiene lo scheletro, le animazioni, il martello e il giogo originali; le icone illustrate dei singoli oggetti seguono borsa, scheda e mercanti. I colori passano dal panno sobrio al vino e bronzo del primo mondo, dal grigio al petrolio e ottone del secondo, dal carbone allo zafferano e all’oro del terzo; aumentano rilievi e finiture con la rarità. Gli asset e la provenienza sono in `public/models/hero-outfits/zanetto/`; `node scripts/check-zanetto-outfits.ts` verifica mesh, pesi, coperture e associazioni agli oggetti.
+il martello da campana).
 
-Il Risorto indossa gli otto set ridipinti sul suo corpo (il fuoco viola di costole e occhi arde attraverso ognuno); Fosca ne porta solo elmi, cappelli e
-spallacci (misurati su ciascuno: al Risorto, a Fra' Tizian e a Zanetto il cappuccio, a Bortolo la paglietta, a lei il velo si
-ripiegano sotto l'elmo, e sotto la maschera a becco del becchino si ripiega il becco della sua); ognuno
-stringe le armi col proprio pugno. Le campane di Zanetto stanno su un giogo fissato al petto,
-appese sotto gli spallacci perché nessun set le tocchi.
+Ogni eroe ha tre aspetti coordinati, uno per famiglia di build (`src/player/whole-outfit-key.ts`). L’abito completo
+sceglie insieme le sei parti corrispondenti dello stesso sorgente; capitolo e rarità modificano rilievi e finiture sulla
+sagoma della famiglia. La palette appartiene alla build: comune sobrio e opaco, raro più ricco, epico rifinito con
+bagliori discreti, senza imporre stoffa blu agli oggetti rari. Il cambio è atomico anche nel renderer: il corredo precedente
+resta visibile finché quello nuovo è interamente pronto, e resta intatto se un caricamento fallisce. Il vecchio corredo
+misto continua a usare la resa precedente fino al primo abito. Le quindici illustrazioni di indumenti completi sono
+nell’atlante `public/models/hero-outfits/whole-icons.webp`, condiviso da borsa, scheda e botteghe.
+
+Sono riutilizzati i dodici master di produzione di Bortolo, Fosca, Tizian e Zanetto. I tre master del Risorto sono
+assemblati da texture originali Arsenale/Chierico/Voto e ornamenti già adattati: **nessun nuovo modello interamente
+scolpito**. Restano scheletro, animazioni, mani e presa delle armi originali. La coerenza del completo non elimina ogni
+compenetrazione o irregolarità delle vecchie fonti: il Risorto conserva costole e arti scheletrici esposti e non ha una
+nuova corazza chiusa con avambracci e schinieri scolpiti. Per raggiungere quel tipo di riferimento servirebbe ulteriore
+lavoro sulla geometria degli indumenti; questo aggiornamento non lo dichiara raggiunto. Asset e provenienza sono in
+`public/models/hero-outfits/`; `scripts/check-whole-outfits.ts` verifica le quindici identità, coperture, scheletro e
+caricamenti atomici, insieme ai controlli delle fonti precedenti.
 
 ## Abilità
 
@@ -573,9 +584,10 @@ src/
                              guardia dopo il combattimento, passo e corsa a
                              falcata misurata (niente piedi che scivolano), combo a 3 colpi, una
                              mossa per incantesimo, reazioni ai colpi, morte; aura per Velo e Patto
-  player/outfit.ts           l'equipaggiamento sull'eroe: otto set (pezzi sulle ossa, fusi per
-                             materiale nello spazio della pelle), tinte per zona e spallacci d'osso
-                             rientrati nello shader del corpo, l'arma in pugno
+  player/outfit.ts           abiti completi atomici sulle ossa originali, compatibilità coi corredi
+                             precedenti e arma in pugno; hero-outfits.ts carica le sei parti coordinate
+  player/whole-outfit-key.ts quindici identità visuali per le famiglie canoniche degli eroi
+  loot/builds.ts             quindici famiglie: ruolo, priorità, spell consigliate e ricette statistiche
   ui/figure.ts               l'eroe nella scheda: lui stesso, disegnato dal renderer del gioco
                              in un angolo del canvas e copiato nella scheda, solo mentre è aperta
   camera/thirdPersonCamera.ts camera follow/orbit con anti-compenetrazione

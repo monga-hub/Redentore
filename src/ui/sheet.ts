@@ -3,6 +3,7 @@ import { SLOTS, type Equipment, type Slot } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
+import { itemIcon } from './itemIcon.ts';
 import { itemTip } from './tooltip.ts';
 import { RANK, SCHOOL_NAME, medal } from './book.ts';
 import type { School } from '../player/levels.ts';
@@ -85,7 +86,7 @@ export class SheetPanel {
   private cell(slot: Slot): string {
     const id = this.gear.worn[slot], it = id ? ITEM.get(id) : undefined, s = SLOTS.find((x) => x.id === slot)!;
     if (!it) return `<div class="cell" title="${s.name}">${ICONS[s.icon]}</div>`;
-    return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${ICONS[it.icon]}</button>`;
+    return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${itemIcon(it)}</button>`;
   }
 
   private render(): void {

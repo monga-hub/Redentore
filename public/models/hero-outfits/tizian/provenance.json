@@ -1,0 +1,80 @@
+{
+  "hero": "tizian",
+  "source": "Existing approved Meshy masters and retextures, recolored locally to the superseding 2026-11-03 art direction; no new Meshy jobs.",
+  "originalModelSha256": "e48e75cdc1610669d471672accde908da8cdc247cec0ae535fa991a637bb594b",
+  "method": "Original animated upper garment, trouser and hand surfaces with source-material projection; independently attached source hood, shoulder ornaments, front apron, lower robe and shoes. Original skeleton, animations, item IDs and stats retained.",
+  "world3Footwear": "World3 shoe geometry comes from tizian-3-master. Existing converso-piedi and fanale-piedi items select it. There is no world3 epic feet item; no fallback is relabeled world3.",
+  "worlds": [
+    {
+      "world": 1,
+      "sourceSha256": "fa56991b7bafe8b31ad2ada63b9a932a2f636ff1711e635991f37acae69d52d3",
+      "sourceTasks": {
+        "master": "01a19d86-25d3-77a5-b59d-91978a204330",
+        "green": "01a19d9a-0071-77d6-8233-91da56b739d8",
+        "blue": "01a19d9a-1e12-7532-99b7-428d4e588898"
+      },
+      "rawSourceTriangles": 24841,
+      "removedGeneratedFaceAndHandTriangles": 3051,
+      "shoeSourceTriangleCount": 1755,
+      "shoeSourceTrianglesSha256": "1924df9a8db17122016b6b99734a54710ceeceafd69219fbc5932fccc321cb21"
+    },
+    {
+      "world": 2,
+      "sourceSha256": "8e5e6fd0c8fbf7df3a284533ff153c19bfe4f9837690666c4136ddb18a479cc1",
+      "sourceTasks": {
+        "master": "01a19d86-307f-7078-9b16-cc68c6ea3a0f",
+        "green": "01a19d9a-38e7-72b8-8fb5-63e04afef010",
+        "blue": "01a19d9a-510d-76d1-afb6-acb14fd66626"
+      },
+      "rawSourceTriangles": 24761,
+      "removedGeneratedFaceAndHandTriangles": 2988,
+      "shoeSourceTriangleCount": 699,
+      "shoeSourceTrianglesSha256": "e7bdc03e4077d30c96cf0aaa382661e5c1ba70f1defe450462ce7b04a4f458b0"
+    },
+    {
+      "world": 3,
+      "sourceSha256": "887c36dee94ccb13b1be3070980e4b2d356c93f975c99443820e193a562c540a",
+      "sourceTasks": {
+        "master": "01a19d86-3c6a-7409-b43b-842b0640a91d",
+        "green": "01a19d9a-679e-71f0-94c1-37bb800627da",
+        "blue": "01a19d9a-7d67-738a-8883-ca1ec9abf36b"
+      },
+      "rawSourceTriangles": 24741,
+      "removedGeneratedFaceAndHandTriangles": 3513,
+      "shoeSourceTriangleCount": 1031,
+      "shoeSourceTrianglesSha256": "738016039aa04576ea380c2a91ce5e562dbac9acf28dde0214a385eff7fdc160"
+    }
+  ],
+  "art": {
+    "palettes": {
+      "1": "Furnace ash-brown and soot, leather, copper, ivory stitchwork, amber glass",
+      "2": "Lagoon deep petrol and verdigris, ivory linen, brass, amber glass",
+      "3": "Charcoal and oxblood, bronze-brown leather, antique gold, ruby and amber glass"
+    },
+    "rarity": "Internal green/blue/epic file keys select restrained matte / richer detailed / precious finishes, never rarity-border clothing colors. Existing source detail preserved; hue-mapped cloth and metals, adjusted roughness and metalness. ORM red limits existing breathing glow to glass highlights.",
+    "icons": "Original fantasy item paintings generated with builtin ImageGen: three 6x3 sheets, empty unworn garments and isolated pieces, then packed for the existing 73-ID atlas. Same world/finish/slot shares an illustration across alternate-stat item IDs; six starter cells retain existing painted icons. No photographs or filtered model renders.",
+    "illustrationSources": [
+      {
+        "world": 1,
+        "sheetSha256": "c6483ecd7bff10bf72349fab7fcb0658b17d6dcee4fb6b19bf78a2366c8ba49a",
+        "promptSha256": "bbc41ba98733ff1b2e1331c4e1aae1376725e621f206198db6323bb3ec61c987",
+        "generator": "OpenAI builtin ImageGen",
+        "date": "2026-11-03"
+      },
+      {
+        "world": 2,
+        "sheetSha256": "dab059f7bd0da6434008329f542465d871cd3abe526e3ab6f88feb8fe1362a02",
+        "promptSha256": "770c2d18aa4ec3159f46da461ef452972949942ff4f6a9771044485faa146398",
+        "generator": "OpenAI builtin ImageGen",
+        "date": "2026-11-03"
+      },
+      {
+        "world": 3,
+        "sheetSha256": "036032f69419fee4b31d12b2192c48fa6d2740568019e78356a7b4b928b81daa",
+        "promptSha256": "c4757aee110c9cd47114c1a9f896d2cd042a21467e07c676accdc16efff3a2b8",
+        "generator": "OpenAI builtin ImageGen",
+        "date": "2026-11-03"
+      }
+    ]
+  }
+}

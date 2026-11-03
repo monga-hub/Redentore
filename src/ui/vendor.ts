@@ -4,6 +4,7 @@ import { buy, buyPrice, sell, sellPrice, type Equipment } from '../loot/gear.ts'
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
+import { itemIcon } from './itemIcon.ts';
 import { itemTip } from './tooltip.ts';
 
 // The merchants' window, WoW style (Fra' Bortolo's shop, Mastro Iseppo's): "Commercia" in their dialogue opens it
@@ -134,7 +135,7 @@ export class VendorPanel {
     if (!this.el.classList.contains('on')) return;
     const cell = (k: string, id: string, n = 1) => {
       const it = ITEM.get(id)!;
-      return `<button class="cell" data-k="${k}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}">${ICONS[it.icon]}${n > 1 ? `<b>${n}</b>` : ''}</button>`;
+      return `<button class="cell" data-k="${k}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}">${itemIcon(it)}${n > 1 ? `<b>${n}</b>` : ''}</button>`;
     };
     this.el.innerHTML = `<h2>${this.who.name}</h2><button class="x" aria-label="Chiudi bottega">✕</button>
       <p class="sub">${this.who.sub}</p>

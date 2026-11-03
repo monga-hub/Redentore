@@ -122,3 +122,16 @@ Downloaded by `scripts/audio/build.py` into `node_modules/.cache/audio` (never c
 | `ice_crunch` | Crack and Crunch | Aurelon | CC0 | https://freesound.org/people/Aurelon/sounds/422623/ |
 | `ice_cracks` | Ice Cracks | karlis.stigis | CC0 | https://freesound.org/people/karlis.stigis/sounds/168712/ |
 | `ice_break` | Ice break | humanoide9000 | CC0 | https://freesound.org/people/humanoide9000/sounds/329744/ |
+
+
+### Fra’ Tizian — three modular world outfits (2026-11-03)
+
+`public/models/hero-outfits/tizian/` derives from the project's already approved Meshy-generated Murano glassblower sources. No additional Meshy generation or purchased content was used for this delivery. The three masters preserve the original Tizian skeleton/animations and provide three quality finishes per item-origin world, recolored independently of rarity borders. The original animated upper garments, trousers and hands are retained where useful for reliable deformation; new source hood, shoulder ornaments, apron/robe panels and footwear provide the outfit progression. Source faces and generated hands are removed. The icons are original fantasy item illustrations generated with OpenAI’s builtin ImageGen on 2026-11-03: three sheets of isolated empty garments and objects, with no rendered-model photographs or faces. Starter cells reuse the existing painted icon atlas.
+
+| World | Approved master task | Green retexture task | Blue retexture task |
+| --- | --- | --- | --- |
+| 1 | `01a19d86-25d3-77a5-b59d-91978a204330` | `01a19d9a-0071-77d6-8233-91da56b739d8` | `01a19d9a-1e12-7532-99b7-428d4e588898` |
+| 2 | `01a19d86-307f-7078-9b16-cc68c6ea3a0f` | `01a19d9a-38e7-72b8-8fb5-63e04afef010` | `01a19d9a-510d-76d1-afb6-acb14fd66626` |
+| 3 | `01a19d86-3c6a-7409-b43b-842b0640a91d` | `01a19d9a-679e-71f0-94c1-37bb800627da` | `01a19d9a-7d67-738a-8883-ca1ec9abf36b` |
+
+The master’s original material supplies the epic detail source. All nine palettes were reworked: furnace ash/copper/amber, lagoon petrol/ivory/brass, and charcoal/oxblood/antique gold. Roughness, metalness and restricted glass glow distinguish quality within each world. `provenance.json` records input hashes and the source3 shoe provenance. Material atlases combine the approved source maps with projected original-surface maps. Existing original-model and generated-asset attribution above continues to apply.

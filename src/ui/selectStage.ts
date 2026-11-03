@@ -282,7 +282,7 @@ export class SelectStage {
 
   /** Stand `hero` in the middle, dressed in `worn`; whoever stood there goes. */
   show(hero: Hero, worn: GearState): void {
-    if (this.model) { this.holder.remove(this.model.root); free(this.model.root); }
+    if (this.model) { this.model.dispose(); this.holder.remove(this.model.root); free(this.model.root); }
     this.model = new UndeadModel(hero);
     this.facing = undefined;
     this.model.wear(worn);
@@ -337,6 +337,7 @@ export class SelectStage {
   /** Everything off the GPU, the context dropped, the canvas gone. */
   dispose(): void {
     this.gone = true;
+    this.model?.dispose();
     cancelAnimationFrame(this.raf);
     removeEventListener('resize', this.resize);
     free(this.scene);

@@ -3,6 +3,7 @@ import { UPPER, loadModel, over, stand } from '../core/models.ts';
 import type { GearState } from '../loot/gear.ts';
 import { Outfit } from './outfit.ts';
 import { HEROES, type Hero } from './heroes.ts';
+import { relaxFoscaHands } from './fosca-idle.ts';
 
 // The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
 // (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB (each hero, player/heroes.ts, on the same rig with
@@ -216,16 +217,19 @@ export class UndeadModel {
   private leftHand?: THREE.Object3D;
   private outfit?: Outfit;
   private worn: GearState = {};
+  private disposed = false;
 
   constructor(hero: Hero) {
     this.pace = GAIT[hero];
     loadModel(HEROES[hero].file).then((gltf) => {
+      if (this.disposed) return;
       const model = gltf.scene;
       stand(model, HEROES[hero].height);
       const head = model.getObjectByName('Head');
       if (head) head.userData.crown = HEROES[hero].height - head.getWorldPosition(new THREE.Vector3()).y; // m from the joint to his crown (ui/figure.ts)
       let body: THREE.SkinnedMesh | undefined;
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
+      if (hero === 'fosca') relaxFoscaHands(model, gltf.animations);
       const up = UPRIGHT[hero];
       if (up) upright(model, gltf.animations, up);
       const outfit = (this.outfit = new Outfit(model, body!, hero));
@@ -277,6 +281,13 @@ export class UndeadModel {
   wear(worn: GearState): void {
     this.worn = { ...worn };
     this.outfit?.wear(this.worn);
+  }
+
+  /** Stop asynchronous equipment loading before the selection stage frees the model's resources. */
+  dispose(): void {
+    this.disposed = true;
+    this.outfit?.dispose();
+    this.mixer?.stopAllAction();
   }
 
   /** Play a move over whatever the legs are doing, its blow landing `after` s from now. */
@@ -361,6 +372,7 @@ export class UndeadModel {
     this.outfit?.update(dt);
     const showAura = this.aura.update(dt) || this.priming-- > 0;
     for (const s of this.shells) s.visible = showAura;
+    this.outfit?.showAura(this.aura.material, showAura);
     if (this.dead) { // the fall takes the whole body over 0.2 s
       this.deadK = Math.min(1, this.deadK + dt / 0.2);
       this.dying?.setEffectiveWeight(this.deadK);

@@ -63,6 +63,7 @@ import { VendorPanel } from './ui/vendor.ts';
 import { DeathScreen } from './ui/death.ts';
 import { HEROES } from './player/heroes.ts';
 import { chooseHero } from './ui/select.ts';
+import { itemIconHero } from './ui/itemIcon.ts';
 import { CloudSync } from './core/cloud.ts';
 import { accountLine } from './ui/account.ts';
 
@@ -71,7 +72,8 @@ await checkVersion(); // before the heavy boot: a stale cached build reloads ont
 initAudio(); // before the intro, whose first press unlocks the sound
 migrate(); // once: the old shared saves go to their heroes (core/save.ts)
 const cloud = new CloudSync(); // the runs mirrored to the hub account, merged in the background (core/cloud.ts)
-const { hero, start } = await chooseHero(cloud); // the squad: whose run this boot plays (ui/select.ts)
+const { hero, start } = await chooseHero(cloud);
+itemIconHero(hero); // the squad: whose run this boot plays (ui/select.ts)
 await Promise.race([cloud.ready, new Promise((r) => setTimeout(r, 3e3))]); // a pick before the boot merge is over waits for it, 3 s at most
 cloud.playing = hero; // from here on, a late merge leaves his device run alone: his uploads win
 barFor(hero); // his own bar

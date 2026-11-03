@@ -1,6 +1,7 @@
 import { playSfx } from '../audio/engine.ts';
 import { Bag, ITEM, RARITY } from '../loot/bag.ts';
 import { sellPrice, type Equipment } from '../loot/gear.ts';
+import { itemIcon } from './itemIcon.ts';
 import { ICONS } from './icons.ts';
 import { TIP_CSS, itemTip } from './tooltip.ts';
 
@@ -235,7 +236,7 @@ export class BagPanel {
     this.grid.innerHTML = Array.from({ length: Bag.SLOTS }, (_, i) => {
       const s = this.bag.items[i], it = s && ITEM.get(s.id);
       if (!it) return '<div class="cell"></div>';
-      return `<button class="cell" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${ICONS[it.icon]}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
+      return `<button class="cell" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${itemIcon(it)}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
     }).join('');
     for (const r of this.renders) r();
     this.sel = undefined;

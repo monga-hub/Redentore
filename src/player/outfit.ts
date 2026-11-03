@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { hasHeroOutfits } from './hero-outfit-key.ts';
+import { HeroOutfits } from './hero-outfits.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { arm, loadModel, shaft } from '../core/models.ts';
 import { GEAR, type GearState, type Slot } from '../loot/gear.ts';
@@ -792,6 +794,7 @@ export class Outfit {
   private readonly root: THREE.Group;
   private readonly body: THREE.SkinnedMesh;
   private readonly paint?: Paint;
+  private readonly heroOutfits?: HeroOutfits;
   private readonly guard: Guard;
   private readonly own: Body;
   /** Shared with the body's shader (and the pieces': uGlow). */
@@ -815,6 +818,15 @@ export class Outfit {
     const region = this.mark(), m = body.material as THREE.MeshStandardMaterial;
     if (this.own.paint) this.paint = new Paint(body, region);
     else m.metalness = METAL; // his own maps, made like the painted ones
+    if (hasHeroOutfits(hero)) this.heroOutfits = new HeroOutfits(hero, body, (material) => {
+      material.onBeforeCompile = (sh) => {
+        sh.uniforms.uFist = this.uniforms.uFist;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 aFist;\nuniform float uFist;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += aFist * uFist;');
+        lit(sh, this.uniforms.uGlow);
+      };
+      material.customProgramCacheKey = () => 'hero-outfit-glove';
+    });
     this.guard = new Guard(root, this.fit);
     const yoke = this.own.yoke;
     if (yoke) loadModel(YOKE).then((gltf) => this.bake('giogo', yoke, gltf.scene), (e) => console.error('yoke failed to load', e));
@@ -934,10 +946,17 @@ export class Outfit {
       const was = this.worn[slot] && lookOf(this.worn[slot]!);
       this.worn[slot] = id;
       changed = true;
-      if ((slot === 'testa' || slot === 'spalle') && (!this.pieces.has(slot) || was !== (id && lookOf(id)))) this.piece(slot);
+      if (!this.heroOutfits && (slot === 'testa' || slot === 'spalle') && (!this.pieces.has(slot) || was !== (id && lookOf(id)))) this.piece(slot);
     }
     if (changed) this.paint?.paint(REGION_SLOT.map((s) => { const id = this.worn[s]; return id ? lookOf(id) : undefined; }));
+    if (changed) this.heroOutfits?.wear(this.worn);
   }
+
+  showAura(material: THREE.ShaderMaterial, visible: boolean): void {
+    this.heroOutfits?.showAura(material, visible);
+  }
+
+  dispose(): void { this.heroOutfits?.dispose(); }
 
   /** The piece of what `slot` wears now, in place of the one there: loaded, then baked onto its bones. */
   private piece(slot: Worn): void {

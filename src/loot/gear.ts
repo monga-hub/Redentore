@@ -23,16 +23,20 @@ export const SLOTS: readonly { id: Slot; name: string; w: number; armor: number;
 ];
 export const SLOT = new Map(SLOTS.map((s) => [s.id, s]));
 
-export type Stat = 'vigore' | 'intelletto' | 'spirito' | 'potenza' | 'critico' | 'celerita';
+export type Stat = 'vigore' | 'intelletto' | 'spirito' | 'potenza' | 'critico' | 'celerita' | 'forza' | 'agilita' | 'potenzaAttacco' | 'potenzaMagica';
 export type Stats = Partial<Record<Stat | 'armatura', number>>;
 /** `cost`: budget points per point of it; `green`: a WoW "Equipaggiato:" line rather than a white stat. */
 export const STAT: Record<Stat, { name: string; cost: number; green?: string }> = {
+  forza: { name: 'Forza', cost: 0.75, green: '# Forza: aumenta la potenza fisica con rendimento decrescente (fino al 40%).' },
+  agilita: { name: 'Agilità', cost: 0.75, green: '# Agilità: aumenta la velocità di lancio e recupero globale con rendimento decrescente (fino al 30%); non accelera attacchi base, ricariche o canalizzazioni.' },
+  potenzaAttacco: { name: 'Potenza d’attacco', cost: 1.75, green: 'aumenta del #% i danni fisici.' },
+  potenzaMagica: { name: 'Potenza magica', cost: 1.75, green: 'aumenta del #% i danni magici.' },
   vigore: { name: 'Vigore', cost: 1.5 },
   intelletto: { name: 'Intelletto', cost: 1.5 },
   spirito: { name: 'Spirito', cost: 1.2 },
   potenza: { name: 'Potenza', cost: 2.5, green: 'aumenta del #% i danni di tutte le tue abilità.' },
   critico: { name: 'Critico', cost: 3, green: 'aumenta del #% la probabilità di infliggere un colpo critico.' },
-  celerita: { name: 'Celerità', cost: 2.5, green: 'riduce del #% i tempi di lancio e il tempo di recupero globale.' },
+  celerita: { name: 'Celerità', cost: 2.5, green: 'aumenta del #% la velocità di lancio e recupero globale; non accelera attacchi base, ricariche o canalizzazioni.' },
 };
 export const HP_PER = 10, MANA_PER = 10, REGEN_PER = 0.1; // per point of Vigore, Intelletto, Spirito
 export const ARMOR_K = 700; // armor / (armor + K) of every blow is turned aside
@@ -238,7 +242,7 @@ export const worth = (it: Item) => Object.entries(it.stats ?? {}).reduce((s, [k,
 
 /** Stats summed over worn ids. */
 export function totals(ids: Iterable<string | undefined>): Required<Stats> {
-  const t: Required<Stats> = { armatura: 0, vigore: 0, intelletto: 0, spirito: 0, potenza: 0, critico: 0, celerita: 0 };
+  const t: Required<Stats> = { armatura: 0, vigore: 0, intelletto: 0, spirito: 0, potenza: 0, critico: 0, celerita: 0, forza: 0, agilita: 0, potenzaAttacco: 0, potenzaMagica: 0 };
   for (const id of ids) for (const [k, v] of Object.entries(BY_ID.get(id ?? '')?.stats ?? {})) t[k as Stat] += v;
   return t;
 }
@@ -250,8 +254,22 @@ export function crit(n: number, chance: number, rnd: () => number = Math.random)
 }
 
 /** What gear makes of the hero, for main.ts, the sheet and the balance bot. */
-export function effects(t: Required<Stats>): { hp: number; mana: number; regen: number; dmg: number; crit: number; haste: number; cut: number } {
-  return { hp: t.vigore * HP_PER, mana: t.intelletto * MANA_PER, regen: t.spirito * REGEN_PER, dmg: 1 + t.potenza / 100, crit: CRIT_BASE + t.critico, haste: 1 + t.celerita / 100, cut: armorCut(t.armatura) };
+export function effects(t: Stats) {
+  const strength = Math.max(0, t.forza ?? 0), agility = Math.max(0, t.agilita ?? 0);
+  const strengthPower = 40 * strength / (80 + strength), agilityHaste = 30 * agility / (60 + agility);
+  const dmg = 1 + (t.potenza ?? 0) / 100;
+  return {
+    hp: (t.vigore ?? 0) * HP_PER, mana: (t.intelletto ?? 0) * MANA_PER, regen: (t.spirito ?? 0) * REGEN_PER,
+    dmg, physical: dmg + ((t.potenzaAttacco ?? 0) + strengthPower) / 100, magic: dmg + (t.potenzaMagica ?? 0) / 100,
+    strengthPower, agilityHaste, crit: CRIT_BASE + (t.critico ?? 0),
+    haste: 1 + ((t.celerita ?? 0) + agilityHaste) / 100, cut: armorCut(t.armatura ?? 0),
+  };
+}
+
+export type DamageKind = 'physical' | 'magic' | 'hybrid';
+/** Each effect uses one channel; the bone/shadow spear splits its base damage equally. */
+export function damageMultiplier(e: ReturnType<typeof effects>, kind: DamageKind = 'magic'): number {
+  return kind === 'physical' ? e.physical : kind === 'hybrid' ? (e.physical + e.magic) / 2 : e.magic;
 }
 
 export type GearState = Partial<Record<Slot, string>>;

@@ -7,6 +7,7 @@
 // (forsaken.ts) draws every one of them from `bolts`, `fires`, `tolls`, `pillars`, `orbs`, `rods`, `hallows`,
 // `dash` and the `events` they leave; scripts/balance.ts plays the same rules with no looks at all.
 // No three.js here.
+import type { DamageKind } from '../loot/gear.ts';
 import type { World } from '../core/physics.ts';
 import { FRIAR, engaged } from '../enemies/brain.ts';
 import { chill, chilled, expose, frozen, root, stun, type Control } from '../enemies/control.ts';
@@ -76,7 +77,7 @@ const HOLY_FIRE = 1.5; // Giudizio ardente on the burning
 /** What the grimoire needs from whoever casts: the hero, the damage dealer, the foes, the plague clouds. */
 export interface Host {
   player: { pos: P; facing: number; world: World };
-  hurt?: (inside: (x: number, z: number, mob: Mob) => boolean, n: number) => void;
+  hurt?: (inside: (x: number, z: number, mob: Mob) => boolean, n: number, kind?: DamageKind) => void;
   aimed?: () => Mob | undefined;
   foes?: () => Iterable<Mob>;
   /** A plague cloud covers (x, z) (Miasma elettrico, Miasma velenoso). */
@@ -146,8 +147,8 @@ export class Grimoire {
     return !t || !alive(t) ? 'Nessun bersaglio.' : flat(t, p) > range ? 'Bersaglio fuori portata.' : 'Bersaglio non in vista.';
   }
 
-  private hit(m: Mob, n: number): void {
-    if (n > 0) this.host.hurt?.((_x, _z, o) => o === m, n);
+  private hit(m: Mob, n: number, kind: DamageKind = 'magic'): void {
+    if (n > 0) this.host.hurt?.((_x, _z, o) => o === m, n, kind);
   }
   /** Every living foe within `r` of `c` (feet) with no wall between them: blasts stop at walls. */
   private near(c: P, r: number): Mob[] {
@@ -530,11 +531,11 @@ export class Grimoire {
   private arrive(k: Dash): void {
     const t = this.tune, p = this.host.player.pos;
     if (k.kind === 'leap') {
-      for (const m of this.near(p, t.leapR)) { this.hit(m, t.leapDmg); if (m.cc) stun(m.cc, LEAP.stun); }
+      for (const m of this.near(p, t.leapR)) { this.hit(m, t.leapDmg, 'physical'); if (m.cc) stun(m.cc, LEAP.stun); }
       this.events.push({ type: 'leap', ...p, big: true });
     } else {
       const m = k.to && alive(k.to) && flat(k.to, p) < CHARGE.stop + 1.5 ? k.to : undefined;
-      if (m) { this.hit(m, t.chargeDmg); if (m.cc) stun(m.cc, t.chargeStun); }
+      if (m) { this.hit(m, t.chargeDmg, 'physical'); if (m.cc) stun(m.cc, t.chargeStun); }
       this.events.push({ type: 'charge', x: m?.x ?? p.x, y: (m?.y ?? p.y), z: m?.z ?? p.z, big: !!m });
     }
   }
@@ -544,7 +545,8 @@ export class Grimoire {
     const p = this.host.player.pos, t = this.tune;
     for (const m of this.near(p, WHIRL_R)) {
       const c = m.cc;
-      this.hit(m, t.fxFrostWhirl && c && frozen(c) ? t.whirlDmg * WHIRL_FROZEN : t.whirlDmg);
+      this.hit(m, t.whirlDmg, 'physical');
+      if (t.fxFrostWhirl && c && frozen(c)) this.hit(m, t.whirlDmg * (WHIRL_FROZEN - 1));
       if (t.fxFrostWhirl && c) chill(c, 2, WHIRL_CHILL);
     }
   }
@@ -557,7 +559,7 @@ export class Grimoire {
       const dx = m.x - p.x, dz = m.z - p.z, d = Math.hypot(dx, dz);
       if (d > 0.6 && (dx * fx + dz * fz) / d < GRACE.arc) continue;
       const missing = 1 - Math.max(0, m.hp) / maxHp(m);
-      this.hit(m, t.graceDmg * (1 + t.graceMul * missing));
+      this.hit(m, t.graceDmg * (1 + t.graceMul * missing), 'physical');
       any = true;
     }
     this.events.push({ type: 'grace', x: p.x + fx * 1.6, y: p.y, z: p.z + fz * 1.6, big: any });

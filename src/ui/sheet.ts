@@ -43,7 +43,7 @@ const CSS = `
 `;
 
 /** The numbers beside the figure (main.ts reads them off the stats, the cards and the gear). */
-export interface Summary { name: string; lv: number; schools: readonly School[]; hp: number; mana: number; armor: number; cut: number; dmg: number; crit: number; haste: number; regen: number }
+export interface Summary { name: string; lv: number; schools: readonly School[]; hp: number; mana: number; armor: number; cut: number; dmg: number; physical?: number; magic?: number; crit: number; haste: number; regen: number }
 
 export class SheetPanel {
   readonly el = document.createElement('div');
@@ -100,8 +100,8 @@ export class SheetPanel {
           <div class="sch">${n.schools.map((s, i) => `<span>${medal(i)}${SCHOOL_NAME.get(s)} <small>${RANK[i]}</small></span>`).join('')}</div>
           <dl><dt>Salute</dt><dd>${it(n.hp)}</dd><dt>Mana</dt><dd>${it(n.mana)}</dd>
           <dt>Armatura</dt><dd title="Danni subiti in meno">${it(n.armor)} (−${pct(n.cut)})</dd>
-          <dt>Danni</dt><dd class="${n.dmg > 1 ? 'up' : ''}">+${pct(n.dmg - 1)}</dd><dt>Critico</dt><dd>${Math.round(n.crit)}% (×1,5)</dd>
-          <dt>Celerità</dt><dd class="${n.haste > 1 ? 'up' : ''}">+${pct(n.haste - 1)}</dd><dt>Mana/s</dt><dd>${n.regen.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</dd></dl></div></div>`;
+          <dt>Danni fisici</dt><dd class="${(n.physical ?? n.dmg) > 1 ? 'up' : ''}">+${pct((n.physical ?? n.dmg) - 1)}</dd><dt>Danni magici</dt><dd class="${(n.magic ?? n.dmg) > 1 ? 'up' : ''}">+${pct((n.magic ?? n.dmg) - 1)}</dd><dt>Critico</dt><dd>${Math.round(n.crit)}% (×1,5)</dd>
+          <dt>Velocità lancio</dt><dd class="${n.haste > 1 ? 'up' : ''}">+${pct(n.haste - 1)}</dd><dt>Mana/s</dt><dd>${n.regen.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</dd></dl></div></div>`;
     this.el.querySelector('.stage')!.append(this.stage);
   }
 }

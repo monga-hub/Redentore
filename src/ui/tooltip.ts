@@ -37,8 +37,8 @@ export const TIP_CSS = `
 `;
 
 const coin = (n: number) => `${n.toLocaleString('it-IT')} oro`;
-const KEYS: (Stat | 'armatura')[] = ['armatura', 'vigore', 'intelletto', 'spirito', 'potenza', 'critico', 'celerita'];
-const label = (k: Stat | 'armatura', v: number) => (k === 'armatura' ? `${v} Armatura` : STAT[k].green ? `${v}% ${STAT[k].name}` : `${v} ${STAT[k].name}`);
+const KEYS: (Stat | 'armatura')[] = ['armatura', 'vigore', 'intelletto', 'spirito', 'forza', 'agilita', 'potenzaAttacco', 'potenzaMagica', 'potenza', 'critico', 'celerita'];
+const label = (k: Stat | 'armatura', v: number) => (k === 'armatura' ? `${v} Armatura` : STAT[k].green ? `${v}${k === 'forza' || k === 'agilita' ? '' : '%'} ${STAT[k].name}` : `${v} ${STAT[k].name}`);
 
 let leaf = 0; // Il libro di sabbia's page last shown: the next opening turns another
 

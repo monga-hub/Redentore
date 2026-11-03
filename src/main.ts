@@ -56,7 +56,7 @@ import { Director } from './audio/director.ts';
 import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
-import { Equipment, SHOP2, crit, effects, shop, starter, worth as value } from './loot/gear.ts';
+import { Equipment, SHOP2, crit, damageMultiplier, effects, shop, starter, worth as value } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
 import { VendorPanel } from './ui/vendor.ts';
@@ -258,7 +258,7 @@ const buffs = () => {
     hallow: m.hallows.reduce((t, z) => (Math.hypot(p.x - z.x, p.z - z.z) < z.r && Math.abs(p.y - z.y) < 1.5 ? Math.max(t, z.t) : t), 0),
   });
 };
-kit.hurt = (inside, n) => { n = crit(n * tune.dmg * quest.dmgMul * worn.dmg, worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); sangiorgio.hurtWhere(inside, n); dragon.hurtWhere(inside, n); arredi.hurtWhere(inside); };
+kit.hurt = (inside, n, kind) => { n = crit(n * tune.dmg * quest.dmgMul * damageMultiplier(worn, kind), worn.crit); friars.hurtWhere(inside, n); priests.hurtWhere(inside, n); bees.hurtWhere(inside, n); zitelle.hurtWhere(inside, n); sangiorgio.hurtWhere(inside, n); dragon.hurtWhere(inside, n); arredi.hurtWhere(inside); };
 kit.aimed = () => targeting.target?.mob;
 const foes = [...friars.all, ...priests.all, ...bees.all, ...zitelle.all, ...sangiorgio.all, ...drago.all];
 kit.foes = () => foes;
@@ -437,7 +437,7 @@ const bagPanel = new BagPanel(bag, gear); // B or the satchel button
 bagPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); };
 const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure button: the paper doll
   name: HEROES[hero].name, lv: levels.lv, schools: HEROES[hero].school, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
-  dmg: tune.dmg * worn.dmg, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
+  dmg: tune.dmg * worn.dmg, physical: tune.dmg * worn.physical, magic: tune.dmg * worn.magic, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
 const figure = new Figure(renderer, scene, player.mesh, sheet.stage); // the sheet's hero, as dressed, while it is open
 sheet.el.addEventListener('hidden', () => figure.free());

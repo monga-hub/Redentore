@@ -59,7 +59,7 @@ import type { Target } from '../src/enemies/brain.ts';
 import { BELFRY, CAMPANILE } from '../src/level/zones/sangiorgio.ts';
 import { DRAGO, DRAGO_SPOTS, spawnDrago, waves } from '../src/enemies/drago.ts';
 import { HEROES, heroOf, type Hero } from '../src/player/heroes.ts';
-import { Equipment, shop, buyPrice, crit, effects, sellPrice, totals, worth, type GearState } from '../src/loot/gear.ts';
+import { Equipment, shop, buyPrice, crit, damageMultiplier, effects, sellPrice, totals, worth, type GearState, type DamageKind } from '../src/loot/gear.ts';
 
 const DT = 1 / 30;
 /** HANDS=0.6: the bot lands that share of its damage, a stand-in for a human's slower, sloppier rotation. */
@@ -325,8 +325,8 @@ class Run {
   dealt = new Map<string, number>(); // on the boss, by source
   casts = new Map<string, number>(); // abilities started, by id
   taken = new Map<string, number>(); // from the boss, by attack (before the hp floor)
-  hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number) => {
-    n = crit(n * tune.dmg * HANDS * this.worn.dmg, this.worn.crit, rnd);
+  hurt = (inside: (x: number, z: number, m: Mob) => boolean, n: number, kind?: DamageKind) => {
+    n = crit(n * tune.dmg * HANDS * damageMultiplier(this.worn, kind), this.worn.crit, rnd);
     for (const m of this.mobs) if (m.state !== 'dead' && inside(m.x, m.z, m)) {
       if ((m === this.boss || m === this.l2.boss || m === this.l3.boss || (isCaster(m) && m.kind === DRAGO)) && FIGHTING.has(m.state)) this.dealt.set(this.src, (this.dealt.get(this.src) ?? 0) + Math.min(n, m.hp));
       if (isCaster(m)) casterHurt(m, n); else friarHurt(m, n);
@@ -1283,7 +1283,7 @@ export function routeTable(rs: RouteResult[]): string {
 /** What a set is: pieces by quality and the stats it adds. */
 function gearLine(g: GearState): string {
   const its = Object.values(g).map((id) => ITEM.get(id!)!), n = (r: string) => its.filter((i) => i.rarity === r).length, e = effects(totals(Object.values(g)));
-  return `${n('epico')} epic ${n('raro')} rare ${n('noncomune')} green ${n('comune')} white: +${e.hp} hp +${e.mana} mana, ${Math.round(e.cut * 100)}% armor, +${Math.round((e.dmg - 1) * 100)}% dmg, ${e.crit}% crit, +${Math.round((e.haste - 1) * 100)}% haste`;
+  return `${n('epico')} epic ${n('raro')} rare ${n('noncomune')} green ${n('comune')} white: +${e.hp} hp +${e.mana} mana, ${Math.round(e.cut * 100)}% armor, +${Math.round((e.physical - 1) * 100)}% physical / +${Math.round((e.magic - 1) * 100)}% magic, ${e.crit}% crit, +${Math.round((e.haste - 1) * 100)}% haste`;
 }
 /** The boss alone: per build, level and gear, wins, tries to the first kill, the kill time and potions. */
 export function bossTable(rs: BossResult[]): string {

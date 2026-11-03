@@ -1,3 +1,4 @@
+import type { DamageKind } from '../loot/gear.ts';
 import * as THREE from 'three';
 import { playSfx } from '../audio/engine.ts';
 import type { PlayerController } from '../player/controller.ts';
@@ -326,7 +327,7 @@ export class Forsaken {
     return this.combo;
   }
   /** Damage dealer, wired to the enemies by main.ts: hurts every enemy for which `inside` holds. */
-  hurt?: (inside: (x: number, z: number, mob: Mob) => boolean, n: number) => void;
+  hurt?: (inside: (x: number, z: number, mob: Mob) => boolean, n: number, kind?: DamageKind) => void;
   /** Wired by main.ts: the selected target, and every enemy. */
   aimed?: () => Mob | undefined;
   foes?: () => Iterable<Mob>;
@@ -1591,7 +1592,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     // The main attack: off the GCD so the 0.3 s cooldown is the real swing rate, WoW auto-attack style.
     id: 'fall', name: "Caduta d'ossa", icon: 'fall', cooldown: 0.3, offGcd: true, swing: true, main: true, charge: 3,
     get desc() {
-      return `Un fendente di schegge d'ossa davanti a te: ${dmg(tune.fallDmg)} danni a tutti i nemici entro ${num(tune.fallRange)} m.`
+      return `Un fendente di schegge d'ossa davanti a te: ${dmg(tune.fallDmg)} danni fisici a tutti i nemici entro ${num(tune.fallRange)} m.`
         + (tune.fallThird > 1 ? ` Il terzo colpo della combo ne infligge ${dmg(tune.fallDmg * tune.fallThird)}.` : '')
         + (tune.fallMana ? ` Ogni fendente che colpisce ti ridà ${num(tune.fallMana)} mana.` : '')
         + (tune.fxFall ? ' Il terzo colpo semina una nube di peste (al massimo ogni 3 s).' : '');
@@ -1606,7 +1607,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
         const ok = d < tune.fallRange && (d < 0.6 || (dx * fx + dz * fz) / d > tune.fallArc) && k.player.world.sees(p, mob); // not through a wall
         if (ok) hit++;
         return ok;
-      }, third ? tune.fallDmg * tune.fallThird : tune.fallDmg);
+      }, third ? tune.fallDmg * tune.fallThird : tune.fallDmg, 'physical');
       if (hit && tune.fallMana) k.stats.restoreMana(tune.fallMana);
       if (third && tune.fxFall) k.sowFall();
     },
@@ -1714,7 +1715,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'leap', name: 'Balzo del sepolcro', icon: 'leap', mana: 30, charge: 10,
     get cooldown() { return tune.leapCd * tune.cdr; },
-    get desc() { return `Un balzo fino a 12 m sul nemico (senza nemico, davanti a te): all'atterraggio ${dmg(tune.leapDmg)} danni entro ${num(tune.leapR)} m e un attimo di stordimento. I muri ti fermano.`; },
+    get desc() { return `Un balzo fino a 12 m sul nemico (senza nemico, davanti a te): all'atterraggio ${dmg(tune.leapDmg)} danni fisici entro ${num(tune.leapR)} m e un attimo di stordimento. I muri ti fermano.`; },
     check: (k) => (k.magic.dashing ? "Un'altra azione è in corso." : k.magic.reach('leap')),
     fire(k) {
       k.player.model.play('leap', 0.3);
@@ -1727,7 +1728,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     id: 'whirl', name: "Turbine d'ossa", icon: 'whirl', mana: 35, charge: 10, mobile: true,
     get cooldown() { return 10 * tune.cdr; },
     get channel() { return { duration: tune.whirlTime, tick: 0.5 }; },
-    get desc() { return `Per ${num(tune.whirlTime)} s giri su te stesso con la clava, anche correndo: ${dmg(tune.whirlDmg)} danni ogni mezzo secondo a chi è entro 3 m, e la clava che gira para il ${GUARD_CUT * 100}% dei colpi che subisci.${tune.fxFrostWhirl ? ' Gela chi colpisce (40% più lento) e fa il doppio a chi è congelato.' : ''}`; },
+    get desc() { return `Per ${num(tune.whirlTime)} s giri su te stesso con la clava, anche correndo: ${dmg(tune.whirlDmg)} danni fisici ogni mezzo secondo a chi è entro 3 m, e la clava che gira para il ${GUARD_CUT * 100}% dei colpi che subisci.${tune.fxFrostWhirl ? ' Gela chi colpisce (40% più lento); sui congelati aggiunge altrettanti danni magici di gelo.' : ''}`; },
     during(k) {
       k.stats.guard = 0.1; // the whirling club parries
       k.player.model.channel(true, 'spin');
@@ -1747,7 +1748,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'grace', name: 'Colpo di grazia', icon: 'grace', mana: 20, charge: 10,
     get cooldown() { return tune.graceCd * tune.cdr; },
-    get desc() { return `Un fendente a due mani davanti a te: ${dmg(tune.graceDmg)} danni, che crescono con le ferite di ciascun nemico, fino a ${dmg(tune.graceDmg * (1 + tune.graceMul))} su chi è quasi morto.`; },
+    get desc() { return `Un fendente a due mani davanti a te: ${dmg(tune.graceDmg)} danni fisici, che crescono con le ferite di ciascun nemico, fino a ${dmg(tune.graceDmg * (1 + tune.graceMul))} su chi è quasi morto.`; },
     fire(k) {
       k.player.model.play('execute', 0.15);
       k.player.model.fight();
@@ -1759,7 +1760,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'charge', name: 'Carica del dannato', icon: 'charge', mana: 25, charge: 25,
     get cooldown() { return tune.chargeCd * tune.cdr; },
-    get desc() { return `Ti scagli a testa bassa sul nemico tra 4 e 20 m: ${dmg(tune.chargeDmg)} danni e stordito per ${num(tune.chargeStun)} s (meno sui più forti). Riempie un quarto della barra della furia.`; },
+    get desc() { return `Ti scagli a testa bassa sul nemico tra 4 e 20 m: ${dmg(tune.chargeDmg)} danni fisici e stordito per ${num(tune.chargeStun)} s (meno sui più forti). Riempie un quarto della barra della furia.`; },
     check: (k) => (k.magic.dashing ? "Un'altra azione è in corso." : k.magic.reach('charge')),
     fire(k) {
       k.player.model.fight();
@@ -1969,7 +1970,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   // The Ossa's specials (the other schools' are above with their school): locked until the fury bar round the big button is full; using one empties it.
   {
     id: 'strike', name: 'Sentenza del sepolcro', icon: 'strike', cooldown: 0, special: true,
-    get desc() { return `Speciale (barra della furia piena). Una lancia d'ossa e ombra trafigge il bersaglio per ${dmg(tune.strikeDmg)} danni; senza bersaglio, il nemico più vicino davanti a te (entro ${STRIKE_RANGE} m).`; },
+    get desc() { return `Speciale (barra della furia piena). Una lancia d'ossa e ombra trafigge il bersaglio per ${dmg(tune.strikeDmg)} danni (metà fisici e metà magici); senza bersaglio, il nemico più vicino davanti a te (entro ${STRIKE_RANGE} m).`; },
     check(k) {
       const m = k.strikeTarget(), p = k.player.pos;
       if (!m) return 'Nessun bersaglio.';
@@ -1981,7 +1982,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
       k.player.model.play('judgment', BLOW);
       playSfx('strike_cast', chest(k));
       k.player.model.fight();
-      k.hurt?.((_x, _z, mob) => mob === m, tune.strikeDmg);
+      k.hurt?.((_x, _z, mob) => mob === m, tune.strikeDmg, 'hybrid');
       // The smash runs along the floor to the mark, then the spear bursts out under it.
       const trail = v.ribbons.begin(groundTrail), d = Math.hypot(m.x - p.x, m.z - p.z);
       for (let s = 0; s <= 1.0001; s += 0.1) v.ribbons.push(trail, p.x + (m.x - p.x) * s, p.y + 0.15 + (m.y - p.y) * s, p.z + (m.z - p.z) * s);
@@ -1992,12 +1993,12 @@ export const ABILITIES: Ability<Forsaken>[] = [
   },
   {
     id: 'nova', name: 'Lamento della cripta', icon: 'nova', cooldown: 0, special: true,
-    get desc() { return `Speciale (barra della furia piena). Un'onda di schegge d'ossa esplode da te: ${dmg(tune.novaDmg)} danni a tutti i nemici entro ${num(tune.novaR)} m.`; },
+    get desc() { return `Speciale (barra della furia piena). Un'onda di schegge d'ossa esplode da te: ${dmg(tune.novaDmg)} danni fisici a tutti i nemici entro ${num(tune.novaR)} m.`; },
     fire(k) {
       const p = k.player.pos;
       k.player.model.play('slam', BLOW);
       k.player.model.fight();
-      k.hurt?.((x, z, mob) => Math.hypot(x - p.x, z - p.z) < tune.novaR && k.player.world.sees(p, mob), tune.novaDmg);
+      k.hurt?.((x, z, mob) => Math.hypot(x - p.x, z - p.z) < tune.novaR && k.player.world.sees(p, mob), tune.novaDmg, 'physical');
       k.at(BLOW, () => k.nova());
     },
   },

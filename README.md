@@ -177,7 +177,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
   pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono
   davvero: Vigore (+10 salute), Intelletto (+10 mana), Spirito (rigenerazione), Potenza (+% danni),
-  Critico (probabilità di un colpo al 150%) e Celerità (lanci e tempo di recupero globale più rapidi);
+  Critico (probabilità di un colpo al 150%) e Celerità (velocità di lancio e recupero globale, tempi divisi per 1 + bonus/100);
   l'armatura toglie A / (A + 700) dei danni. Il confronto con il pezzo indossato è nel tooltip.
   Quello che si indossa si vede sul Risorto (`src/player/outfit.ts`), come i set di WoW e Diablo: ogni famiglia di pezzi
   è un set con la sua sagoma e i suoi colori, e un set intero si legge come un solo personaggio. Livello 1: il becchino
@@ -282,8 +282,15 @@ renderer suo e un modello per volta, e tutto torna libero (GPU compresa) prima c
 Bortolo col Gelo (Stiletto di ghiaccio sul tasto grande, Dardo di brina e Caligo gelato), Suor Fosca con la Peste (Spina di peste
 sul tasto grande, Nube di peste e Sputo di bile), Fra' Tizian col Fuoco (Tizzone sul tasto grande, Rogo dell'eretico e Cero
 funebre), Zanetto col Fulmine (Folgore sul tasto grande, Catena di saette e Rintocco del campanile); carte dei livelli e tomi sono
-solo delle sue due scuole (vedi Abilità). Le statistiche (Vigore, Intelletto, Spirito, Potenza, Critico, Celerità) sono le stesse per
-tutti e nessuna è "la sua": accanto alle medaglie non c'è una statistica principale.
+solo delle sue due scuole (vedi Abilità). Le statistiche restano disponibili a tutti: Potenza è universale,
+Potenza d'attacco aumenta i danni fisici, Potenza magica quelli magici (+1% per punto, bonus sommati).
+Forza aggiunge `40 × F / (80 + F)` punti percentuali al canale fisico; Agilità aggiunge
+`30 × A / (60 + A)` punti percentuali alla Celerità. I rendimenti decrescono, senza soglie obbligatorie.
+Ossa usa il canale fisico, gli incantesimi quello magico; Sentenza del sepolcro divide a metà i due canali.
+Turbine di brina separa il colpo fisico dal bonus magico contro i congelati. Veleni, evocazioni e zone usano
+il canale magico; Critico vale per entrambi. Agilità e Celerità accelerano lanci e recupero globale,
+non ricariche, attacchi base o canalizzazioni. Intelletto (+10 mana/punto), Spirito (+0,1 mana/s/punto)
+e cure percentuali mantengono le loro regole. La scheda mostra separatamente danni fisici e magici.
 Note di zona (`src/core/notes-cloud.ts`): «Salva e invia nota» conserva prima la nota in `redentore-notes`,
 poi tenta una sola chiamata a `submit('redentore', note)` del modulo same-origin `/hub/notes.js`, con la sessione
 Mongames. Invia categoria, testo, zona, livello della quest, eroe, posizione `{x, z}`, versione e data originale

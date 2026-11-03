@@ -42,7 +42,7 @@ const MOON = 2.4;
 // Outdoor -> indoor endpoints of everything the indoor factor drives.
 const FOG_OUT = new THREE.Color(0x1a2332), FOG_IN = new THREE.Color(0x0c0d11);
 const MOOD = {
-  hemi: [0.44, 0.09],
+  hemi: [1.2, 0.9],
   fog: [0.016, 0.028],
   exposure: [1.0, 1.05],
   cool: [0.7, 0.3],
@@ -54,7 +54,7 @@ const MOOD = {
 // adds contrast and closes in a heavy vignette.
 const DIABLO_MOOD: Record<keyof typeof MOOD, readonly [number, number]> = {
   ...MOOD,
-  hemi: [0.27, 0.06],
+  hemi: [0.9, 0.7],
   exposure: [1.0, 1.1],
   cool: [0.35, 0.15],
   vignette: [0.62, 0.72],
@@ -249,7 +249,8 @@ export class Atmosphere {
   private climbed = false; // the current rung was reached going up
   private readonly pixelRatio: number;
   private readonly fog = new THREE.FogExp2(FOG_OUT.getHex(), MOOD.fog[0]);
-  private readonly hemi = new THREE.HemisphereLight(0x5a74a0, 0x15130f, MOOD.hemi[0]);
+  // Soft sky and ground bounce keep unlit paths readable, including under roofs on low quality.
+  private readonly hemi = new THREE.HemisphereLight(0x9baecd, 0x596070, MOOD.hemi[0]);
   private readonly moon = new THREE.DirectionalLight(0xa9c2f0, MOON);
   private readonly moonOffset = MOON_DIR.clone().multiplyScalar(150);
   private readonly sky = new THREE.Mesh(new THREE.SphereGeometry(900, 48, 24), skyMaterial());

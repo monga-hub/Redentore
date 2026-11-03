@@ -16,7 +16,7 @@ export interface Kind { name: string; max: number; height: number; all: readonly
 const TAP_PX = 8; // pointer travel below this is a tap, not a camera drag
 const TAP_MS = 350;
 const PICK_PX = 26; // min screen radius around a mob's body that still selects it
-const TAB_RANGE = 40; // m: Tab only picks enemies this close
+const TAB_RANGE = 40; // m: Tab and explicit HUD selection only pick enemies this close
 
 /**
  * Closest mob under screen point (x, y): each living mob is a vertical feet-to-head segment
@@ -46,7 +46,8 @@ export function pick(kinds: readonly Kind[], camera: THREE.Camera, x: number, y:
 }
 
 type Pick = { kind: Kind; mob: Mob };
-const live = (m: Mob) => m.state !== 'dead' && m.state !== 'evade';
+const live = (m: Mob) => m.hp > 0 && m.state !== 'dead' && m.state !== 'evade';
+const present = (target: Pick, kinds: readonly Kind[]) => live(target.mob) && kinds.includes(target.kind) && target.kind.ready() && target.kind.all.includes(target.mob);
 
 /** The nearest living enemy to `p` (feet) closer than `range` m that `seen` allows, other than `skip`; only those `only` allows. */
 export function nearest(kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen: (m: Mob, k: Kind) => boolean = () => true, skip?: Mob, only: (m: Mob) => boolean = live): Pick | undefined {
@@ -63,17 +64,27 @@ export function nearest(kinds: readonly Kind[], p: { x: number; z: number }, ran
   return best;
 }
 
+/** Tab order: hero distance, stable kind/mob order on ties; advance through every eligible foe and wrap. */
+export function next(current: Pick | undefined, kinds: readonly Kind[], p: { x: number; z: number }, seen: (m: Mob, k: Kind) => boolean): Pick | undefined {
+  const candidates = kinds.flatMap((kind) => kind.ready() ? kind.all
+    .filter((mob) => live(mob) && Math.hypot(mob.x - p.x, mob.z - p.z) < TAB_RANGE && seen(mob, kind))
+    .map((mob) => ({ kind, mob })) : []);
+  if (!candidates.length) return undefined;
+  candidates.sort((a, b) => Math.hypot(a.mob.x - p.x, a.mob.z - p.z) - Math.hypot(b.mob.x - p.x, b.mob.z - p.z));
+  return candidates[(candidates.findIndex((pick) => pick.mob === current?.mob) + 1) % candidates.length];
+}
+
 /**
  * The target a cast goes to: the current one while it lives (even out of range: the spell says so), else the nearest within
  * `range` of those fighting the hero, else the nearest of all: a pack at rest is pulled only when nobody is fighting.
  */
 export function resolve(current: Pick | undefined, kinds: readonly Kind[], p: { x: number; z: number }, range: number, seen?: (m: Mob, k: Kind) => boolean): Pick | undefined {
-  return current && live(current.mob) ? current : nearest(kinds, p, range, seen, undefined, engaged) ?? nearest(kinds, p, range, seen);
+  return current && present(current, kinds) ? current : nearest(kinds, p, range, seen, undefined, engaged) ?? nearest(kinds, p, range, seen);
 }
 
 /**
  * Target selection, WoW style: click or tap an enemy to target it, click empty ground to clear,
- * Tab for the nearest one. A red ring marks the target's feet and the frame next to the player's
+ * Tab to cycle nearby enemies. A red ring marks the target's feet and the frame next to the player's
  * (#target, styled in index.html) shows its name and health. Dying clears the target.
  */
 export class Targeting {
@@ -91,7 +102,7 @@ export class Targeting {
   /** Where line of sight is checked from: the camera, unless set (the Diablo view's camera is above the roofs). */
   eye?: () => THREE.Vector3;
 
-  constructor(el: HTMLElement, camera: THREE.Camera, scene: THREE.Scene, blockers: THREE.Object3D[], kinds: readonly Kind[]) {
+  constructor(el: HTMLElement, camera: THREE.Camera, scene: THREE.Scene, blockers: THREE.Object3D[], kinds: readonly Kind[], heroSeen: (m: Mob, k: Kind) => boolean = (m, k) => this.seen(m, k)) {
     this.kinds = kinds;
     this.camera = camera;
     this.blockers = blockers;
@@ -120,13 +131,20 @@ export class Targeting {
     addEventListener('keydown', (e) => {
       if (e.code !== 'Tab') return;
       e.preventDefault(); // keep focus off the browser chrome
-      if (!e.repeat) this.nearest();
+      if (!e.repeat) this.cycle();
     });
+    document.getElementById('target-cycle')!.addEventListener('click', () => this.cycle(heroSeen));
+    document.getElementById('target-nearest')!.addEventListener('click', () => this.nearest(heroSeen));
   }
 
-  /** Tab: the nearest living enemy in range and in sight, skipping the current target so repeated presses alternate. */
-  nearest(): void {
-    this.target = nearest(this.kinds, this.player, TAB_RANGE, (m, k) => this.seen(m, k), this.target?.mob) ?? this.target;
+  /** Select only, within Tab's existing 40 m bound; spell range is still checked when casting. */
+  nearest(seen: (m: Mob, k: Kind) => boolean = (m, k) => this.seen(m, k)): void {
+    this.target = nearest(this.kinds, this.player, TAB_RANGE, seen);
+  }
+
+  /** Keyboard Tab retains camera visibility; HUD buttons supply hero LOS. */
+  cycle(seen: (m: Mob, k: Kind) => boolean = (m, k) => this.seen(m, k)): void {
+    this.target = next(this.target, this.kinds, this.player, seen);
   }
 
   /** Auto-target a cast using its line of sight; pointer picking keeps the camera ray. */
@@ -151,7 +169,7 @@ export class Targeting {
   /** Per frame, after the enemies moved. `player`: feet position, for Tab. */
   update(dt: number, player: THREE.Vector3): void {
     this.player.copy(player);
-    if (this.target?.mob.state === 'dead') this.target = undefined;
+    if (this.target && !present(this.target, this.kinds)) this.target = undefined;
     const tg = this.target;
     this.frame.hidden = !tg || !!tg.kind.ownBar?.();
     this.ring.visible = !!tg;

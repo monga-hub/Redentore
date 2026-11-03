@@ -240,6 +240,7 @@ se iOS chiude la scheda (o l'app dalla schermata Home) si riparte da prima dell'
 | 1 … 9 | barra delle abilità (anche clic/tap sui pulsanti): l'attacco primario, l'attacco base della scuola dell'eroe (Caduta d'ossa per il Risorto, Stiletto di ghiaccio per Bortolo, Spina di peste per Suor Fosca, Tizzone per Fra' Tizian, Folgore per Zanetto), fisso sull'1 (il tasto grande su touch), e gli otto posti 2 … 9 che si riempiono dal libro delle abilità (col mouse trascinali anche sulla barra per scambiarli; l'ordine resta salvato). Il Risorto parte con Preghiera di suffragio (2), Bortolo con Dardo di brina (2), Caligo gelato (3) e Preghiera di suffragio (4), Suor Fosca con Nube di peste (2), Sputo di bile (3) e Preghiera di suffragio (4), Fra' Tizian con Rogo dell'eretico (2), Cero funebre (3) e Preghiera di suffragio (4), Zanetto con Catena di saette (2), Rintocco del campanile (3) e Preghiera di suffragio (4); le altre arrivano coi livelli |
 | R | Fiala di linfa tombale: ripristina il 30% della salute massima |
 | T | Fiala di essenza spettrale: ripristina il 30% del mana massimo |
+| Tab | passa al bersaglio successivo entro 40 m, in ordine di distanza dall’eroe, tornando al primo dopo l’ultimo |
 | K | libro delle abilità (anche il pulsante col libro sotto la figura, o dal menu): vedi sotto |
 | 1 / 2 / 3 | al passaggio di livello (il gioco si ferma) scegli una delle tre carte: nuova abilità o potenziamento (anche clic/tap, ←/→ e Invio) |
 | Esc | annulla il lancio in corso; altrimenti apre il menu di gioco (salva/carica, audio, crediti) |
@@ -251,7 +252,12 @@ Su telefono/tablet (solo dispositivi touch): stick virtuale a sinistra per muove
 trascina sul resto dello schermo per la camera, pizzica per lo zoom; a destra le
 abilità diventano tasti tondi a ventaglio attorno all'angolo (stile action-RPG mobile): l'attacco
 primario grande nell'angolo, gli otto posti attorno, e fuori dagli otto, in basso a sinistra dove
-riposa il pollice, il salto e le due fiale. In colonna sotto l'ingranaggio borsa, figura e libro;
+riposa il pollice, il salto e le due fiale. Accanto alle fiale, due tasti dorati selezionano soltanto:
+quello superiore (frecce circolari) scorre i nemici, quello inferiore (mirino) sceglie il più vicino all’eroe.
+Entrambi escludono morti, nemici in ritirata, non caricati o a 40 m e oltre; controllano la linea di vista
+dall’eroe, così un ostacolo davanti alla sola telecamera non li impedisce. Tab conserva la visibilità
+della visuale corrente. La selezione manuale resta prioritaria anche oltre la portata di una magia:
+portata, muri e recupero sono verificati al lancio. Nessun candidato cancella la selezione. In colonna sotto l'ingranaggio borsa, figura e libro;
 lo schermo intero (solo dove il browser lo permette) sta sotto il riquadro del personaggio.
 
 In alto a sinistra il riquadro del personaggio mostra vita e mana (`src/player/stats.ts`,

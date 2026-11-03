@@ -204,6 +204,23 @@
       #fullscreen { right: calc(12px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); width: 36px; height: 36px; opacity: .85;
         border: 2px solid transparent; background: radial-gradient(circle at 40% 35%, #4a3a26, #120d09) padding-box, var(--gilt-ring) border-box; }
 
+      #target-controls {
+        position: absolute; z-index: 2; left: calc(100% + 12px); bottom: 0; pointer-events: auto; display: flex; flex-direction: column; gap: 8px;
+      }
+      #target-controls button {
+        position: relative; width: 44px; height: 44px; cursor: pointer;
+        border: 3px solid transparent; background: radial-gradient(circle at 38% 22%, #3c3020, #0b0907 70%) padding-box, var(--gilt-ring) border-box;
+      }
+      #target-controls button:active { filter: brightness(1.4); }
+      #target-controls button:focus-visible { outline: 2px solid #ffd75e; outline-offset: 3px; }
+      body:is(.touch, .diablo) #target-controls {
+        position: fixed; left: auto; right: calc(env(safe-area-inset-right) + 346px * var(--k) + 36px);
+        bottom: calc(env(safe-area-inset-bottom) + 70px * var(--k) - 22px);
+      }
+      @media (orientation: portrait) {
+        body:is(.touch, .diablo) #target-controls { bottom: calc(env(safe-area-inset-bottom) + 110px); }
+      }
+
       /* Action bar: WoW-style buttons on a carved stone bar in a gilded frame, a painted winged lion of San Marco
          on each end (--cap-img), conic cooldown sweep on --p. */
       .actionbar {
@@ -447,6 +464,14 @@
       <button class="note" aria-label="Note sulla zona" title="Note sulla zona"></button>
     </div>
     <div id="stick"><div id="knob"></div></div>
+    <div id="target-controls" role="group" aria-label="Selezione bersaglio">
+      <button id="target-cycle" class="touch-btn" type="button" title="Bersaglio successivo" aria-label="Seleziona il bersaglio successivo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-2L3 9m0-5v5h5M4 16a8 8 0 0 0 14 2l3-3m0 5v-5h-5"/></svg>
+      </button>
+      <button id="target-nearest" class="touch-btn" type="button" title="Bersaglio più vicino" aria-label="Seleziona il nemico più vicino">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1"/><path d="M12 2v5m0 10v5M2 12h5m10 0h5"/></svg>
+      </button>
+    </div>
     <button id="jump" class="touch-btn ring orb" aria-label="Salta" style="--a: 180deg; --r: 196px; --d: 54px"></button>
     <button id="fullscreen" class="touch-btn" aria-label="Schermo intero">
       <svg width="20" height="20" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>

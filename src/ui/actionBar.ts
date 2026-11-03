@@ -69,7 +69,7 @@ export class ActionBar<C extends Caster> {
     this.sys = sys;
     const bar = el('div', 'bar');
     this.castbar.append(this.castFill, this.castName, this.castTime);
-    this.root.append(this.castbar, bar);
+    this.root.append(this.castbar, bar, document.getElementById('target-controls')!);
     document.body.append(this.root, this.errors, this.tip);
 
     KEYS.forEach((_, i) => {

@@ -215,7 +215,7 @@ const kinds: Kind[] = [ // the levels are only shown, on the nameplates
   { name: DRAGO.name!, max: DRAGO.hp, height: 9, all: [drago.boss], ready: () => dragon.root.children.length > 0, ownBar: () => questView.bossShown },
   { name: 'Marinaio annegato', max: MARINAIO.hp, height: 1.85, all: drago.sailors, ready: () => dragon.root.children.length > 0, lv: 16 },
 ];
-const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, kinds); // click/tap an enemy, Tab for the nearest
+const targeting = new Targeting(renderer.domElement, cam.camera, scene, level.cameraBlockers, kinds, (m) => player.world.sees(player.pos, m)); // click/tap, Tab cycle, hero-LOS HUD selection
 const FALLEN = 3.6; // s the hero lies dead before waking
 const SLOW = 0.3, SLOW_FOR = 1.4; // the world's speed as the hero falls, easing back to 1 over SLOW_FOR s
 let dying = 0;

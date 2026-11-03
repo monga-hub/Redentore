@@ -2,7 +2,7 @@
 // overlapping mobs wins, empty ground, dead mobs and mobs behind the camera select nothing.
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
-import { pick, resolve, type Kind, type Mob } from '../src/ui/target.ts';
+import { pick, nearest, next, resolve, type Kind, type Mob } from '../src/ui/target.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 const W = 800, H = 600;
@@ -80,3 +80,52 @@ selection.target = undefined; reset();
 assert.equal(sys.tryCast(0), false, 'auto-target never crosses a physical wall');
 assert.equal(selection.target, undefined);
 console.log('base cast auto-target: hero LOS, facing away, manual choice, range, walls and cooldown ok');
+
+// Explicit controls use hero distance and hero LOS, not the camera ray or facing.
+const third = mob(2, -10), zero = mob(0, -1), evading = mob(0, -2, 'evade'), distant = mob(0, -41);
+zero.hp = 0;
+const controlsKind = { ...kind, all: [far, dead, near, third, zero, evading, distant] };
+const controls = [controlsKind], visible = () => true;
+assert.equal(nearest(controls, { x: 2, z: -11 }, 40)?.mob, third, 'nearest is relative to hero, not camera');
+assert.equal(next(undefined, controls, hero, visible)?.mob, near);
+assert.equal(next({ kind: controlsKind, mob: near }, controls, hero, visible)?.mob, third);
+assert.equal(next({ kind: controlsKind, mob: third }, controls, hero, visible)?.mob, far);
+assert.equal(next({ kind: controlsKind, mob: far }, controls, hero, visible)?.mob, near, 'wrap all three');
+assert.equal(next({ kind: controlsKind, mob: dead }, controls, hero, visible)?.mob, near);
+assert.equal(next({ kind, mob: behind }, controls, hero, visible)?.mob, near, 'removed target restarts cycle');
+assert.equal(next(undefined, controls, hero, () => false), undefined);
+assert.equal(next(undefined, [{ ...controlsKind, ready: () => false }], hero, visible), undefined);
+assert.equal(next(undefined, [], hero, visible), undefined);
+assert.equal(nearest([], hero, 40), undefined);
+assert.equal(resolve({ kind, mob: behind }, controls, hero, 40)?.mob, near, 'removed current target is cleared');
+Object.assign(selection, { kinds: [castKind], target: undefined });
+const chosen = () => selection.target?.mob;
+
+Targeting.prototype.nearest.call(selection, (m) => new World().sees(host.player.pos, m));
+assert.equal(chosen(), close, 'camera occlusion does not exclude HUD nearest');
+host.player.world = new World();
+reset(); assert.equal(sys.tryCast(0), true, 'HUD selected target is usable by base ability');
+Targeting.prototype.cycle.call(selection, () => true);
+assert.equal(chosen(), selected);
+selected.state = 'dead';
+Targeting.prototype.cycle.call(selection, () => true);
+assert.equal(chosen(), close, 'dead current skipped');
+close.state = 'dead';
+Targeting.prototype.nearest.call(selection, () => true);
+assert.equal(selection.target, undefined, 'no candidates clears stale selection');
+console.log('HUD nearest/cycle: hero distance, complete wrap, eligibility, removed/dead/empty targets and camera occlusion ok');
+
+const single = { ...kind, all: [near] };
+assert.equal(next({ kind: single, mob: near }, [single], hero, visible)?.mob, near, 'one candidate wraps to itself');
+assert.equal(next(undefined, [{ ...kind, all: [mob(0, -40)] }], hero, visible), undefined, '40 m boundary stays exclusive');
+const tie = mob(0, 5), tied = { ...kind, all: [near, tie] };
+assert.equal(next({ kind: tied, mob: near }, [tied], hero, visible)?.mob, tie, 'ties retain registry order');
+const staleFrame = { hidden: false }, staleRing = { visible: true };
+Object.assign(selection, { target: { kind: castKind, mob: close }, frame: staleFrame, ring: staleRing });
+Targeting.prototype.update.call(selection, 0, new THREE.Vector3());
+assert.equal(selection.target, undefined);
+assert.equal(staleFrame.hidden, true);
+assert.equal(staleRing.visible, false);
+Object.assign(selection, { target: { kind, mob: behind } });
+Targeting.prototype.update.call(selection, 0, new THREE.Vector3());
+assert.equal(selection.target, undefined, 'removed target clears without a button press');

@@ -9,25 +9,20 @@ import { itemTip, spellName } from './tooltip.ts';
 import { RANK, SCHOOL_NAME, medal } from './book.ts';
 import type { School } from '../player/levels.ts';
 
-// The character sheet, WoW style: C (or the figure button under the satchel) opens a paper doll
-// in the bag's overlay: head, neck, shoulders, chest down the left, hands, legs, feet, ring down the
-// right, the weapon underneath, and between them the hero himself, full length and as dressed now,
-// idling (ui/figure.ts draws him into `stage`; a drag turns him round). Beside it the numbers gear and
-// levels make (health, mana, armor and what it turns aside, damage, crit, cast speed, mana regen), under his name and his two
-// schools' medals (gold the primary, silver the secondary).
+// C (or the figure button under the satchel) opens the character sheet in the bag's overlay:
+// all four equipment slots down the left, the full-length hero beside them (ui/figure.ts draws
+// him into `stage`; a drag turns him round), then his level, schools and stats.
 // Hover (tap) a slot for its tooltip; click the shown one to take it off into the bag.
 
 const CSS = `
-#bag .sheet .doll { display: grid; grid-template-columns: var(--s) calc(var(--s) * 3.8) var(--s) auto; grid-template-rows: repeat(5, var(--s)); gap: 4px 8px; }
-#bag .sheet .col { display: flex; flex-direction: column; gap: 4px; grid-row: 1 / 5; }
-#bag .sheet .col.r { grid-column: 3; }
+#bag .sheet .doll { display: grid; grid-template-columns: var(--s) calc(var(--s) * 3.8) auto; gap: 8px; align-items: start; }
+#bag .sheet .col { display: flex; flex-direction: column; gap: 4px; }
 #bag .sheet .cell:not([style]) .ico { opacity: .3; filter: grayscale(1); } /* an empty slot shows what goes there, faded */
-#bag .sheet .stage { position: relative; grid-column: 2; grid-row: 1 / 5; border-radius: 6px; overflow: hidden; background: #120c08; }
+#bag .sheet .stage { position: relative; grid-column: 2; grid-row: 1; height: calc(var(--s) * 4 + 12px); border-radius: 6px; overflow: hidden; background: #120c08; }
 #bag .sheet .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 #bag .sheet .stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
   box-shadow: inset 0 0 16px 6px rgba(0,0,0,.85), inset 0 0 0 1px rgba(217,173,82,.35); }
-#bag .sheet .wpn { grid-column: 2; grid-row: 5; display: flex; justify-content: center; }
-#bag .sheet .stats { grid-column: 4; grid-row: 1 / 6; min-width: 112px; padding: 16px 0 0 8px; border-left: 1px solid rgba(217,173,82,.25); } /* clear of the ✕ */
+#bag .sheet .stats { grid-column: 3; grid-row: 1; min-width: 112px; padding: 16px 0 0 8px; border-left: 1px solid rgba(217,173,82,.25); } /* clear of the ✕ */
 #bag .sheet .lv { margin: 0 0 6px; font: bold 12px/15px Georgia, serif; color: #ffd75e; }
 #bag .sheet .sch { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px; font: 11px/15px Georgia, serif; color: #f3e2b0; }
 #bag .sheet .sch span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
@@ -37,11 +32,12 @@ const CSS = `
 #bag .sheet .build-info { max-width: min(400px, calc(100vw - 70px)); margin-top: 8px; font: 11px/15px Georgia, serif; }
 #bag .sheet .build-info p { margin: 4px 0; }
 #bag .sheet dd.up { color: #3fd84a; }
-/* Beside the bag the sheet is wider than six cells now: the cells shrink a little sooner. */
+/* Leave room for both panels when the bag is open beside the sheet. */
 #bag.duo:has(.sheet.on) { --s: min(46px, calc((100vw - 170px) / 14.6), calc((100dvh - 110px) / 5.6)); }
 @media (max-width: 480px) { /* a phone held upright: the numbers under the doll */
-  #bag .sheet .doll { grid-template-columns: var(--s) calc(var(--s) * 3.8) var(--s); grid-template-rows: repeat(5, var(--s)) auto; }
-  #bag .sheet .stats { grid-column: 1 / 4; grid-row: 6; padding: 6px 0 0; border: 0; }
+  #bag.duo:has(.sheet.on) { --s: min(46px, calc((100vw - 80px) / 6), calc((100dvh - 210px) / 10.6)); }
+  #bag .sheet .doll { grid-template-columns: var(--s) calc(var(--s) * 3.8); }
+  #bag .sheet .stats { grid-column: 1 / 3; grid-row: 2; padding: 6px 0 0; border: 0; }
 }
 `;
 
@@ -88,17 +84,16 @@ export class SheetPanel {
 
   private cell(slot: Slot): string {
     const id = this.gear.worn[slot], it = id ? ITEM.get(id) : undefined, s = SLOT.get(slot)!;
-    if (!it) return `<div class="cell" title="${s.name}">${ICONS[s.icon]}</div>`;
+    if (!it) return `<button class="cell" title="${s.name}" aria-label="${s.name}: vuoto">${ICONS[s.icon]}</button>`;
     return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${itemIcon(it)}</button>`;
   }
 
   private render(): void {
     if (!this.shown) return;
     const n = this.read(), pct = (k: number) => `${Math.round(k * 100)}%`, it = (x: number) => Math.round(x).toLocaleString('it-IT');
-    const col = (ids: Slot[], side = '') => `<div class="col ${side}">${ids.map((s) => this.cell(s)).join('')}</div>`;
+    const slots: Slot[] = ['abito', 'arma', 'amuleto', 'anello'];
     this.el.innerHTML = `<h2>Personaggio</h2><button class="x" aria-label="Chiudi scheda">✕</button>
-      <div class="doll">${col(['abito', 'amuleto'])}<div class="stage" title="Trascina per girarlo"></div>${col(['anello'], 'r')}
-        <div class="wpn">${this.cell('arma')}</div>
+      <div class="doll"><div class="col">${slots.map((s) => this.cell(s)).join('')}</div><div class="stage" title="Trascina per girarlo"></div>
         <div class="stats"><div class="lv">${n.name} · livello ${n.lv}</div>
           <div class="sch">${n.schools.map((s, i) => `<span>${medal(i)}${SCHOOL_NAME.get(s)} <small>${RANK[i]}</small></span>`).join('')}</div>
           <dl><dt>Salute</dt><dd>${it(n.hp)}</dd><dt>Mana</dt><dd>${it(n.mana)}</dd>

@@ -62,6 +62,20 @@ if (!quest.key) fail('opening the chest gave no key');
 if (quest.bonusXp !== questXp('chiave') || quest.done.join() !== 'chiave') fail('the key out of the chest is not a quest done');
 // Fra' Bortolo, sought since Fra' Zuane's first quest: found once, paid once.
 if (!BORTOLO_OBJECTIVE || !quest.meet() || quest.meet() || quest.bonusXp !== questXp('chiave') + questXp('bortolo')) fail("finding Fra' Bortolo does not pay its reward exactly once");
+// Skipping the serra leaves the errand incomplete: it expires when the next world opens, without a reward or flag reset.
+{
+  const q = new Quest(level.world);
+  q.accepted = q.blessed = q.bossDead = true; // no blessing/head marker to mask the errand's marker
+  if (!q.bortoloActive || q.marks(0).speziale !== 'ready') fail('the errand is unavailable late in world 1');
+  q.accept2();
+  for (const next of [2, 3]) {
+    if (next === 3) q.accept3();
+    const before = q.done.join(), xp = q.bonusXp;
+    if (q.bortoloActive || q.marks(0).speziale === 'ready' || q.meet() || q.found || q.done.join() !== before || q.bonusXp !== xp) fail(`world ${next} retains or rewards the incomplete serra errand`);
+  }
+  q.accepted2 = q.accepted3 = false; // eligibility is derived; the incomplete progress was not erased
+  if (!q.bortoloActive || !q.meet() || q.meet()) fail('valid world-1 progress was destroyed');
+}
 want('grate');
 const grate = quest.gates.find((g) => g.id === 'grata-nord')!, c = quest.centre(grate);
 const at = quest.prompt(feet(c.x, c.z + 1.2));

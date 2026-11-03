@@ -374,7 +374,7 @@ export class QuestView {
   private spezialeEntries(): Entry[] {
     const q = this.quest, alive = this.friars();
     const t = q.accepted3 && !q.boss3Dead ? (q.blessed3 ? SPEZIALE_SANGIORGIO_AGAIN : SPEZIALE_SANGIORGIO) : q.accepted2 && !q.boss2Dead ? (q.blessed2 ? SPEZIALE_ZITELLE_AGAIN : SPEZIALE_ZITELLE) : q.bossDead ? SPEZIALE_DONE : q.blessed ? SPEZIALE_AGAIN : SPEZIALE_TALK;
-    const out: Entry[] = [q.accepted && !q.found
+    const out: Entry[] = [q.bortoloActive
       ? { title: QUESTS.bortolo.title, state: 'ready', text: join(t), reward: pay('bortolo'), act: () => { q.meet(); } } // found, as Fra' Zuane asked
       : { title: 'Parla', state: 'talk', text: join(t) }];
     const heads = { title: HEADS_TITLE, objective: `Teste di frate ${q.heads}/${q.headsNeed(alive)}`, reward: pay('teste') };
@@ -445,7 +445,7 @@ export class QuestView {
   log(): { id: 'main' | 'bortolo' | 'relic' | 'teste' | SideQuest['id']; title: string; line: string; ready: boolean }[] {
     const q = this.quest, s = q.stage, alive = this.friars(), out: ReturnType<QuestView['log']> = [];
     if (s !== 'done') out.push({ id: 'main', title: titleOf(s), line: OBJECTIVE[s], ready: s === 'report' || s === 'return' || s === 'return3' });
-    if (q.accepted && !q.found) out.push({ id: 'bortolo', title: QUESTS.bortolo.title, line: BORTOLO_OBJECTIVE, ready: false });
+    if (q.bortoloActive) out.push({ id: 'bortolo', title: QUESTS.bortolo.title, line: BORTOLO_OBJECTIVE, ready: false });
     if (q.relic && !q.relicBack) out.push({ id: 'relic', title: RELIC_TITLE, line: RELIC_OBJECTIVE, ready: true });
     if (q.asked && !q.boon) {
       const ok = q.headsReady(alive);
@@ -556,7 +556,7 @@ export class QuestView {
     }
     this.tapped = false;
     this.quest.update(player);
-    const q = this.quest, stage = q.stage, side = (q.accepted && !q.found ? 'b' : '') + (q.relic && !q.relicBack ? 'r' : '') + this.heads();
+    const q = this.quest, stage = q.stage, side = (q.bortoloActive ? 'b' : '') + (q.relic && !q.relicBack ? 'r' : '') + this.heads();
     if (stage !== this.stage) {
       const was = this.stage, done = was === 'report' || was === 'return' || was === 'return3'; // complete: its banner and chime are payout's
       if (was === 'talk') notices.push(`Missione accettata: ${QUEST_TITLE}`);

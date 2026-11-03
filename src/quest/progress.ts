@@ -290,7 +290,7 @@ export class Quest {
     const s = this.stage, over = this.boss2Dead;
     return {
       zuane: mark(s === 'report' || s === 'return' || s === 'return3' || (this.relic && !this.relicBack), s === 'talk' || s === 'offer' || s === 'offer3'),
-      speziale: mark((this.accepted && !this.found) || this.headsReady(alive),
+      speziale: mark(this.bortoloActive || this.headsReady(alive),
         !this.blessed || (this.accepted2 && !this.blessed2 && !over) || (this.accepted3 && !this.blessed3 && !this.boss3Dead) || (!this.asked && !this.bossDead && alive > 0)),
       ...Object.fromEntries((Object.keys(GIVERS) as Giver[]).map((g) => [g, // out of sight until their level opens: the chains fall (level 1's from the start)
         [true, this.accepted2, this.accepted3][GIVERS[g].level - 1] ? mark(this.side.handInReady(g), this.side.open(g).length > 0) : undefined])) as Record<Giver, Mark>,
@@ -302,9 +302,14 @@ export class Quest {
     return SIDE.flatMap((q) => (q.prep && this.side.done.includes(q.id) ? [q.prep] : []));
   }
 
+  /** The serra errand belongs to world 1; keep its saved progress when later worlds open. */
+  get bortoloActive(): boolean {
+    return this.accepted && !this.found && !this.accepted2 && !this.accepted3;
+  }
+
   /** Fra' Bortolo is found, once Fra' Zuane has sent the hero looking. */
   meet(): boolean {
-    if (!this.accepted || this.found) return false;
+    if (!this.bortoloActive) return false;
     this.found = true;
     return this.complete('bortolo');
   }

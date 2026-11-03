@@ -121,6 +121,7 @@ z.quest.takeKey();
 for (const g of z.quest.gates) if (g.needs === 'key') z.quest.open(g);
 z.quest.win();
 z.quest.report();
+z.quest.meet(); // Earned in world 1, before opening world 2.
 z.quest.accept2();
 z.quest.arrived = true;
 z.quest.takeKey2();
@@ -164,7 +165,6 @@ if (!rz.quest.relic || !rz.quest.relicBack || !rs.quest.relic || !rs.quest.relic
 if (old.quest.relic || old.quest.relicBack) fail('a save from before the corona loads with it found');
 // The quests done round-trip and their XP is what the save counted; a save from before them is rebuilt from its flags,
 // with only Fra' Zuane's old report reward counted in its XP (the rest is paid on load); an unknown quest is dropped.
-z.quest.meet();
 const qs = JSON.parse(JSON.stringify(serialize(z))), qb = boot();
 deserialize(qb, qs);
 if (qb.quest.done.join() !== 'chiave,reverendissimo,bortolo' || !qb.quest.found || questXpIn(qs) !== qb.quest.bonusXp) fail(`quests done restored as ${qb.quest.done}`);
@@ -175,6 +175,19 @@ if (qo.quest.done.join() !== 'chiave,bortolo,reverendissimo' || questXpIn({ ...q
 deserialize((qo = boot(), qo), { ...qs, quest: { ...qs.quest, done: ['chiave', 'from_the_future'] } });
 if (qo.quest.done.join() !== 'chiave') fail('unknown quest kept');
 if (!valid({ ...qs, quest: oldQ }) || valid({ ...qs, quest: { ...qs.quest, done: [1] } }) || valid({ ...qs, quest: { ...qs.quest, found: 'yes' } })) fail('quests done validation');
+// Incomplete serra errands in existing later-world saves stay incomplete and cannot pay again on load.
+for (const later of [zs, s3]) for (const legacy of [false, true]) {
+  const copy = boot(), saved = JSON.parse(JSON.stringify(later));
+  saved.quest.found = saved.quest.blessed = false;
+  saved.quest.done = saved.quest.done.filter((id: string) => id !== 'bortolo');
+  if (legacy) { delete saved.quest.found; delete saved.quest.done; }
+  deserialize(copy, saved);
+  const xp = copy.quest.bonusXp, gold = copy.bag.gold, done = copy.quest.done.join();
+  if (copy.quest.bortoloActive || copy.quest.meet() || copy.quest.found || copy.quest.done.join() !== done || copy.quest.bonusXp !== xp || copy.bag.gold !== gold) fail('a later-world save revived or paid the serra errand');
+  const roundTrip = boot();
+  deserialize(roundTrip, serialize(copy));
+  if (roundTrip.quest.bortoloActive || roundTrip.quest.found || roundTrip.quest.done.join() !== done) fail('saving a hidden serra errand lost its state');
+}
 // Mastro Iseppo's quests: taken, handed in and counted survive a save, his quest items with the bag; a save from before him loads with none.
 z.quest.side.taken.push('lumi', 'ditale');
 z.quest.side.done.push('ferri');

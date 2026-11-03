@@ -9,7 +9,7 @@ import { killAll } from '../enemies/caster.ts';
 import { BASE_ATTACK, CARD, levelOf, ownSchools } from '../player/levels.ts';
 import { BOONS, QUESTS, type Quest, type QuestId } from '../quest/progress.ts';
 import type { SideState } from '../quest/squero.ts';
-import type { Bag, BagState } from '../loot/bag.ts';
+import { recoverItem, type Bag, type BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 import { HEROES, heroOf, type Hero } from '../player/heroes.ts';
 
@@ -108,7 +108,11 @@ export function deserialize(g: Game, s: GameState): void {
   g.levels.picks = own.picks;
   g.levels.learned = own.learned;
   g.levels.main = typeof s.build?.main === 'string' ? s.build.main : '';
-  if (s.gear) g.gear.decode(s.gear); // before the clamp too: Vigore raises the max
+  g.bag.hero = g.hero;
+  if (s.gear) {
+    for (const id of Object.values(s.gear)) if (id) recoverItem(id);
+    g.gear.decode(s.gear);
+  } // before the clamp too: Vigore raises the max
   g.quest.boon = BOONS.some((b) => b.id === s.quest.boon) ? s.quest.boon! : ''; // before the clamp too: the rite's boon may raise it
   g.levels.apply(); // before the clamp: a saved 1472 hp needs the raised max
   g.stats.hp = Math.min(Math.max(p.hp, 1), g.stats.hpMax); // never wake up dead

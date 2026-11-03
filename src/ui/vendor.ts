@@ -68,7 +68,7 @@ export class VendorPanel {
     host.kind('s', {
       tip: (id, tap) => {
         const it = ITEM.get(id)!, p = buyPrice(it);
-        return itemTip(it, { worn: ITEM.get(this.gear.worn[it.slot!] ?? ''), price: `Prezzo: ${p.toLocaleString('it-IT')} oro`, hint: hint(tap, 'compra', p), no: this.bag.gold < p });
+        return itemTip(it, { worn: this.gear.comparison(it), price: `Prezzo: ${p.toLocaleString('it-IT')} oro`, hint: hint(tap, 'compra', p), no: this.bag.gold < p });
       },
       use: (id) => this.buy(id, buyPrice(ITEM.get(id)!)),
     }, () => this.render());

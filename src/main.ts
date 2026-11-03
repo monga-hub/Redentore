@@ -56,7 +56,7 @@ import { Director } from './audio/director.ts';
 import { Bag, ITEM, RELIC, RELIC_PRIZE } from './loot/bag.ts';
 import { Drops, type Dropper } from './loot/drops.ts';
 import { BagPanel } from './ui/bag.ts';
-import { Equipment, SHOP2, crit, damageMultiplier, effects, shop, starter, worth as value } from './loot/gear.ts';
+import { Equipment, shop2, crit, damageMultiplier, effects, shop, starter, worth as value } from './loot/gear.ts';
 import { SheetPanel } from './ui/sheet.ts';
 import { Figure } from './ui/figure.ts';
 import { VendorPanel } from './ui/vendor.ts';
@@ -128,7 +128,7 @@ levels.learned = [...HEROES[hero].kit]; // his school's start (a load lays its o
 levels.schools = HEROES[hero].school;
 let booted = false; // past the load: a base attack learnt from now on is called out
 const levelUp = new LevelUp(); // the two-card window
-const gear = new Equipment(); // what the hero wears: the hemp set and his own weapon at first
+const gear = new Equipment(hero); // what the hero wears: the hemp set and his own weapon at first
 gear.worn = starter(HEROES[hero].weapon);
 let worn = effects(gear.totals);
 levels.apply = () => { // the cards, Fra' Bortolo's boon and the gear, laid on the kit and the stats
@@ -275,7 +275,8 @@ const head = new THREE.Vector3();
 // Saved games index the mobs: the original friars and every priest first, as before the new friar groups and the bees, which follow.
 const old = GROUPS.flat().length;
 const mobs = [...friars.all.slice(0, old), ...priests.all, ...friars.all.slice(old), ...bees.all, ...zitelle.all, ...sangiorgio.all]; // level 2's, then level 3's last
-const bag = new Bag(); // gold and items picked up off the dead
+const bag = new Bag();
+bag.hero = hero; // gold and items picked up off the dead
 quest.side.bag = bag; // Mastro Iseppo's quest items go in and out of it
 const game: Game = { hero, player, stats: playerStats, kit: kit.system, quest, mobs, time: 0, fog: discovery, levels, bag, gear };
 const worth = mobs.map((m) => ('kind' in m ? m.kind.xp : FRIAR.xp)); // XP each mob is worth dead
@@ -340,7 +341,7 @@ function arena(): void {
     if (c.kind === 'ability') kit.system.learn(c.id);
   }
   const worn = { ...gear.worn };
-  for (const it of shop(true)) { const cur = ITEM.get(worn[it.slot!] ?? ''); if (!cur || value(it) > value(cur)) worn[it.slot!] = it.id; }
+  for (const it of shop(true, hero)) { const cur = ITEM.get(worn[it.slot!] ?? ''); if (!cur || value(it) > value(cur)) worn[it.slot!] = it.id; }
   booted = false; // its base attacks learnt quietly: the book isn't up yet
   gear.decode(worn); // and the stats laid on
   booted = true;
@@ -460,7 +461,7 @@ const notes = new NotesPanel(() => ({ area: level.areaAt(player.pos.x, player.po
 notes.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); book.close(); };
 { const q = document.querySelector<HTMLButtonElement>('#minimap .note')!; q.innerHTML = QUILL; q.addEventListener('click', () => { if (!menu.paused) notes.toggle(); }); }
 bagPanel.keys.KeyK = () => book.show();
-questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(quest.accepted3) }); // San Giorgio's purple pieces once the third quest is taken
+questView.shop = () => vendor.open({ name: "Fra' Bortolo", sub: 'Speziale · reliquie e paramenti dei morti', goods: () => shop(quest.accepted3, hero) }); // San Giorgio's purple pieces once the third quest is taken
 questView.board = (c) => { kit.system.cancel(); dctl.stop(); ferry.board(c, player); };
 /** San Giorgio's campanile (quest/progress.ts `climb`): a fade to black, the hero up in the bell chamber or down at the door, a fade back. */
 const veil = document.createElement('div');
@@ -471,7 +472,7 @@ let climbing: { to: { x: number; z: number; yaw: number }; t: number } | undefin
 questView.climb = (to) => { if (!climbing) { kit.system.cancel(); dctl.stop(); climbing = { to, t: 0 }; } };
 /** Up in the bell chamber: the follow camera held short of its piers and cornice, the view over the lagoon opened (stream, fx/atmosphere.ts). */
 const aloft = () => player.pos.y > BELFRY.y - 2 && player.pos.x > BELFRY.x0 - 1 && player.pos.x < BELFRY.x1 + 1 && player.pos.z > BELFRY.z0 - 1 && player.pos.z < BELFRY.z1 + 1;
-questView.shop2 = () => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => SHOP2 });
+questView.shop2 = () => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => shop2(hero) });
 questView.reward = (gold) => { bag.gold += gold; };
 questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
 questView.boonTaken = () => levels.apply();

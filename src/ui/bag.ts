@@ -1,6 +1,6 @@
 import { playSfx } from '../audio/engine.ts';
 import { Bag, ITEM, RARITY } from '../loot/bag.ts';
-import { sellPrice, type Equipment } from '../loot/gear.ts';
+import { isLegacyArmor, sellPrice, type Equipment } from '../loot/gear.ts';
 import { itemIcon } from './itemIcon.ts';
 import { ICONS } from './icons.ts';
 import { TIP_CSS, itemTip } from './tooltip.ts';
@@ -138,12 +138,13 @@ export class BagPanel {
     this.kind('b', {
       tip: (what, tap) => {
         const s = this.bag.items[Number(what)], it = ITEM.get(s.id)!;
-        const verb = it.quest ? '' : this.selling ? `vendi per ${(sellPrice(it) * s.n).toLocaleString('it-IT')} oro` : it.slot ? 'indossa' : '';
-        return itemTip(it, { n: s.n, worn: it.slot ? ITEM.get(this.gear.worn[it.slot] ?? '') : null, hint: verb && `${tap ? 'Tocca di nuovo' : 'Clic'}: ${verb}` });
+        const verb = it.recovered ? '' : it.quest ? '' : this.selling ? `vendi per ${(sellPrice(it) * s.n).toLocaleString('it-IT')} oro` : it.slot ? isLegacyArmor(it) && this.gear.hero ? 'vecchio corredo: conserva o vendi' : 'indossa' : '';
+        return itemTip(it, { n: s.n, worn: it.slot ? this.gear.comparison(it) : null, hint: verb && `${tap ? 'Tocca di nuovo' : 'Clic'}: ${verb}` });
       },
       use: (what) => {
         const i = Number(what), it = ITEM.get(this.bag.items[i]?.id ?? '');
         if (!it) return;
+        if (it.recovered) return this.say('Oggetto sconosciuto conservato nel salvataggio; non può essere usato o venduto.');
         if (it.quest) return this.say(it.id === 'corona-zuane' ? 'Fra’ Zuane la aspetta, sulla fondamenta.' : 'Mastro Iseppo lo aspetta, allo squero.');
         if (this.selling) return this.selling(i);
         if (!it.slot) return this.say('Questo non si indossa: Fra’ Bortolo potrebbe comprarlo.');
@@ -233,7 +234,7 @@ export class BagPanel {
   refresh(): void {
     this.seen = JSON.stringify(this.bag.encode());
     this.gold.innerHTML = `<i></i>${this.bag.gold.toLocaleString('it-IT')} oro`;
-    this.grid.innerHTML = Array.from({ length: Bag.SLOTS }, (_, i) => {
+    this.grid.innerHTML = Array.from({ length: Math.max(Bag.SLOTS, this.bag.items.length) }, (_, i) => {
       const s = this.bag.items[i], it = s && ITEM.get(s.id);
       if (!it) return '<div class="cell"></div>';
       return `<button class="cell" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${itemIcon(it)}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;

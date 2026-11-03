@@ -113,7 +113,7 @@ function saved(): Map<Hero, { lv: number; worn: GearState; s: GameState }> {
   for (const hero of HERO_IDS) {
     const s = resume(hero);
     if (!s) continue;
-    const gear = new Equipment(); // read as a load would: ids from another build dropped
+    const gear = new Equipment(hero); // read as a load would: ids from another build dropped
     gear.worn = starter(HEROES[hero].weapon);
     if (s.gear) gear.decode(s.gear);
     out.set(hero, { lv: levelOf(s.build?.xp ?? 0).lv, worn: gear.worn, s });

@@ -1,5 +1,5 @@
 import { ITEM, RARITY, type Bag } from '../loot/bag.ts';
-import { SLOTS, type Equipment, type Slot } from '../loot/gear.ts';
+import { ARMOR_SLOTS, SLOT, type Equipment, type Slot } from '../loot/gear.ts';
 import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
@@ -84,7 +84,7 @@ export class SheetPanel {
   }
 
   private cell(slot: Slot): string {
-    const id = this.gear.worn[slot], it = id ? ITEM.get(id) : undefined, s = SLOTS.find((x) => x.id === slot)!;
+    const id = this.gear.worn[slot], it = id ? ITEM.get(id) : undefined, s = SLOT.get(slot)!;
     if (!it) return `<div class="cell" title="${s.name}">${ICONS[s.icon]}</div>`;
     return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${itemIcon(it)}</button>`;
   }
@@ -94,7 +94,7 @@ export class SheetPanel {
     const n = this.read(), pct = (k: number) => `${Math.round(k * 100)}%`, it = (x: number) => Math.round(x).toLocaleString('it-IT');
     const col = (ids: Slot[], side = '') => `<div class="col ${side}">${ids.map((s) => this.cell(s)).join('')}</div>`;
     this.el.innerHTML = `<h2>Personaggio</h2><button class="x" aria-label="Chiudi scheda">✕</button>
-      <div class="doll">${col(['testa', 'amuleto', 'spalle', 'torso'])}<div class="stage" title="Trascina per girarlo"></div>${col(['mani', 'gambe', 'piedi', 'anello'], 'r')}
+      <div class="doll">${col(['abito', 'amuleto'])}<div class="stage" title="Trascina per girarlo"></div>${col(['anello'], 'r')}
         <div class="wpn">${this.cell('arma')}</div>
         <div class="stats"><div class="lv">${n.name} · livello ${n.lv}</div>
           <div class="sch">${n.schools.map((s, i) => `<span>${medal(i)}${SCHOOL_NAME.get(s)} <small>${RANK[i]}</small></span>`).join('')}</div>
@@ -102,6 +102,11 @@ export class SheetPanel {
           <dt>Armatura</dt><dd title="Danni subiti in meno">${it(n.armor)} (−${pct(n.cut)})</dd>
           <dt>Danni fisici</dt><dd class="${(n.physical ?? n.dmg) > 1 ? 'up' : ''}">+${pct((n.physical ?? n.dmg) - 1)}</dd><dt>Danni magici</dt><dd class="${(n.magic ?? n.dmg) > 1 ? 'up' : ''}">+${pct((n.magic ?? n.dmg) - 1)}</dd><dt>Critico</dt><dd>${Math.round(n.crit)}% (×1,5)</dd>
           <dt>Velocità lancio</dt><dd class="${n.haste > 1 ? 'up' : ''}">+${pct(n.haste - 1)}</dd><dt>Mana/s</dt><dd>${n.regen.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</dd></dl></div></div>`;
+    if (!this.gear.worn.abito && ARMOR_SLOTS.some((slot) => this.gear.worn[slot])) {
+      const legacy = document.createElement('div');
+      legacy.innerHTML = `<p>Vecchio corredo conservato: indossa un abito completo per sostituirlo. Tutti i pezzi passeranno in borsa.</p>${ARMOR_SLOTS.filter((slot) => this.gear.worn[slot]).map((slot) => this.cell(slot)).join('')}`;
+      this.el.append(legacy);
+    }
     this.el.querySelector('.stage')!.append(this.stage);
   }
 }

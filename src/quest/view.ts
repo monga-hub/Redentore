@@ -389,10 +389,11 @@ export class QuestView {
   private giverEntries(giver: Giver): Entry[] {
     const s = this.quest.side, g = GIVERS[giver], open = s.open(giver), rank = { ready: 0, offer: 1, busy: 2, talk: 3 };
     return SIDE.filter((sq) => giverOf(sq) === giver).flatMap((sq): Entry[] => {
-      const base = { title: QUESTS[sq.id].title, objective: s.line(sq), reward: pay(sq.id, sq.reward && ITEM.get(sq.reward)?.name) };
-      if (s.ready(sq)) return [{ ...base, state: 'ready', text: sq.done.join('\n\n'), act: () => { // paid at once: its items out, the reward in (the XP, gold and banner are payout's)
-        if (!s.handIn(sq)) return g.full;
-        if (sq.reward) this.news.push(`Ricompensa: ${ITEM.get(sq.reward)!.name}`);
+      const choices = s.rewardChoices(sq);
+      const base = { title: QUESTS[sq.id].title, objective: s.line(sq), reward: pay(sq.id, choices.length ? 'Un abito a scelta per il tuo eroe' : sq.reward && ITEM.get(sq.reward)?.name) };
+      if (s.ready(sq)) return [{ ...base, state: 'ready', choices: choices.length ? choices.map((it) => ({ id: it.id, label: it.name })) : undefined, text: sq.done.join('\n\n'), act: (choice) => { // paid at once: its items out, the reward in (the XP, gold and banner are payout's)
+        if (!s.handIn(sq, choice)) return g.full;
+        if (sq.reward) this.news.push(`Ricompensa: ${ITEM.get(choice ?? sq.reward)!.name}`);
       } }];
       if (s.active(sq.id)) return [{ ...base, state: 'busy', text: sq.busy }];
       if (open.includes(sq)) return [{ ...base, state: 'offer', text: sq.offer.join('\n\n'), decline: g.decline, act: () => {

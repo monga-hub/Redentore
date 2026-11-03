@@ -26,7 +26,8 @@
 // turned three pilgrims away from his door the night of the vow (their letters, in three corners of the complex, then the bread of the
 // cerca off the friars, laid on the refettorio's board, and the noviziato's bell rung to call them to supper); and Fra' Lunardo, the
 // beekeeper, in the uliveto by the apiary, who wants the giant bee's sting and the hives smoked. Their quests end with the Reverendissimo.
-import { ITEM, type Bag } from '../loot/bag.ts';
+import { isLegacyArmor, outfitChoices } from '../loot/gear.ts';
+import { ITEM, levelOfItem, type Bag } from '../loot/bag.ts';
 import { CHURCH_FLOOR } from '../level/plan.ts';
 import { BELLS, FAC, LABIRINTO, LIB_F, SCANSIE } from '../level/zones/sangiorgio.ts';
 import type { Talk } from './dialogue.ts';
@@ -810,12 +811,20 @@ export class SideQuests {
   }
 
   /** Its items out of the bag (every step's), the reward in; false (nothing changed) when the bag has no room for the reward. */
-  handIn(q: SideQuest): boolean {
+  rewardChoices(q: SideQuest) {
+    const it = ITEM.get(q.reward ?? '');
+    return it && this.bag?.hero && isLegacyArmor(it) ? outfitChoices(this.bag.hero, levelOfItem(it), it.rarity) : [];
+  }
+
+  handIn(q: SideQuest, choice?: string): boolean {
     const bag = this.bag;
-    if (!bag) return false;
+    if (!bag || this.done.includes(q.id)) return false;
     const items = [...new Set([...(q.secret ? [q.secret.drop] : []), ...stepsOf(q).flatMap((w) => (w.kind === 'kill' || w.kind === 'escort' ? [] : w.kind === 'use' ? [w.needs?.item, w.gives?.item].filter((i) => i !== undefined) : w.kind === 'finds' ? w.finds.map((f) => f.item) : [w.item]))])].map((id) => [id, this.have(id)] as const);
+    const choices = this.rewardChoices(q);
+    if (choices.length && !choices.some((it) => it.id === choice)) return false;
+    const reward = choices.length ? choice! : q.reward;
     for (const [id, n] of items) if (n) bag.remove(id, n);
-    if (q.reward && !bag.add(q.reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
+    if (reward && !bag.add(reward)) { for (const [id, n] of items) if (n) bag.add(id, n); return false; }
     this.taken.splice(this.taken.indexOf(q.id), 1);
     this.done.push(q.id);
     delete this.kills[q.id];

@@ -1,4 +1,7 @@
 import { RARITY, type Item } from '../loot/bag.ts';
+import { buildOf } from '../loot/builds.ts';
+import { CARD } from '../player/levels.ts';
+import { HEROES } from '../player/heroes.ts';
 import { SLOT, STAT, sellPrice, type Stat, type Stats } from '../loot/gear.ts';
 
 // The item tooltip, WoW style: name in its quality's colour, slot and item level, armor, white
@@ -53,6 +56,11 @@ function box(it: Item, n = 1, head = ''): string {
       if (!v) continue;
       const g = k !== 'armatura' && STAT[k].green;
       html += g ? `<span class="g">Equipaggiato: ${g.replace('#', String(v))}</span>` : `<span class="w">${k === 'armatura' ? '' : '+'}${label(k, v)}</span>`;
+    }
+    const build = buildOf(it.build);
+    if (build) {
+      const names = (id: string) => CARD.get(id)?.name ?? ({ fall: 'Caduta d’ossa', lance: 'Stiletto di ghiaccio', thorn: 'Spina di peste', umbra: 'Strale d’ombra', ember: 'Tizzone', spark: 'Folgore', smite: 'Castigo', mend: 'Preghiera di suffragio' } as Record<string, string>)[id] ?? id;
+      html += `<p>${HEROES[build.hero].name} · ${build.role}</p><p>Priorità: ${build.priorities}</p><p>Consigli: ${build.spells.map(names).join(' · ')}</p><small>Le abilità vanno apprese normalmente. L’abito non le concede e non blocca le altre.</small>`;
     }
     const lore = it.pages ? it.pages[leaf++ % it.pages.length] : it.lore;
     if (lore) html += `<p class="lore">«${lore}»</p>`;

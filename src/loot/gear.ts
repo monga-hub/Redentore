@@ -7,10 +7,13 @@
 // buy by quality × slot, sell a quarter of it, flavour junk by rarity. Fra' Bortolo sells level 1's
 // purple pieces, Mastro Iseppo level 2's (SHOP). No three.js and no DOM, so `npm run check` drives it in Node.
 import type { Bag, Icon, Item, Rarity } from './bag.ts';
+import { BUILDS, buildsFor, buildOf, type BuildId } from './builds.ts';
+import { HEROES, type Hero } from '../player/heroes.ts';
 
-export type Slot = 'testa' | 'spalle' | 'torso' | 'mani' | 'gambe' | 'piedi' | 'arma' | 'amuleto' | 'anello';
+export type Slot = 'abito' | 'testa' | 'spalle' | 'torso' | 'mani' | 'gambe' | 'piedi' | 'arma' | 'amuleto' | 'anello';
 /** Paper-doll order; `w` scales the stat budget and the price, `armor` the armor. */
-export const SLOTS: readonly { id: Slot; name: string; w: number; armor: number; icon: Icon }[] = [
+const ALL_SLOTS: readonly { id: Slot; name: string; w: number; armor: number; icon: Icon }[] = [
+  { id: 'abito', name: 'Abito completo', w: 5.25, armor: 5, icon: 'chest' },
   { id: 'testa', name: 'Testa', w: 1, armor: 0.8, icon: 'helm' },
   { id: 'amuleto', name: 'Collo', w: 0.55, armor: 0, icon: 'amulet' },
   { id: 'spalle', name: 'Spalle', w: 0.75, armor: 0.7, icon: 'shoulders' },
@@ -21,7 +24,8 @@ export const SLOTS: readonly { id: Slot; name: string; w: number; armor: number;
   { id: 'anello', name: 'Dito', w: 0.55, armor: 0, icon: 'ring' },
   { id: 'arma', name: 'Arma', w: 1.3, armor: 0, icon: 'club' },
 ];
-export const SLOT = new Map(SLOTS.map((s) => [s.id, s]));
+export const SLOTS = ALL_SLOTS.filter((s) => ['abito', 'arma', 'amuleto', 'anello'].includes(s.id));
+export const SLOT = new Map(ALL_SLOTS.map((s) => [s.id, s]));
 
 export type Stat = 'vigore' | 'intelletto' | 'spirito' | 'potenza' | 'critico' | 'celerita' | 'forza' | 'agilita' | 'potenzaAttacco' | 'potenzaMagica';
 export type Stats = Partial<Record<Stat | 'armatura', number>>;
@@ -219,17 +223,46 @@ const make = (lvl: 1 | 2 | 3) => ([id, name, slot, rarity, focus, lore]: typeof 
   if (s.armor) stats.armatura = Math.round(ARMOR[rarity]! * k.armor * s.armor);
   return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : lvl === 3 ? { l3: true as const } : {}) };
 };
-export const GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3)), ...UNIQUE3.map(make(3)).map((g) => ({ ...g, unique: true as const, ...(g.id === 'libro-di-sabbia' ? { pages: SABBIA } : {}) }))];
+const LEGACY_GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3)), ...UNIQUE3.map(make(3)).map((g) => ({ ...g, unique: true as const, ...(g.id === 'libro-di-sabbia' ? { pages: SABBIA } : {}) }))];
+/** Three families × three chapters per hero, expanded through existing rarity budgets. */
+export const OUTFITS: readonly Item[] = BUILDS.flatMap((b) => ([1, 2, 3] as const).flatMap((chapter) =>
+  (['comune', 'noncomune', 'raro', 'epico'] as const).map((rarity): Item => {
+    const k = chapter === 3 ? L3 : chapter === 2 ? L2 : { budget: 1, armor: 1, ilvl: 0 };
+    const points = BUDGET[rarity]! * k.budget * 5.25;
+    // Every family keeps mana, health and regeneration before spending its offensive share.
+    const stats: Stats = { vigore: Math.max(1, Math.round(points * .18 / 1.5)), intelletto: Math.max(1, Math.round(points * .18 / 1.5)), spirito: Math.max(1, Math.round(points * .12 / 1.2)), armatura: Math.round(ARMOR[rarity]! * k.armor * 5) };
+    const costs: Record<string, number> = { potenzaAttacco: 1.75, potenzaMagica: 1.75, forza: .75, agilita: .75 };
+    b.focus.forEach((stat, i) => {
+      const key = stat as Stat;
+      stats[key] = (stats[key] ?? 0) + Math.max(1, Math.round(points * .52 * SHARES[2][i] / (costs[stat] ?? STAT[key].cost)));
+    });
+    return { id: outfitId(b.id, chapter, rarity), name: `Abito del ${b.name} · ${['Redentore', 'Zitelle', 'San Giorgio'][chapter - 1]}`, rarity, icon: 'chest', lore: b.description, slot: 'abito', hero: b.hero, build: b.id, chapter, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(chapter === 2 ? { l2: true } : chapter === 3 ? { l3: true } : {}) };
+  })));
+export function outfitId(build: BuildId, chapter: 1 | 2 | 3, rarity: Rarity): string { return `abito-${build}-${chapter}-${rarity}`; }
+export const GEAR: readonly Item[] = [...LEGACY_GEAR, ...OUTFITS];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
 /** Every purple piece on sale: level 1's from Fra' Bortolo (and level 3's once the third quest is taken), level 2's from Mastro Iseppo. */
-export const SHOP = GEAR.filter((g) => g.rarity === 'epico' && !g.unique);
-export const shop = (level3: boolean) => SHOP.filter((g) => !g.l2 && (level3 || !g.l3));
+export const SHOP = LEGACY_GEAR.filter((g) => g.rarity === 'epico' && !g.unique);
+export const shop = (level3: boolean, hero?: Hero) => hero ? [...SHOP.filter((g) => !isLegacyArmor(g) && !g.l2 && (level3 || !g.l3)), ...outfitChoices(hero, level3 ? 3 : 1, 'noncomune'), ...outfitChoices(hero, level3 ? 3 : 1, 'epico')] : SHOP.filter((g) => !g.l2 && (level3 || !g.l3));
+export const outfitChoices = (hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity = 'epico') => OUTFITS.filter((g) => g.hero === hero && g.chapter === chapter && g.rarity === rarity);
+export const shop2 = (hero: Hero) => [...SHOP2.filter((g) => !isLegacyArmor(g)), ...outfitChoices(hero, 2, 'noncomune'), ...outfitChoices(hero, 2)];
+export const ARMOR_SLOTS = ['testa', 'spalle', 'torso', 'mani', 'gambe', 'piedi'] as const;
+export const isLegacyArmor = (it: Item) => (ARMOR_SLOTS as readonly string[]).includes(it.slot ?? '');
 /** Mastro Iseppo's goods in the squero: level 2's purple pieces (Fra' Bortolo keeps level 1's). `shop` is both together. */
 export const SHOP2 = SHOP.filter((g) => g.l2);
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club (not the other heroes' own weapons). */
-export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(GEAR.filter((g) => g.rarity === 'comune' && !['remo-gelato', 'stiletto-osso', 'canna-vetraio', 'martello-campana'].includes(g.id)).map((g) => [g.slot, g.id]));
+export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(LEGACY_GEAR.filter((g) => g.rarity === 'comune' && !['remo-gelato', 'stiletto-osso', 'canna-vetraio', 'martello-campana'].includes(g.id)).map((g) => [g.slot, g.id]));
 /** A new game's set: the hemp and the hero's own weapon (player/heroes.ts). */
-export const starter = (weapon: string): GearState => ({ ...STARTER, arma: weapon });
+export const starter = (weapon: string): GearState => {
+  const hero = (Object.keys(HEROES) as Hero[]).find((h) => HEROES[h].weapon === weapon) ?? 'risorto';
+  return { abito: outfitId(buildsFor(hero)[0].id, 1, 'comune'), arma: weapon };
+};
+
+export function outfitSelection(hero: Hero, worn: GearState): { build: BuildId; chapter: 1 | 2 | 3; rarity: Rarity; legacy: boolean } {
+  const it = BY_ID.get(worn.abito ?? '');
+  if (it?.hero === hero && buildOf(it.build)) return { build: it.build!, chapter: it.chapter!, rarity: it.rarity, legacy: false };
+  return { build: buildsFor(hero)[0].id, chapter: 1, rarity: 'comune', legacy: true };
+}
 
 /** Gold Fra' Bortolo asks for it. */
 export const buyPrice = (it: Item) => (it.slot ? Math.round(BUY[it.rarity]! * SLOT.get(it.slot)!.w * (it.l3 ? L3.buy : it.l2 ? L2.buy : 1)) : JUNK[it.rarity] * 4);
@@ -238,7 +271,7 @@ export const sellPrice = (it: Item) => Math.floor(buyPrice(it) / 4);
 /** Share of a blow armor turns aside. */
 export const armorCut = (armor: number) => armor / (armor + ARMOR_K);
 /** Budget points an item's stats are worth (the balance bot's "better"). */
-export const worth = (it: Item) => Object.entries(it.stats ?? {}).reduce((s, [k, v]) => s + v * (k === 'armatura' ? 0.15 : STAT[k as Stat].cost), 0);
+export const worth = (it: Item) => Object.entries(it.stats ?? {}).reduce((s, [k, v]) => s + v * (k === 'armatura' ? 0.15 : (STAT[k as Stat]?.cost ?? ({ forza: .75, agilita: .75, potenzaAttacco: 1.75, potenzaMagica: 1.75 } as Record<string, number>)[k])), 0);
 
 /** Stats summed over worn ids. */
 export function totals(ids: Iterable<string | undefined>): Required<Stats> {
@@ -276,21 +309,39 @@ export type GearState = Partial<Record<Slot, string>>;
 
 /** What the hero wears. Every change calls `onChange` (main.ts re-lays the stats). */
 export class Equipment {
-  worn: GearState = { ...STARTER };
+  worn: GearState;
+  /** Omitted only by legacy callers/checks. Production always supplies the actual hero. */
+  readonly hero?: Hero;
+  constructor(hero?: Hero) { this.hero = hero; this.worn = hero ? starter(HEROES[hero].weapon) : { ...STARTER }; }
   onChange = () => {};
 
   get totals(): Required<Stats> {
-    return totals(Object.values(this.worn));
+    return totals(Object.entries(this.worn).filter(([slot]) => !this.worn.abito || !(ARMOR_SLOTS as readonly string[]).includes(slot)).map(([, id]) => id));
   }
 
   /** Wear the item in bag slot `i`, the piece it replaces going into that bag slot. Returns why not, or ''. */
   wear(bag: Bag, i: number): string {
     const s = bag.items[i], it = s && BY_ID.get(s.id);
     if (!it) return 'Non si può indossare.';
+    if (it.hero && it.hero !== this.hero) return 'Questo abito appartiene a un altro eroe.';
+    if (this.hero && isLegacyArmor(it)) return 'Pezzo del vecchio corredo: conservalo o vendilo. Ora si indossa un abito completo.';
+    if (it.slot === 'abito') {
+      const pieces = ARMOR_SLOTS.flatMap((slot) => this.worn[slot] ? [this.worn[slot]!] : []);
+      const old = this.worn.abito;
+      if (bag.items.length - (s.n === 1 ? 1 : 0) + pieces.length + (old ? 1 : 0) > bag.capacity) return 'Libera spazio in borsa per conservare tutti i pezzi del vecchio corredo.';
+      bag.items.splice(i, 1, ...(s.n > 1 ? [{ id: s.id, n: s.n - 1 }] : []), ...[...pieces, ...(old ? [old] : [])].map((id) => ({ id, n: 1 })));
+      for (const slot of ARMOR_SLOTS) delete this.worn[slot];
+      this.worn.abito = it.id;
+      this.onChange();
+      return '';
+    }
     const old = this.worn[it.slot!];
-    this.worn[it.slot!] = it.id;
-    if (old) bag.items[i] = { id: old, n: 1 };
+    if (s.n > 1) {
+      if (old && !bag.add(old)) return 'La borsa è piena.';
+      s.n--;
+    } else if (old) bag.items[i] = { id: old, n: 1 };
     else bag.items.splice(i, 1);
+    this.worn[it.slot!] = it.id;
     this.onChange();
     return '';
   }
@@ -305,6 +356,15 @@ export class Equipment {
     return '';
   }
 
+  /** Compare a complete outfit against the combined old loadout until its first replacement. */
+  comparison(it: Item): Item | undefined {
+    if (it.slot === 'abito' && !this.worn.abito) {
+      const ids = ARMOR_SLOTS.map((slot) => this.worn[slot]);
+      if (ids.some(Boolean)) return { id: 'legacy-comparison', name: 'Vecchio corredo completo', rarity: 'comune', icon: 'chest', slot: 'abito', lore: 'I sei pezzi saranno conservati in borsa quando indossi un abito.', stats: totals(ids) };
+    }
+    return BY_ID.get(this.worn[it.slot!] ?? '');
+  }
+
   encode(): GearState {
     return { ...this.worn };
   }
@@ -312,7 +372,11 @@ export class Equipment {
   /** Lay a saved set over this one; ids from another build, or in the wrong slot, are dropped. */
   decode(s: GearState): void {
     this.worn = {};
-    for (const [slot, id] of Object.entries(s)) if (BY_ID.get(id ?? '')?.slot === slot) this.worn[slot as Slot] = id;
+    for (const [slot, id] of Object.entries(s)) {
+      const it = BY_ID.get(id ?? '');
+      // Unknown records survive round trips without granting stats or pretending to fit another slot.
+      if (!it || (it.slot === slot && (!it.hero || it.hero === this.hero))) this.worn[slot as Slot] = id;
+    }
     this.onChange();
   }
 }
@@ -320,7 +384,7 @@ export class Equipment {
 /** Sell the whole stack in bag slot `i` to Fra' Bortolo; what went and for how much, or undefined. */
 export function sell(bag: Bag, i: number, item: (id: string) => Item | undefined): { id: string; n: number; gold: number } | undefined {
   const s = bag.items[i], it = s && item(s.id);
-  if (!it || it.quest) return undefined;
+  if (!it || it.quest || it.recovered) return undefined;
   bag.items.splice(i, 1);
   const gold = sellPrice(it) * s.n;
   bag.gold += gold;

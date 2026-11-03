@@ -3,7 +3,9 @@
 // with an id, a rarity and a line of lore: vendor junk) and, on its own roll, a piece of gear
 // (loot/gear.ts). The bag keeps gold and stacks by item id; gear doesn't stack. No three.js and no
 // DOM, so `npm run check` drives it in Node.
-import { GEAR, type Slot, type Stats } from './gear.ts';
+import { GEAR, isLegacyArmor, type Slot, type Stats } from './gear.ts';
+import type { Hero } from '../player/heroes.ts';
+import type { BuildId } from './builds.ts';
 
 export type Rarity = 'comune' | 'noncomune' | 'raro' | 'epico' | 'leggendario';
 export const RARITY: Record<Rarity, { name: string; color: string }> = {
@@ -19,7 +21,7 @@ export type Icon = 'rosary' | 'candle' | 'bone' | 'relic' | 'medal' | 'vial' | '
   | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'legs' | 'boots' | 'club' | 'amulet' | 'ring';
 /** Gear has a `slot`, its `stats` and an item level; flavour items only a lore line. */
 /** `l2`: from level 2 (the Giudecca and the Zitelle): only its dead drop it. `quest`: no table rolls it and Fra' Bortolo won't buy it (the friars' heads aren't even bagged: loot/drops.ts collect). */
-export interface Item { id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true; pages?: readonly string[] }
+export interface Item { hero?: Hero; build?: BuildId; chapter?: 1 | 2 | 3; recovered?: true; id: string; name: string; rarity: Rarity; icon: Icon; lore: string; slot?: Slot; stats?: Stats; ilvl?: number; l2?: true; l3?: true; quest?: true; unique?: true; pages?: readonly string[] }
 /** The level an item drops in (`l2`, `l3`). */
 export const levelOfItem = (x: Item): 1 | 2 | 3 => (x.l3 ? 3 : x.l2 ? 2 : 1);
 /** Quest items' colour, on the ground and in the tracker. */
@@ -121,7 +123,7 @@ const GOLD2 = 1.6, GOLD3 = 2.2;
 export interface Drop { gold: number[]; items: string[] }
 
 /** What one death drops: the gold piles and the item ids. `rnd` in [0, 1). `level` 2, 3: that level's gear and junk, more gold. */
-export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 | 3 = 1): Drop {
+export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 | 3 = 1, hero?: Hero): Drop {
   const t = TABLES[tier], [lo, hi] = t.gold, k = level === 3 ? GOLD3 : level === 2 ? GOLD2 : 1, mine = (x: Item) => levelOfItem(x) === level;
   const gold = Array.from({ length: t.piles }, () => Math.round((lo + Math.floor(rnd() * (hi - lo + 1))) * k));
   const prize = level === 3 ? BOSS3_PRIZE : level === 2 ? BOSS2_PRIZE : BOSS_PRIZE;
@@ -134,7 +136,7 @@ export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 |
   const g = t.gear;
   for (let i = 0; i < g.rolls; i++) {
     if (rnd() >= g.chance[Math.min(i, 1)]) continue;
-    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x) && x.id !== BOSS3_PRIZE && !x.unique);
+    const r = pick(g.weights, rnd), pool = GEAR.filter((x) => x.rarity === r && mine(x) && x.id !== BOSS3_PRIZE && !x.unique && (hero ? !isLegacyArmor(x) && (!x.hero || x.hero === hero) : !x.hero));
     if (pool.length) items.push(pool[Math.floor(rnd() * pool.length)].id);
   }
   return { gold, items };
@@ -155,6 +157,8 @@ export class Bag {
   static readonly SLOTS = 30;
   static readonly STACK = 20; // a slot holds this many of one flavour item; gear one
   static cap = (id: string) => (ITEM.get(id)?.slot ? 1 : Bag.STACK);
+  readonly capacity = Bag.SLOTS;
+  hero?: Hero;
   gold = 0;
   readonly items: Stack[] = [];
 
@@ -162,7 +166,7 @@ export class Bag {
   add(id: string, n = 1): boolean {
     if (!ITEM.has(id) || n < 1) return false;
     const cap = Bag.cap(id);
-    const room = this.items.reduce((s, x) => s + (x.id === id ? cap - x.n : 0), 0) + (Bag.SLOTS - this.items.length) * cap;
+    const room = this.items.reduce((s, x) => s + (x.id === id ? Math.max(0, cap - x.n) : 0), 0) + Math.max(0, Bag.SLOTS - this.items.length) * cap;
     if (room < n) return false;
     for (const x of this.items) if (x.id === id && x.n < cap) { const k = Math.min(n, cap - x.n); x.n += k; n -= k; }
     while (n > 0) { const k = Math.min(n, cap); this.items.push({ id, n: k }); n -= k; }
@@ -195,6 +199,16 @@ export class Bag {
   decode(s: BagState): void {
     this.gold = Math.max(0, Math.floor(s.gold));
     this.items.length = 0;
-    for (const [id, n] of s.items) if (ITEM.has(id) && n >= 1) this.add(id, Math.min(Math.floor(n), Bag.cap(id)));
+    // Restored records are not acquisitions: retain overflow, old counts and unknown ids verbatim.
+    for (const [id, n] of s.items) if (n >= 1) {
+      recoverItem(id);
+      this.items.push({ id, n: Math.floor(n) });
+    }
   }
+}
+
+/** Unknown saved objects remain visible and recoverable, with no invented resale value. */
+export function recoverItem(id: string): Item {
+  if (!ITEM.has(id)) ITEM.set(id, { id, name: 'Oggetto del vecchio corredo', rarity: 'comune', icon: 'relic', lore: 'Identificativo conservato nel salvataggio: oggetto non riconosciuto in questa versione.', recovered: true });
+  return ITEM.get(id)!;
 }

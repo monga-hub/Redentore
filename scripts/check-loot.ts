@@ -49,7 +49,7 @@ const back = new Bag();
 back.decode(JSON.parse(JSON.stringify(bag.encode())));
 if (back.gold !== 1234 || JSON.stringify(back.encode()) !== JSON.stringify(bag.encode())) fail('bag round-trip');
 back.decode({ gold: -5, items: [['from_the_future', 3], ['mozzicone', 2]] });
-if (back.gold !== 0 || back.items.length !== 1 || back.count('mozzicone') !== 2) fail('unknown ids or negative gold kept');
+if (back.gold !== 0 || back.items.length !== 2 || back.count('from_the_future') !== 3 || back.count('mozzicone') !== 2) fail('unknown ids lost or negative gold kept');
 // --- gear ---
 if (GEAR.some((g) => !g.slot || !g.stats || !Object.keys(g.stats).length) || shop(false).length !== 9 || shop(true).length !== 15 || shop(true).some((g) => g.l2) || SHOP.some((g) => g.rarity !== 'epico')) fail('gear table malformed');
 if (Object.keys(STARTER).length !== 7 || STARTER.amuleto || STARTER.anello) fail('starter set');
@@ -99,10 +99,10 @@ if (sell(rb, 0, (id) => ITEM.get(id)) || !rb.count(RELIC)) fail('sold the corona
 if (ITEM.get(RELIC_PRIZE)?.slot !== 'amuleto' || !buyPrice(ITEM.get(RELIC_PRIZE)!)) fail('the medal is not a priced neck piece');
 const g2 = new Equipment();
 g2.decode(JSON.parse(JSON.stringify({ ...gear.encode(), anello: 'saio-voto', amuleto: 'from_the_future' })));
-if (JSON.stringify(g2.encode()) !== JSON.stringify(gear.encode())) fail('gear round-trip keeps junk or loses pieces');
+if (JSON.stringify(g2.encode()) !== JSON.stringify({ ...gear.encode(), amuleto: 'from_the_future' })) fail('gear round-trip loses known or unknown records');
 
 // What is worn shows: a model in the fist for every weapon, a look for every visible piece past the hemp (neck and ring don't show).
-for (const g of GEAR) if (g.slot === 'arma' ? !WEAPONS[g.id] : g.slot !== 'amuleto' && g.slot !== 'anello' && g.rarity !== 'comune' && !lookOf(g.id)) fail(`${g.id} does not show on the hero`);
+for (const g of GEAR.filter((g) => !g.build)) if (g.slot === 'arma' ? !WEAPONS[g.id] : g.slot !== 'amuleto' && g.slot !== 'anello' && g.rarity !== 'comune' && !lookOf(g.id)) fail(`${g.id} does not show on the hero`);
 // Every look: the body painted anew (three maps), a helm and a pair of pauldrons; every weapon's model.
 const model = (f: string) => existsSync(new URL(`../public/models/${f}`, import.meta.url));
 for (const l of LOOKS) {

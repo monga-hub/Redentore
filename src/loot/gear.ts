@@ -1,11 +1,6 @@
-// Equipment, classic WoW style (see data/redentore-equip-vendor-w6/DESIGN.md): nine slots, items
-// whose stats come from a budget (quality × slot weight) spent on the two or three stats each
-// leans on, armor on the six armor slots, a white starter set worn from the start. The stats act
-// on the kit: armor cuts damage taken (with diminishing returns), Vigore/Intelletto raise health
-// and mana, Spirito the mana regen, Potenza every ability's damage, Critico the chance of a 150%
-// blow, Celerità cast times and the GCD (main.ts and scripts/balance.ts lay them on). Prices:
-// buy by quality × slot, sell a quarter of it, flavour junk by rarity. Fra' Bortolo sells level 1's
-// purple pieces, Mastro Iseppo level 2's (SHOP). No three.js and no DOM, so `npm run check` drives it in Node.
+// Four current slots: whole outfit, weapon, amulet and ring. Legacy six-piece armor records
+// remain readable and retain their budgets and sale prices. All gear uses chapter × rarity
+// budgets; no renderer or DOM here, so headless checks exercise the same acquisition paths.
 import type { Bag, Icon, Item, Rarity } from './bag.ts';
 import { BUILDS, buildsFor, buildOf, type BuildId } from './builds.ts';
 import { HEROES, type Hero } from '../player/heroes.ts';
@@ -231,12 +226,11 @@ export const OUTFITS: readonly Item[] = BUILDS.flatMap((b) => ([1, 2, 3] as cons
     const points = BUDGET[rarity]! * k.budget * 5.25;
     // Every family keeps mana, health and regeneration before spending its offensive share.
     const stats: Stats = { vigore: Math.max(1, Math.round(points * .18 / 1.5)), intelletto: Math.max(1, Math.round(points * .18 / 1.5)), spirito: Math.max(1, Math.round(points * .12 / 1.2)), armatura: Math.round(ARMOR[rarity]! * k.armor * 5) };
-    const costs: Record<string, number> = { potenzaAttacco: 1.75, potenzaMagica: 1.75, forza: .75, agilita: .75 };
     b.focus.forEach((stat, i) => {
       const key = stat as Stat;
-      stats[key] = (stats[key] ?? 0) + Math.max(1, Math.round(points * .52 * SHARES[2][i] / (costs[stat] ?? STAT[key].cost)));
+      stats[key] = (stats[key] ?? 0) + Math.max(1, Math.round(points * .52 * SHARES[2][i] / STAT[key].cost));
     });
-    return { id: outfitId(b.id, chapter, rarity), name: `Abito del ${b.name} · ${['Redentore', 'Zitelle', 'San Giorgio'][chapter - 1]}`, rarity, icon: 'chest', lore: b.description, slot: 'abito', hero: b.hero, build: b.id, chapter, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(chapter === 2 ? { l2: true } : chapter === 3 ? { l3: true } : {}) };
+    return { id: outfitId(b.id, chapter, rarity), name: `Abito · ${b.name} · ${['Redentore', 'Zitelle', 'San Giorgio'][chapter - 1]}`, rarity, icon: 'chest', lore: b.description, slot: 'abito', hero: b.hero, build: b.id, chapter, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(chapter === 2 ? { l2: true } : chapter === 3 ? { l3: true } : {}) };
   })));
 export function outfitId(build: BuildId, chapter: 1 | 2 | 3, rarity: Rarity): string { return `abito-${build}-${chapter}-${rarity}`; }
 export const GEAR: readonly Item[] = [...LEGACY_GEAR, ...OUTFITS];
@@ -271,7 +265,7 @@ export const sellPrice = (it: Item) => Math.floor(buyPrice(it) / 4);
 /** Share of a blow armor turns aside. */
 export const armorCut = (armor: number) => armor / (armor + ARMOR_K);
 /** Budget points an item's stats are worth (the balance bot's "better"). */
-export const worth = (it: Item) => Object.entries(it.stats ?? {}).reduce((s, [k, v]) => s + v * (k === 'armatura' ? 0.15 : (STAT[k as Stat]?.cost ?? ({ forza: .75, agilita: .75, potenzaAttacco: 1.75, potenzaMagica: 1.75 } as Record<string, number>)[k])), 0);
+export const worth = (it: Item) => Object.entries(it.stats ?? {}).reduce((s, [k, v]) => s + v * (k === 'armatura' ? 0.15 : STAT[k as Stat].cost), 0);
 
 /** Stats summed over worn ids. */
 export function totals(ids: Iterable<string | undefined>): Required<Stats> {
@@ -323,7 +317,7 @@ export class Equipment {
   wear(bag: Bag, i: number): string {
     const s = bag.items[i], it = s && BY_ID.get(s.id);
     if (!it) return 'Non si può indossare.';
-    if (it.hero && it.hero !== this.hero) return 'Questo abito appartiene a un altro eroe.';
+    if (this.hero && it.hero && it.hero !== this.hero) return 'Questo abito appartiene a un altro eroe.';
     if (this.hero && isLegacyArmor(it)) return 'Pezzo del vecchio corredo: conservalo o vendilo. Ora si indossa un abito completo.';
     if (it.slot === 'abito') {
       const pieces = ARMOR_SLOTS.flatMap((slot) => this.worn[slot] ? [this.worn[slot]!] : []);
@@ -375,7 +369,7 @@ export class Equipment {
     for (const [slot, id] of Object.entries(s)) {
       const it = BY_ID.get(id ?? '');
       // Unknown records survive round trips without granting stats or pretending to fit another slot.
-      if (!it || (it.slot === slot && (!it.hero || it.hero === this.hero))) this.worn[slot as Slot] = id;
+      if (!it || (it.slot === slot && (!this.hero || !it.hero || it.hero === this.hero))) this.worn[slot as Slot] = id;
     }
     this.onChange();
   }

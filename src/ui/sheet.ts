@@ -4,7 +4,8 @@ import { playSfx } from '../audio/engine.ts';
 import type { BagPanel } from './bag.ts';
 import { ICONS } from './icons.ts';
 import { itemIcon } from './itemIcon.ts';
-import { itemTip } from './tooltip.ts';
+import { buildOf } from '../loot/builds.ts';
+import { itemTip, spellName } from './tooltip.ts';
 import { RANK, SCHOOL_NAME, medal } from './book.ts';
 import type { School } from '../player/levels.ts';
 
@@ -33,6 +34,8 @@ const CSS = `
 #bag .sheet .sch small { color: #9a8c70; font-style: italic; }
 #bag .sheet dl { display: grid; grid-template-columns: auto auto; gap: 1px 10px; margin: 0; font: 11px/15px system-ui, sans-serif; }
 #bag .sheet dt { color: #c9b48a; } #bag .sheet dd { margin: 0; text-align: right; color: #f3ecd8; white-space: nowrap; }
+#bag .sheet .build-info { max-width: min(400px, calc(100vw - 70px)); margin-top: 8px; font: 11px/15px Georgia, serif; }
+#bag .sheet .build-info p { margin: 4px 0; }
 #bag .sheet dd.up { color: #3fd84a; }
 /* Beside the bag the sheet is wider than six cells now: the cells shrink a little sooner. */
 #bag.duo:has(.sheet.on) { --s: min(46px, calc((100vw - 170px) / 14.6), calc((100dvh - 110px) / 5.6)); }
@@ -102,6 +105,12 @@ export class SheetPanel {
           <dt>Armatura</dt><dd title="Danni subiti in meno">${it(n.armor)} (−${pct(n.cut)})</dd>
           <dt>Danni fisici</dt><dd class="${(n.physical ?? n.dmg) > 1 ? 'up' : ''}">+${pct((n.physical ?? n.dmg) - 1)}</dd><dt>Danni magici</dt><dd class="${(n.magic ?? n.dmg) > 1 ? 'up' : ''}">+${pct((n.magic ?? n.dmg) - 1)}</dd><dt>Critico</dt><dd>${Math.round(n.crit)}% (×1,5)</dd>
           <dt>Velocità lancio</dt><dd class="${n.haste > 1 ? 'up' : ''}">+${pct(n.haste - 1)}</dd><dt>Mana/s</dt><dd>${n.regen.toLocaleString('it-IT', { maximumFractionDigits: 1 })}</dd></dl></div></div>`;
+    const build = buildOf(ITEM.get(this.gear.worn.abito ?? '')?.build);
+    if (build) {
+      const info = document.createElement('div'); info.className = 'build-info';
+      info.innerHTML = `<b>${build.name} · ${build.role}</b><details><summary>Consigli di gioco</summary><p>${build.description}</p><p>Priorità: ${build.priorities}</p><p>${build.spells.map(spellName).join(' · ')}</p><p>Abilità da apprendere normalmente; puoi usare anche le altre.</p></details>`;
+      this.el.append(info);
+    }
     if (!this.gear.worn.abito && ARMOR_SLOTS.some((slot) => this.gear.worn[slot])) {
       const legacy = document.createElement('div');
       legacy.innerHTML = `<p>Vecchio corredo conservato: indossa un abito completo per sostituirlo. Tutti i pezzi passeranno in borsa.</p>${ARMOR_SLOTS.filter((slot) => this.gear.worn[slot]).map((slot) => this.cell(slot)).join('')}`;

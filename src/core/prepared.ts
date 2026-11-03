@@ -14,7 +14,7 @@ export const XP = 1525;
 /** Level-up cards for levels 2..12, as `offer` deals them: an ability on the even levels to 10, an upgrade or passive between. */
 export const PICKS = ['step', 'hp', 'leap', 'fall_dmg', 'nova', 'fall_third', 'ward', 'leap_big', 'whirl', 'dmg', 'hp'];
 /** Level 1's purple set, one piece a slot. */
-export const GEAR = { testa: 'mitria', amuleto: 'ruta-oro', spalle: 'mantella-peste', torso: 'saio-voto', mani: 'guanti-palladio', gambe: 'cosciali-lazzaretto', piedi: 'zoccoli-redentore', anello: 'anello-1576', arma: 'pastorale' };
+export const GEAR = { abito: 'abito-risorto-fossore-1-epico', amuleto: 'ruta-oro', anello: 'anello-1576', arma: 'pastorale' };
 /** The bar: the club on 1, the health potion on R and mana potion on T, the rest in the touch fan's order. */
 export const BAR: Layout = { bar: ['fall', 'leap', 'whirl', 'step', 'nova', 'ward', 'mend', null, null, 'potion', 'mana_potion'], off: [] };
 const UNSEEN = new Set(['giudecca', 'zitelle']); // level 2's zones: not walked yet

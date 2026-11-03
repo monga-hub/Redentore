@@ -173,13 +173,22 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   (nova attorno a sé), *Immersione* (sparisce sott'acqua e riemerge in uno dei tre punti segnati da briccole; l'anello
   di quello scelto si riempie di verde un attimo prima); al 40% e al 20% salgono due marinai annegati per volta. In
   console `drago()` lo rimette in piedi. `node scripts/balance.ts drago melee,arcane` lo gioca con il bot.
-- Equipaggiamento stile WoW classico (`src/loot/gear.ts`): nove posti (testa, collo, spalle, torso, mani,
-  gambe, piedi, dito, arma), si parte col set di canapa bianco e la clava d'osso. I nemici fanno cadere
-  pezzi bianchi, verdi, blu e viola (élite e boss i migliori) con armatura e statistiche che agiscono
+- Equipaggiamento (`src/loot/builds.ts`, `src/loot/gear.ts`): quattro posti, abito completo, arma, amuleto e anello.
+  Ogni eroe ha tre famiglie (prima scuola, seconda scuola, ibrido), ciascuna nei tre capitoli: 45 definizioni prima delle
+  rarità comune, non comune, rara ed epica. Si parte con un abito comune e l’arma del proprio eroe. Negozi e bottino
+  offrono abiti compatibili col personaggio e col capitolo; i negozi hanno tre alternative verdi e tre epiche allo stesso
+  tier. Le ricompense d’armatura delle missioni fanno scegliere uno dei tre abiti equivalenti nel dialogo esistente.
+  Ruolo, statistiche consigliate e incantesimi suggeriti si leggono nei tooltip: le abilità vanno sempre apprese,
+  nessuna viene concessa o bloccata dall’abito. Armatura e statistiche agiscono
   davvero: Vigore (+10 salute), Intelletto (+10 mana), Spirito (rigenerazione), Potenza (+% danni),
   Critico (probabilità di un colpo al 150%) e Celerità (velocità di lancio e recupero globale, tempi divisi per 1 + bonus/100);
   l'armatura toglie A / (A + 700) dei danni. Il confronto con il pezzo indossato è nel tooltip.
-  Quello che si indossa si vede sul Risorto (`src/player/outfit.ts`), come i set di WoW e Diablo: ogni famiglia di pezzi
+  I salvataggi precedenti conservano il corredo misto equipaggiato e tutti gli oggetti in borsa, con gli stessi bonus
+  e prezzi di vendita. Al primo abito, i sei pezzi passano in borsa atomicamente: se manca spazio, niente cambia.
+  I pezzi vecchi si possono conservare o vendere, senza nuovi equipaggiamenti separati. Gli ID sconosciuti e le borse
+  eccedenti restano recuperabili nel salvataggio, senza statistiche o valore inventati; nessun reset o premio di migrazione.
+  Il confronto di un abito include l’intero vecchio corredo. I quattro posti e l’anteprima sono nella scheda esistente.
+  Per i corredi precedenti, quello che si indossa si vede sul Risorto (`src/player/outfit.ts`), come i set di WoW e Diablo: ogni famiglia di pezzi
   è un set con la sua sagoma e i suoi colori, e un set intero si legge come un solo personaggio. Livello 1: il becchino
   della peste (verde: cuoio cerato, ferro arrugginito, fiale di vetro, cappello e maschera a becco), il chierico (verde, per
   chi lancia: talare nera, cotta di pizzo, mozzetta cremisi, saturno), l'Arsenale (blu: acciaio e ottone, fascia cremisi,

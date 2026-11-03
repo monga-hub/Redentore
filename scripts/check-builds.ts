@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { BUILDS, buildsFor } from '../src/loot/builds.ts';
-import { HERO_IDS } from '../src/player/heroes.ts';
+import { BASES, CARD } from '../src/player/levels.ts';
+import { HERO_IDS, HEROES } from '../src/player/heroes.ts';
 import { SideQuests, SIDE_BY } from '../src/quest/squero.ts';
 import { Bag, ITEM, roll, levelOfItem } from '../src/loot/bag.ts';
-import { Equipment, OUTFITS, ARMOR_SLOTS, STARTER, outfitChoices, outfitSelection, shop, shop2, buyPrice, sellPrice, sell, totals, worth } from '../src/loot/gear.ts';
+import { effects, Equipment, OUTFITS, ARMOR_SLOTS, STARTER, outfitChoices, outfitSelection, shop, shop2, buyPrice, sellPrice, sell, totals, worth } from '../src/loot/gear.ts';
 
 assert.equal(BUILDS.length, 15);
+for (const b of BUILDS) {
+  assert(b.schools.every((s) => HEROES[b.hero].school.includes(s)));
+  assert(b.spells.every((id) => BASES.includes(id) || CARD.has(id) || id === 'mend'));
+}
 assert.equal(new Set(OUTFITS.map((it) => `${it.build}:${it.chapter}`)).size, 45);
 assert.equal(new Set(OUTFITS.map((it) => it.id)).size, OUTFITS.length);
 for (const hero of HERO_IDS) {
@@ -15,12 +20,12 @@ for (const hero of HERO_IDS) {
   assert.equal(Object.keys(gear.worn).length, 2);
   for (const chapter of [1, 2, 3] as const) {
     const goods = chapter === 2 ? shop2(hero) : shop(chapter === 3, hero);
-    for (const rarity of ['noncomune', 'epico'] as const) {
+    for (const rarity of ['comune', 'noncomune', 'raro', 'epico'] as const) {
       const choices = outfitChoices(hero, chapter, rarity);
       assert.equal(choices.length, 3);
       assert.equal(new Set(choices.map((it) => JSON.stringify(it.stats))).size, 3);
       for (const it of choices) {
-        assert(goods.some((g) => g.id === it.id));
+        if (rarity === 'noncomune' || rarity === 'epico') assert(goods.some((g) => g.id === it.id));
         assert.equal(levelOfItem(it), chapter);
         assert(it.stats!.intelletto! > 0 && it.stats!.spirito! > 0);
         if (chapter > 1) {
@@ -35,6 +40,10 @@ for (const hero of HERO_IDS) {
         assert.equal(gear.worn.abito, it.id);
         assert.deepEqual(outfitSelection(hero, gear.worn), { build: it.build, chapter, rarity, legacy: false });
         assert.equal(gear.totals.armatura, it.stats!.armatura);
+        const e = effects(gear.totals);
+        assert(e.physical > 1 || e.magic > 1);
+        if (it.build === 'fosca-untora') assert(e.agilityHaste > 0);
+        if (it.build === 'risorto-fossore') assert(e.strengthPower > 0);
         const copy = new Equipment(hero); copy.decode(JSON.parse(JSON.stringify(gear.encode())));
         assert.deepEqual(copy.encode(), gear.encode());
         assert.equal(gear.takeOff(bag, 'abito'), '');
@@ -103,3 +112,10 @@ assert(options.every((it) => it.hero === 'fosca' && it.chapter === 2 && it.rarit
 const untouched = JSON.stringify(rewards.encode());
 assert.equal(side.handIn(quest, 'wrong-hero-reward'), false);
 assert.equal(JSON.stringify(rewards.encode()), untouched);
+
+side.taken.push(quest.id);
+assert(side.handIn(quest, options[2].id));
+assert.equal(rewards.count(options[2].id), 1);
+assert.equal(rewards.count(options[0].id), 0);
+assert.equal(side.handIn(quest, options[2].id), false);
+assert.equal(rewards.count(options[2].id), 1);

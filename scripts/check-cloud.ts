@@ -4,7 +4,8 @@
 // leave the device's runs exactly as they were; autosaves go up in one throttled batch, and a failed one is retried.
 import { CloudSync, GAME, REPLACED, merge, type Saves } from '../src/core/cloud.ts';
 import { autosave, resume, type GameState } from '../src/core/save.ts';
-import type { Hero } from '../src/player/heroes.ts';
+import { HERO_IDS, HEROES, type Hero } from '../src/player/heroes.ts';
+import { starter } from '../src/loot/gear.ts';
 
 const fail = (why: string) => { throw new Error(why); };
 console.warn = () => undefined; // the failures below are meant
@@ -183,3 +184,21 @@ for (const computerFirst of [true, false]) {
 }
 
 console.log('cloud ok: merge both ways, further on wins (a level-16 run kept before cloud saves reaches the phone), a buried run comes back, refused uploads shown, the hero in play kept, offline / logged out / cloud down leave the device alone, throttled uploads');
+
+// Whole outfits, retained legacy inventory and currencies travel independently for all five heroes.
+{
+  const desktop = mem(), phone = mem(), h = hub('outfits@test.invalid');
+  for (const hero of HERO_IDS) {
+    const state = run(hero, 123);
+    state.gear = starter(HEROES[hero].weapon);
+    state.bag = { gold: 12345, items: [['canapa-torso', 1], ['unknown-recoverable', 2]] };
+    state.build = { xp: 20, lv: 2, picks: ['hp'], learned: [], main: '' };
+    autosave(state, desktop, 4321);
+  }
+  await merge(h.client, desktop);
+  await merge(h.client, phone);
+  for (const hero of HERO_IDS) {
+    const a = resume(hero, desktop)!, b = resume(hero, phone)!;
+    if (JSON.stringify(a) !== JSON.stringify(b) || !b.gear?.abito || b.bag?.gold !== 12345) fail(`whole outfit cloud round trip lost ${hero}`);
+  }
+}

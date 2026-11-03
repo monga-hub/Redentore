@@ -43,6 +43,8 @@ const coin = (n: number) => `${n.toLocaleString('it-IT')} oro`;
 const KEYS: (Stat | 'armatura')[] = ['armatura', 'vigore', 'intelletto', 'spirito', 'forza', 'agilita', 'potenzaAttacco', 'potenzaMagica', 'potenza', 'critico', 'celerita'];
 const label = (k: Stat | 'armatura', v: number) => (k === 'armatura' ? `${v} Armatura` : STAT[k].green ? `${v}${k === 'forza' || k === 'agilita' ? '' : '%'} ${STAT[k].name}` : `${v} ${STAT[k].name}`);
 
+export const spellName = (id: string) => CARD.get(id)?.name ?? ({ fall: 'Caduta d’ossa', lance: 'Stiletto di ghiaccio', thorn: 'Spina di peste', umbra: 'Strale d’ombra', ember: 'Tizzone', spark: 'Folgore', smite: 'Castigo', mend: 'Preghiera di suffragio' } as Record<string, string>)[id] ?? id;
+
 let leaf = 0; // Il libro di sabbia's page last shown: the next opening turns another
 
 /** One item's box. `n`: how many in the stack. */
@@ -59,8 +61,7 @@ function box(it: Item, n = 1, head = ''): string {
     }
     const build = buildOf(it.build);
     if (build) {
-      const names = (id: string) => CARD.get(id)?.name ?? ({ fall: 'Caduta d’ossa', lance: 'Stiletto di ghiaccio', thorn: 'Spina di peste', umbra: 'Strale d’ombra', ember: 'Tizzone', spark: 'Folgore', smite: 'Castigo', mend: 'Preghiera di suffragio' } as Record<string, string>)[id] ?? id;
-      html += `<p>${HEROES[build.hero].name} · ${build.role}</p><p>Priorità: ${build.priorities}</p><p>Consigli: ${build.spells.map(names).join(' · ')}</p><small>Le abilità vanno apprese normalmente. L’abito non le concede e non blocca le altre.</small>`;
+      html += `<p>${HEROES[build.hero].name} · ${build.role}</p><p>Priorità: ${build.priorities}</p><p>Consigli: ${build.spells.map(spellName).join(' · ')}</p><small>Le abilità vanno apprese normalmente. L’abito non le concede e non blocca le altre.</small>`;
     }
     const lore = it.pages ? it.pages[leaf++ % it.pages.length] : it.lore;
     if (lore) html += `<p class="lore">«${lore}»</p>`;

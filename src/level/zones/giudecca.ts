@@ -4,6 +4,7 @@ import { material, type Role } from '../materials.ts';
 import { Z } from '../plan.ts';
 import { groundPatch } from '../ground.ts';
 import { Props } from '../props.ts';
+import { gondola, keel } from '../gondola.ts';
 import { front, houses as dress } from '../facades.ts';
 
 // Level 2's way out: the Fondamenta della Giudecca east of the Redentore, to the Zitelle
@@ -202,13 +203,20 @@ function squero(b: LevelBuilder, p: Props): void {
     b.box(-195.4, -181.6, 4.4, 4.7, -25.3, -12.7, 'wood', { collide: false });
     b.hipRoof(-195, -182, -25, -13, 4.7, 0.6, 0.35);
   });
-  // A gondola on trestles, black, its ferro at the prow (east, away from the rio).
-  const hull = new THREE.Shape().moveTo(-5.5, 1.1).quadraticCurveTo(-3, 0, 0, 0).quadraticCurveTo(3, 0, 5.5, 1.3).lineTo(5.2, 1.35).quadraticCurveTo(2.5, 0.55, 0, 0.55).quadraticCurveTo(-2.5, 0.55, -5.2, 1.15).closePath();
-  const g = shaped(extrude(hull, 1.4, 0.06)).translate(0, 0.9, -0.7).rotateY(Math.PI - 0.3).translate(-184, 0, -3.3);
-  b.decor(g, 'iron', true);
+  // The same hull as Iseppo's ferry, raised until its keel rests on the squero's trestles.
+  const boat = gondola(), yaw = Math.PI - 0.3, lift = 2.42;
+  boat.name = 'squero-gondola';
+  boat.position.set(-184, lift, -3.3);
+  boat.rotation.y = yaw;
+  b.add(boat);
+  boat.updateMatrixWorld(true);
+  b.cameraBlockers.push(boat.children[0]); // the hull still blocks follow-camera and targeting rays
   b.box(-186.5, -181.5, 0, 1.05, -5.2, -2.8, 'mass', { visible: false }); // its bulk, for walking round it
-  for (const dx of [-3, 0, 3]) p.box(-184 - dx - 0.6, -184 - dx + 0.6, 0, 0.9, -4.2 + dx * 0.3, -3.8 + dx * 0.3, 'wood');
-  p.box(-189.8, -189.6, 1.3, 2.4, -2.6, -2.4, 'iron'); // the ferro
+  for (const x of [-2.7, 0, 2.7]) {
+    const h = lift + keel(x) - 0.02;
+    const cx = -184 + x * Math.cos(yaw), cz = -3.3 - x * Math.sin(yaw);
+    p.box(cx - 0.2, cx + 0.2, 0, h, cz - 0.75, cz + 0.75, 'wood', yaw);
+  }
   // Oars leaning on the shed, planks stacked.
   for (let i = 0; i < 5; i++) p.rod(-194.6, 0, -16 + i * 0.6, -194.2, 3.6, -16.2 + i * 0.6, 0.05, 'wood');
   for (let i = 0; i < 6; i++) p.box(-192, -184, i * 0.12, i * 0.12 + 0.1, -22 + i * 0.05, -21.4 + i * 0.05, 'wood');

@@ -45,11 +45,13 @@ export class Survival {
       kit.hurt = (inside,n,kind) => {
         for (const m of this.mobs) if (m.hp > 0 && inside(m.x,m.z,m)) {
           if (hurt(m,crit(n * tuning.dmg * damageMultiplier(worn,kind),worn.crit))) {
-            this.kills++; if (tuning.leech) stats.heal(stats.hpMax * tuning.leech);
+            this.kills++; state.kills++; if (tuning.leech) stats.heal(stats.hpMax * tuning.leech);
           }
         }
       };
-      const state = { hero: h, player, stats, kit, tuning, input: idle(), consumed: Array(11).fill(0) as number[], cast: 0, feedback: '', feedbackUntil: 0 };
+      const state = { kills:0, healing:0, survived:0, hero: h, player, stats, kit, tuning, input: idle(), consumed: Array(11).fill(0) as number[], cast: 0, feedback: '', feedbackUntil: 0 };
+      const heal=stats.heal.bind(stats);
+      stats.heal=n=>{const restored=heal(n);state.healing+=restored;return restored;};
       kit.system.fired = (a,tick) => {
         const pos=player.pos;
         this.events.push({seq:++this.eventSeq,player:i,slot:kit.system.slots.indexOf(a),tick,target:(kit.aimed?.() as Friar & {id:number} | undefined)?.id??0,x:pos.x,y:pos.y,z:pos.z,yaw:player.facing});
@@ -69,6 +71,7 @@ export class Survival {
       this.seq++;return;
     }
     this.time = Math.min(DURATION, this.time + dt);
+    for(const p of this.players)if(!p.stats.dead)p.survived=this.time;
     const stage = Math.min(5, 1 + Math.floor(this.time / 60));
     this.spawnIn -= dt;
     if (this.spawnIn <= 0 && this.mobs.filter(m=>m.hp>0).length < MAX_MOBS) {
@@ -143,7 +146,7 @@ export class Survival {
   input(slot: number,c: Controls): void { this.players[slot].input=c; }
   snapshot(): Frame {
     return {events:[...this.events],seq:this.seq,countdown:this.countdown,time:this.time,stage:Math.min(5,1+Math.floor(this.time/60)),kills:this.kills,outcome:this.outcome,
-      players:this.players.map(p=>{Object.assign(tune,p.tuning);return {x:p.player.pos.x,y:p.player.pos.y,z:p.player.pos.z,yaw:p.player.facing,hp:p.stats.hp,max:p.stats.hpMax,mana:p.stats.mana,manaMax:p.stats.manaMax,charge:p.kit.system.charge,cast:p.cast,target:(p.kit.aimed?.() as Friar & {id:number}|undefined)?.id??0,feedback:this.time<p.feedbackUntil?p.feedback:'',casting:p.kit.system.casting?{slot:p.kit.system.slots.indexOf(p.kit.system.casting.ability),t:p.kit.system.casting.t,total:p.kit.system.casting.total}:null,slots:p.kit.system.slots.map(a=>a?{id:a.id,name:a.name,cost:a.mana??0,reason:p.stats.dead?'Eroe caduto':p.kit.system.unavailable(p.kit.system.slots.indexOf(a)),cd:Math.max(p.kit.system.cooldown(a),p.kit.system.gcd(a))}:{id:'',name:'',cd:0,cost:0,reason:'Slot vuoto'})};}),
+      players:this.players.map(p=>{Object.assign(tune,p.tuning);return {stats:{kills:p.kills,healing:p.healing,survived:p.survived},x:p.player.pos.x,y:p.player.pos.y,z:p.player.pos.z,yaw:p.player.facing,hp:p.stats.hp,max:p.stats.hpMax,mana:p.stats.mana,manaMax:p.stats.manaMax,charge:p.kit.system.charge,cast:p.cast,target:(p.kit.aimed?.() as Friar & {id:number}|undefined)?.id??0,feedback:this.time<p.feedbackUntil?p.feedback:'',casting:p.kit.system.casting?{slot:p.kit.system.slots.indexOf(p.kit.system.casting.ability),t:p.kit.system.casting.t,total:p.kit.system.casting.total}:null,slots:p.kit.system.slots.map(a=>a?{id:a.id,name:a.name,cost:a.mana??0,reason:p.stats.dead?'Eroe caduto':p.kit.system.unavailable(p.kit.system.slots.indexOf(a)),cd:Math.max(p.kit.system.cooldown(a),p.kit.system.gcd(a))}:{id:'',name:'',cd:0,cost:0,reason:'Slot vuoto'})};}),
       mobs:this.mobs.map(m=>({id:m.id,x:m.x,y:m.y,z:m.z,yaw:m.yaw,hp:m.hp,max:m.max,state:m.hp<=0?'dead':m.state==='swing'?'swing':'chase',t:m.t}))};
   }
   dispose(): void { for(const p of this.players) {p.player.model.dispose();} }

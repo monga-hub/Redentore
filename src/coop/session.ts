@@ -4,7 +4,7 @@ import { Survival } from '../../server/simulation.ts';
 import { combatHero, controls, acceptInput, idle, validBar, type CombatHero, type Controls, type Frame } from './protocol.ts';
 import { pack, unpack, NETWORK_HZ, LEASE_MS, GRACE_MS, MAX_PACKET } from './packets.ts';
 
-export interface PartyState {room:string;invite:string;epoch:string;slot:number;phase:'lobby'|'fight'|'ended';reason:string;paused:boolean;members:{hero:CombatHero;ready:boolean;connected:boolean}[];frame?:Frame}
+export interface PartyState {ending?:'exit';room:string;invite:string;epoch:string;slot:number;phase:'lobby'|'fight'|'ended';reason:string;paused:boolean;members:{hero:CombatHero;ready:boolean;connected:boolean}[];frame?:Frame}
 interface Row {room:string;invite:string;epoch:string;slot:0|1;phase:PartyState['phase'];reason:string;members:({snapshot:unknown;bar:unknown;ready:boolean}|null)[]}
 export class BetaSession {
   readonly lease=crypto.randomUUID(); // per page, never cloned through sessionStorage to another tab
@@ -89,8 +89,8 @@ export class BetaSession {
     const r=raw as Row;
     if(!r||typeof r.room!=='string'||typeof r.epoch!=='string'||![0,1].includes(r.slot)||!['lobby','fight','ended'].includes(r.phase)||!Array.isArray(r.members)||r.members.length!==2)throw Error('Risposta lobby non valida.');
     if(this.state&&(r.room!==this.state.room||r.epoch!==this.state.epoch))throw Error('Stanza cambiata: crea un nuovo invito.');
-    const members=r.members.filter((m):m is NonNullable<typeof m>=>!!m).map(m=>{const hero=combatHero(m.snapshot);if(validBar(hero,m.bar))hero.bar=[...m.bar];return {hero,ready:m.ready===true,connected:true};});
-    this.state={room:r.room,invite:r.invite,epoch:r.epoch,slot:r.slot,phase:r.phase,reason:r.reason||this.state?.reason||'',members,paused:this.state?.paused??false,frame:this.state?.frame};
+    const members=r.phase==='ended'&&this.state?this.state.members.map((m,i)=>({...m,connected:!!r.members[i]})):r.members.filter((m):m is NonNullable<typeof m>=>!!m).map(m=>{const hero=combatHero(m.snapshot);if(validBar(hero,m.bar))hero.bar=[...m.bar];return {hero,ready:m.ready===true,connected:true};});
+    this.state={room:r.room,invite:r.invite,epoch:r.epoch,slot:r.slot,phase:r.phase,reason:r.reason||this.state?.reason||'',members,paused:this.state?.paused??false,frame:r.phase==='ended'&&this.sim?this.sim.snapshot():this.state?.frame};
     if(r.phase==='fight'&&r.slot===0&&!this.sim){if(members.length!==2)throw Error('Manca il compagno.');this.sim=new Survival(members.map(m=>m.hero)as[CombatHero,CombatHero]);this.startedAt=performance.now();this.lastTick=this.startedAt;this.guestAt=0;}
     this.emit(this.state);
     if(r.phase==='ended')void this.close(false);
@@ -170,8 +170,8 @@ export class BetaSession {
       else if(this.state.slot===1&&performance.now()-this.hostAt<=1000){const i=this.sample();i.seq=++this.sendSeq;if(await this.channels[1].send({type:'broadcast',event:'input',payload:{e:this.state.epoch,i}})!=='ok')throw Error('Invio Realtime non riuscito.');}
     }catch{void this.reconnect();}finally{this.inFlight=false;}
   }
-  private end(reason:string):void{if(this.stopped)return;if(this.state){this.state.phase='ended';this.state.paused=true;this.state.reason=reason;this.emit(this.state);}void this.close(true);}
-  async leave():Promise<void>{this.end('Hai lasciato l’arena. La campagna non è cambiata.');}
+  private end(reason:string,ending?:'exit'):void{if(this.stopped)return;if(this.state){if(this.sim)this.state.frame=this.sim.snapshot();this.state.ending=ending;this.state.phase='ended';this.state.paused=true;this.state.reason=reason;this.emit(this.state);}void this.close(true);}
+  async leave():Promise<void>{this.end('Hai lasciato l’arena.', 'exit');}
   private async removeChannels():Promise<void>{this.joined=false;++this.nonce;const channels=this.channels;this.channels=[];await Promise.allSettled(channels.map(c=>this.client.removeChannel(c)));}
   private async close(release:boolean):Promise<void>{
     if(this.stopped)return;this.stopped=true;

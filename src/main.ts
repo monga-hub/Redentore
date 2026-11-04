@@ -1,3 +1,4 @@
+import { arenaReturnHero, clearArenaReturn, rememberArenaReturn, takeArenaReturn } from './coop/return.ts';
 import { account } from './coop/account.ts';
 import { LfgClient, storeLfgHandoff, type LfgState } from './coop/lfg.ts';
 import { LfgUi } from './coop/lfg-ui.ts';
@@ -79,8 +80,16 @@ await checkVersion(); // before the heavy boot: a stale cached build reloads ont
 
 initAudio(); // before the intro, whose first press unlocks the sound
 migrate(); // once: the old shared saves go to their heroes (core/save.ts)
+const returning = new URLSearchParams(location.search).has('adventure');
+const returnUser = returning ? (await account.auth.getSession()).data.session?.user.id : undefined;
+const returnIntent = returning ? arenaReturnHero(returnUser) : undefined;
+if (returning) history.replaceState(null, '', location.pathname);
 const cloud = new CloudSync(); // the runs mirrored to the hub account, merged in the background (core/cloud.ts)
-const { hero, start } = await chooseHero(cloud);
+if (returnIntent && resume(returnIntent)) cloud.playing = returnIntent; // protect the entry checkpoint from a late boot merge
+if (returnIntent && !resume(returnIntent)) await Promise.race([cloud.ready, new Promise(r=>setTimeout(r,3e3))]);
+const returnHero = returning ? takeArenaReturn(returnUser) : undefined;
+if (returnHero) try { localStorage.setItem('redentore.last', returnHero); } catch { /* run still resumes */ }
+const { hero, start } = returnHero ? { hero: returnHero, start: 'run' as const } : await chooseHero(cloud);
 itemIconHero(hero); // the squad: whose run this boot plays (ui/select.ts)
 await Promise.race([cloud.ready, new Promise((r) => setTimeout(r, 3e3))]); // a pick before the boot merge is over waits for it, 3 s at most
 cloud.playing = hero; // from here on, a late merge leaves his device run alone: his uploads win
@@ -680,7 +689,10 @@ const keep = ():boolean => {
 };
 let lfgFrozen=false,lfgDeparting=false,lfgPreparing:string|undefined;
 const lfgClient=new LfgClient(account,handleLfg,message=>lfgUi.error(message));
-const conserve=()=>saveForCoop(cloud,hero,keep,()=>serialize(game));
+const conserve=()=>saveForCoop(cloud,hero,()=>{
+  if(dying>0||playerStats.dead||mobs.some(m=>FIGHTING.has(m.state))||kit.system.casting)return false;
+  return keep();
+},()=>serialize(game));
 const lfgUi=new LfgUi(lfgClient,()=>hero,async()=>{await conserve();});
 Object.assign(window,{lfgClient,lfgUi});
 document.addEventListener('sanctuary-arena',()=>{lfgUi.open();kit.system.cancel();input.consume();dctl.stop();worldMap.close();bagPanel.close();book.close();buildPanel.close();});
@@ -695,9 +707,13 @@ function handleLfg(state:LfgState){
       catch(e){await cancelLfg(p.id,(e as Error).message);}
     })();}
   }else if(state.status==='claiming'&&state.handoff&&!lfgDeparting){
-    lfgFrozen=true;
-    if(!storeLfgHandoff(state.handoff)){void cancelLfg(state.handoff.proposal,'Conservazione del passaggio non disponibile. La campagna resta sul dispositivo.');return;}
-    lfgDeparting=true;void lfgClient.stop();const url=new URL(location.pathname,location.origin);url.searchParams.set('coop','');url.searchParams.set('lfg',state.handoff.proposal);location.assign(url.href);
+    lfgFrozen=true;const handoff=state.handoff;
+    if(!storeLfgHandoff(handoff)){void cancelLfg(state.handoff.proposal,'Conservazione del passaggio non disponibile. La campagna resta sul dispositivo.');return;}
+    lfgDeparting=true;void(async()=>{
+      const {data}=await account.auth.getSession();
+      if(!data.session||!rememberArenaReturn(hero,data.session.user.id)){clearArenaReturn();lfgDeparting=false;await cancelLfg(handoff.proposal,'Impossibile conservare il rientro. Riprova.');return;}
+      void lfgClient.stop();const url=new URL(location.pathname,location.origin);url.searchParams.set('coop','');url.searchParams.set('lfg',handoff.proposal);location.assign(url.href);
+    })();
   }else if(state.status!=='claiming'&&state.status!=='admitted'){
     if(lfgFrozen)lfgUi.close();lfgFrozen=false;lfgPreparing=undefined;
   }

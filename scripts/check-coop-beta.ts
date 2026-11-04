@@ -84,3 +84,35 @@ assert(host!.frame!.players.every(p=>p.cast===0),'reconnect never silently enabl
 service.offline.add(0);const hostChannel=[...service.channels].find(c=>c.id===0)!;hostChannel.status!('CHANNEL_ERROR');await wait(4400);assert.equal(host?.phase,'ended','host connection failure ends without migration');
 move=idle();await a.leave();await b.leave();assert.equal(host?.phase,'ended');assert.equal(guest?.phase,'ended');assert.equal(service.channels.size,0,'leave releases every channel');
 console.log(`coop beta ok: real kit300s/five stages, compact packet ${JSON.stringify(payload).length}B, two browser-session state machines through fixture transport, guest forged state/duplicate/third refused, host movement, ${service.frames} frames/${service.inputs} controls, no reward/save calls, unsubscribe.`);
+
+// Terminal results retain the final host counters and departed participants; late rows cannot reopen them.
+for(const outcome of ['victory','defeat','exit','guest-exit','peer-loss'] as const){
+  const fixture=new Service();let hostEnd:PartyState|undefined,guestEnd:PartyState|undefined;
+  const h=new BetaSession(fixture.client(0),s=>{hostEnd=structuredClone(s);},()=>idle(),()=>{});
+  const g=new BetaSession(fixture.client(1),s=>{guestEnd=structuredClone(s);},()=>idle(),()=>{});
+  await h.enter('tizian');await g.enter('bortolo','invite-fixture');await h.action('ready');await g.action('ready');await h.action('start');
+  const running=(h as unknown as {sim:Survival;exchange():Promise<void>;poll():Promise<void>;acceptRow(row:unknown):void});
+  running.sim.countdown=0;running.sim.time=73;running.sim.kills=3;running.sim.players[0].kills=2;running.sim.players[1].kills=1;
+  running.sim.players[0].healing=125;running.sim.players.forEach(p=>{p.survived=73;});
+  if(outcome==='victory'||outcome==='defeat')running.sim.outcome=outcome;
+  await running.exchange();await wait(60);
+  if(outcome==='exit')await h.leave();
+  if(outcome==='guest-exit')await g.leave();
+  if(outcome==='peer-loss'){
+    fixture.room.members[1]=null;fixture.room.phase='ended';
+    await running.poll();
+  }
+  if(outcome==='exit')await (g as unknown as {poll():Promise<void>}).poll();
+  if(outcome==='guest-exit')await running.poll();
+  assert.equal(hostEnd?.phase,'ended');
+  if(outcome!=='peer-loss')assert.equal(guestEnd?.phase,'ended');
+  assert.equal(hostEnd!.members.length,2);assert.equal(hostEnd!.frame!.kills,3);
+  assert.deepEqual(hostEnd!.frame!.players.map(p=>p.stats!.kills),[2,1]);
+  if(outcome==='peer-loss')assert.equal(hostEnd!.members[1].connected,false);
+  else assert.equal(guestEnd!.frame!.players[0].stats!.healing,125);
+  if(outcome==='exit')assert.equal(hostEnd!.ending,'exit');
+  if(outcome==='guest-exit')assert.equal(guestEnd!.ending,'exit');
+  running.acceptRow({...fixture.room,slot:0,phase:'lobby'});assert.equal(hostEnd!.phase,'ended','late lobby ignored');
+  await h.leave();await g.leave();assert.equal(fixture.channels.size,0);
+}
+console.log('Terminal host/guest victory/defeat/manual exits/departed member + final counters + duplicate/late result: ok');

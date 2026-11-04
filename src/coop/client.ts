@@ -1,3 +1,5 @@
+import { adventureUrl, rememberArenaReturn } from './return.ts';
+import { renderRecap } from './recap.ts';
 import { takeLfgHandoff } from './lfg.ts';
 import { account } from './account.ts';
 import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
@@ -30,17 +32,19 @@ body.touch #coop-partner{top:76px;transform:scale(var(--k));transform-origin:0 0
 #arena h1{color:#ffd75e;font-size:28px;margin:0 0 12px}#arena p{line-height:1.45;margin:10px 0}#arena .muted{color:#bcb39f;font:13px/1.5 system-ui}
 #arena button,#arena select,#arena input,#arena a.button{font:16px Georgia;min-height:44px;padding:10px;border:1px solid #9d8248;background:#241c13;color:#f6dea3;border-radius:4px;box-sizing:border-box}#arena button{cursor:pointer}#arena button:disabled{opacity:.45;cursor:default}#arena input:not([type=checkbox]){width:100%;font-family:monospace}#arena input[type=checkbox]{width:18px;height:18px;min-height:0;padding:0;vertical-align:middle}#arena select{width:100%}#arena .actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}#arena a{color:#ffd75e}#arena .status{color:#ffce80;min-height:24px;font:14px system-ui;overflow-wrap:anywhere}#arena .party{display:flex;gap:12px}.party>div{flex:1;background:#ffffff08;padding:12px;border:1px solid #736140}.party img{width:52px;height:52px;object-fit:cover;float:left;margin-right:10px;border-radius:50%}
 #arena .fighting{display:none}body.coop-fight #arena .panel{display:none}body.coop-fight #arena .fighting{display:flex}
-@media(max-height:500px){#arena .panel{padding:12px 18px}#arena h1{font-size:22px}#arena p{margin:6px 0}.party>div{padding:6px}}
+#arena .recap{max-width:540px;border:3px solid transparent;background:var(--panel);box-shadow:var(--panel-shadow)}
+#arena .recap h1{text-align:center}#arena .recap h2{font-size:17px;color:#f3e2b0;margin:18px 0 8px}#arena .recap dl{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0;font:13px system-ui;text-align:center}#arena .recap dd{margin:5px 0 0;font-size:18px;color:#ffd75e;font-weight:bold}#arena .recap ul{list-style:none;padding:0;margin:0 0 18px}#arena .recap li{padding:10px 0;border-top:1px solid #736140}#arena .recap li span{display:block;margin-top:4px;font:13px system-ui;color:#bcb39f}#arena .recap table{width:100%;border-collapse:collapse;margin:12px 0 22px;font:13px system-ui}#arena .recap th,#arena .recap td{padding:12px 4px;border-bottom:1px solid #736140;text-align:center}#arena .recap th:first-child{text-align:left}#arena .recap tbody th{color:#f3e2b0;font: bold 15px Georgia}#arena .recap th img{width:32px;height:32px;object-fit:cover;float:left;margin-right:8px;border:1px solid #736140;border-radius:50%}#arena .recap small{display:block;margin-top:5px;color:#bcb39f;font:12px system-ui}#arena .recap td{color:#ffd75e;font-variant-numeric:tabular-nums}@media(max-width:400px){#arena .recap{padding:16px 10px}#arena .recap table{font-size:11px}#arena .recap tbody th{font-size:13px}}#arena .recap button{width:100%;min-height:48px;cursor:pointer}
+@media(max-height:500px){#arena .recap{display:grid;grid-template-columns:1fr 1.5fr;gap:6px 12px;max-width:640px}#arena .recap h1{margin:0;text-align:left;align-self:center}#arena .recap dl{margin:0;font-size:12px}#arena .recap dd{font-size:16px}#arena .recap table{grid-column:1/-1;margin:6px 0}#arena .recap th,#arena .recap td{padding:6px 4px}#arena .recap button{grid-column:1/-1;min-height:44px}#arena .panel{padding:12px 18px}#arena h1{font-size:22px}#arena p{margin:6px 0}.party>div{padding:6px}}
 `;document.head.append(css);
-const root=document.createElement('main');root.id='arena';root.innerHTML=`<section class="panel"><h1>L’assedio dei cinque minuti</h1><p>Beta cooperativa sperimentale: due eroi contro cinque ondate sempre più forti, per 5 minuti. Nessuna ricompensa persistente: niente XP, oro o oggetti.</p><p class="muted">Serve la vittoria sulla Governatrice del capitolo 2, salvata nel cloud. Nessun livello minimo. Usi abilità apprese, build ed equipaggiamento: nessun amico può ferirti. Il browser host gestisce la partita e deve restare in primo piano. Una sola stanza beta alla volta.</p><div class="setup"><label>Eroe dal tuo account<select id="coop-hero"></select></label><p class="eligibility muted"></p><label>Codice invito<input id="coop-code" autocomplete="off" spellcheck="false" placeholder="Incolla il codice o il link privato"></label><div class="actions"><button id="coop-create">Crea stanza privata</button><button id="coop-join">Entra con invito</button></div></div><div class="lobby" hidden><div class="party"></div><p class="invite muted"></p><details class="book"><summary>Abilità dell’arena · modifica gli 8 slot</summary><div class="loadout"></div><p class="muted">Scegli tra tutte le abilità apprese. La barra della campagna resta invariata.</p></details><div class="actions"><button id="coop-copy">Copia link invito</button><button id="coop-ready">Sono pronto</button><button id="coop-start">Inizia assedio</button><button id="coop-leave">Lascia stanza</button></div><p class="muted">WASD / frecce o levetta touch per muoverti. Lancia le abilità equipaggiate con i pulsanti o 1–9, sul bersaglio selezionato, altrimenti sul più vicino. R/T: pozioni. Trascina sul lato destro per ruotare la camera, pizzica per lo zoom. Usa i controlli bersaglio del gioco. Nel menu puoi attivare le abilità automatiche per il tuo eroe, solo per questa arena. Per le magie con tempo di lancio fermati; abilità istantanee e pozioni funzionano in movimento. Benedizioni temporanee della campagna escluse.</p></div><p class="status" role="status" aria-live="polite"></p><div class="actions"><a class="button" href="${location.pathname}">Torna alla campagna</a><a id="coop-login" class="button">Accedi a Mongames</a></div></section>`;document.body.append(root);
+const root=document.createElement('main');root.id='arena';root.innerHTML=`<section class="panel"><h1>L’assedio dei cinque minuti</h1><p>Beta cooperativa sperimentale: due eroi contro cinque ondate sempre più forti, per 5 minuti. Nessuna ricompensa persistente: niente XP, oro o oggetti.</p><p class="muted">Serve la vittoria sulla Governatrice del capitolo 2, salvata nel cloud. Nessun livello minimo. Usi abilità apprese, build ed equipaggiamento: nessun amico può ferirti. Il browser host gestisce la partita e deve restare in primo piano. Una sola stanza beta alla volta.</p><div class="setup"><label>Eroe dal tuo account<select id="coop-hero"></select></label><p class="eligibility muted"></p><label>Codice invito<input id="coop-code" autocomplete="off" spellcheck="false" placeholder="Incolla il codice o il link privato"></label><div class="actions"><button id="coop-create">Crea stanza privata</button><button id="coop-join">Entra con invito</button></div></div><div class="lobby" hidden><div class="party"></div><p class="invite muted"></p><details class="book"><summary>Abilità dell’arena · modifica gli 8 slot</summary><div class="loadout"></div><p class="muted">Scegli tra tutte le abilità apprese. La barra della campagna resta invariata.</p></details><div class="actions"><button id="coop-copy">Copia link invito</button><button id="coop-ready">Sono pronto</button><button id="coop-start">Inizia assedio</button><button id="coop-leave">Lascia stanza</button></div><p class="muted">WASD / frecce o levetta touch per muoverti. Lancia le abilità equipaggiate con i pulsanti o 1–9, sul bersaglio selezionato, altrimenti sul più vicino. R/T: pozioni. Trascina sul lato destro per ruotare la camera, pizzica per lo zoom. Usa i controlli bersaglio del gioco. Nel menu puoi attivare le abilità automatiche per il tuo eroe, solo per questa arena. Per le magie con tempo di lancio fermati; abilità istantanee e pozioni funzionano in movimento. Benedizioni temporanee della campagna escluse.</p></div><p class="status" role="status" aria-live="polite"></p><div class="actions"><a id="coop-return" class="button" href="${adventureUrl(location.pathname)}">Torna all’avventura</a><a id="coop-login" class="button">Accedi a Mongames</a></div></section>`;document.body.append(root);
 const el=<T extends HTMLElement>(q:string)=>root.querySelector<T>(q)!;
-const status=(s:string)=>{el('.status').textContent=s;if(phase==='fight')hud?.notice(s);};
+const status=(s:string)=>{const line=root.querySelector('.status');if(line)line.textContent=s;if(phase==='fight')hud?.notice(s);};
 const heroSelect=el<HTMLSelectElement>('#coop-hero'),code=el<HTMLInputElement>('#coop-code');
 el<HTMLAnchorElement>('#coop-login').href='/accedi.html?next='+encodeURIComponent(location.pathname+location.search);
 let saves=new Map<Hero,unknown>(),selected:Hero='risorto',session:BetaSession|undefined,view:ArenaView|undefined,hud:ArenaHud|undefined,room=false,connecting=false,slot=0,latest:Frame|undefined,phase='setup';
 let shownLoadout='';
 const lfgRoute=new URLSearchParams(location.search).has('lfg');
-const buttons=()=>{let eligible=false;try{combatHero(saves.get(selected));eligible=true;}catch{}el<HTMLButtonElement>('#coop-create').disabled=lfgRoute||!eligible||connecting||room;el<HTMLButtonElement>('#coop-join').disabled=lfgRoute||!eligible||connecting||room;};
+const buttons=()=>{if(!root.querySelector('#coop-create'))return;let eligible=false;try{combatHero(saves.get(selected));eligible=true;}catch{}el<HTMLButtonElement>('#coop-create').disabled=lfgRoute||!eligible||connecting||room;el<HTMLButtonElement>('#coop-join').disabled=lfgRoute||!eligible||connecting||room;};
 heroSelect.onchange=()=>{selected=heroSelect.value as Hero;try{const h=combatHero(saves.get(selected));el('.eligibility').textContent=`${HEROES[h.hero].name} · livello ${levelOf(h.xp).lv} · Governatrice sconfitta`;}catch(e){el('.eligibility').textContent=(e as Error).message;}buttons();};
 async function loadHeroes(){
   const {data}=await account.auth.getSession();el('#coop-login').hidden=!!data.session;
@@ -56,15 +60,23 @@ const urlInvite=new URLSearchParams(location.search).get('invite');if(urlInvite)
 function inviteOf(value:string):string|undefined{let v=value.trim();try{if(v.includes('://'))v=new URL(v).searchParams.get('invite')??'';}catch{return;}return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)?v:undefined;}
 function send(m:{type:string;bar?:unknown}){if(m.type==='ready'||m.type==='start'||m.type==='equip')void session?.action(m.type,m.bar).catch(e=>status((e as Error).message));}
 function leave(){void session?.leave();}
+function back(){void session?.leave();location.replace(adventureUrl(location.pathname));}
+el<HTMLAnchorElement>('#coop-return').onclick=e=>{e.preventDefault();back();};
+async function rememberReturn(){const {data}=await account.auth.getSession();if(data.session)rememberArenaReturn(selected,data.session.user.id);}
 async function connect(invite?:string){
   if(connecting||room)return;
   connecting=true;buttons();status('Connessione alla lobby privata…');
   session=new BetaSession(account,handle,()=>view?.sample()??idle(),status);
-  try{await session.enter(selected,invite);}catch(e){await session.leave();room=false;status('Arena non disponibile: '+(e as Error).message);}
+  try{await rememberReturn();await session.enter(selected,invite);}catch(e){await session.leave();room=false;status('Arena non disponibile: '+(e as Error).message);}
   finally{connecting=false;buttons();}
 }
 function handle(m:PartyState){
+    if(phase==='ended')return;
     connecting=false;room=m.phase!=='ended';slot=m.slot;phase=m.phase;
+    if(phase==='ended'){
+      document.body.classList.remove('coop-fight');hud?.close();view?.dispose();view=undefined;room=false;
+      renderRecap(el('.panel'),m,back);return;
+    }
     el<HTMLElement>('.setup').hidden=true;el<HTMLElement>('.lobby').hidden=false;el<HTMLButtonElement>('#coop-ready').disabled=m.members[slot]?.ready||phase!=='lobby';el<HTMLButtonElement>('#coop-start').hidden=slot!==0;el<HTMLButtonElement>('#coop-start').disabled=m.members.length!==2||m.members.some((p:{ready:boolean})=>!p.ready)||phase!=='lobby';
     el('.party').replaceChildren(...m.members.map((p:{hero:CombatHero;ready:boolean;connected:boolean},i:number)=>{const div=document.createElement('div'),img=document.createElement('img');img.src=import.meta.env.BASE_URL+'models/'+HEROES[p.hero.hero].portrait;img.alt='';div.append(img,document.createTextNode(`${i===slot?'Tu: ':''}${HEROES[p.hero.hero].name} · liv. ${levelOf(p.hero.xp).lv} · ${p.connected?(p.ready?'Pronto':'In attesa'):'Riconnessione'}`));return div;}));
     const mine=m.members[slot].hero as CombatHero;
@@ -85,8 +97,6 @@ function handle(m:PartyState){
       if(!hud)hud=new ArenaHud(view,m.members.map(p=>p.hero),slot,leave);
       if(!latest||m.frame.seq>=latest.seq){latest=m.frame;view.snapshot(m.frame,m.paused);drawHud(m.frame);}
       document.body.classList.add('coop-fight');status(m.paused?m.reason:'');
-    }else if(phase==='ended'){
-      document.body.classList.remove('coop-fight');hud?.close();view?.dispose();view=undefined;latest=undefined;room=false;status(String(m.reason).slice(0,250)+(m.frame?` · ${m.frame.time.toFixed(1)}s · ${m.frame.kills} uccisioni`:''));buttons();
     }else status(lfgRoute?'Partita accettata: attendi la connessione del compagno…':m.members.length===2?'Entrambi presenti: confermate di essere pronti.':'In attesa del secondo giocatore…');
 }
 function drawHud(f:Frame){hud?.update(f);}
@@ -94,13 +104,14 @@ el<HTMLButtonElement>('#coop-create').onclick=()=>void connect();el<HTMLButtonEl
 el<HTMLButtonElement>('#coop-ready').onclick=()=>send({type:'ready'});el<HTMLButtonElement>('#coop-start').onclick=()=>send({type:'start'});el<HTMLButtonElement>('#coop-leave').onclick=leave;
 addEventListener('pagehide',()=>{void session?.leave();});addEventListener('visibilitychange',()=>{if(document.hidden&&room&&phase==='fight')leave();});
 document.addEventListener('arena-art-error',()=>status('Caricamento modelli non riuscito. Esci e riprova con una connessione stabile.'));
+function expired(){const panel=el('.panel');panel.replaceChildren();panel.classList.add('recap');const h=document.createElement('h1');h.textContent='Partita interrotta';const p=document.createElement('p');p.textContent='La sessione non è più disponibile.';const b=document.createElement('button');b.textContent='Torna all’avventura';b.onclick=back;panel.append(h,p,b);}
 async function claimLfg(){
   const handoff=takeLfgHandoff(new URLSearchParams(location.search).get('lfg'));
   el<HTMLElement>('.setup').hidden=true;
-  if(!handoff){status('Passaggio LFG mancante o già usato. Torna alla campagna e cerca di nuovo.');return;}
+  if(!handoff){expired();return;}
   connecting=true;buttons();status('Partita accettata: connessione al compagno…');
   session=new BetaSession(account,handle,()=>view?.sample()??idle(),status);
-  try{await session.enterLfg(handoff);}catch(e){await session.leave();room=false;status('Cooperativa non disponibile: '+(e as Error).message);}
+  try{await session.enterLfg(handoff);}catch(e){await session.leave();room=false;if(!session.state)expired();else status('Cooperativa non disponibile: '+(e as Error).message);}
   finally{connecting=false;buttons();}
 }
 buttons();if(lfgRoute)void claimLfg();else void loadHeroes();

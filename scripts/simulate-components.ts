@@ -21,39 +21,47 @@ const rosters: Tier[][] = [
   [...c2.all.filter(m => m !== c2.boss).map(m => tier2(m.kind)), 'boss'],
   [...c3.all.filter(m => m !== c3.boss).map(m => tier3(m.kind)), 'boss'],
 ];
+// Source-defined ambient C3 subset; excludes side-quest hidden packs, not a measured main route.
+const hidden3 = new Set(c3.hidden.flatMap(h => h.members));
+rosters.push([...c3.all.filter(m => m !== c3.boss && !hidden3.has(m)).map(m => tier3(m.kind)), 'boss']);
 const rarities = ['comune', 'noncomune', 'raro', 'epico'] as const;
 const report: object[] = [];
 for (let index = 0; index < rosters.length; index++) {
-  const chapter = (index + 1) as 1 | 2 | 3, roster = rosters[index];
+  const chapter = Math.min(index + 1, 3) as 1 | 2 | 3, roster = rosters[index];
   const counts = Object.fromEntries(Object.keys(TABLES).map(t => [t, roster.filter(x => x === t).length]));
   const deaths = roster.length;
   const components = Object.fromEntries(rarities.map(r => [r, roster.reduce((n, t) => n + COMPONENT_TABLES[t].chances.reduce((a,b) => a+b,0) * (COMPONENT_TABLES[t].weights[r] ?? 0)/100,0)])) as Record<Rarity, number>;
   const total = Object.values(components).reduce((a,b) => a+b,0);
   const percentile: Record<string, object> = {};
-  const gold = roster.reduce((s,t) => s + TABLES[t].piles * (TABLES[t].gold[0] + TABLES[t].gold[1])/2 * [1,1.6,2.2][index],0);
+  const gold = roster.reduce((s,t) => s + TABLES[t].piles * (TABLES[t].gold[0] + TABLES[t].gold[1])/2 * [1,1.6,2.2][chapter - 1],0);
   const runs = 10000, complete = Object.fromEntries(rarities.map(r => [r,0])) as Record<Rarity,number>;
   const completion: Record<string, number[]> = Object.fromEntries(rarities.map(r => [r, []]));
-  const slots: number[] = [], duplicate: number[] = [];
+  const slots: number[] = [], duplicate: number[] = [], commonDuplicates: number[] = [], epicUnique: number[] = [];
+  const epicDrops: number[] = [];
   for (let run = 0; run < runs; run++) {
     const found = new Map<string, Set<string>>(rarities.map(r => [r,new Set()]));
     const bag = new Bag(); bag.hero = 'risorto';
-    let dups = 0;
+    let dups = 0, commonDups = 0, epics = 0;
     // Fresh chapter once; every subsequent eligible kill is worker, never another boss/elite.
     for (let kill = 0; kill < 12000; kill++) {
       if (kill === deaths - 1) {
         // Compare a fresh clear with its one boss; continue farming on the unspent pre-boss bag.
         const fresh = new Map([...found].map(([r, parts]) => [r, new Set(parts)]));
         for (const id of rollComponents('boss', rnd, chapter, 'risorto', { count: id => fresh.get(ITEM.get(id)!.rarity)!.has(ITEM.get(id)!.component!) ? 1 : 0 })) {
-          const it = ITEM.get(id)!; if (fresh.get(it.rarity)!.has(it.component!)) dups++;
+          const it = ITEM.get(id)!;
+          if (it.rarity === 'epico') epics++;
+          if (fresh.get(it.rarity)!.has(it.component!)) { dups++; if (it.rarity === 'comune') commonDups++; }
           fresh.get(it.rarity)!.add(it.component!); assert(bag.add(id));
         }
         for (const rarity of rarities) if (fresh.get(rarity)!.size === 6) complete[rarity]++;
         slots.push(bag.items.length); duplicate.push(dups);
+        commonDuplicates.push(commonDups); epicUnique.push(fresh.get('epico')!.size); epicDrops.push(epics);
       }
       for (const id of rollComponents(kill < deaths - 1 ? roster[kill] : 'worker', rnd, chapter, 'risorto', { count: id => found.get(ITEM.get(id)!.rarity)!.has(ITEM.get(id)!.component!) ? 1 : 0 })) {
         const it = ITEM.get(id)!;
         const group = found.get(it.rarity)!;
-        if (group.has(it.component!)) dups++;
+        if (it.rarity === 'epico') epics++;
+        if (group.has(it.component!)) { dups++; if (it.rarity === 'comune') commonDups++; }
         group.add(it.component!);
         if (kill < deaths - 1) assert(bag.add(id), 'one chapter component-only inventory overflow');
       }
@@ -68,10 +76,11 @@ for (let index = 0; index < rosters.length; index++) {
     kills: summary(completion[rarity]), chapterEquivalentKills: Object.fromEntries(Object.entries(summary(completion[rarity])).map(([k,v]) => [k, +(v/deaths).toFixed(2)])),
     completeInFreshChapterPct: +(100*complete[rarity]/runs).toFixed(2),
   };
-  report.push({chapter, counts, deaths, goldBeforeJunkQuests:gold, expectedComponents:components,
+  report.push({chapter, scenario:index < 3 ? 'optimistic-full-clear' : 'ambient-without-hidden-side-quest-packs', counts, deaths, goldBeforeJunkQuests:gold, expectedComponents:components,
     rarityPctOfComponents: Object.fromEntries(rarities.map(r => [r, +(components[r]/total*100).toFixed(3)])),
     expectedComponentsPer100Deaths: Object.fromEntries(rarities.map(r => [r, +(components[r]/deaths*100).toFixed(3)])),
-    completionBeforeBossThenWorker:percentile, componentOnlySlots:summary(slots), duplicatesPerFreshChapter:summary(duplicate)});
+    completionBeforeBossThenWorker:percentile, componentOnlySlots:summary(slots), duplicatesPerFreshChapter:summary(duplicate), commonDuplicatesPerFreshChapter:summary(commonDuplicates),
+    epicUniqueFresh:{p10:quantile(epicUnique,.1), ...summary(epicUnique)}, epicDropsFresh:{mean:epicDrops.reduce((a,b)=>a+b,0)/runs, p10:quantile(epicDrops,.1), ...summary(epicDrops)}});
 }
 const workerCompletion: Record<string, object> = {};
 for (const rarity of ['comune','raro','epico'] as const) {

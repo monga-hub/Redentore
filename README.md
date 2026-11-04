@@ -187,10 +187,10 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   Pezzi di capitoli o rarità diversi non si uniscono e non si potenziano automaticamente. I vecchi pezzi, privi di
   metadati espliciti di componente/eroe, restano conservabili e vendibili ma non sono ingredienti; gli abiti già ottenuti restano tuoi.
   Drop componenti provvisori: worker 1 tiro al 50%, frate 1 al 75%, prete 1 all’85%, élite 2 al 100%/50%, boss 2 al
-  100%/100%. Nel tiro riuscito, comune/noncomune/raro/epico: worker e frate 50/25/19/6, prete 45/26/21/8,
-  élite 40/26/24/10, boss 35/26/27/12 (denominatore 100). Epici per morte attesi: 0,03/0,045/0,068/0,15/0,24.
+  100%/100%. Nel tiro riuscito, comune/noncomune/raro/epico: worker e frate 32/29/29/10, prete 28/30/30/12,
+  élite 24/30/30/16, boss 22/29/29/20 (denominatore 100). Epici per morte attesi: 0,05/0,075/0,102/0,24/0,40.
   Dopo aver estratto la rarità si sceglie uniformemente una parte mancante in borsa per la stessa ricetta, se presente;
-  altrimenti una delle sei. Nessun aumento garantito degli epici: sfortuna sulla rarità e duplicati dopo il set completo
+  altrimenti una delle sei. Nessun numero garantito di epici: sfortuna sulla rarità e duplicati dopo il set completo
   rimangono; ritardare la raccolta può produrre parti duplicate a terra. Nemici risorti: tabella worker, fino al boss;
   ricaricare un morto non rigenera bottino. `node scripts/simulate-components.ts` riproduce le simulazioni seeded dei
   roster reali, p50/p90/p99, ripetizioni e pressione della borsa: le stime non misurano minuti reali di gioco.

@@ -148,11 +148,11 @@ export function roll(tier: Tier, rnd: () => number = Math.random, level: 1 | 2 |
 
 /** Independent component rolls. Weights sum to 100; repeats use worker through Drops. */
 export const COMPONENT_TABLES: Record<Tier, { chances: number[]; weights: Weights }> = {
-  worker: { chances: [.5], weights: { comune: 50, noncomune: 25, raro: 19, epico: 6 } },
-  friar: { chances: [.75], weights: { comune: 50, noncomune: 25, raro: 19, epico: 6 } },
-  priest: { chances: [.85], weights: { comune: 45, noncomune: 26, raro: 21, epico: 8 } },
-  elite: { chances: [1, .5], weights: { comune: 40, noncomune: 26, raro: 24, epico: 10 } },
-  boss: { chances: [1, 1], weights: { comune: 35, noncomune: 26, raro: 27, epico: 12 } },
+  worker: { chances: [.5], weights: { comune: 32, noncomune: 29, raro: 29, epico: 10 } },
+  friar: { chances: [.75], weights: { comune: 32, noncomune: 29, raro: 29, epico: 10 } },
+  priest: { chances: [.85], weights: { comune: 28, noncomune: 30, raro: 30, epico: 12 } },
+  elite: { chances: [1, .5], weights: { comune: 24, noncomune: 30, raro: 30, epico: 16 } },
+  boss: { chances: [1, 1], weights: { comune: 22, noncomune: 29, raro: 29, epico: 20 } },
 };
 export function rollComponents(tier: Tier, rnd: () => number, chapter: 1 | 2 | 3, hero: Hero, bag?: Pick<Bag, 'count'>): string[] {
   const table = COMPONENT_TABLES[tier], out: string[] = [];

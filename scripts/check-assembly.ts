@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { Bag, ITEM, roll, rollComponents, recoverItem } from '../src/loot/bag.ts';
+import { createHash } from 'node:crypto';
+import { Bag, ITEM, roll, rollComponents, recoverItem, COMPONENT_TABLES, type Tier } from '../src/loot/bag.ts';
 import { Assembly, assemblyProgress } from '../src/loot/assembly.ts';
 import { ARMOR_SLOTS, COMPONENTS, Equipment, STARTER, componentId, componentShop, shop, shop2, sell, buy, sellPrice, buyPrice } from '../src/loot/gear.ts';
 import { HERO_IDS } from '../src/player/heroes.ts';
@@ -100,3 +101,49 @@ for(const chapter of [1,2,3] as const) for(const tier of ['worker','friar','prie
   if(it.component){assert.equal(it.chapter,chapter);assert.equal(it.hero,'fosca');assert(!it.slot);}
 }
 console.log(`assembly ok: ${outputs} actual hero/chapter/rarity/build transactions + equip; cancel/stale/reload/doubleclick/full/overflow/legacy; vendor-refresh/sell-buyback/chapter boundary; quest one-time XP/flags; 15000 production drops`);
+
+// Successful component rolls are normalized; stronger enemies favor rarer parts,
+// while epic remains the least frequent and green/blue stay balanced.
+const tiers: Tier[] = ['worker','friar','priest','elite','boss'];
+const rarities = ['comune','noncomune','raro','epico'] as const;
+for (const [i,tier] of tiers.entries()) {
+  const table = COMPONENT_TABLES[tier], weights = rarities.map(r => table.weights[r]!);
+  assert(weights.every(w => Number.isFinite(w) && w > 0));
+  assert.equal(weights.reduce((a,b) => a+b,0),100);
+  assert.equal(table.weights.noncomune,table.weights.raro);
+  assert(weights.slice(0,3).every(w => w > table.weights.epico!));
+  if (i) {
+    const prev = COMPONENT_TABLES[tiers[i-1]].weights;
+    assert(table.weights.comune! <= prev.comune!);
+    assert(table.weights.epico! >= prev.epico!);
+    assert(table.weights.raro! + table.weights.epico! >= prev.raro! + prev.epico!);
+  }
+  assert.deepEqual(table.chances, [[.5],[.75],[.85],[1,.5],[1,1]][i]);
+  // Probe each interval in the actual picker for every compatible hero/chapter.
+  let lower = 0;
+  for (const rarity of rarities) {
+    const probe = (lower + table.weights[rarity]!/2)/100;
+    lower += table.weights[rarity]!;
+    for (const hero of HERO_IDS) for (const chapter of [1,2,3] as const) {
+      let call = 0;
+      const ids = rollComponents(tier,()=>[0,probe,.5][call++ % 3],chapter,hero);
+      assert.equal(ids.length,table.chances.length);
+      for (const id of ids) {
+        const it = ITEM.get(id)!;
+        assert.equal(it.rarity,rarity); assert.equal(it.hero,hero); assert.equal(it.chapter,chapter);
+      }
+    }
+  }
+}
+// Baseline captured before the rebalance: same RNG stream, gold/junk/weapon/jewelry
+// and component quantities across 7,500 production deaths must remain identical.
+let fixtureSeed=47471, calls=0;
+const fixtureRnd=()=>{ calls++; return (fixtureSeed=Math.imul(fixtureSeed,1664525)+1013904223>>>0)/4294967296; };
+const hash=createHash('sha256');
+for(const hero of HERO_IDS) for(const chapter of [1,2,3] as const) for(const tier of tiers) for(let i=0;i<100;i++) {
+  const d=roll(tier,fixtureRnd,chapter,hero);
+  hash.update(JSON.stringify({gold:d.gold,items:d.items.filter(id=>!ITEM.get(id)!.component),components:d.items.filter(id=>ITEM.get(id)!.component).length}));
+}
+assert.equal(hash.digest('hex'),'1f5bf87beb398d698e67614eaca2e22ec9261c0529fbe126fa93b3dda54325f2');
+assert.equal(calls,95210);
+console.log('component balance ok: normalized ordered weights, green/blue parity, all hero/chapter picker intervals, unchanged non-component RNG fixture');

@@ -1,3 +1,4 @@
+import { SANCTUARY, type SanctuaryService } from './sanctuary.ts';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Priest } from '../enemies/caster.ts';
@@ -24,7 +25,7 @@ const join = (t: Talk) => t.pages.join('\n\n'); // a quest's text, whole, in the
 const back = (q: SideQuest) => { const g = GIVERS[giverOf(q)!]; return q.back ?? `Torna da ${g.at.name}, ${g.where}`; }; // a side quest's line once it is ready
 const pay = (id: QuestId, item?: string) => ({ xp: QUESTS[id].xp, gold: QUESTS[id].gold, item });
 const OPEN_TIME = 1.6; // s for a gate to open
-const SWING = { portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1, cenacolo: -1, 'cenacolo-orto': -1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls; the Cenacolo's into the hall and out to the garden
+const SWING = { 'santa-croce': -1, portone: -1, coro: 1, 'portone-zitelle': -1, 'coro-zitelle': 1, cenacolo: -1, 'cenacolo-orto': -1 }; // door leaves swing into the church: -Z behind the facade, +Z off the choir and presbytery walls; the Cenacolo's into the hall and out to the garden
 const GOLD = 0xffd36a;
 const LOOT = 2.2; // s of the chest's opening: lid, burst, the key rising and fading
 const BANNER = 4; // s a "Missione completata" banner stays up; quests done together queue
@@ -131,6 +132,9 @@ export class QuestView {
   private vfx: Vfx;
   private npc = new Npc(NPC);
   private speziale = new Npc(SPEZIALE, RUE);
+  private services = Object.fromEntries(Object.entries(SANCTUARY).map(([id, at]) => [id, new Npc(at, at.tint, at.model)])) as Record<SanctuaryService, Npc>;
+  /** The solo integration owns these actions; the arena is never mounted in the world. */
+  service?: (id: SanctuaryService) => void;
   private givers: Record<Giver, Npc>; // the Cardinale on his procession's spot (quest/escort.ts), set with the quest
   private glory: THREE.Object3D[] = []; // San Giorgio's light: round the statue, his head, the pool at his foot (once level 3 opens)
   private tiara = tiara(); // on the Cardinale's head once he is crowned on the Bacino, until he gives it to the hero
@@ -207,7 +211,7 @@ export class QuestView {
     this.key = key();
     this.key.visible = false;
     chest.add(this.lid, this.inside, this.glint, this.key);
-    this.root.add(chest, this.npc.root, this.speziale.root, ...Object.values(this.givers).map((n) => n.root));
+    this.root.add(...Object.values(this.services).map((n) => n.root), chest, this.npc.root, this.speziale.root, ...Object.values(this.givers).map((n) => n.root));
     for (const q of SIDE) for (const w of stepsOf(q)) for (const at of w.kind === 'finds' ? w.finds.map((f) => f.at) : w.kind === 'find' || w.kind === 'use' ? [w.at] : []) {
       if (this.finds.some((f) => f.q === q && f.at === at) || (q.secret && w.kind === 'use')) continue; // one glint a spot (the well is drawn from twice); a secret's shelf is like the others
       const m = q.secret ? book() : new THREE.Mesh(this.glint.geometry, this.glint.material);
@@ -263,6 +267,7 @@ export class QuestView {
     document.body.append(this.promptEl, this.bossEl, this.victoryEl, this.doneEl, this.epilogueEl);
     (document.getElementById('minimap') ?? document.body).append(this.trackEl); // under the minimap, like WoW's tracker
     this.talk.onClose = () => {
+      for (const n of Object.values(this.services)) n.talking = false;
       this.npc.talking = false;
       if (this.speziale.talking && (this.quest.bless() || (this.quest.accepted3 ? !this.quest.boss3Dead && this.quest.bless3() : this.quest.accepted2 && this.quest.bless2()))) this.blessed(); // he gives it as he says goodbye
       this.speziale.talking = false;
@@ -332,6 +337,7 @@ export class QuestView {
   /** The quest givers, each under his "!" or "?" (Quest.marks). */
   private marks(dt: number, player: THREE.Vector3): void {
     const m = this.quest.marks(this.friars());
+    for (const n of Object.values(this.services)) { n.root.visible = this.quest.boss2Dead && player.x > -430; n.update(dt, player, undefined); }
     this.npc.update(dt, player, m.zuane);
     this.speziale.update(dt, player, m.speziale);
     for (const [g, n] of Object.entries(this.givers) as [Giver, Npc][]) n.update(dt, player, m[g]);
@@ -541,7 +547,11 @@ export class QuestView {
       if (n) notices.push(n);
       if (pr.ferry) this.board?.(pr.ferry);
       if (pr.climb) this.climb?.(pr.climb);
-      if (pr.talk === 'zuane') {
+      if (pr.service) {
+        const id = pr.service, at = SANCTUARY[id];
+        this.services[id].talking = true;
+        this.talk.show({ name: at.name, portrait: `${import.meta.env.BASE_URL}models/${id === 'maestro' ? 'iseppo' : 'zuane'}.webp` }, at.greeting, () => [{ title: id === 'maestro' ? 'Preparati per l’arena' : 'Redistribuisci i miei punti', state: 'talk', text: at.greeting, actionLabel: this.service ? (id === 'maestro' ? 'Cerca un gruppo' : 'Redistribuisci i miei punti') : undefined, act: () => this.service?.(id) }]);
+      } else if (pr.talk === 'zuane') {
         this.npc.talking = true;
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, GREET.zuane, () => this.zuaneEntries());
       } else if (pr.talk === 'speziale') {

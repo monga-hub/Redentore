@@ -1,3 +1,4 @@
+import { SANCTUARY, type SanctuaryService } from './sanctuary.ts';
 // The dungeon's progression, as plain state over the collision World (no three.js, so
 // `npm run check` walks it in Node). The church is shut at the start: Fra' Zuane, the porter's
 // ghost on the fondamenta, gives the quest; the player takes the public route fondamenta ->
@@ -61,6 +62,7 @@ export const GATES: GateSpec[] = [
   { id: 'catene', label: 'le catene del Ponte de la Croce', kind: 'chain', axis: 'z', at: 15, c: -56.5, w: 10, t: 0.6, y0: 0, h: 3, needs: 'quest2' }, // across the whole quay
   { id: 'coro-zitelle', label: 'la porta della chiesa delle Zitelle', kind: 'door', axis: 'x', at: ZCX, c: -30, w: 2.4, t: 1, y0: ZF, h: 3.2, needs: 'key2' }, // the presbytery's back door, from the court
   { id: 'portone-zitelle', label: 'il portone delle Zitelle', kind: 'door', axis: 'x', at: ZCX, c: 0, w: 3.4, t: 1, y0: ZF, h: 6, needs: 'boss2' }, // facade
+  { id: 'santa-croce', label: 'il portone di Santa Croce', kind: 'door', axis: 'x', at: -118, c: -14, w: 3.2, t: 0.8, y0: 0, h: 4.8, needs: 'boss2' },
   // Level 3 (zones/sangiorgio.ts).
   { id: 'catene-punta', label: 'le catene oltre i Tre Oci', kind: 'chain', axis: 'z', at: 10, c: -302, w: 20, t: 0.6, y0: 0, h: 3, needs: 'quest3' }, // across the quay past the Tre Oci
   { id: 'cenacolo', label: 'la porta del Cenacolo', kind: 'door', axis: 'x', at: -530, c: CENACOLO.z1, w: 2.4, t: 1, y0: 0, h: 3.6, needs: 'key3' }, // from the antirefettorio
@@ -173,7 +175,7 @@ export const RELIC_DROP = { base: 0.02, ramp: 0.01 } as const;
 const REACH = 2.6; // m: interaction distance from a gate's centre or the chest
 
 /** What the player can do right here, for the prompt. `act` is undefined for a locked/barred notice. */
-export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | Giver; ferry?: Crossing; climb?: { x: number; z: number; yaw: number } }
+export interface Prompt { text: string; act?: () => string; talk?: 'zuane' | 'speziale' | Giver; service?: SanctuaryService; ferry?: Crossing; climb?: { x: number; z: number; yaw: number } }
 /** The gondola's trips (quest/ferry.ts): the Punta to San Giorgio, back, or home to the Redentore once the Abate is dead. */
 export type Crossing = 'out' | 'back' | 'home';
 
@@ -227,6 +229,7 @@ export class Quest {
       return { ...g, open: false, box: world.add(cx, cz, hx, hz, g.y0, g.y0 + g.h) };
     });
     world.add(CHEST.x, CHEST.z, CHEST.w / 2, CHEST.d / 2, CHEST.y, CHEST.y + CHEST.h);
+    for (const at of Object.values(SANCTUARY)) world.add(at.x, at.z, at.r, at.r, 0, 1.8);
     world.add(NPC.x, NPC.z, NPC.r, NPC.r, 0, 1.8);
     world.add(SPEZIALE.x, SPEZIALE.z, SPEZIALE.r, SPEZIALE.r, 0, 1.8);
     const held = (Object.keys(GIVERS) as Giver[]).map((g) => { const at = GIVERS[g].at; return world.add(at.x, at.z, at.r, at.r, at.y ?? 0, (at.y ?? 0) + 1.8); });
@@ -504,6 +507,9 @@ export class Quest {
 
   /** The nearest thing to interact with around the player's feet `p`, if any. */
   prompt(p: { x: number; y: number; z: number }): Prompt | undefined {
+    if (this.boss2Dead && Math.abs(p.y) < 1.5) for (const [service, at] of Object.entries(SANCTUARY)) {
+      if (Math.hypot(p.x - at.x, p.z - at.z) < REACH) return { text: `Parla con ${at.name}`, act: () => '', service: service as SanctuaryService };
+    }
     if (Math.hypot(p.x - NPC.x, p.z - NPC.z) < REACH && p.y < 1.5) return { text: `Parla con ${NPC.name}`, act: () => '', talk: 'zuane' };
     if (Math.hypot(p.x - SPEZIALE.x, p.z - SPEZIALE.z) < REACH && p.y < 1.5) return { text: `Parla con ${SPEZIALE.name}`, act: () => '', talk: 'speziale' };
     for (const g of Object.keys(GIVERS) as Giver[]) { const at = this.side.where(g); if (Math.hypot(p.x - at.x, p.z - at.z) < REACH && p.y < 1.5) return { text: `Parla con ${at.name}`, act: () => '', talk: g }; }

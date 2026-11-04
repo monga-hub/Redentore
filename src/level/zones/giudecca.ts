@@ -3,7 +3,7 @@ import { type LevelBuilder, extrude, ring, shaped } from '../builder.ts';
 import { material, type Role } from '../materials.ts';
 import { Z } from '../plan.ts';
 import { groundPatch } from '../ground.ts';
-import { Props } from '../props.ts';
+import { Props, bench } from '../props.ts';
 import { gondola, keel } from '../gondola.ts';
 import { front, houses as dress } from '../facades.ts';
 
@@ -96,7 +96,7 @@ export function buildGiudecca(b: LevelBuilder): void {
   b.floor(-100, -76, -30, -16, 'paving', 0, 0.02);
   b.well(-88, -23, 0.9, 0.9);
 
-  // Campo de Santa Croce: the convent church's closed front (now a prison: no way in), a well, benches.
+  // Campo de Santa Croce: the sanctuary opens when the Governatrice's vow is broken.
   b.area('Campo de Santa Croce', -132, -104, -14, 10);
   b.floor(-132, -104, -14, 10, 'paving', 0, 0.02);
   santaCroce(b);
@@ -179,7 +179,9 @@ export function lampPost(b: LevelBuilder, p: Props, x: number, z: number, y0: nu
 /** Santa Croce: a plain stone front with a pediment and a shut door, the convent's blind walls either side. */
 function santaCroce(b: LevelBuilder): void {
   b.together(() => {
-    b.box(-126, -110, 0, 15, -40, -14, 'stone');
+    b.wallX(-14, -126, -110, { h: 15, role: 'stone', t: 0.8, doors: [{ at: -118, w: 3.2, h: 4.8 }] });
+    b.wallX(-40, -126, -110, { h: 15, role: 'stone', t: 0.8 });
+    for (const x of [-126, -110]) b.wallZ(x, -40, -14, { h: 15, role: 'stone', t: 0.8 });
     b.band(-126, -110, -40, -14, 9.5, 9.9, 0.15);
     b.band(-126, -110, -40, -14, 14.6, 15, 0.3);
     const g = new THREE.Shape().moveTo(-126.4, 15).lineTo(-109.6, 15).lineTo(-118, 19.2).closePath();
@@ -187,10 +189,28 @@ function santaCroce(b: LevelBuilder): void {
     b.hipRoof(-126, -110, -40, -15, 15);
   });
   for (const x of [-124.5, -111.5]) b.part(null, x - 0.5, x + 0.5, 0.4, 14.6, -14, -13.6, 'stoneDark'); // pilasters
-  b.part(null, -119.6, -116.4, 0, 4.8, -14, -13.85, 'wood'); // the shut door
+  // QuestView owns the hinged door; the old solid mass and decorative leaf are gone.
   b.part(null, -120, -116, 4.8, 5.3, -14, -13.6, 'stoneDark');
   b.decor(shaped(ring(-118, 11.6, 1.1, 1.5, 0.3)).translate(0, 0, -13.85), 'stoneDark'); // oculus
   b.decor(shaped(extrude(new THREE.Shape().absarc(-118, 11.6, 1.1, 0, Math.PI * 2, false), 0.1, 0)).translate(0, 0, -13.84), 'lantern');
+  b.area('Santa Croce: santuario della Rinascita', -125.5, -110.5, -39.5, -14.5);
+  b.floor(-125.6, -110.4, -39.6, -14.4, 'paving');
+  const p = new Props(b, 1576);
+  // A broad center aisle leaves both services and the altar reachable without weaving between pews.
+  for (const x of [-122, -114]) for (const z of [-19, -22, -25, -28]) bench(p, x, z, 0);
+  b.box(-120, -116, 0, 0.16, -38, -34, 'stoneDark', { camera: false });
+  b.box(-119.5, -116.5, 0.16, 1.25, -37, -35.8, 'stone', { camera: false });
+  b.box(-119.7, -116.3, 1.25, 1.43, -37.2, -35.6, 'wood', { camera: false });
+  for (const z of [-18, -24, -30, -36]) {
+    b.box(-125.5, -110.5, 5.8, 6.1, z - 0.12, z + 0.12, 'wood', { collide: false });
+    for (const x of [-125.3, -110.7]) b.lights.push({ x, y: 2.5, z, kind: 'torch', nx: x < -118 ? 1 : -1, nz: 0 });
+  }
+  for (const x of [-119, -118, -117]) {
+    p.disc(x, 1.43, -36.4, 0.06, 0.3, 'flower');
+    b.lights.push({ x, y: 1.75, z: -36.4, kind: 'candle' });
+  }
+  b.lights.push({ x: -118, y: 3, z: -35, kind: 'glow', color: 0xffb36a });
+
 }
 
 /** The squero: slipway boards into the rio, the tezon on posts, a gondola on trestles, oars and planks. */

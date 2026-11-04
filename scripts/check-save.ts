@@ -491,3 +491,12 @@ for (const hero of Object.keys(HEROES) as Hero[]) {
   deserialize(target, twice);
   if (JSON.stringify(target.gear.encode()) !== JSON.stringify(source.gear.encode()) || JSON.stringify(target.bag.encode()) !== JSON.stringify(source.bag.encode())) fail(`whole outfit round trip lost records for ${hero}`);
 }
+
+// A gate added after this hero's old save still opens from the existing boss2 victory flag.
+{
+  const old = structuredClone(s);
+  old.quest.boss2Dead = true;
+  old.quest.gates = old.quest.gates.filter((id: string) => id !== 'santa-croce');
+  const g = boot(); deserialize(g, old);
+  if (!g.quest.gate('santa-croce').open || g.quest.prompt({x:-122,y:0,z:-30})?.service !== 'maestro') fail('legacy Governatrice victory did not open Santa Croce/services');
+}

@@ -148,7 +148,7 @@ console.log('-- level 2: the chains on the Ponte de la Croce fallen');
 for (const a of level.areas) {
   if (level3(a) && cells(road, a)) fail(`${a.zone.padEnd(11)} ${a.label} reachable before the third quest`);
   if (!level2(a)) continue;
-  const hit = cells(road, a), shut = zChurch(a);
+  const hit = cells(road, a), shut = a.label.startsWith('Santa Croce:') || zChurch(a);
   if (shut ? hit > 0 : !hit) fail(`${a.zone.padEnd(11)} ${a.label}: ${hit} cells reached, want ${shut ? 'none (locked)' : 'some'}`);
   else console.log(`ok   ${a.zone.padEnd(11)} ${a.label} (${shut ? 'locked' : `${hit} cells`})`);
 }

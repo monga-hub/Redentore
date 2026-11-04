@@ -75,6 +75,8 @@ export interface Speaker { name: string; portrait: string; tint?: string }
 
 /** One line of the list. offer: Accetta runs `act`; ready: Completa (or a pick of `choices`) runs it; busy and talk only show `text`. */
 export interface Entry {
+  /** A service action on a normal conversation page. */
+  actionLabel?: string;
   title: string;
   state: 'offer' | 'ready' | 'busy' | 'talk';
   text: string;
@@ -182,6 +184,7 @@ export class Dialogue {
       : q.state === 'offer' ? `<button data-do="act">Accetta${key}</button><button class="no" data-do="decline">Rifiuta</button>`
       : q.state === 'ready' && q.choices ? q.choices.map((c) => `<button data-do="pick:${c.id}">${esc(c.label)}</button>`).join('')
       : q.state === 'ready' ? `<button data-do="act">Completa${key}</button><button class="no" data-do="back">Indietro</button>`
+      : q.actionLabel ? `<button data-do="service">${esc(q.actionLabel)}</button><button class="no" data-do="back">Indietro</button>`
       : `<button data-do="back">Indietro${key}</button>`;
   }
 
@@ -189,6 +192,7 @@ export class Dialogue {
     playSfx('ui_click', null, { ui: true });
     const q = this.detail;
     if (what.startsWith('open:')) this.page(this.shown[+what.slice(5)]);
+    else if (what === 'service' && q?.actionLabel) { this.close(); q.act?.(); }
     else if (what === 'back') this.list();
     else if (what === 'decline') this.list(q?.decline ?? this.greeting);
     else if (what === 'shop') {

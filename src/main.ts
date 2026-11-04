@@ -66,7 +66,6 @@ import { chooseHero } from './ui/select.ts';
 import { itemIconHero } from './ui/itemIcon.ts';
 import { CloudSync } from './core/cloud.ts';
 import { accountLine } from './ui/account.ts';
-import { mergeArenaRewards } from './core/arena-rewards.ts';
 
 await checkVersion(); // before the heavy boot: a stale cached build reloads onto the deployed one
 
@@ -640,12 +639,7 @@ const PACK = 12, CALM = 22; // m: three fighting foes this close widen the frami
 const BOSSES = [priests.boss, zitelle.boss, sangiorgio.boss, bees.queen]; // framed wide in their fight, like the dragon
 let kept = KEEP;
 const save = keeper(serialize(game).player); // until a calm save this boot: where the load (or the new game) put him
-const keep = () => {
-  if (!sandbox) {
-    const combined = mergeArenaRewards(serialize(game), resume(hero));
-    if (combined.arenaRewards) { game.arenaRewards = combined.arenaRewards; if (combined.bag && JSON.stringify(combined.bag) !== JSON.stringify(bag.encode())) bag.decode(combined.bag); }
-  }
-  if (!sandbox && !roused(drago.boss) && !flying() && !ferry.trip && save(serialize(game), dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state)))) cloud.push(hero); };
+const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && !ferry.trip && save(serialize(game), dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state)))) cloud.push(hero); };
 addEventListener('visibilitychange', () => { if (document.hidden) { keep(); void cloud.flush(); } }); // the account gets it too: iOS may kill the tab
 
 const timer = new THREE.Timer();

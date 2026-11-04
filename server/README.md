@@ -1,3 +1,7 @@
+# DORMANT DEDICATED-SERVER PROTOTYPE
+
+Current approved beta uses src/coop/session.ts and Supabase private Realtime, with NO persistent rewards. Do not deploy this runtime or its reward migration for the beta. Historical dedicated-server instructions follow for retained work only.
+
 # Arena runtime
 
 This is a separate Node 24+ authority. GitHub Pages serves the browser only. Do not enable the online entry in a production build until this runtime, the SQL migration and real two-account tests are complete.

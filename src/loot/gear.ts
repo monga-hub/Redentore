@@ -253,7 +253,7 @@ export const SHOP2 = SHOP.filter((g) => g.l2);
 export const componentShop = (hero: Hero, chapter: 1 | 2 | 3) => COMPONENTS.filter(it => it.hero === hero && it.chapter === chapter && it.rarity !== 'epico');
 export const shop = (level3: boolean, hero?: Hero) => hero ? [...SHOP.filter(g => !isLegacyArmor(g) && !g.l2 && (level3 || !g.l3)), ...componentShop(hero, level3 ? 3 : 1)] : SHOP.filter(g => !g.l2 && (level3 || !g.l3));
 export const outfitChoices = (hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity = 'epico') => OUTFITS.filter(g => g.hero === hero && g.chapter === chapter && g.rarity === rarity);
-export const shop2 = (hero: Hero) => [...SHOP2.filter(g => !isLegacyArmor(g)), ...componentShop(hero, 2)];
+export const shop2 = (hero: Hero, chapter: 2 | 3 = 2) => chapter === 3 ? shop(true, hero) : [...SHOP2.filter(g => !isLegacyArmor(g)), ...componentShop(hero, 2)];
 /** Worn on a new game (and by saves from before the equipment): the hemp set and the bone club (not the other heroes' own weapons). */
 export const STARTER: Partial<Record<Slot, string>> = Object.fromEntries(LEGACY_GEAR.filter((g) => g.rarity === 'comune' && !['remo-gelato', 'stiletto-osso', 'canna-vetraio', 'martello-campana'].includes(g.id)).map((g) => [g.slot, g.id]));
 /** A new game's set: the hemp and the hero's own weapon (player/heroes.ts). */

@@ -90,7 +90,7 @@ fino alla chiesa delle Zitelle, il livello 3 (l'ultimo) passa in gondola dalla P
   Maestra*, *L'ex voto del Redentore* (si torna nella chiesa del livello 1, terza cappella a destra); e *La lettera
   di Marieta*, che parte raccogliendo un drop raro delle zitelle (sicuro dopo la chiave della Maestra). Ognuna
   paga esperienza e oro (tabella `QUESTS`, banner "Missione completata") conservando solo i precedenti premi diversi dall’armatura; Iseppo vende
-  componenti comuni, non comuni e rari del livello 2, armi e gioielli precedenti e i tomi (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
+  componenti comuni, non comuni e rari del capitolo della sua bottega (2 nello squero, 3 sull’approdo di San Giorgio), armi e gioielli precedenti e i tomi (Commercia). Tracker con più missioni, pin sulla minimappa per ogni
   obiettivo, oggetti di missione col raggio dorato; gondolieri e codeghe risorgono come i frati (lontano dall'eroe,
   un quarto dell'esperienza, bottino magro) finché la Governatrice è viva; se cade prima, le missioni di raccolta e
   di uccisione si consegnano lo stesso. Tutto nel salvataggio (i vecchi si caricano senza).

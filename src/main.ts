@@ -472,7 +472,7 @@ let climbing: { to: { x: number; z: number; yaw: number }; t: number } | undefin
 questView.climb = (to) => { if (!climbing) { kit.system.cancel(); dctl.stop(); climbing = { to, t: 0 }; } };
 /** Up in the bell chamber: the follow camera held short of its piers and cornice, the view over the lagoon opened (stream, fx/atmosphere.ts). */
 const aloft = () => player.pos.y > BELFRY.y - 2 && player.pos.x > BELFRY.x0 - 1 && player.pos.x < BELFRY.x1 + 1 && player.pos.z > BELFRY.z0 - 1 && player.pos.z < BELFRY.z1 + 1;
-questView.shop2 = () => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => shop2(hero) });
+questView.shop2 = (chapter) => vendor.open({ name: 'Mastro Iseppo', sub: 'Proto dello squero · il corredo della Pia Casa', goods: () => shop2(hero, chapter) });
 questView.reward = (gold) => { bag.gold += gold; };
 questView.relicBack = () => { bag.remove(RELIC); return bag.add(RELIC_PRIZE) ? ITEM.get(RELIC_PRIZE)!.name : ''; }; // the corona's slot makes room for the medal
 questView.boonTaken = () => levels.apply();

@@ -162,7 +162,7 @@ export class QuestView {
   /** Fra' Bortolo's Commercia: main.ts opens the shop. */
   shop?: () => void;
   /** Mastro Iseppo's: main.ts opens his shop. */
-  shop2?: () => void;
+  shop2?: (chapter: 2 | 3) => void;
   /** A quest handed in: main.ts puts its gold in the bag. */
   reward?: (gold: number) => void;
   /** Fra' Zuane takes his corona back: main.ts swaps it in the bag for his medal and returns the medal's name. */
@@ -550,7 +550,7 @@ export class QuestView {
       } else if (pr.talk) {
         const g = pr.talk, spec = GIVERS[g], face = FACES[g], s = this.quest.side, all = SIDE.every((sq) => giverOf(sq) !== g || s.done.includes(sq.id));
         this.givers[g].talking = true;
-        this.talk.show({ name: spec.at.name, portrait: `${import.meta.env.BASE_URL}models/${face.file}.webp`, tint: face.tint }, all ? spec.bye : spec.greet, () => this.giverEntries(g), g === 'iseppo' || g === 'riva' ? () => this.shop2?.() : undefined); // Mastro Iseppo's Commercia in the squero and on San Giorgio's approdo, the same goods
+        this.talk.show({ name: spec.at.name, portrait: `${import.meta.env.BASE_URL}models/${face.file}.webp`, tint: face.tint }, all ? spec.bye : spec.greet, () => this.giverEntries(g), g === 'iseppo' || g === 'riva' ? () => this.shop2?.(g === 'riva' ? 3 : 2) : undefined); // Stock follows Iseppo's placement, including a return to the squero after San Giorgio is unlocked.
       }
       if (this.quest.chestOpen && this.lidP === 0) this.loot();
     }

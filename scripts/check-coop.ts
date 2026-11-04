@@ -19,9 +19,9 @@ import { autosave, resume, type GameState } from '../src/core/save.ts';
 import { componentId } from '../src/loot/gear.ts';
 import { Bag, ITEM } from '../src/loot/bag.ts';
 
-const base:GameState={v:1,hero:'tizian',player:{x:0,y:0,z:0,yaw:0,hp:1280,mana:400,charge:0},quest:{key:true,gates:[],bossDead:true,boss3Dead:true},dead:[],time:400,build:{xp:9300,lv:31,picks:[],learned:['pyre','cero']},bag:{gold:123,items:[]},at:10};
+const base:GameState={v:1,hero:'tizian',player:{x:0,y:0,z:0,yaw:0,hp:1280,mana:400,charge:0},quest:{key:true,gates:[],bossDead:true,boss2Dead:true,boss3Dead:true},dead:[],time:400,build:{xp:9300,lv:31,picks:[],learned:['pyre','cero']},bag:{gold:123,items:[]},at:10};
 const h=combatHero(base);
-assert.throws(()=>combatHero({...base,build:{...base.build,xp:9299,lv:99}}));assert.throws(()=>combatHero({...base,quest:{...base.quest,boss3Dead:false,accepted3:true}}));assert.throws(()=>combatHero({...base,build:{...base.build,xp:Infinity}}));
+assert.equal(combatHero({...base,build:{...base.build,xp:100,lv:99}}).xp,100);assert.throws(()=>combatHero({...base,quest:{...base.quest,boss2Dead:false,boss3Dead:true,accepted2:true}}));assert.throws(()=>combatHero({...base,build:{...base.build,xp:Infinity}}));
 assert.equal(controls({...idle(),seq:1,x:Infinity}),undefined);assert.equal(controls({...idle(),seq:1,casts:[1]}),undefined);
 assert(!validBar(h,['fall',...Array(8).fill(null)]));assert(validBar(h,['ember','pyre','cero',...Array(6).fill(null)]));
 const frozen=JSON.stringify(base);new Survival([h,h]).dispose();assert.equal(JSON.stringify(base),frozen,'campaign snapshot immutable');

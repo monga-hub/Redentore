@@ -27,6 +27,22 @@ export function lfgState(v:unknown):LfgState {
   if(v.handoff!==undefined){const h=v.handoff;if(!object(h)||typeof h.proposal!=='string'||!uuid.test(h.proposal)||(typeof h.ticket!=='string'||!uuid.test(h.ticket)))throw Error('Passaggio LFG non valido.');}
   return v as unknown as LfgState;
 }
+export const LFG_HANDOFF_KEY='redentore.lfg.handoff';
+/** Persist only an unclaimed, owner-bound one-use ticket across the route navigation, never a room lease. */
+export function storeLfgHandoff(handoff:LfgHandoff,store?:Pick<Storage,'setItem'>):boolean {
+  if(!uuid.test(handoff.proposal)||!uuid.test(handoff.ticket))return false;
+  try{(store??sessionStorage).setItem(LFG_HANDOFF_KEY,JSON.stringify(handoff));return true;}catch{return false;}
+}
+/** Consume before using it. A cloned tab still loses the server's atomic one-use claim race. */
+export function takeLfgHandoff(proposal:string|null,store?:Pick<Storage,'getItem'|'removeItem'>):LfgHandoff|undefined {
+  if(!proposal||!uuid.test(proposal))return;
+  try{
+    const target=store??sessionStorage,raw=target.getItem(LFG_HANDOFF_KEY);target.removeItem(LFG_HANDOFF_KEY);
+    if(!raw||raw.length>256)return;
+    const h:unknown=JSON.parse(raw);
+    if(object(h)&&h.proposal===proposal&&typeof h.ticket==='string'&&uuid.test(h.ticket))return {proposal,ticket:h.ticket};
+  }catch{/* storage unavailable: no unsafe handoff */}
+}
 /** Existing hero identity: no email/account profile or invented player nickname. */
 export const lfgCharacter=(p:Pick<LfgEntry,'hero'|'level'>)=>({name:HEROES[p.hero].name,className:HEROES[p.hero].title,level:p.level});
 

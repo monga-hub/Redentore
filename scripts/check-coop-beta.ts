@@ -5,10 +5,10 @@ import { BetaSession, type PartyState } from '../src/coop/session.ts';
 import { pack, unpack, MAX_PACKET } from '../src/coop/packets.ts';
 import { combatHero, idle, type Controls } from '../src/coop/protocol.ts';
 import { Survival } from '../server/simulation.ts';
-const snapshots=['tizian','bortolo'].map(hero=>({hero,build:{xp:9300,picks:[],learned:hero==='tizian'?['pyre','cero']:['frost','caligo']},quest:{boss3Dead:true},gear:{}}));
+const snapshots=['tizian','bortolo'].map(hero=>({hero,build:{xp:9300,picks:[],learned:hero==='tizian'?['pyre','cero']:['frost','caligo']},quest:{boss2Dead:true,boss3Dead:false},gear:{}}));
 const heroes=snapshots.map(combatHero);
-assert.throws(()=>combatHero({...snapshots[0],build:{...snapshots[0].build,xp:9299,lv:99}}));
-assert.throws(()=>combatHero({...snapshots[0],quest:{boss3Dead:false,accepted3:true}}));
+assert.equal(combatHero({...snapshots[0],build:{...snapshots[0].build,xp:100,lv:99}}).xp,100);
+assert.throws(()=>combatHero({...snapshots[0],quest:{boss2Dead:false,boss3Dead:true,accepted2:true}}));
 const sim=new Survival([heroes[0],heroes[1]]);sim.players.forEach(p=>{p.stats.immune=1e9;});
 const stages=new Set<number>();for(let i=0;i<6201&&sim.outcome==='fight';i++){sim.step(.05);stages.add(sim.snapshot().stage);assert(sim.mobs.length<=24);}
 assert.equal(sim.outcome,'victory');assert.deepEqual([...stages],[1,2,3,4,5]);

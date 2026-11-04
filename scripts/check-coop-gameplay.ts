@@ -4,7 +4,7 @@ import { arenaLevel, COURT } from '../src/coop/environment.ts';
 import { COUNTDOWN, combatHero, controls, idle } from '../src/coop/protocol.ts';
 import { pack, unpack, MAX_PACKET } from '../src/coop/packets.ts';
 
-const heroes=['tizian','bortolo'].map(hero=>combatHero({hero,build:{xp:9300,picks:[],learned:hero==='tizian'?['pyre','cero']:['frost','caligo']},quest:{boss3Dead:true}}));
+const heroes=['tizian','bortolo'].map(hero=>combatHero({hero,build:{xp:9300,picks:[],learned:hero==='tizian'?['pyre','cero']:['frost','caligo']},quest:{boss2Dead:true,boss3Dead:false}}));
 const level=arenaLevel();
 assert(level.root.children.length>0,'real campaign environment');
 for(let x=-COURT.hx+1;x<COURT.hx;x+=1)for(let z=-COURT.hz+1;z<COURT.hz;z+=1){

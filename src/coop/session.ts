@@ -1,4 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { LfgClient, type LfgHandoff } from './lfg.ts';
 import { Survival } from '../../server/simulation.ts';
 import { combatHero, controls, acceptInput, idle, validBar, type CombatHero, type Controls, type Frame } from './protocol.ts';
 import { pack, unpack, NETWORK_HZ, LEASE_MS, GRACE_MS, MAX_PACKET } from './packets.ts';
@@ -11,6 +12,9 @@ export class BetaSession {
   private client:SupabaseClient;
   private channels:RealtimeChannel[]=[];
   private joined=false;
+  private entering=false;
+  private lfg=false;
+  private advancing=false;
   private stopped=false;
   private polling=false;
   private changing=false;
@@ -33,14 +37,45 @@ export class BetaSession {
   private sample:()=>Controls;
   private error:(s:string)=>void;
   constructor(client:SupabaseClient,emit:BetaSession['emit'],sample:BetaSession['sample'],error:BetaSession['error']) {this.client=client;this.emit=emit;this.sample=sample;this.error=error;}
+  private beginEntry():void {
+    if(this.stopped||this.entering||this.state)throw Error('Sessione già aperta o chiusa.');
+    this.entering=true;
+  }
   async enter(hero:string,invite?:string):Promise<void>{
+    this.beginEntry();
     const {data,error}=await this.client.rpc('coop_beta',{op:invite?'join':'create',lease:this.lease,hero,...(invite?{invite}:{})});
     if(error)throw Error(error.message);
-    try{this.acceptRow(data);await this.subscribe();}catch(e){await this.close(true);throw e;}
+    await this.open(data);
+  }
+  /** Canonical, account-bound claim only. Never accept a caller-supplied room/snapshot or a copied lease. */
+  async enterLfg(handoff:LfgHandoff):Promise<void>{
+    this.beginEntry();this.lfg=true;
+    const claim=new LfgClient(this.client,()=>{},this.error,this.lease),deadline=performance.now()+30_000;
+    try {
+      while(!this.stopped){
+        const next=await claim.claim(handoff);
+        if(this.stopped)return;
+        if(next.status==='admitted'){await this.open(next.admission);return;}
+        if(!next.waitingForHost||performance.now()>=deadline)throw Error('Passaggio LFG scaduto. Torna alla campagna e cerca di nuovo.');
+        await new Promise(r=>setTimeout(r,500));
+      }
+    }catch(e){await this.close(true);throw e;}finally{await claim.stop();}
+  }
+  private async open(row:unknown):Promise<void>{
+    try{this.acceptRow(row);await this.subscribe();}catch(e){await this.close(true);throw e;}
     if(this.stopped)return;
     this.heartbeat=setInterval(()=>void this.poll(),LEASE_MS);
     this.loop=setInterval(()=>this.tick(),50);
     this.broadcast=setInterval(()=>void this.exchange(),1000/NETWORK_HZ);
+    await this.advanceLfg();
+  }
+  private async advanceLfg():Promise<void>{
+    if(!this.lfg||this.advancing||this.stopped||!this.joined||this.changing||this.state?.phase!=='lobby')return;
+    this.advancing=true;
+    try{
+      if(!this.state.members[this.state.slot].ready)await this.action('ready');
+      if(!this.stopped&&this.state.phase==='lobby'&&this.state.slot===0&&this.state.members.length===2&&this.state.members.every(m=>m.ready))await this.action('start');
+    }catch(e){this.end('Avvio cooperativa non riuscito: '+(e as Error).message);}finally{this.advancing=false;}
   }
   async action(op:'ready'|'start'|'equip',payload?:unknown):Promise<void>{
     if(!this.state||this.stopped||this.changing)return;
@@ -59,6 +94,7 @@ export class BetaSession {
     if(r.phase==='fight'&&r.slot===0&&!this.sim){if(members.length!==2)throw Error('Manca il compagno.');this.sim=new Survival(members.map(m=>m.hero)as[CombatHero,CombatHero]);this.startedAt=performance.now();this.lastTick=this.startedAt;this.guestAt=0;}
     this.emit(this.state);
     if(r.phase==='ended')void this.close(false);
+    else void this.advanceLfg();
   }
   private async poll():Promise<void>{
     if(this.stopped||!this.state||this.polling)return;this.polling=true;

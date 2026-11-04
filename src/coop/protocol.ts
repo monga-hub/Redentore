@@ -1,5 +1,5 @@
 import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
-import { BASES, levelOf, ownSchools, tuneOf } from '../player/levels.ts';
+import { BASES, ownSchools, tuneOf } from '../player/levels.ts';
 import type { GearState } from '../loot/gear.ts';
 
 export const VERSION = 3, COUNTDOWN = 10, DURATION = 300, MAX_MOBS = 24;
@@ -8,20 +8,24 @@ export interface Controls { seq: number; x: number; z: number; casts: number[]; 
 export const idle = (): Controls => ({ seq: 0, x: 0, z: 0, casts: Array(11).fill(0), auto: false, jump: false, target: 0 });
 const record = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const ids = (x: unknown): x is string[] => Array.isArray(x) && x.length <= 500 && x.every(k => typeof k === 'string' && k.length <= 80);
-export function combatHero(s: unknown): CombatHero {
-  if (!record(s) || !HERO_IDS.includes(s.hero as Hero) || !record(s.build) || !record(s.quest)) throw Error('Salva un eroe valido nel cloud.');
-  const b = s.build, xp = b.xp;
-  if (typeof xp !== 'number' || !Number.isFinite(xp) || xp < 9300 || xp > 1e7 || levelOf(xp).lv < 31 || s.quest.boss3Dead !== true) throw Error('Servono livello 31 e vittoria sull’Abate del capitolo 3.');
+/** Transport/build validation is independent of campaign admission; it never invents quest flags. */
+function combatBuild(hero:unknown, b:unknown, gear:unknown, boon:unknown):CombatHero {
+  if (!HERO_IDS.includes(hero as Hero) || !record(b)) throw Error('Build non valida.');
+  const xp=b.xp;
+  if (typeof xp!=='number' || !Number.isFinite(xp) || xp<0 || xp>1e7) throw Error('Progressione non valida.');
   if (!ids(b.picks) || !ids(b.learned ?? [])) throw Error('Build non valida.');
-  const hero = s.hero as Hero;
-  const own = ownSchools(b.picks, b.learned as string[] ?? [], HEROES[hero].school);
-  const gear = s.gear ?? {};
-  if (!record(gear) || Object.keys(gear).length > 10 || Object.values(gear).some(v => typeof v !== 'string' || v.length > 160)) throw Error('Equipaggiamento non valido.');
-  return { hero, xp, picks: own.picks, learned: own.learned, main: typeof b.main === 'string' ? b.main : '', gear: structuredClone(gear) as GearState, boon: typeof s.quest.boon === 'string' ? s.quest.boon : '' };
+  const h=hero as Hero, own=ownSchools(b.picks,b.learned as string[] ?? [],HEROES[h].school), worn=gear??{};
+  if (!record(worn) || Object.keys(worn).length>10 || Object.values(worn).some(v=>typeof v!=='string'||v.length>160)) throw Error('Equipaggiamento non valido.');
+  return {hero:h,xp,picks:own.picks,learned:own.learned,main:typeof b.main==='string'?b.main:'',gear:structuredClone(worn) as GearState,boon:typeof boon==='string'?boon:''};
 }
-export function validHero(h: unknown): h is CombatHero {
+export function combatHero(s:unknown):CombatHero {
+  if (!record(s) || !record(s.quest)) throw Error('Salva un eroe valido nel cloud.');
+  if (s.quest.boss2Dead!==true) throw Error('Sconfiggi la Governatrice del capitolo 2 e salva nel cloud.');
+  return combatBuild(s.hero,s.build,s.gear,s.quest.boon);
+}
+export function validHero(h:unknown):h is CombatHero {
   if (!record(h)) return false;
-  try { combatHero({ hero: h.hero, build: { xp: h.xp, picks: h.picks, learned: h.learned, main: h.main }, quest: { boss3Dead: true, boon: h.boon }, gear: h.gear }); return true; } catch { return false; }
+  try {combatBuild(h.hero,{xp:h.xp,picks:h.picks,learned:h.learned,main:h.main},h.gear,h.boon);return true;}catch{return false;}
 }
 export function controls(x: unknown): Controls | undefined {
   if (!record(x) || !Number.isSafeInteger(x.seq) || Number(x.seq) < 1 || Number(x.seq) > 2147483647 || typeof x.x !== 'number' || typeof x.z !== 'number' || !Number.isFinite(x.x) || !Number.isFinite(x.z) || Math.abs(x.x) > 1 || Math.abs(x.z) > 1 || (!Number.isSafeInteger(x.target) || Number(x.target)<0 || Number(x.target)>2147483647) || typeof x.jump !== 'boolean' || typeof x.auto !== 'boolean' || !Array.isArray(x.casts) || x.casts.length !== 11 || x.casts.some(v => !Number.isSafeInteger(v) || v < 0 || v > 2147483647)) return;

@@ -177,7 +177,7 @@ for (const computerFirst of [true, false]) {
   if (h.calls.length) fail('uploaded before the wait');
   await new Promise((r) => setTimeout(r, 60));
   await sync.flush();
-  if (h.calls.join() !== 'save risorto,save bortolo' || cloudRun(h, 'risorto')?.time !== 5) fail(`throttled uploads: ${h.calls}`);
+  if (h.calls.join() !== 'load risorto,save risorto,load bortolo,save bortolo' || cloudRun(h, 'risorto')?.time !== 5) fail(`throttled uploads: ${h.calls}`);
   sync.forget('risorto');
   await new Promise((r) => setTimeout(r, 0));
   if (cloudRun(h, 'risorto') || !cloudRun(h, 'bortolo')) fail('Ricomincia did not drop only his slot');

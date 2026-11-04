@@ -1,3 +1,4 @@
+import type { BuildEdit } from '../core/build-state.ts';
 // Experience levels and the choose-a-card upgrades, Vampire Survivors style but on a finite budget:
 // nobody respawns, so XP is the worth of the mobs lying dead (main.ts derives it every frame) and the
 // curve is tuned to it. Full clear before the boss: 1145 XP, level 11; the quest route with the apiary
@@ -471,6 +472,9 @@ export class Levels {
   schools: readonly School[] = RISORTO;
   /** The base attack on the big button, if the player put his secondary school's there (the book); else his own. */
   main = '';
+  /** Refunded choices left for the build panel; they must not reopen random level-up dialogs. */
+  banked = 0;
+  edit?: BuildEdit;
   picks: string[] = [];
   learned: string[] = [];
   /** Lay `picks` on the kit, stats and bar (main.ts). */
@@ -482,6 +486,6 @@ export class Levels {
 
   /** Level-ups earned but not chosen yet. */
   get pending(): number {
-    return Math.max(0, this.lv - 1 - this.picks.length);
+    return Math.max(0, this.lv - 1 - this.picks.length - this.banked);
   }
 }

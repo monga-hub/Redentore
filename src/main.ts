@@ -1,3 +1,6 @@
+import { nextEdit } from './core/build-state.ts';
+import { BuildPanel } from './ui/build.ts';
+import { reset as resetBuild, spend as spendBuild } from './player/build.ts';
 import * as THREE from 'three';
 import { buildLevel } from './level/index.ts';
 import { SPAWN } from './level/plan.ts';
@@ -126,6 +129,8 @@ const bar = new ActionBar(kit.system);
 const levels = new Levels(); // XP from the dead, the cards picked; laid on the kit by `apply`
 levels.learned = [...HEROES[hero].kit]; // his school's start (a load lays its own)
 levels.schools = HEROES[hero].school;
+if (!ahead) levels.edit = nextEdit();
+cloud.on(() => { if (cloud.status === 'ok' && levels.edit?.id === cloud.acknowledgedBuild.get(hero)) levels.edit!.ancestors = []; });
 let booted = false; // past the load: a base attack learnt from now on is called out
 const levelUp = new LevelUp(); // the two-card window
 const gear = new Equipment(hero); // what the hero wears: the hemp set and his own weapon at first
@@ -337,6 +342,7 @@ function arena(): void {
   while (levels.picks.length < LV - 1) {
     const cards = offer(levels.picks, Math.random, levels.learned, levels.schools), c = cards.find((k) => k.kind === 'ability') ?? cards[0];
     if (!c) break;
+    if (levels.edit) levels.edit = nextEdit(levels.edit);
     levels.picks.push(c.id);
     if (c.kind === 'ability') kit.system.learn(c.id);
   }
@@ -375,6 +381,7 @@ function openLevelUp(): void {
   input.consume();
   dctl.stop();
   levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned, levels.schools), counter(levels.picks), (c: Card) => {
+    if (levels.edit) levels.edit = nextEdit(levels.edit);
     levels.picks.push(c.id);
     if (c.kind === 'ability') { // onto the first free slot, even if an earlier run took it off the bar
       kit.system.learn(c.id);
@@ -440,12 +447,27 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
   name: HEROES[hero].name, lv: levels.lv, schools: HEROES[hero].school, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
   dmg: tune.dmg * worn.dmg, physical: tune.dmg * worn.physical, magic: tune.dmg * worn.magic, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
+const buildPanel = new BuildPanel(levels, () => ({ name: HEROES[hero].name, title: HEROES[hero].title, schools: HEROES[hero].school, names: Object.fromEntries(ABILITIES.map((a)=>[a.id,a.name])) }), () => buildBlocked(), (op, id) => {
+  const why = buildBlocked(); if (why) return why;
+  const before = { picks: [...levels.picks], banked: levels.banked, edit: levels.edit }, hp = playerStats.hp, mana = playerStats.mana;
+  let edit; try { edit = nextEdit(levels.edit); } catch (e) { return (e as Error).message; }
+  const error = op === 'reset' ? resetBuild(levels) : spendBuild(levels, id!);
+  if (error) return error;
+  levels.edit = edit;
+  levels.apply(); playerStats.hp = Math.min(hp, playerStats.hpMax); playerStats.mana = Math.min(mana, playerStats.manaMax);
+  if (!autosave(serialize(game))) { levels.picks = before.picks; levels.banked = before.banked; levels.edit = before.edit; levels.apply(); playerStats.hp = hp; playerStats.mana = mana; return 'Salvataggio non disponibile: nessun punto modificato.'; }
+  cloud.push(hero); return undefined;
+});
+buildPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); book.close(); };
+sheet.build = () => buildPanel.show();
+questView.service = (id) => { if (id === 'custode') buildPanel.show(true); else document.dispatchEvent(new CustomEvent('sanctuary-arena')); };
 const figure = new Figure(renderer, scene, player.mesh, sheet.stage); // the sheet's hero, as dressed, while it is open
 sheet.el.addEventListener('hidden', () => figure.free());
 const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commercia, Mastro Iseppo's; their tomes teach a school of his
   owned: () => tune.owned,
   schools: HEROES[hero].school,
   learn: (ids) => {
+    if (levels.edit) levels.edit = nextEdit(levels.edit);
     levels.learned.push(...ids);
     for (const id of ids) kit.system.learn(id);
     levels.apply();
@@ -628,12 +650,17 @@ addEventListener('resize', () => {
 });
 
 // Debug hooks for later ships and for poking around in the console.
-Object.assign(window, { arredi, dragoSet: drago, dragon, sandbox, zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, game, discovery, worldMap });
+Object.assign(window, { arredi, dragoSet: drago, dragon, sandbox, zitelle, l2, sangiorgio, l3, ferry, bag, gear, sheet, book, vendor, drops, bagPanel, levels, levelUp, CARD, intro, audio, sound: { tap, voices }, scene, level, player, cam, dcam, occlusion, dctl, dfx, gothic, fx, kit, playerStats, friars, priests, bees, targeting, quest, questView, menu, buildPanel, game, discovery, worldMap });
 
 // The autosave (core/save.ts keeper): every few seconds, when the tab is hidden (iOS may kill it then) and at once on
 // every kill, card and pickup. Mid-fight (or fallen) the hero is kept where he last stood calm, so a resume lands
 // before the pull, never in it, with all the fight earned. Never afloat, in the intro, the sandbox or the dragon's fight.
 const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin', 'pour']); // 'spin': the Governatrice's fuso; 'pour': the Abate's Calice
+function buildBlocked(): string | undefined {
+  if (dying > 0 || playerStats.dead || flying() || ferry.trip || sandbox || roused(drago.boss) || foes.some((m) => m.state !== 'dead' && m.state !== 'pray' && m.state !== 'hoe') || kit.system.casting) return 'Puoi modificare la build soltanto fuori dal combattimento e dai viaggi.';
+  if (new URLSearchParams(location.search).has('coop')) return 'La build non si modifica durante una sessione multiplayer.';
+  return undefined;
+}
 const KEEP = 5; // s
 const PACK = 12, CALM = 22; // m: three fighting foes this close widen the framing; none alive this close draws it in
 const BOSSES = [priests.boss, zitelle.boss, sangiorgio.boss, bees.queen]; // framed wide in their fight, like the dragon
@@ -648,13 +675,13 @@ renderer.setAnimationLoop(() => {
   const real = Math.min(timer.getDelta(), 0.05);
   const since = FALLEN - dying; // s since the hero fell, while dying
   const dt = dying > 0 && since < SLOW_FOR ? real * (SLOW + (1 - SLOW) * since / SLOW_FOR) : real; // slow motion as the hero falls
-  if (menu.paused || worldMap.open || bagPanel.open || book.open || notes.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
+  if (menu.paused || worldMap.open || bagPanel.open || book.open || buildPanel.open || notes.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
     if (sheet.shown) { player.model.animate(dt, 0, true); figure.draw(); } // he idles on the sheet (and in the world behind it)
     input.consume();
     input.endFrame();
-    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open || notes.open, pressed); // the dialogue window ducks the music itself
+    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open || buildPanel.open || notes.open, pressed); // the dialogue window ducks the music itself
     fx.render();
     return;
   }

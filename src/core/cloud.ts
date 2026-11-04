@@ -1,3 +1,4 @@
+import { reconcileBuild } from './build-state.ts';
 // Cloud saves: each hero's run (core/save.ts) mirrored to the player's Mongames account through the hub's save client,
 // https://monga-hub.github.io/hub/saves.js, imported at runtime (the game is on the hub's origin and shares its login).
 // The run on the device stays the one played: logged out, offline, in `npm run dev` or with the hub missing, nothing
@@ -29,7 +30,7 @@ export interface Saves {
 /** The hub's client, or null: offline, local dev, the hub not (yet) deployed. */
 export async function connect(): Promise<Saves | null> {
   const url = '/hub/saves.js'; // a variable: served by the hub, not bundled
-  try { return await import(/* @vite-ignore */ url) as Saves; } catch { return null; }
+  try { const hub = await import(/* @vite-ignore */ url) as Saves; const { guardedSaves } = await import('./build-cloud.ts'); return guardedSaves(hub); } catch { return null; }
 }
 
 const stamp = (s?: GameState) => s?.at ?? 0;
@@ -60,8 +61,23 @@ export async function merge(cloud: Saves, store: Storage, skip?: Hero): Promise<
   await Promise.all(HERO_IDS.map(async (hero) => {
     let mine = resume(hero, store);
     const back = runOf(parse(store.getItem(REPLACED(hero))), hero);
-    if (back && hero !== skip && (!mine || lead(back, mine) < 0) && lay(store, hero, back, mine)) { mine = back; pulled.push(hero); }
+    if (back && mine) { const next = reconcileBuild(mine, back); if (next !== mine) { if (!autosave(next, store, stamp(mine))) throw Error('Salvataggio locale non disponibile.'); mine = next; } }
+    const restored = back ? reconcileBuild(back,mine) : undefined;
+    if (restored && hero !== skip && (!mine || lead(restored, mine) < 0) && lay(store, hero, restored, mine)) { mine = restored; pulled.push(hero); }
     const theirs = runOf(await cloud.load(GAME, hero), hero);
+    if (mine && theirs) {
+      const w = lead(theirs,mine)<0 ? theirs : mine, d = w === theirs ? mine : theirs;
+      const combined = reconcileBuild(w,d);
+      if (combined !== w) {
+        if (hero === skip && combined.build?.edit?.id !== mine.build?.edit?.id) throw Error('La build cloud è cambiata: copia locale conservata. Esci e riprendi la partita.');
+        if (!lay(store,hero,combined,mine)) throw Error('Salvataggio locale non disponibile.');
+        mine = combined;
+        await send(cloud,combined,hero);
+        if(hero!==skip)pulled.push(hero);
+        return;
+      }
+      if (combined.build?.edit && combined.build.edit.id !== theirs.build?.edit?.id) { await send(cloud,combined,hero); return; }
+    }
     if (theirs && (!mine || lead(theirs, mine) < 0)) {
       if (hero !== skip && lay(store, hero, theirs, mine) && !pulled.includes(hero)) pulled.push(hero);
     } else if (mine && (!theirs || lead(mine, theirs) < 0)) await send(cloud, mine, hero);
@@ -80,6 +96,7 @@ export class CloudSync {
   error = '';
   /** The hero in play: merges leave his device run alone. */
   playing?: Hero;
+  readonly acknowledgedBuild = new Map<Hero,string>();
   /** Settles once the client is known and the first merge (if logged in) is over. */
   readonly ready: Promise<void>;
   private client: Saves | null = null;
@@ -126,7 +143,18 @@ export class CloudSync {
       this.dirty.clear();
       this.set('sync');
       try {
-        for (const hero of heroes) { const s = resume(hero, this.store); if (s) await send(this.client, s, hero); }
+        for (const hero of heroes) {
+          const s = resume(hero,this.store); if (!s) continue;
+          const remote = runOf(await this.client.load(GAME,hero),hero);
+          const winner = remote && lead(remote,s)<0 ? remote : s;
+          const combined = reconcileBuild(winner,winner===s?remote:s);
+          if (combined.build?.edit?.id !== s.build?.edit?.id) {
+            try { this.store.setItem(REPLACED(hero),JSON.stringify(remote)); } catch { /* current local state remains intact */ }
+            throw Error('La build cloud è cambiata: copia locale conservata. Esci e riprendi la partita.');
+          }
+          await send(this.client,combined,hero);
+          if(combined.build?.edit)this.acknowledgedBuild.set(hero,combined.build.edit.id);
+        }
         this.set('ok');
       } catch (e) {
         for (const h of heroes) this.dirty.add(h); // tried again with the next push
@@ -135,15 +163,14 @@ export class CloudSync {
     });
   }
 
-  /**
-   * "Ricomincia": his slot and his device backup go too (if the removal fails, his new run's first upload replaces it).
-   * ponytail: another device still holding his old run sends it up again, and being further on it comes back here
-   * (the new one kept under REPLACED): Ricomincia there too. A per-run id would tell the two apart, if it ever matters.
-   */
+  /** Serialize an explicitly confirmed restart before any later upload of the new run. */
   forget(hero: Hero): void {
     this.dirty.delete(hero);
     try { this.store.removeItem(REPLACED(hero)); } catch { /* blocked storage */ }
-    if (this.user) this.client?.remove(GAME, hero).catch(() => { /* replaced by the next upload */ });
+    if (this.user) void this.run(async () => {
+      try { if (!await this.client?.remove(GAME,hero)) throw Error('Ripartenza cloud non confermata.'); }
+      catch(e) { this.fail(e); }
+    });
   }
 
   private async login(u: { id: string; email: string } | null): Promise<void> {

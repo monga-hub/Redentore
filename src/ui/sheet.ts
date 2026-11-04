@@ -52,6 +52,7 @@ export class SheetPanel {
   private readonly read: () => Summary;
   /** Where the hero is drawn (ui/figure.ts), kept across redraws. */
   readonly stage = document.createElement('canvas');
+  build?: () => void;
 
   constructor(host: BagPanel, bag: Bag, gear: Equipment, read: () => Summary) {
     this.host = host;
@@ -62,6 +63,7 @@ export class SheetPanel {
     style.textContent = CSS;
     document.head.append(style);
     this.el.className = 'panel sheet';
+    this.el.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[data-build]')) this.build?.(); });
     host.mount(this.el);
     host.keys.KeyC = () => this.toggle();
     host.kind('w', {
@@ -93,7 +95,7 @@ export class SheetPanel {
     const n = this.read(), pct = (k: number) => `${Math.round(k * 100)}%`, it = (x: number) => Math.round(x).toLocaleString('it-IT');
     const slots: Slot[] = ['abito', 'arma', 'amuleto', 'anello'];
     this.el.innerHTML = `<h2>Personaggio</h2><button class="x" aria-label="Chiudi scheda">✕</button>
-      <div class="doll"><div class="col">${slots.map((s) => this.cell(s)).join('')}</div><div class="stage" title="Trascina per girarlo"></div>
+      <button data-build type="button">Gestisci build e potenziamenti</button><div class="doll"><div class="col">${slots.map((s) => this.cell(s)).join('')}</div><div class="stage" title="Trascina per girarlo"></div>
         <div class="stats"><div class="lv">${n.name} · livello ${n.lv}</div>
           <div class="sch">${n.schools.map((s, i) => `<span>${medal(i)}${SCHOOL_NAME.get(s)} <small>${RANK[i]}</small></span>`).join('')}</div>
           <dl><dt>Salute</dt><dd>${it(n.hp)}</dd><dt>Mana</dt><dd>${it(n.mana)}</dd>

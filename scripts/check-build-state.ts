@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { Levels, tuneOf } from '../src/player/levels.ts';
+import { allocation, budget, checkBuild, reset, spend } from '../src/player/build.ts';
+const b=new Levels();b.xp=1320;b.picks=['step','fall_dmg','fall_dmg','hp','potion_big','linfa'];
+const skills=tuneOf(b.picks,b.learned,b.schools).owned;
+assert.equal(checkBuild(b,b.schools),undefined);const pending=b.pending;
+assert.equal(reset(b),undefined);assert.equal(b.banked,4);assert.deepEqual(b.picks,['step','linfa']);assert.equal(b.pending,pending);
+assert.deepEqual(tuneOf(b.picks,b.learned,b.schools).owned,skills);assert.equal(reset(b),undefined);assert.equal(b.banked,4);
+const n=budget(b);assert.equal(spend(b,'fall_dmg'),undefined);assert.equal(budget(b),n-1);assert.equal(b.banked,3);assert.equal(b.pending,pending);
+const before=JSON.stringify(b);assert.ok(spend(b,'pyre_big'));assert.equal(JSON.stringify(b),before);
+b.picks.push('unknown');assert.ok(reset(b));assert.equal(b.banked,3);
+const f=new Levels();f.xp=1320;f.schools=['bone','plague'];f.learned=['plague'];f.picks=['plague_dps','fx_fallplague'];assert.equal(reset(f),undefined);assert.equal(f.banked,2);assert.equal(allocation(f.picks).length,0);
+const over=new Levels();over.picks=['fall_dmg'];assert.ok(reset(over));assert.equal(over.banked,0);
+console.log('build state ok: exact refund, paid unlock/filler retained, unspent refunds independent of level offers, school/prerequisite/budget rejection, dependent fusion reset');

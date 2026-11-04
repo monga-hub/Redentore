@@ -135,7 +135,7 @@ const levels = new Levels(); // XP from the dead, the cards picked; laid on the 
 levels.learned = [...HEROES[hero].kit]; // his school's start (a load lays its own)
 levels.schools = HEROES[hero].school;
 if (!ahead) levels.edit = nextEdit();
-cloud.on(() => { if (cloud.status === 'ok' && levels.edit?.id === cloud.acknowledgedBuild.get(hero)) levels.edit!.ancestors = []; });
+cloud.on(() => { if (cloud.status === 'ok' && levels.edit && levels.edit.id === cloud.acknowledgedBuild.get(hero)) levels.edit.ancestors = []; });
 let booted = false; // past the load: a base attack learnt from now on is called out
 const levelUp = new LevelUp(); // the two-card window
 const gear = new Equipment(hero); // what the hero wears: the hemp set and his own weapon at first

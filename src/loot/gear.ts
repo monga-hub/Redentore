@@ -42,7 +42,7 @@ export const ARMOR_K = 700; // armor / (armor + K) of every blow is turned aside
 export const CRIT_BASE = 5, CRIT_MUL = 1.5; // % chance with no gear, × a critical blow deals
 
 const BUDGET: Partial<Record<Rarity, number>> = { comune: 4, noncomune: 9, raro: 15, epico: 24, leggendario: 30 };
-const ARMOR: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 14, raro: 20, epico: 28 };
+const ARMOR: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 14, raro: 20, epico: 28, leggendario: 34 };
 const ILVL: Partial<Record<Rarity, number>> = { comune: 5, noncomune: 10, raro: 15, epico: 20, leggendario: 22 };
 const BUY: Partial<Record<Rarity, number>> = { comune: 8, noncomune: 40, raro: 120, epico: 480, leggendario: 1200 };
 /** Level 2's pieces (the Giudecca and the Zitelle): a bigger budget and more armor at each quality, a higher item level, dearer. */
@@ -219,9 +219,13 @@ const make = (lvl: 1 | 2 | 3) => ([id, name, slot, rarity, focus, lore]: typeof 
   return { id, name, rarity, icon: s.icon, lore: lore ?? '', slot, stats, ilvl: ILVL[rarity]! + k.ilvl, ...(lvl === 2 ? { l2: true as const } : lvl === 3 ? { l3: true as const } : {}) };
 };
 const LEGACY_GEAR: readonly Item[] = [...DEFS.map(make(1)), ...DEFS2.map(make(2)), ...DEFS3.map(make(3)), ...UNIQUE3.map(make(3)).map((g) => ({ ...g, unique: true as const, ...(g.id === 'libro-di-sabbia' ? { pages: SABBIA } : {}) }))];
+// Legendary recipes exist only at endgame; acquisition tables keep their own ordinary weights.
+const recipeRarities = (chapter: 1 | 2 | 3): readonly Rarity[] => chapter === 3
+  ? ['comune', 'noncomune', 'raro', 'epico', 'leggendario']
+  : ['comune', 'noncomune', 'raro', 'epico'];
 /** Three families × three chapters per hero, expanded through existing rarity budgets. */
 export const OUTFITS: readonly Item[] = BUILDS.flatMap((b) => ([1, 2, 3] as const).flatMap((chapter) =>
-  (['comune', 'noncomune', 'raro', 'epico'] as const).map((rarity): Item => {
+  recipeRarities(chapter).map((rarity): Item => {
     const k = chapter === 3 ? L3 : chapter === 2 ? L2 : { budget: 1, armor: 1, ilvl: 0 };
     const points = BUDGET[rarity]! * k.budget * 5.25;
     // Every family keeps mana, health and regeneration before spending its offensive share.
@@ -239,18 +243,23 @@ export const isLegacyArmor = (it: Item) => (ARMOR_SLOTS as readonly string[]).in
 export function componentId(hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity, part: ArmorPart): string { return `pezzo-${hero}-${chapter}-${rarity}-${part}`; }
 /** New ingredients carry proven metadata; old armor is never silently converted. */
 export const COMPONENTS: readonly Item[] = (Object.keys(HEROES) as Hero[]).flatMap(hero => ([1, 2, 3] as const).flatMap(chapter =>
-  (['comune', 'noncomune', 'raro', 'epico'] as const).flatMap(rarity => ARMOR_SLOTS.map((part): Item => ({
+  recipeRarities(chapter).flatMap(rarity => ARMOR_SLOTS.map((part): Item => ({
     id: componentId(hero, chapter, rarity, part), hero, chapter, rarity, component: part,
     name: `${SLOT.get(part)!.name} · Capitolo ${chapter} · ${rarity} · ${HEROES[hero].name}`,
-    icon: SLOT.get(part)!.icon, illustration: LEGACY_GEAR.find(g => g.slot === part && g.rarity === rarity && !g.l2 && !g.l3)!.id,
+    icon: SLOT.get(part)!.icon, illustration: LEGACY_GEAR.find(g => g.slot === part && g.rarity === (rarity === 'leggendario' ? 'epico' : rarity) && !g.l2 && !g.l3)!.id,
     lore: 'Componente: unisci testa, spalle, torso, mani, gambe e piedi dello stesso capitolo, rarità ed eroe. Scegli la build dopo l’unione.',
     ...(chapter === 2 ? { l2: true } : chapter === 3 ? { l3: true } : {}),
   })))));
 export const GEAR: readonly Item[] = [...LEGACY_GEAR, ...OUTFITS, ...COMPONENTS];
 const BY_ID = new Map(GEAR.map((g) => [g.id, g]));
+/** Validate reward identity only; the cooperative server owns eligibility and grants. */
+export function isLegendaryComponentReward(id: string, hero: Hero): boolean {
+  const it = BY_ID.get(id);
+  return !!it?.component && it.hero === hero && it.chapter === 3 && it.rarity === 'leggendario';
+}
 export const SHOP = LEGACY_GEAR.filter((g) => g.rarity === 'epico' && !g.unique);
 export const SHOP2 = SHOP.filter((g) => g.l2);
-export const componentShop = (hero: Hero, chapter: 1 | 2 | 3) => COMPONENTS.filter(it => it.hero === hero && it.chapter === chapter && it.rarity !== 'epico');
+export const componentShop = (hero: Hero, chapter: 1 | 2 | 3) => COMPONENTS.filter(it => it.hero === hero && it.chapter === chapter && ['comune', 'noncomune', 'raro'].includes(it.rarity));
 export const shop = (level3: boolean, hero?: Hero) => hero ? [...SHOP.filter(g => !isLegacyArmor(g) && !g.l2 && (level3 || !g.l3)), ...componentShop(hero, level3 ? 3 : 1)] : SHOP.filter(g => !g.l2 && (level3 || !g.l3));
 export const outfitChoices = (hero: Hero, chapter: 1 | 2 | 3, rarity: Rarity = 'epico') => OUTFITS.filter(g => g.hero === hero && g.chapter === chapter && g.rarity === rarity);
 export const shop2 = (hero: Hero, chapter: 2 | 3 = 2) => chapter === 3 ? shop(true, hero) : [...SHOP2.filter(g => !isLegacyArmor(g)), ...componentShop(hero, 2)];

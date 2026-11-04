@@ -14,7 +14,7 @@ export function assemblyProgress(bag: Bag): Progress[] {
     if (!group) { group = { chapter: it.chapter, rarity: it.rarity, parts: [], ids: [] }; groups.set(key, group); }
     if (!group.parts.includes(it.component)) { group.parts.push(it.component); group.ids.push(it.id); }
   }
-  return [...groups.values()].sort((a, b) => a.chapter - b.chapter || ['comune', 'noncomune', 'raro', 'epico'].indexOf(a.rarity) - ['comune', 'noncomune', 'raro', 'epico'].indexOf(b.rarity));
+  return [...groups.values()].sort((a, b) => a.chapter - b.chapter || ['comune', 'noncomune', 'raro', 'epico', 'leggendario'].indexOf(a.rarity) - ['comune', 'noncomune', 'raro', 'epico', 'leggendario'].indexOf(b.rarity));
 }
 
 const pending = new WeakMap<Bag, Assembly>();

@@ -8,17 +8,16 @@ import { SLOT, STAT, sellPrice, type Stat, type Stats } from '../loot/gear.ts';
 // Shared by the bag, the character sheet and Fra' Bortolo's shop (ui/bag.ts places it).
 
 export const TIP_CSS = `
-#bag .tip { position: fixed; z-index: 16; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; width: max-content;
-  max-width: calc(100vw - 16px); pointer-events: none; }
+#bag .tip { position: fixed; z-index: 16; display: flex; flex-wrap: nowrap; gap: 6px; align-items: flex-start; width: max-content;
+  max-width: calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)); pointer-events: none; }
 #bag .tip[hidden] { display: none; }
 #bag .tip.stack { flex-direction: column; }
 #bag .tip.split { flex-wrap: nowrap; max-width: none; } /* the new piece left of the panels, the worn one right: gap set by ui/bag.ts */
-/* Never taller than the screen inside the safe area (scroll-padding carries the insets to ui/bag.ts): stacked, the worn piece gives way first, faded where cut. */
-#bag .tip, #bag .tip .box { max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+/* Each card remains readable by native scroll inside the safe area. */
+#bag .tip, #bag .tip .box { max-height: var(--tip-height, calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
 #bag .tip { scroll-padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-#bag .tip .box { flex-shrink: 0; overflow: hidden; }
-#bag .tip .box.worn { flex-shrink: 1; min-height: 0; }
-#bag .tip .box.cut { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); }
+#bag .tip .box { flex-shrink: 1; min-width: 0; overflow-y: auto; overscroll-behavior-y: contain; pointer-events: auto; }
+#bag .tip.stack:has(.worn) .box { max-height: calc((var(--tip-height, calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom))) - 6px) / 2); }
 #bag .tip .box { box-sizing: border-box; width: max-content; max-width: min(250px, calc(100vw - 16px)); padding: 8px 10px;
   background: var(--tip-bg); border: 2px solid var(--tip-border); border-radius: 5px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px rgba(0,0,0,.6), 0 4px 14px #000; }
 #bag .tip .box.worn { opacity: .92; }
@@ -33,7 +32,7 @@ export const TIP_CSS = `
 #bag .tip .diff { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(154,159,184,.35); font: 11px/15px system-ui, sans-serif; color: #c9cde0; }
 #bag .tip .diff i { font-style: normal; white-space: nowrap; margin-right: 6px; }
 #bag .tip .up { color: #3fd84a; } #bag .tip .down { color: #ff5a4a; }
-#bag .tip .hint { display: block; margin-top: 6px; font: italic 11px/15px system-ui, sans-serif; color: #ffd75e; }
+#bag .tip .hint { position: sticky; bottom: 0; background: var(--tip-bg); display: block; margin-top: 6px; font: italic 11px/15px system-ui, sans-serif; color: #ffd75e; }
 #bag .tip .hint.no { color: #ff5a4a; }
 `;
 
@@ -79,9 +78,9 @@ function diff(it: Item, worn?: Item): string {
  * `price`: a shop line instead of the sell price; `hint`: what a click does (`no`: it can't).
  */
 export function itemTip(it: Item, o: { n?: number; worn?: Item | null; price?: string; hint?: string; no?: boolean; compact?: boolean } = {}): string {
-  let main = box(it, o.n);
+  let main = box(it, o.n, o.worn ? o.worn.id === it.id ? 'Indossato' : 'Selezionato' : '');
   if (o.price) main = main.replace(/<small class="price">.*<\/small>$/, `<small class="price"><span>${o.price}</span></small>`);
-  if (it.slot && o.worn !== null && !o.compact) main += diff(it, o.worn);
+  if (it.slot && o.worn !== null) main += diff(it, o.worn);
   if (o.hint) main += `<span class="hint${o.no ? ' no' : ''}">${o.hint}</span>`;
-  return `<div class="box">${main}</div>` + (o.worn && o.worn.id !== it.id && !o.compact ? `<div class="box worn">${box(o.worn, 1, 'Indossato')}</div>` : '');
+  return `<div class="box" tabindex="0">${main}</div>` + (o.worn && o.worn.id !== it.id ? `<div class="box worn" tabindex="0">${box(o.worn, 1, 'Indossato')}</div>` : '');
 }

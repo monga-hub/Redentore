@@ -33,9 +33,23 @@ for (const item of outfits) {
   assert(tip.includes(`${item.stats!.armatura} Armatura`) && tip.includes('class="g"'));
   assert(!/Consigli:|Priorità:|Le abilità|Presidio elettrico|class="lore"/.test(tip));
   const touch = itemTip(item, { compact: true, worn: ITEM.get(gear.worn.abito!) });
-  assert.equal((touch.match(/class="box/g) ?? []).length, 1);
-  assert(!/Se lo indossi|nessuna differenza|Equipaggiato: aumenta/.test(touch));
+  const worn = ITEM.get(gear.worn.abito!);
+  assert.equal((touch.match(/class="box/g) ?? []).length, worn && worn.id !== item.id ? 2 : 1);
+  if (worn && worn.id !== item.id) assert(touch.includes('Indossato') && touch.includes('Selezionato') && touch.includes('Se lo indossi'));
+  assert(!/nessuna differenza|Equipaggiato: aumenta|Consigli:|Priorità:|class="lore"/.test(touch));
   assert.equal(gear.wear(bag, bag.items.findIndex(s => s.id === item.id)), '');
+}
+// Touch retains the same equipped comparison and stat deltas for rings and weapons.
+for (const [selected, equipped] of [['fede-senza-dote', 'anello-1576'], ['clava-osso', 'baculo-abate']]) {
+  const item = ITEM.get(selected)!, worn = ITEM.get(equipped)!;
+  const tip = itemTip(item, { compact: true, worn, hint: 'Tocca di nuovo: indossa' });
+  assert(tip.includes(item.name) && tip.includes(worn.name));
+  assert(tip.includes('Selezionato') && tip.includes('Indossato') && tip.includes('Se lo indossi'));
+  assert(tip.includes('Tocca di nuovo: indossa'));
+  assert.equal((itemTip(item, { compact: true, worn: null }).match(/class="box/g) ?? []).length, 1);
+  const same = itemTip(item, { compact: true, worn: item });
+  assert.equal((same.match(/class="box/g) ?? []).length, 1);
+  assert(same.includes('Indossato'));
 }
 assert(bag.items.some(s => s.id === 'canapa-torso' && s.n === 2));
 // Full-bag legacy conversion is atomic; freeing enough room then preserves every old piece.

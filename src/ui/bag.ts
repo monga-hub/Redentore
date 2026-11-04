@@ -27,15 +27,17 @@ const CSS = `
 /* Touch: gear, bag, figure and book (ui/book.ts) one under the other, 44 px apart at --k .72, clear of the thumb arc's top button. */
 body.touch #bag-btn { top: calc(12px + 44px * var(--k) / .72 + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
 body.touch #sheet-btn { top: calc(12px + 88px * var(--k) / .72 + env(safe-area-inset-top)); transform: scale(calc(var(--k) / .72)); transform-origin: 100% 0; }
-#bag { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center; overflow: auto;
+#bag { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center; overflow: hidden; box-sizing: border-box; height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: rgba(0,0,0,.5); font: 15px/1.35 Georgia, serif; color: #f3e2b0; user-select: none;
   --s: min(46px, calc((100vw - 80px) / 6), calc((100dvh - 120px) / 5)); }
 #bag.duo { --s: min(46px, calc((100vw - 150px) / 12), calc((100dvh - 110px) / 5.6)); }
 #bag.show { display: flex; }
-#bag .row { display: flex; align-items: flex-start; justify-content: center; gap: 12px; margin: auto; padding: 22px 8px 8px; }
+#bag .row { display: flex; align-items: flex-start; justify-content: center; gap: 12px; margin: auto; padding: 22px 8px 8px; max-height: 100%; box-sizing: border-box; }
 #bag .panel { position: relative; display: none; box-sizing: border-box; padding: 26px 14px 12px;
   border: 3px solid transparent; border-radius: 8px; background: var(--panel); box-shadow: var(--panel-shadow); }
-#bag .panel.on { display: block; }
+#bag .panel.on { display: flex; flex-direction: column; min-height: 64px; max-height: calc(100dvh - 30px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+#bag .panel-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; }
 #bag h2 { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); margin: 0; padding: 4px 22px; white-space: nowrap;
   font: bold 15px/20px Georgia, serif; color: #ffd75e; letter-spacing: 1px; text-shadow: 0 1px 2px #000;
   border: 2px solid transparent; border-radius: 4px; background: linear-gradient(#4a3420, #140e08) padding-box, var(--gilt) border-box; box-shadow: 0 0 0 1px #000, 0 3px 8px rgba(0,0,0,.6); }
@@ -143,7 +145,7 @@ export class BagPanel {
     this.sayEl = this.el.querySelector('.say')!;
     this.progress = document.createElement('div');
     this.progress.className = 'assembly-progress';
-    this.progress.style.cssText = 'max-height: min(150px, 25dvh); overflow:auto; margin-top:8px; font:12px/1.4 Georgia;';
+    this.progress.style.cssText = 'margin-top:8px; font:12px/1.4 Georgia;';
     this.panel.append(this.progress);
     this.assembly = new AssemblyPanel(this.el, bag, message => { this.refresh(); if (message) this.say(message, true); });
     this.progress.addEventListener('click', e => {
@@ -179,6 +181,9 @@ export class BagPanel {
         this.select(null);
         return !!this.dragged;
       }, target => this.drop(target));
+    this.tip.addEventListener('click', e => e.stopPropagation());
+    this.el.addEventListener('scroll', e => { if (!this.tip.contains(e.target as Node)) this.select(null); }, true);
+    addEventListener('resize', () => this.select(null));
     this.el.addEventListener('click', (e) => {
       if (this.discardDialog.open || this.assembly.open) return;
       const t = e.target as HTMLElement;
@@ -311,6 +316,14 @@ export class BagPanel {
       return `<button class="cell" data-bag-index="${i}" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${itemIcon(it)}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
     }).join('');
     for (const r of this.renders) r();
+    // Keep the title and close button outside each panel's native scroll area.
+    for (const panel of this.row.querySelectorAll('.panel')) {
+      if (panel.querySelector('.panel-body')) continue;
+      const body = document.createElement('div');
+      body.className = 'panel-body';
+      body.append(...[...panel.children].filter(child => !child.matches('h2, .x')));
+      panel.append(body);
+    }
     this.sel = undefined;
     this.tip.hidden = true;
   }
@@ -334,8 +347,8 @@ export class BagPanel {
       }
       return;
     }
-    // Only the empty backdrop is destructive: panels, gaps, controls, body and other overlays are inert.
-    if (target === this.el) this.askDiscard(selection);
+    // Only empty overlay background requests confirmation; panels, controls and other overlays are inert.
+    if (target === this.el || target === this.row) this.askDiscard(selection);
   }
 
   private askDiscard(selection: StackSelection): void {
@@ -363,20 +376,29 @@ export class BagPanel {
     const [k, what] = split(c.dataset.k!);
     this.tip.innerHTML = this.kinds[k]?.tip(what, tap && document.body.classList.contains('touch')) ?? '';
     this.tip.hidden = false;
+    this.tip.style.removeProperty('--tip-height');
+    this.tip.style.maxWidth = '';
     const panels = [...this.row.querySelectorAll('.panel.on')].map((p) => p.getBoundingClientRect());
     const p = { left: Math.min(...panels.map((r) => r.left)), right: Math.max(...panels.map((r) => r.right)) };
     const t = this.tip, [main, worn] = [...t.children] as HTMLElement[], sa = getComputedStyle(t); // scroll-padding: the safe-area insets
     const L = 8 + parseFloat(sa.scrollPaddingLeft), R = innerWidth - 8 - parseFloat(sa.scrollPaddingRight);
     const T = 8 + parseFloat(sa.scrollPaddingTop), B = innerHeight - 8 - parseFloat(sa.scrollPaddingBottom);
-    const lay = (m: string) => { t.className = `tip ${m}`; t.style.gap = m === 'split' ? `${p.right - p.left + 16}px` : ''; return m; };
-    const beside = (m: string) => (m === 'split' ? p.left - main.offsetWidth - 8 >= L && p.right + 8 + worn.offsetWidth <= R
+    const lay = (m: string) => {
+      t.className = `tip ${m}`;
+      t.style.gap = m === 'split' ? `${p.right - p.left + 16}px` : '';
+      main.style.maxWidth = m === 'split' ? `${Math.min(250, p.left - L - 8)}px` : '';
+      if (worn) worn.style.maxWidth = m === 'split' ? `${Math.min(250, R - p.right - 8)}px` : '';
+      return m;
+    };
+    const beside = (m: string) => (m === 'split' ? p.left - L >= 188 && R - p.right >= 188 && p.left - main.offsetWidth - 8 >= L && p.right + 8 + worn.offsetWidth <= R
       : p.left - t.offsetWidth - 8 >= L || p.right + 8 + t.offsetWidth <= R);
     const whole = () => [t, ...t.children].every((x) => x.scrollHeight <= x.clientHeight + 1); // nothing cut by, or spilling past, the height cap
     // beside the panels: the worn piece beside the new one, under it, or across the panels; failing that above or
-    // below the cell, side by side or stacked; at worst stacked, the worn piece cut short to fit the screen
-    const m = ['', 'stack', ...(worn ? ['split'] : [])].find((k) => beside(lay(k)) && whole()) ?? lay(['', 'stack'].find((k) => !beside(lay(k)) && whole()) ?? 'stack');
-    for (const x of t.children) x.classList.toggle('cut', x.scrollHeight > x.clientHeight + 1);
-    const b = c.getBoundingClientRect(), w = t.offsetWidth, h = t.offsetHeight;
+    // below the cell, side by side or stacked, with native scroll when the cards exceed the available height
+    const layouts = R - L < 500 ? ['stack'] : ['', 'stack', ...(worn ? ['split'] : [])];
+    const m = layouts.find((k) => beside(lay(k)) && whole()) ?? lay(layouts.filter(k => k !== 'split').find((k) => !beside(lay(k)) && whole()) ?? 'stack');
+    const b = c.getBoundingClientRect();
+    let w = t.offsetWidth, h = t.offsetHeight;
     const left = p.left - (m === 'split' ? main.offsetWidth : w) - 8, right = p.right + 8, side = beside(m);
     const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
     // No room beside: over another open panel (the shop while selling from the bag, the bag while buying), so the
@@ -384,12 +406,23 @@ export class BagPanel {
     const o = side ? undefined : [...this.row.querySelectorAll('.panel.on')].find((x) => !x.contains(c))?.getBoundingClientRect();
     const own = c.closest('.panel')!.getBoundingClientRect();
     if (o) {
+      if (o.width < 400) lay('stack');
+      t.style.maxWidth = `${Math.min(o.width, R - L)}px`;
+      t.style.setProperty('--tip-height', `${Math.min(o.height, B - T)}px`);
+      w = t.offsetWidth; h = t.offsetHeight;
       t.style.left = `${clamp(o.left + o.width / 2 - w / 2, L, R - w)}px`;
       t.style.top = `${o.bottom <= own.top ? clamp(o.bottom - h, T, B - h) : clamp(o.top, T, B - h)}px`;
       return;
     }
+    if (!side) {
+      // Reserve the selected cell for the next tap or hold; scroll cards in the larger free area.
+      const above = b.top - T - 8, below = B - b.bottom - 8;
+      t.style.setProperty('--tip-height', `${Math.max(80, above, below)}px`);
+      h = t.offsetHeight;
+      t.style.top = `${above >= below ? clamp(b.top - h - 8, T, B - h) : clamp(b.bottom + 8, T, B - h)}px`;
+    }
     t.style.left = `${side ? (left >= L ? left : right) : clamp(b.left + b.width / 2 - w / 2, L, R - w)}px`;
-    t.style.top = `${side ? clamp(b.top, T, B - h) : b.top - h - 8 < T ? Math.min(b.bottom + 8, B - h) : b.top - h - 8}px`;
+    if (side) t.style.top = `${clamp(b.top, T, B - h)}px`;
   }
 }
 

@@ -184,7 +184,7 @@ begin
     if q.user_id is not null and q.lease<>lease then raise exception 'Coda già aperta in un’altra scheda'; end if;
     if o.id is not null and who in (o.host_id,o.guest_id) then raise exception 'Rispondi prima alla proposta'; end if;
     insert into public.coop_lfg_queue(user_id,lease,hero,projection) values(who,lease,hero,public.coop_lfg_projection(who,hero))
-      on conflict(user_id) do update set hero=excluded.hero,projection=excluded.projection,seen_at=now(),expires_at=now()+interval '35 seconds';
+      on conflict(user_id) do update set hero=excluded.hero,projection=excluded.projection,seen_at=now(),expires_at=now()+interval '35 seconds',notice='';
     select * into q from public.coop_lfg_queue where user_id=who;
   elsif q.user_id is null or q.lease<>lease then
     -- Idempotent leave on an expired entry cannot remove a newer tab's membership.
@@ -226,6 +226,7 @@ begin
     if not found or (q.avoid_id=peer.user_id and q.avoid_until>now()) then raise exception 'Giocatore non disponibile'; end if;
     insert into public.coop_lfg_offer(host_id,guest_id,host_lease,guest_lease,host_hero,guest_hero,source)
       values(who,peer.user_id,lease,peer.lease,q.hero,peer.hero,'direct') returning * into o;
+    update public.coop_lfg_queue set notice='' where user_id in (o.host_id,o.guest_id);
     perform public.coop_lfg_notify(o.host_id);perform public.coop_lfg_notify(o.guest_id);
   end if;
   -- An inspect/list request never starts an unsolicited new match. Join and heartbeat drive FIFO.
@@ -237,6 +238,7 @@ begin
       if b.user_id is not null then
         insert into public.coop_lfg_offer(host_id,guest_id,host_lease,guest_lease,host_hero,guest_hero,source)
           values(a.user_id,b.user_id,a.lease,b.lease,a.hero,b.hero,'auto') returning * into o;
+        update public.coop_lfg_queue set notice='' where user_id in (o.host_id,o.guest_id);
         perform public.coop_lfg_notify(o.host_id);perform public.coop_lfg_notify(o.guest_id);exit;
       end if;
     end loop;

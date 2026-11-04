@@ -117,7 +117,7 @@ a=await rpc(0,'heartbeat');b=await rpc(1,'heartbeat');assert.equal(a.status,'sea
 await assert.rejects(()=>rpc(0,'accept',{proposal}),/Proposta scaduta/);
 await assert.rejects(()=>rpc(0,'invite',{target:b.entry}),/non disponibile/);
 await admin();await db.exec("update public.coop_lfg_queue set avoid_until=now()-interval '1 second'");
-a=await rpc(0,'heartbeat');assert.equal(a.status,'offered');await expireOffer();a=await rpc(0,'heartbeat');assert.equal(a.status,'searching');assert.match(a.notice,/scaduto/);
+a=await rpc(0,'heartbeat');assert.equal(a.status,'offered');assert.equal(a.notice,'','new proposal clears prior rejection notice');await expireOffer();a=await rpc(0,'heartbeat');assert.equal(a.status,'searching');assert.match(a.notice,/scaduto/);
 await rpc(0,'leave');assert.equal((await rpc(1,'list')).entries.length,1);await assert.rejects(()=>rpc(1,'inspect',{target:a.entry}),/non disponibile/);
 // Offline lease cleanup and same-page reconnect vs fresh-page takeover.
 await clear();a=await rpc(0,'join');assert.equal((await rpc(0,'heartbeat')).entry,a.entry);

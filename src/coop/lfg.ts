@@ -89,7 +89,10 @@ export class LfgClient {
     this.user=data.session.user.id;
     const next=await this.run('join',{hero});this.active=true;this.schedule();
     if(!this.unsubscribe){const {data:{subscription}}=this.client.auth.onAuthStateChange((_event,session)=>{
-      if(!session||session.user.id!==this.user)void this.stop();
+      if(!session||session.user.id!==this.user){
+        const stopped=this.stop(),generation=this.generation;
+        void stopped.then(()=>{if(generation===this.generation){this.state={status:'idle',notice:'Account disconnesso o cambiato: cerca di nuovo.'};this.emit(this.state);}});
+      }
       else void this.client.realtime.setAuth(session.access_token);
     });this.unsubscribe=()=>subscription.unsubscribe();}
     try{await this.subscribe(data.session.access_token);}catch(e){if(generation===this.generation){this.error((e as Error).message);this.retry();}}
@@ -113,7 +116,7 @@ export class LfgClient {
     if(!this.active||this.state.status==='idle'||this.state.status==='admitted')return;
     this.timer=setTimeout(()=>void this.run('heartbeat').catch(e=>{
       this.error((e as Error).message);
-      if(this.state.expiresAt&&Date.parse(this.state.expiresAt)<=Date.now())void this.stop().then(()=>{this.state={status:'idle',notice:'Disponibilità scaduta: cerca di nuovo.'};this.emit(this.state);});
+      if(this.state.expiresAt&&Date.parse(this.state.expiresAt)<=Date.now()){const stopped=this.stop(),generation=this.generation;void stopped.then(()=>{if(generation===this.generation){this.state={status:'idle',notice:'Disponibilità scaduta: cerca di nuovo.'};this.emit(this.state);}});}
       else this.schedule();
     }),this.state.status==='searching'?10_000:2_000);
   }

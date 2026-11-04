@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { lfgBuild, lfgInspectHtml } from '../src/coop/lfg-ui.ts';
+import { CARD } from '../src/player/levels.ts';
+import { outfitId } from '../src/loot/gear.ts';
+const p={hero:'tizian' as const,level:3,picks:['pyre_big','pyre_big','dmg','unknown-secret'],learned:['pyre'],main:'ember',gear:{arma:'<script>private</script>',abito:outfitId('tizian-maestro-fornace',1,'comune')},snapshotAt:'2026-11-04T12:00:00Z',email:'PRIVATE-SECRET',bag:{gold:987654321}};
+const before=JSON.stringify(p),model=lfgBuild(p),html=lfgInspectHtml(p);
+assert.equal(JSON.stringify(p),before,'read-only inspector never changes peer build/gear');
+assert.equal(model.build,'Maestro della fornace');assert(model.skills.some(s=>s.id==='pyre'));
+assert.equal(model.skills.find(s=>s.id==='pyre')?.rank,3);assert.equal(model.talents.find(c=>c.id==='dmg')?.rank,1);assert.equal(model.cards.some(c=>c.id==='unknown-secret'),false);assert(!html.includes('<script>'));assert(!html.includes('PRIVATE-SECRET'));assert(!html.includes('987654321'));
+assert(html.includes('&#60;script&#62;private&#60;/script&#62;'));assert(html.includes('Equipaggiamento'));assert(html.includes('Abilità e rank'));assert(html.includes('passive e fusioni'));
+assert(!html.includes('<button'),'read-only inspection exposes no equipment action buttons');
+const once=CARD.get('pyre')!;
+assert.equal(lfgBuild({...p,picks:[once.id,once.id]}).cards.find(c=>c.id===once.id)?.rank,1,'effective card ranks clamp to existing max');
+assert.equal(lfgBuild({...p,gear:{}}).build,'Combinazione personale','no invented gear build score');
+console.log('LFG inspect PASS: existing hero/gear/card catalogs, effective ranks and talents, read-only projection, unknown IDs escaped, no peer equipment actions. DOM/layout flows require browser fixture.');

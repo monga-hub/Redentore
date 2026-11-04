@@ -46,7 +46,7 @@ const arenaLease=crypto.randomUUID();const claimant=new LfgClient(fake,s=>states
 response={status:'admitted',admission:{room:crypto.randomUUID()}};
 await claimant.claim({proposal:crypto.randomUUID(),ticket:crypto.randomUUID()});assert.equal(calls.at(-1)?.args.lease,arenaLease);assert.equal(calls.at(-1)?.args.op,'claim');
 response={status:'searching',entry:id};const other=new LfgClient(fake,s=>states.push(s),e=>errors.push(e));await other.join('bortolo');response={status:'idle'};await other.leave();assert.equal(calls.at(-1)?.args.op,'leave');assert.equal(other.state.status,'idle');
-const logged=new LfgClient(fake,s=>states.push(s),e=>errors.push(e));response={status:'searching',entry:id};await logged.join('tizian');authChanged?.('SIGNED_OUT',null);await drain();const loggedCount=calls.length;mock.timers.tick(40_000);await drain();assert.equal(calls.length,loggedCount,'logout stops availability renewal');
+const logged=new LfgClient(fake,s=>states.push(s),e=>errors.push(e));response={status:'searching',entry:id};await logged.join('tizian');authChanged?.('SIGNED_OUT',null);await drain();const loggedCount=calls.length;mock.timers.tick(40_000);await drain();assert.equal(calls.length,loggedCount,'logout stops availability renewal');assert.equal(logged.state.status,'idle','logout clears visible availability');
 assert.throws(()=>lfgState({status:'fake'}));assert.throws(()=>lfgState({status:'searching',entries:[{id,hero:'private-email',level:1}]}));
 assert.throws(()=>lfgState({status:'claiming',handoff:{proposal:id,ticket:null}}));
 assert.equal(errors.length,0);mock.timers.reset();

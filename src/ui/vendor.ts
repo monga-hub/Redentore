@@ -68,7 +68,7 @@ export class VendorPanel {
     host.kind('s', {
       tip: (id, tap) => {
         const it = ITEM.get(id)!, p = buyPrice(it);
-        return itemTip(it, { worn: this.gear.comparison(it), price: `Prezzo: ${p.toLocaleString('it-IT')} oro`, hint: hint(tap, 'compra', p), no: this.bag.gold < p });
+        return itemTip(it, { compact: tap, worn: this.gear.comparison(it), price: `Prezzo: ${p.toLocaleString('it-IT')} oro`, hint: hint(tap, 'compra', p), no: this.bag.gold < p });
       },
       use: (id) => this.buy(id, buyPrice(ITEM.get(id)!)),
     }, () => this.render());
@@ -94,7 +94,7 @@ export class VendorPanel {
     host.kind('r', {
       tip: (i, tap) => {
         const s = this.sold[Number(i)], it = ITEM.get(s.id)!, p = sellPrice(it) * s.n;
-        return itemTip(it, { n: s.n, worn: null, price: `Riacquisto: ${p.toLocaleString('it-IT')} oro`, hint: hint(tap, 'riacquista', p), no: this.bag.gold < p });
+        return itemTip(it, { n: s.n, compact: tap, worn: null, price: `Riacquisto: ${p.toLocaleString('it-IT')} oro`, hint: hint(tap, 'riacquista', p), no: this.bag.gold < p });
       },
       use: (i) => {
         const s = this.sold[Number(i)], it = ITEM.get(s.id)!, p = sellPrice(it) * s.n;

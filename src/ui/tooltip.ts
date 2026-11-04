@@ -1,7 +1,5 @@
 import { RARITY, type Item } from '../loot/bag.ts';
-import { buildOf } from '../loot/builds.ts';
 import { CARD } from '../player/levels.ts';
-import { HEROES } from '../player/heroes.ts';
 import { SLOT, STAT, sellPrice, type Stat, type Stats } from '../loot/gear.ts';
 
 // The item tooltip, WoW style: name in its quality's colour, slot and item level, armor, white
@@ -39,6 +37,7 @@ export const TIP_CSS = `
 #bag .tip .hint.no { color: #ff5a4a; }
 `;
 
+const BONUS: Partial<Record<Stat, string>> = { potenzaAttacco: 'danni fisici', potenzaMagica: 'danni magici', potenza: 'danni', critico: 'probabilità di critico', celerita: 'velocità di lancio' };
 const coin = (n: number) => `${n.toLocaleString('it-IT')} oro`;
 const KEYS: (Stat | 'armatura')[] = ['armatura', 'vigore', 'intelletto', 'spirito', 'forza', 'agilita', 'potenzaAttacco', 'potenzaMagica', 'potenza', 'critico', 'celerita'];
 const label = (k: Stat | 'armatura', v: number) => (k === 'armatura' ? `${v} Armatura` : STAT[k].green ? `${v}${k === 'forza' || k === 'agilita' ? '' : '%'} ${STAT[k].name}` : `${v} ${STAT[k].name}`);
@@ -52,19 +51,15 @@ function box(it: Item, n = 1, head = ''): string {
   const r = RARITY[it.rarity], s: Stats = it.stats ?? {};
   let html = `${head ? `<span class="head">${head}</span>` : ''}<b style="color: ${r.color}">${it.name}</b>`;
   if (it.slot) {
-    html += `<small><span>${SLOT.get(it.slot)!.name}</span><span>${r.name}</span></small><small><span>Livello oggetto ${it.ilvl}</span></small>`;
+    html += `<small><span>${SLOT.get(it.slot)!.name}</span><span>${r.name}</span></small><small><span>${it.ilvl === undefined ? '' : `Livello oggetto ${it.ilvl}`}</span></small>`;
     for (const k of KEYS) {
       const v = s[k];
       if (!v) continue;
       const g = k !== 'armatura' && STAT[k].green;
-      html += g ? `<span class="g">Equipaggiato: ${g.replace('#', String(v))}</span>` : `<span class="w">${k === 'armatura' ? '' : '+'}${label(k, v)}</span>`;
-    }
-    const build = buildOf(it.build);
-    if (build) {
-      html += `<p>${HEROES[build.hero].name} · ${build.role}</p><p>Priorità: ${build.priorities}</p><p>Consigli: ${build.spells.map(spellName).join(' · ')}</p><small>Le abilità vanno apprese normalmente. L’abito non le concede e non blocca le altre.</small>`;
+      html += g ? `<span class="g">+${BONUS[k as Stat] ? `${v}% ${BONUS[k as Stat]}` : label(k, v)}</span>` : `<span class="w">${k === 'armatura' ? '' : '+'}${label(k, v)}</span>`;
     }
     const lore = it.pages ? it.pages[leaf++ % it.pages.length] : it.lore;
-    if (lore) html += `<p class="lore">«${lore}»</p>`;
+    if (lore && !it.build) html += `<p class="lore">«${lore}»</p>`;
   } else html += `<small><span>${r.name}${n > 1 ? ` · ${n} pezzi` : ''}</span></small><p>${it.lore}</p>`;
   return html + `<small class="price"><span>Prezzo di vendita: ${coin(sellPrice(it) * n)}</span></small>`;
 }
@@ -76,17 +71,17 @@ function diff(it: Item, worn?: Item): string {
     const d = (a[k] ?? 0) - (b[k] ?? 0);
     return d ? [`<i class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : '−'}${label(k, Math.abs(d))}</i>`] : [];
   });
-  return `<div class="diff">Se lo indossi: ${parts.join(' ') || 'nessuna differenza'}</div>`; // spaces: the line wraps between changes
+  return parts.length ? `<div class="diff">Se lo indossi: ${parts.join(' ')}</div>` : ''; // spaces: the line wraps between changes
 }
 
 /**
  * The tooltip's HTML. `worn`: the piece worn in that slot (compared beside, and the changes listed);
  * `price`: a shop line instead of the sell price; `hint`: what a click does (`no`: it can't).
  */
-export function itemTip(it: Item, o: { n?: number; worn?: Item | null; price?: string; hint?: string; no?: boolean } = {}): string {
+export function itemTip(it: Item, o: { n?: number; worn?: Item | null; price?: string; hint?: string; no?: boolean; compact?: boolean } = {}): string {
   let main = box(it, o.n);
   if (o.price) main = main.replace(/<small class="price">.*<\/small>$/, `<small class="price"><span>${o.price}</span></small>`);
-  if (it.slot && o.worn !== null) main += diff(it, o.worn);
+  if (it.slot && o.worn !== null && !o.compact) main += diff(it, o.worn);
   if (o.hint) main += `<span class="hint${o.no ? ' no' : ''}">${o.hint}</span>`;
-  return `<div class="box">${main}</div>` + (o.worn ? `<div class="box worn">${box(o.worn, 1, 'Indossato')}</div>` : '');
+  return `<div class="box">${main}</div>` + (o.worn && o.worn.id !== it.id && !o.compact ? `<div class="box worn">${box(o.worn, 1, 'Indossato')}</div>` : '');
 }

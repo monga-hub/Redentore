@@ -174,6 +174,7 @@ function pick(w: Partial<Record<Rarity, number>>, rnd: () => number): Rarity {
   return e[e.length - 1][0];
 }
 
+export interface StackSelection { stack: Stack; id: string; n: number }
 export interface Stack { id: string; n: number }
 /** Saved form: gold and [id, count] per slot, in slot order. */
 export interface BagState { gold: number; items: [string, number][] }
@@ -214,6 +215,32 @@ export class Bag {
 
   count(id: string): number {
     return this.items.reduce((s, x) => s + (x.id === id ? x.n : 0), 0);
+  }
+
+  /** A gesture/confirmation keeps the exact record, never a potentially stale slot index. */
+  selection(i: number): StackSelection | undefined {
+    const stack = this.items[i];
+    return stack && { stack, id: stack.id, n: stack.n };
+  }
+
+  locate(s: StackSelection): number {
+    return s.stack.id === s.id && s.stack.n === s.n ? this.items.indexOf(s.stack) : -1;
+  }
+
+  /** Occupied cells swap; an empty trailing cell moves the record to the end, without saved holes. */
+  reorder(s: StackSelection, target: number): boolean {
+    const i = this.locate(s);
+    if (i < 0 || !Number.isInteger(target) || target < 0 || target >= Math.max(Bag.SLOTS, this.items.length)) return false;
+    if (target < this.items.length) [this.items[i], this.items[target]] = [this.items[target], this.items[i]];
+    else this.items.push(...this.items.splice(i, 1));
+    return true;
+  }
+
+  discard(s: StackSelection): boolean {
+    const i = this.locate(s);
+    if (i < 0) return false;
+    this.items.splice(i, 1);
+    return true;
   }
 
   encode(): BagState {

@@ -1,7 +1,8 @@
 import { assemblyProgress } from '../loot/assembly.ts';
 import { AssemblyPanel } from './assembly.ts';
 import { playSfx } from '../audio/engine.ts';
-import { Bag, ITEM, RARITY } from '../loot/bag.ts';
+import { BagDrag } from './bagDrag.ts';
+import { Bag, ITEM, RARITY, type StackSelection } from '../loot/bag.ts';
 import { isLegacyArmor, sellPrice, type Equipment } from '../loot/gear.ts';
 import { itemIcon } from './itemIcon.ts';
 import { ICONS } from './icons.ts';
@@ -54,6 +55,12 @@ body.touch #sheet-btn { top: calc(12px + 88px * var(--k) / .72 + env(safe-area-i
 #bag .cell .ico { position: absolute; inset: 0; width: auto; height: auto; }
 #bag .cell b { position: absolute; z-index: 1; right: 4px; bottom: 2px; font: bold 11px system-ui, sans-serif; color: #fff; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
 body.diablo #bag .cell .ico { filter: var(--ember); }
+#bag .drag-ghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%); opacity: .85; }
+#bag .cell { -webkit-touch-callout: none; }
+#bag .discard { max-width: min(360px, calc(100vw - 40px)); color: #f3e2b0; background: var(--panel); border: 2px solid #c9a45c; border-radius: 8px; }
+#bag .discard::backdrop { background: rgba(0,0,0,.7); }
+#bag .discard button { padding: 10px 22px; margin: 4px; color: inherit; background: #302014; border: 1px solid #c9a45c; border-radius: 4px; cursor: pointer; }
+#bag .drag-help { max-width: 290px; margin: 8px 0 0; font: 11px/1.4 system-ui; color: #c9b48a; }
 #bag .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; font: 12px/16px system-ui, sans-serif; color: #c9b48a; }
 #bag .assembly-progress button { padding:3px 9px; color:#f3e2b0; background:linear-gradient(#4a3420,#140e08); border:1px solid #c9a45c; border-radius:4px; cursor:pointer; }
 #bag .assembly-progress button:disabled { opacity:.45; cursor:default; }
@@ -87,6 +94,10 @@ export class BagPanel {
   readonly sheetBtn = document.createElement('button');
   private assembly: AssemblyPanel;
   private progress: HTMLElement;
+  private drag: BagDrag;
+  private dragged?: StackSelection;
+  private pendingDelete?: StackSelection;
+  private discardDialog = document.createElement('dialog');
   private seen = '';
   private sel?: HTMLElement;
   private readonly bag: Bag;
@@ -142,7 +153,34 @@ export class BagPanel {
       const progress = assemblyProgress(this.bag)[Number(button.dataset.join)];
       if (progress) this.assembly.show(progress);
     });
+    this.panel.insertAdjacentHTML('beforeend', '<p class="drag-help" tabindex="0" aria-label="Tieni premuto e trascina per riordinare, indossare o eliminare fuori dalla borsa. Da tastiera: seleziona un oggetto e premi Canc per eliminarlo.">Tieni premuto: sposta · indossa · fuori per eliminare.</p>');
+    this.discardDialog.className = 'discard';
+    this.discardDialog.setAttribute('aria-labelledby', 'discard-title');
+    this.discardDialog.innerHTML = '<h3 id="discard-title">Eliminare l’oggetto?</h3><p></p><button data-no autofocus>No</button><button data-yes>Sì, elimina</button>';
+    this.el.append(this.discardDialog);
+    this.discardDialog.addEventListener('click', e => {
+      e.stopPropagation();
+      const button = (e.target as Element).closest('button');
+      if (!button) return;
+      const selection = this.pendingDelete;
+      this.pendingDelete = undefined; // consume before mutating; repeated confirmation is inert
+      this.discardDialog.close();
+      if (button.hasAttribute('data-yes') && selection) {
+        if (!this.bag.discard(selection)) this.say('L’oggetto o la quantità sono cambiati. Nessun oggetto eliminato.');
+        this.refresh();
+      }
+      this.panel.querySelector<HTMLElement>('.x')?.focus();
+    });
+    this.discardDialog.addEventListener('cancel', () => { this.pendingDelete = undefined; });
+    this.discardDialog.addEventListener('close', () => { this.pendingDelete = undefined; });
+    this.drag = new BagDrag(this.el, () => this.bagShown && !this.assembly.open && !this.discardDialog.open,
+      cell => {
+        this.dragged = this.bag.selection(Number(cell.dataset.k!.slice(2)));
+        this.select(null);
+        return !!this.dragged;
+      }, target => this.drop(target));
     this.el.addEventListener('click', (e) => {
+      if (this.discardDialog.open || this.assembly.open) return;
       const t = e.target as HTMLElement;
       if (t === this.el || t === this.row) return this.close();
       const x = t.closest<HTMLElement>('.x');
@@ -152,12 +190,12 @@ export class BagPanel {
       if (c === this.sel) this.use(c); // the shown one: hovered with a mouse, tapped once on touch
       else this.select(c, true);
     });
-    this.el.addEventListener('pointerover', (e) => { const c = (e.target as HTMLElement).closest<HTMLElement>('.cell[data-k]'); if (e.pointerType === 'mouse' && (c !== this.sel || this.tip.hidden)) this.select(c); }); // into the icon of the cell shown: the same opening
+    this.el.addEventListener('pointerover', (e) => { const c = (e.target as HTMLElement).closest<HTMLElement>('.cell[data-k]'); if (!this.drag.active && !this.discardDialog.open && !this.assembly.open && e.pointerType === 'mouse' && (c !== this.sel || this.tip.hidden)) this.select(c); }); // into the icon of the cell shown: the same opening
     this.kind('b', {
       tip: (what, tap) => {
         const s = this.bag.items[Number(what)], it = ITEM.get(s.id)!;
         const verb = it.recovered ? '' : it.quest ? '' : this.selling ? `vendi per ${(sellPrice(it) * s.n).toLocaleString('it-IT')} oro` : it.slot ? isLegacyArmor(it) && this.gear.hero ? 'vecchio corredo: conserva o vendi' : 'indossa' : '';
-        return itemTip(it, { n: s.n, worn: it.slot ? this.gear.comparison(it) : null, hint: verb && `${tap ? 'Tocca di nuovo' : 'Clic'}: ${verb}` });
+        return itemTip(it, { n: s.n, compact: tap, worn: it.slot ? this.gear.comparison(it) : null, hint: verb && `${tap ? 'Tocca di nuovo' : 'Clic'}: ${verb}` });
       },
       use: (what) => {
         const i = Number(what), it = ITEM.get(this.bag.items[i]?.id ?? '');
@@ -173,7 +211,15 @@ export class BagPanel {
     addEventListener('keydown', (e) => { // capture: while the overlay is up, game keys stay out of it (main.ts opens it on B and C)
       if (!this.open) return;
       e.stopPropagation();
+      if (this.discardDialog.open) return; // native dialog owns focus, Tab and Escape
+      if (this.drag.active && e.code === 'Escape') { this.drag.cancel(); e.preventDefault(); return; }
       if (this.assembly.open) return this.assembly.key(e);
+      if (e.code === 'Delete' && this.sel?.dataset.k?.startsWith('b:')) {
+        e.preventDefault();
+        const selected = this.bag.selection(Number(this.sel.dataset.k.slice(2)));
+        if (selected) this.askDiscard(selected);
+        return;
+      }
       if (e.repeat) return;
       if (e.code === 'Escape') this.close();
       else this.keys[e.code]?.();
@@ -203,6 +249,9 @@ export class BagPanel {
   /** Show or hide one panel; the overlay follows (and the game pauses with it). */
   show(panel: HTMLElement = this.panel, on = true): void {
     if (panel.classList.contains('on') === on) return;
+    this.drag.cancel();
+    this.pendingDelete = undefined;
+    this.discardDialog.close();
     if (!on && this.assembly.open) this.assembly.close();
     const was = this.open;
     panel.classList.toggle('on', on);
@@ -252,17 +301,51 @@ export class BagPanel {
 
   /** Redraw every panel (after a wear, a sale, a purchase). */
   refresh(): void {
+    this.drag.cancel();
     this.seen = JSON.stringify(this.bag.encode());
     this.progress.innerHTML = assemblyProgress(this.bag).map((p, i) => `<div style="margin:4px 0;color:${RARITY[p.rarity].color}">Capitolo ${p.chapter} · ${RARITY[p.rarity].name} · ${p.parts.length}/6 pezzi <button data-join="${i}" ${p.parts.length === 6 ? '' : 'disabled'}>Unisci</button><br><small>${['testa', 'spalle', 'torso', 'mani', 'gambe', 'piedi'].map(part => `${p.parts.includes(part as typeof p.parts[number]) ? '✓' : '○'} ${part}`).join(' · ')}</small></div>`).join('');
     this.gold.innerHTML = `<i></i>${this.bag.gold.toLocaleString('it-IT')} oro`;
     this.grid.innerHTML = Array.from({ length: Math.max(Bag.SLOTS, this.bag.items.length) }, (_, i) => {
       const s = this.bag.items[i], it = s && ITEM.get(s.id);
-      if (!it) return '<div class="cell"></div>';
-      return `<button class="cell" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${itemIcon(it)}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
+      if (!it) return `<div class="cell" data-bag-index="${i}"></div>`;
+      return `<button class="cell" data-bag-index="${i}" data-k="b:${i}" style="--c: ${RARITY[it.rarity].color}" aria-label="${it.name}${s.n > 1 ? `, ${s.n}` : ''}">${itemIcon(it)}${s.n > 1 ? `<b>${s.n}</b>` : ''}</button>`;
     }).join('');
     for (const r of this.renders) r();
     this.sel = undefined;
     this.tip.hidden = true;
+  }
+
+  private drop(target: Element | null): void {
+    const selection = this.dragged;
+    this.dragged = undefined;
+    if (!selection || this.bag.locate(selection) < 0 || !target || !this.el.contains(target)) return;
+    const cell = target.closest<HTMLElement>('[data-bag-index]');
+    if (cell && this.grid.contains(cell)) {
+      this.bag.reorder(selection, Number(cell.dataset.bagIndex));
+      this.refresh();
+      return;
+    }
+    const slot = target.closest<HTMLElement>('.sheet.on [data-slot]');
+    if (slot) {
+      const item = ITEM.get(selection.id);
+      if (item?.slot === slot.dataset.slot) {
+        this.say(this.gear.wear(this.bag, this.bag.locate(selection)));
+        this.refresh();
+      }
+      return;
+    }
+    // Only the empty backdrop is destructive: panels, gaps, controls, body and other overlays are inert.
+    if (target === this.el) this.askDiscard(selection);
+  }
+
+  private askDiscard(selection: StackSelection): void {
+    if (this.bag.locate(selection) < 0 || this.assembly.open || this.discardDialog.open) return;
+    this.drag.cancel();
+    this.select(null);
+    this.pendingDelete = selection;
+    this.discardDialog.querySelector('p')!.textContent = `${ITEM.get(selection.id)?.name ?? selection.id} × ${selection.n}. L’intera pila verrà eliminata definitivamente.`;
+    this.discardDialog.showModal();
+    this.discardDialog.querySelector<HTMLElement>('[data-no]')!.focus();
   }
 
   private use(c: HTMLElement): void {

@@ -65,7 +65,7 @@ export class SheetPanel {
     host.mount(this.el);
     host.keys.KeyC = () => this.toggle();
     host.kind('w', {
-      tip: (slot, tap) => itemTip(ITEM.get(this.gear.worn[slot as Slot]!)!, { worn: null, hint: `${tap ? 'Tocca di nuovo' : 'Clic'}: togli` }),
+      tip: (slot, tap) => itemTip(ITEM.get(this.gear.worn[slot as Slot]!)!, { worn: null, compact: tap, hint: `${tap ? 'Tocca di nuovo' : 'Clic'}: togli` }),
       use: (slot) => {
         const why = this.gear.takeOff(this.bag, slot as Slot);
         if (why) this.host.say(why);
@@ -84,8 +84,8 @@ export class SheetPanel {
 
   private cell(slot: Slot): string {
     const id = this.gear.worn[slot], it = id ? ITEM.get(id) : undefined, s = SLOT.get(slot)!;
-    if (!it) return `<button class="cell" title="${s.name}" aria-label="${s.name}: vuoto">${ICONS[s.icon]}</button>`;
-    return `<button class="cell" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${itemIcon(it)}</button>`;
+    if (!it) return `<button class="cell" data-slot="${slot}" title="${s.name}" aria-label="${s.name}: vuoto">${ICONS[s.icon]}</button>`;
+    return `<button class="cell" data-slot="${slot}" data-k="w:${slot}" style="--c: ${RARITY[it.rarity].color}" aria-label="${s.name}: ${it.name}">${itemIcon(it)}</button>`;
   }
 
   private render(): void {

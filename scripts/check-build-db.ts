@@ -37,6 +37,7 @@ await assert.rejects(()=>db.query("insert into saves(user_id,game_id,slot,data) 
 const fresh=await rpc('save',reset.token,state('new',[],'run2'));assert.equal(fresh.state.build.edit.lineage,'run2');
 await db.exec('reset role;set role anon');await assert.rejects(()=>rpc('load'));
 await db.exec('reset role');const before=(await db.query('select user_id,game_id,slot,data from saves order by user_id,game_id')).rows;
+console.log('build function metadata '+JSON.stringify((await db.query("select proname,prosecdef,md5(prosrc) source_md5 from pg_proc join pg_namespace n on n.oid=pronamespace where n.nspname='public' and proname like 'redentore_build_%' order by proname")).rows));
 await db.exec(await readFile(new URL('../supabase/build-state-rollback.sql',import.meta.url),'utf8'));
 assert.deepEqual((await db.query('select user_id,game_id,slot,data from saves order by user_id,game_id')).rows,before);
 await db.close();console.log('build SQL ok: owner-only CAS, races/forks/stale XP/direct legacy writes refused, tombstone prevents old-run resurrection, saves_touch compatibility, other games unchanged, idempotent install and data-preserving rollback');

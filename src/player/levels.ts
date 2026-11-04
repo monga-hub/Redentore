@@ -151,6 +151,8 @@ export interface Card {
   tier?: 'A' | 'B'; // ability cards: B are the specials, offered from level 6
   school?: School; // ability cards
   /** Extra condition on the picks so far (fusions, charge cards). */
+  /** Readable explanation beside the same functional prerequisite, for the build editor. */
+  prerequisite?: string;
   needs?: (count: (id: string) => number, owns: (a: string) => boolean) => boolean;
   apply?: (t: Tune) => void;
 }
@@ -179,7 +181,7 @@ const baseMods = (of: string, name: string, n: [string, string, string, string],
   rank(of, `${of}_mana`, n[3], `${name}: ogni colpo che va a segno ti ridà 4 mana in più a ogni rango.`, (t) => { t.prim[of].mana += 4; }),
 ];
 const passive = (id: string, name: string, text: string, apply: (t: Tune) => void, needs?: Card['needs']): Card =>
-  ({ id, kind: 'passive', name, icon: id, text, max: RANKS, apply, needs });
+  ({ id, kind: 'passive', name, icon: id, text, max: RANKS, apply, needs, prerequisite: needs ? 'Almeno una speciale appresa.' : undefined });
 
 export const CARDS: Card[] = [
   ability('step', "Passo d'ombra", 'A', 'shadow', 'Scatto di 8 m nell’ombra: 25 danni a chi attraversi. 40 mana, recupero 12 s.'),
@@ -301,25 +303,25 @@ export const CARDS: Card[] = [
   rank('hallow', 'hallow_big', 'Sagrato', `Terra consacrata: +35% ai danni al secondo (base ${BASE.hallowDps}) e raggio +25% (base ${BASE.hallowR} m) a ogni rango.`, by('hallowDps', 0.35), by('hallowR', 0.25)),
   rank('hammer', 'hammer_cd', 'Penitenza severa', `Martello della penitenza: +40% ai danni (base ${BASE.hammerDmg}) e stordimento +20% (base ${BASE.hammerStun} s) a ogni rango.`, by('hammerDmg', 0.4), by('hammerStun', 0.2)),
   rank('bubble', 'bubble_cd', 'Santità', `Aureola del redento: dura il 30% in più a ogni rango (base ${BASE.bubbleTime} s).`, by('bubbleTime', 0.3)),
-  { id: 'fury_start', kind: 'mod', name: 'Rancore', icon: 'fury', max: 1, text: 'Dopo una speciale la barra della furia riparte da 30 invece che da 0.',
+  { id: 'fury_start', prerequisite: 'Almeno una speciale appresa.', kind: 'mod', name: 'Rancore', icon: 'fury', max: 1, text: 'Dopo una speciale la barra della furia riparte da 30 invece che da 0.',
     needs: special, apply: (t) => { t.furyStart = 30; } },
 
-  { id: 'fx_wispplague', kind: 'fusion', name: 'Fuoco pestilente', icon: 'wisp', max: 1, text: 'Fusione. Il fuoco fatuo lascia cadere una nube di peste sotto di sé ogni 6 s.',
+  { id: 'fx_wispplague', prerequisite: 'Fuoco fatuo e Nube di peste.', kind: 'fusion', name: 'Fuoco pestilente', icon: 'wisp', max: 1, text: 'Fusione. Il fuoco fatuo lascia cadere una nube di peste sotto di sé ogni 6 s.',
     needs: (_c, owns) => owns('wisp') && owns('plague'), apply: (t) => { t.fxWisp = true; } },
-  { id: 'fx_stepplague', kind: 'fusion', name: 'Ombra appestata', icon: 'step', max: 1, text: "Fusione. Passo d'ombra lascia una nube di peste dove sparisci.",
+  { id: 'fx_stepplague', prerequisite: 'Passo d’ombra e Nube di peste.', kind: 'fusion', name: 'Ombra appestata', icon: 'step', max: 1, text: "Fusione. Passo d'ombra lascia una nube di peste dove sparisci.",
     needs: (_c, owns) => owns('step') && owns('plague'), apply: (t) => { t.fxStep = true; } },
-  { id: 'fx_fallplague', kind: 'fusion', name: 'Ossa appestate', icon: 'fall', max: 1, text: "Fusione. Il terzo colpo di Caduta d'ossa semina una nube di peste (al massimo ogni 3 s).",
+  { id: 'fx_fallplague', prerequisite: 'Caduta d’ossa e almeno un rango di Peste virulenta.', kind: 'fusion', name: 'Ossa appestate', icon: 'fall', max: 1, text: "Fusione. Il terzo colpo di Caduta d'ossa semina una nube di peste (al massimo ogni 3 s).",
     needs: (c, owns) => owns('fall') && c('plague_dps') >= 1, apply: (t) => { t.fxFall = true; } },
 
-  { id: 'fx_shatter', kind: 'fusion', name: 'Frantumazione', icon: 'pyre', max: 1, text: "Fusione. Rogo dell'eretico su un nemico rallentato o congelato: +60% di danni e il ghiaccio esplode in schegge (30 danni entro 3 m).",
+  { id: 'fx_shatter', prerequisite: 'Rogo dell’eretico e un’abilità del Gelo.', kind: 'fusion', name: 'Frantumazione', icon: 'pyre', max: 1, text: "Fusione. Rogo dell'eretico su un nemico rallentato o congelato: +60% di danni e il ghiaccio esplode in schegge (30 danni entro 3 m).",
     needs: (_c, owns) => owns('pyre') && FROST.some(owns), apply: (t) => { t.fxShatter = true; } },
-  { id: 'fx_storm', kind: 'fusion', name: 'Miasma elettrico', icon: 'chain', max: 1, text: 'Fusione. Le saette fanno +50% di danni a chi sta in una nube di peste, e la catena rimbalza su tutti loro (fino a 3 salti in più).',
+  { id: 'fx_storm', prerequisite: 'Nube di peste e un’abilità del Fulmine.', kind: 'fusion', name: 'Miasma elettrico', icon: 'chain', max: 1, text: 'Fusione. Le saette fanno +50% di danni a chi sta in una nube di peste, e la catena rimbalza su tutti loro (fino a 3 salti in più).',
     needs: (_c, owns) => STORM.some(owns) && owns('plague'), apply: (t) => { t.fxStorm = true; } },
-  { id: 'fx_frostwhirl', kind: 'fusion', name: 'Turbine di brina', icon: 'whirl', max: 1, text: "Fusione. Turbine d'ossa gela chi colpisce (rallentato del 40%) e fa il doppio dei danni a chi è congelato.",
+  { id: 'fx_frostwhirl', prerequisite: 'Turbine d’ossa e un’abilità del Gelo.', kind: 'fusion', name: 'Turbine di brina', icon: 'whirl', max: 1, text: "Fusione. Turbine d'ossa gela chi colpisce (rallentato del 40%) e fa il doppio dei danni a chi è congelato.",
     needs: (_c, owns) => owns('whirl') && FROST.some(owns), apply: (t) => { t.fxFrostWhirl = true; } },
-  { id: 'fx_venomcloud', kind: 'fusion', name: 'Miasma velenoso', icon: 'plague', max: 1, text: 'Fusione. Nube di peste dà una dose di veleno al secondo a chi ci sta dentro.',
+  { id: 'fx_venomcloud', prerequisite: 'Nube di peste e almeno una tra Sputo, Unguento dell’untore o Fiato della fossa.', kind: 'fusion', name: 'Miasma velenoso', icon: 'plague', max: 1, text: 'Fusione. Nube di peste dà una dose di veleno al secondo a chi ci sta dentro.',
     needs: (_c, owns) => owns('plague') && (owns('spit') || owns('untore') || owns('miasma')), apply: (t) => { t.fxVenomCloud = true; } },
-  { id: 'fx_holyfire', kind: 'fusion', name: 'Giudizio ardente', icon: 'judge', max: 1, text: 'Fusione. Giudizio del Redentore incendia il bersaglio (brucia 4 s), e su chi già brucia fa +50% di danni.',
+  { id: 'fx_holyfire', prerequisite: 'Giudizio del Redentore e un’abilità del Fuoco.', kind: 'fusion', name: 'Giudizio ardente', icon: 'judge', max: 1, text: 'Fusione. Giudizio del Redentore incendia il bersaglio (brucia 4 s), e su chi già brucia fa +50% di danni.',
     needs: (_c, owns) => owns('judge') && FIRE.some(owns), apply: (t) => { t.fxHolyFire = true; } },
 
   // Repeatable, offered only once the cards above run short.

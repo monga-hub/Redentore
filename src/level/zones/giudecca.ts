@@ -178,16 +178,14 @@ export function lampPost(b: LevelBuilder, p: Props, x: number, z: number, y0: nu
 
 /** Santa Croce: a plain stone front with a pediment and a shut door, the convent's blind walls either side. */
 function santaCroce(b: LevelBuilder): void {
-  b.together(() => {
-    b.wallX(-14, -126, -110, { h: 15, role: 'stone', t: 0.8, doors: [{ at: -118, w: 3.2, h: 4.8 }] });
-    b.wallX(-40, -126, -110, { h: 15, role: 'stone', t: 0.8 });
-    for (const x of [-126, -110]) b.wallZ(x, -40, -14, { h: 15, role: 'stone', t: 0.8 });
-    b.band(-126, -110, -40, -14, 9.5, 9.9, 0.15);
-    b.band(-126, -110, -40, -14, 14.6, 15, 0.3);
-    const g = new THREE.Shape().moveTo(-126.4, 15).lineTo(-109.6, 15).lineTo(-118, 19.2).closePath();
-    b.decor(shaped(extrude(g, 1, 0.05)).translate(0, 0, -14.6), 'stone');
-    b.hipRoof(-126, -110, -40, -15, 15);
-  });
+  b.wallX(-14, -126, -110, { h: 15, role: 'stone', t: 0.8, doors: [{ at: -118, w: 3.2, h: 4.8 }] });
+  b.wallX(-40, -126, -110, { h: 15, role: 'stone', t: 0.8 });
+  for (const x of [-126, -110]) b.wallZ(x, -40, -14, { h: 15, role: 'stone', t: 0.8 });
+  b.band(-126, -110, -40, -14, 9.5, 9.9, 0.15);
+  b.band(-126, -110, -40, -14, 14.6, 15, 0.3);
+  const g = new THREE.Shape().moveTo(-126.4, 15).lineTo(-109.6, 15).lineTo(-118, 19.2).closePath();
+  b.decor(shaped(extrude(g, 1, 0.05)).translate(0, 0, -14.6), 'stone');
+  b.hipRoof(-126, -110, -40, -15, 15);
   for (const x of [-124.5, -111.5]) b.part(null, x - 0.5, x + 0.5, 0.4, 14.6, -14, -13.6, 'stoneDark'); // pilasters
   // QuestView owns the hinged door; the old solid mass and decorative leaf are gone.
   b.part(null, -120, -116, 4.8, 5.3, -14, -13.6, 'stoneDark');

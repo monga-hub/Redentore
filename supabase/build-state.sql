@@ -1,3 +1,4 @@
+BEGIN;
 -- Redentore-only conditional save boundary. Apply before publishing the build editor.
 -- Existing hub saves/RLS and other games are unchanged. No rewards or XP are granted here.
 create table if not exists public.redentore_build_guard (
@@ -79,3 +80,4 @@ begin
 end $$;
 revoke all on function public.redentore_build_save(text,text,uuid,jsonb) from public;
 grant execute on function public.redentore_build_save(text,text,uuid,jsonb) to authenticated;
+COMMIT;

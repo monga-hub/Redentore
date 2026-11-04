@@ -25,3 +25,8 @@ console.log('sanctuary ok: boss2 permanent gate, sealed shell, clear aisle and b
 let pewDrawn=false;const matrix=new THREE.Matrix4(),position=new THREE.Vector3();
 level.root.traverse((o)=>{if(o instanceof THREE.InstancedMesh&&o.userData.role==='wood')for(let i=0;i<o.count;i++){o.getMatrixAt(i,matrix);position.setFromMatrixPosition(matrix);if(Math.abs(position.x+122)<0.01&&Math.abs(position.z+19)<0.2&&position.y<1)pewDrawn=true;}});
 assert.equal(pewDrawn,true,'sanctuary pew geometry is missing');
+
+// Independent walls can fade between the Diablo camera and the hero inside this room.
+const side=level.cameraBlockers.find((m)=>Math.abs(m.position.x+126)<0.01&&Math.abs(m.position.z+27)<0.01);
+const back=level.cameraBlockers.find((m)=>Math.abs(m.position.x+118)<0.01&&Math.abs(m.position.z+40)<0.01);
+assert.ok(side&&back);assert.notEqual(side.userData.piece,back.userData.piece,'sanctuary shell is one opaque occlusion piece');

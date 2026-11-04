@@ -18,6 +18,33 @@ create policy broad_write on realtime.messages for insert to authenticated with 
 create table public.notifications(topic text,payload jsonb);
 create function realtime.send(payload jsonb,event text,topic text,private boolean) returns void language sql as $$insert into public.notifications values(topic,payload)$$;`);
 await db.exec(await sql('coop-beta.sql'));
+// Optional operator metadata replay: no hosted connection, only this in-memory database.
+const preflightPath=process.env.COOP_LFG_PREFLIGHT;
+if(preflightPath){
+ const live=JSON.parse(await readFile(preflightPath,'utf8')) as {
+  functions:{proname:string;definition:string;owner:string;proacl:string[];security_definer:boolean}[];
+  policies:{schemaname:string;tablename:string;policyname:string;permissive:string;cmd:string;roles:string[];qual:string|null;with_check:string|null}[];
+  tables:{nspname:string;relname:string;relrowsecurity:boolean}[];
+ };
+ assert(live.tables.filter(t=>t.relname==='saves'||t.relname==='coop_beta_room').every(t=>t.relrowsecurity));
+ await db.exec('create role service_role bypassrls;grant usage on schema auth,realtime to service_role');
+ for(const f of live.functions){
+  assert(['coop_beta','coop_beta_topic'].includes(f.proname));assert.equal(f.owner,'postgres');assert(f.security_definer);
+  await db.exec(f.definition);
+  const signature=f.proname==='coop_beta'?'text,uuid,uuid,uuid,text,jsonb':'text,boolean,text';
+  await db.exec(`revoke all on function public.${f.proname}(${signature}) from public,anon;grant execute on function public.${f.proname}(${signature}) to authenticated,service_role`);
+ }
+ await db.exec('drop policy own on public.saves');
+ const quote=(v:string)=>'"'+v.replaceAll('"','""')+'"';
+ for(const p of live.policies){
+  await db.exec(`drop policy if exists ${quote(p.policyname)} on ${quote(p.schemaname)}.${quote(p.tablename)}`);
+  await db.exec(`create policy ${quote(p.policyname)} on ${quote(p.schemaname)}.${quote(p.tablename)} as ${p.permissive} for ${p.cmd} to ${p.roles.map(quote).join(',')}${p.qual?' using('+p.qual+')':''}${p.with_check?' with check('+p.with_check+')':''}`);
+ }
+ // Live broad table privileges and Supabase default privileges must not expose new raw tables/helpers.
+ await db.exec('grant all on public.saves to authenticated,service_role;grant all on public.coop_beta_room to service_role;grant select,insert,update on realtime.messages to anon,authenticated,service_role;alter default privileges grant all on tables to authenticated,service_role;alter default privileges grant execute on functions to anon,authenticated,service_role');
+}
+const originalSavePolicies=(await db.query("select * from pg_policies where tablename='saves' order by policyname")).rows;
+const originalSaveAccess=(await db.query("select relacl::text,relrowsecurity from pg_class where oid='public.saves'::regclass")).rows;
 await db.exec(await sql('coop-eligibility.sql'));
 await db.exec(await sql('coop-lfg.sql'));
 const users=[1,2,3,4].map(n=>`${n}`.repeat(8)+'-'+`${n}`.repeat(4)+'-4'+`${n}`.repeat(3)+'-8'+`${n}`.repeat(3)+'-'+`${n}`.repeat(12));
@@ -122,6 +149,8 @@ assert(notifications.length>0);assert(notifications.every(n=>JSON.stringify(n.pa
 await db.exec(await sql('coop-lfg-rollback.sql'));
 room=await beta(0,'create');assert.equal(room.members[0].snapshot.quest.boss2Dead,true);
 await admin();assert.deepEqual((await db.query('select * from public.saves order by user_id')).rows,before);
-assert.equal((await db.query<{n:number}>("select count(*)::int n from pg_policies where tablename='saves'")).rows[0].n,1);
+assert.deepEqual((await db.query("select * from pg_policies where tablename='saves' order by policyname")).rows,originalSavePolicies);
+assert.deepEqual((await db.query("select relacl::text,relrowsecurity from pg_class where oid='public.saves'::regclass")).rows,originalSaveAccess);
 await db.close();
+if(preflightPath)console.log('Live metadata replay PASS: exported beta function definitions, production saves policies/grants plus hostile broad hub/default grants; no hosted execution.');
 console.log('LFG SQL PASS: boss2-only/low-level, owner RLS/privacy, reserved singleton, auto/direct bilateral consent, prepare/claim/replay/duplicate tabs, reject/expiry/leave/reconnect, guarded rollback and unchanged saves. Sequential PGlite; no actual concurrent transactions or hosted service claimed.');

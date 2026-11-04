@@ -87,7 +87,7 @@ function candle(p: Props, x: number, y: number, z: number): void {
 
 // ---------------------------------------------------------------- convento
 
-function dressConvento(b: LevelBuilder): void {
+export function dressConvento(b: LevelBuilder): void {
   b.zone('convento');
   const p = new Props(b, 23);
 

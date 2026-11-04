@@ -371,6 +371,11 @@ export class Atmosphere {
     return this.lite ? QUALITY.sparks : 1;
   }
 
+  dispose(): void {
+    for(const pass of this.composer.passes)pass.dispose();
+    this.composer.dispose();this.vignette.remove();
+  }
+
   setSize(w: number, h: number): void {
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.setSize(w, h);

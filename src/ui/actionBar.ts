@@ -65,7 +65,9 @@ export class ActionBar<C extends Caster> {
   private sys: AbilitySystem<C>;
   private ghost?: HTMLElement; // the icon being dragged
 
-  constructor(sys: AbilitySystem<C>) {
+  private rearrange:boolean;
+  constructor(sys: AbilitySystem<C>, rearrange = true) {
+    this.rearrange=rearrange;
     this.sys = sys;
     const bar = el('div', 'bar');
     this.castbar.append(this.castFill, this.castName, this.castTime);
@@ -96,7 +98,8 @@ export class ActionBar<C extends Caster> {
           s.el.classList.add('down');
           hold = window.setTimeout(() => { held = true; this.showTip(s.el, s.ability!); }, HOLD);
         } else if (e.pointerType !== 'touch' && e.button === 0 && s.ability) {
-          this.grab(i, e, () => { if (sys.tryCast(i)) this.press(s); });
+          if (this.rearrange) this.grab(i, e, () => { if (sys.tryCast(i)) this.press(s); });
+          else addEventListener('pointerup', () => { if (sys.tryCast(i)) this.press(s); }, { once: true });
         }
       });
       const lift = (cast: boolean) => (e: PointerEvent) => {

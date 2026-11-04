@@ -1,80 +1,150 @@
 import * as THREE from 'three';
-import { UndeadModel } from '../player/undead.ts';
+import { PlayerController } from '../player/controller.ts';
+import { PlayerStats } from '../player/stats.ts';
 import { FriarView, arenaFriarTemplate } from '../enemies/friars.ts';
-import { Vfx } from '../abilities/vfx.ts';
+import { Forsaken, ABILITIES, tune } from '../abilities/forsaken.ts';
 import { control } from '../enemies/control.ts';
 import { Input } from '../core/input.ts';
 import { TouchControls } from '../ui/touch.ts';
+import { getView, isDiablo, onStyle, onQuality } from '../core/style.ts';
 import { PHONE } from '../core/device.ts';
-import { type CombatHero, type Frame, type Controls, idle } from './protocol.ts';
+import { ThirdPersonCamera, STEPS } from '../camera/thirdPersonCamera.ts';
+import { DiabloCamera, STEPS as DIABLO_STEPS } from '../camera/diabloCamera.ts';
+import { DiabloControls } from '../player/diabloControls.ts';
+import { Occlusion } from '../fx/occlusion.ts';
+import { Atmosphere } from '../fx/atmosphere.ts';
+import { HEROES } from '../player/heroes.ts';
+import { tuneOf } from '../player/levels.ts';
+import { BOONS } from '../quest/progress.ts';
+import { initAudio, loadBank, playSfx, setListener } from '../audio/engine.ts';
+import { setAmbience, setMusic } from '../audio/music.ts';
+import { type CombatHero, type Frame, type Controls, idle, arenaLayout } from './protocol.ts';
+import { Targeting, type Kind } from '../ui/target.ts';
+import { arenaLevel } from './environment.ts';
 import type { Friar } from '../enemies/brain.ts';
 
-/** Visual interpolation only. Combat, movement limits and damage are computed by the runtime. */
+type VisualMob = Friar & {id:number; max:number; kind:{hp:number;radius:number}};
+/** Interpolated presentation of authoritative results. Cosmetic kits cannot write back to the session. */
 export class ArenaView {
   readonly renderer = new THREE.WebGLRenderer({antialias:!PHONE});
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,120);
+  private level = arenaLevel();
+  readonly cam = new ThirdPersonCamera(innerWidth/innerHeight,0,this.level.cameraBlockers);
+  readonly camera = this.cam.camera;
+  readonly dcam = new DiabloCamera(this.camera);
+  private dctl?:DiabloControls;
+  private occlusion?:Occlusion;
+  blocked=false;
+  get environment() { return this.level; }
   readonly input: Input;
   readonly controls: Controls = idle();
-  private heroes: UndeadModel[]=[];
-  private mobs=new Map<number,FriarView>();
+  private heroes: {player:PlayerController; stats:PlayerStats; kit:Forsaken; tuning:ReturnType<typeof tuneOf>}[]=[];
+  private mobs=new Map<number,{view:FriarView;mob:VisualMob}>();
   private pool:FriarView[]=[];
   private template?: Awaited<ReturnType<typeof arenaFriarTemplate>>;
   private target?:Frame;
-  private vfx=new Vfx();
-  private cast=[0,0];
   private hp=[0,0];
   private last=performance.now();
   private disposed=false;
+  private paused=false;
   private slot=0;
-  private effects: {mesh:THREE.Mesh;life:number}[]=[];
+  private seenEvent=0;
+  private fx:Atmosphere;
+  private kinds:Kind[]=[];
+  private targeting?:Targeting;
+  private syncingTarget=false;
+  get own() { return this.heroes[this.slot]; }
   constructor() {
+    initAudio();loadBank('core');loadBank('arcane');loadBank('mobs');
+    setAmbience('chiostro');setMusic('combat');
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,PHONE?1.25:2));this.renderer.setSize(innerWidth,innerHeight);this.renderer.domElement.id='arena-canvas';document.body.append(this.renderer.domElement);
-    this.scene.background=new THREE.Color(0x111b23);this.scene.fog=new THREE.Fog(0x111b23,35,80);
-    this.scene.add(new THREE.HemisphereLight(0xb8d8ff,0x483522,2.4));
-    const sun=new THREE.DirectionalLight(0xffd6a4,3);sun.position.set(-6,18,10);this.scene.add(sun);
-    const floor=new THREE.Mesh(new THREE.BoxGeometry(36,1,36),new THREE.MeshStandardMaterial({color:0x4b514a,roughness:.95}));floor.position.y=-.5;this.scene.add(floor);
-    const grid=new THREE.GridHelper(36,18,0x8b7955,0x52564a);grid.position.y=.015;this.scene.add(grid);
-    const stone=new THREE.MeshStandardMaterial({color:0x625c50,roughness:.9});
-    for(const sign of [-1,1])for(const axis of ['x','z'] as const){const wall=new THREE.Mesh(new THREE.BoxGeometry(axis==='x'?1:37,1.8,axis==='z'?1:37),stone);wall.position[axis]=sign*18;wall.position.y=.9;this.scene.add(wall);}
-    for(const x of [-17,17])for(const z of [-17,17]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.5,.7,4,8),stone);p.position.set(x,2,z);this.scene.add(p);const light=new THREE.PointLight(0xff9e38,20,9);light.position.set(x,4,z);this.scene.add(light);}
-    this.input=new Input(this.renderer.domElement);this.input.orbit=false;new TouchControls(this.renderer.domElement,this.input);
-    this.scene.add(this.vfx.root);
+    this.scene.add(this.level.root);
+    this.cam.setDist(STEPS[getView()],true);this.dcam.setDist(DIABLO_STEPS[getView()],true);
+    this.input=new Input(this.renderer.domElement);new TouchControls(this.renderer.domElement,this.input);
+    this.fx=new Atmosphere(this.renderer,this.scene,this.camera,this.level);
+    onQuality(q=>{if(!this.disposed)this.fx.setQuality(q);});
     void arenaFriarTemplate().then(t=>{if(!this.disposed)this.template=t;}).catch(()=>{document.dispatchEvent(new CustomEvent('arena-art-error'));});
     addEventListener('resize',this.resize);
     requestAnimationFrame(this.draw);
   }
   setHeroes(heroes:CombatHero[],slot:number):void {
     this.slot=slot;
-    for(let i=0;i<heroes.length;i++)if(!this.heroes[i]){const h=new UndeadModel(heroes[i].hero);h.wear(heroes[i].gear);h.root.position.x=i?2:-2;this.heroes.push(h);this.scene.add(h.root);
-      const ring=new THREE.Mesh(new THREE.RingGeometry(.7,.85,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:i===slot?0xffd75e:0x66c9ff,side:THREE.DoubleSide}));ring.position.y=.035;h.root.add(ring);
+    heroes.forEach((h,i)=>{
+      const player=new PlayerController(this.level.world,{x:i?2:-2,z:0,yaw:0},h.hero);
+      player.model.wear(h.gear);this.scene.add(player.mesh);
+      const stats=new PlayerStats(), tuning=tuneOf(h.picks,h.learned,HEROES[h.hero].school);
+      BOONS.find(b=>b.id===h.boon)?.apply(tuning);Object.assign(tune,tuning);
+      const kit=new Forsaken(player,stats,HEROES[h.hero].school,{bar:arenaLayout(h),off:[]});
+      // These are disposable copies of replicated mobs: all combat writes stay cosmetic.
+      kit.foes=()=>[...this.mobs.values()].map(x=>x.mob);
+      kit.aimed=()=>this.mobs.get(this.target?.players[i].target??0)?.mob;
+      kit.hurt=()=>{};this.scene.add(kit.vfx.root);
+      this.heroes.push({player,stats,kit,tuning});
+      const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.63,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:i===slot?0xffd75e:0x66c9ff,side:THREE.DoubleSide}));ring.position.y=.05;player.mesh.add(ring);
+    });
+    this.targeting=new Targeting(this.renderer.domElement,this.camera,this.scene,this.level.cameraBlockers,this.kinds,(m)=>this.level.world.sees(this.own.player.pos,m));
+    this.targeting.onSelect=t=>{if(!this.syncingTarget)this.controls.target=(t?.mob as VisualMob|undefined)?.id??0;};
+    this.dctl=new DiabloControls(this.renderer.domElement,this.camera,this.scene,this.own.player,this.targeting,()=>[...this.mobs.values()].map(e=>e.mob));
+    this.dctl.swing=()=>{this.controls.casts[0]++;return true;};
+    this.occlusion=new Occlusion([this.level.root],this.level,heroes.map((_,i)=>[this.heroes[i].player.mesh,1.8]));
+    onStyle(diablo=>{
+      if(this.disposed)return;
+      this.input.orbit=!diablo;this.dctl!.enabled=diablo;this.dctl!.stop();this.occlusion!.enabled=diablo;
+      this.targeting!.eye=diablo?()=>this.own.player.pos.clone().add(new THREE.Vector3(0,1.6,0)):undefined;
+      this.fx.setStyle(diablo);document.body.classList.toggle('diablo',diablo);this.dcam.snap();
+    });
+  }
+  snapshot(f:Frame,paused=false):void {
+    this.paused=paused;
+    if(this.target&&f.seq<this.target.seq)return;
+    this.target=f;
+    for(const m of f.mobs){let entry=this.mobs.get(m.id);if(!entry&&this.template){const view=this.pool.pop()??new FriarView(this.template);view.root.position.set(m.x,m.y,m.z);view.root.visible=true;this.scene.add(view.root);entry={view,mob:{...m,cc:control(),cd:0,struck:false,home:{x:m.x,z:m.z,yaw:0},mates:[],kind:{hp:m.max,radius:.4}} as VisualMob};this.mobs.set(m.id,entry);}if(entry)Object.assign(entry.mob,m);}
+    for(const max of new Set(f.mobs.map(m=>m.max)))if(!this.kinds.some(k=>k.max===max))this.kinds.push({name:'Frate risorto',max,height:1.8,all:[],ready:()=>true,lv:31});
+    for(const kind of this.kinds)kind.all=[...this.mobs.values()].filter(e=>e.mob.max===kind.max&&f.mobs.some(m=>m.id===e.mob.id)).map(e=>e.mob);
+    const selected=this.mobs.get(f.players[this.slot].target)?.mob,kind=this.kinds.find(k=>k.all.includes(selected!));
+    this.syncingTarget=true;if(this.targeting)this.targeting.target=selected&&kind?{kind,mob:selected}:undefined;this.syncingTarget=false;
+    for(const e of f.events)if(e.seq>this.seenEvent){
+      this.seenEvent=e.seq;const h=this.heroes[e.player],a=ABILITIES.find(a=>a.id===f.players[e.player].slots[e.slot]?.id);if(!h||!a)continue;
+      Object.assign(tune,h.tuning);h.player.pos.set(e.x,e.y,e.z);h.player.facing=e.yaw;
+      const aimed=h.kit.aimed;h.kit.aimed=()=>this.mobs.get(e.target)?.mob;
+      a.fire(h.kit,e.tick);h.kit.aimed=aimed;
     }
   }
-  snapshot(f:Frame):void {if(!this.target||f.seq>=this.target.seq)this.target=f;}
   sample():Controls {
-    this.controls.x=(this.input.down('KeyD','ArrowRight')?1:0)-(this.input.down('KeyA','ArrowLeft')?1:0)||this.input.stickX;
-    this.controls.z=(this.input.down('KeyS','ArrowDown')?1:0)-(this.input.down('KeyW','ArrowUp')?1:0)||this.input.stickY;
+    if(this.blocked){this.controls.x=this.controls.z=0;this.controls.jump=false;this.input.endFrame();this.controls.seq++;return structuredClone(this.controls);}
+    let x=(this.input.down('KeyD','ArrowRight')?1:0)-(this.input.down('KeyA','ArrowLeft')?1:0)||this.input.stickX;
+    let z=(this.input.down('KeyS','ArrowDown')?1:0)-(this.input.down('KeyW','ArrowUp')?1:0)||this.input.stickY;
+    // The original controller receives camera-relative stick motion; the wire carries world motion.
+    const length=Math.max(1,Math.hypot(x,z));x/=length;z/=length;
+    const c=Math.cos(isDiablo()?this.dcam.yaw:this.cam.yaw),s=Math.sin(isDiablo()?this.dcam.yaw:this.cam.yaw);
+    this.controls.x=Math.max(-1,Math.min(1,x*c+z*s));this.controls.z=Math.max(-1,Math.min(1,z*c-x*s));
     const codes=['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','KeyR','KeyT'];
-    codes.forEach((code,i)=>{if(this.input.pressed(code))this.controls.casts[i]++;});this.input.endFrame();
+    codes.forEach((code,i)=>{if(this.input.pressed(code))this.controls.casts[i]++;});
+    if(!x&&!z&&isDiablo()&&this.dctl){this.controls.x=this.dctl.steer.x;this.controls.z=this.dctl.steer.z;}
+    this.controls.jump=this.input.down('Space');this.input.endFrame();
     this.controls.seq++;return structuredClone(this.controls);
   }
-  private resize=()=>{this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();};
+  private resize=()=>{this.renderer.setSize(innerWidth,innerHeight);this.camera.aspect=innerWidth/innerHeight;this.camera.updateProjectionMatrix();this.fx.setSize(innerWidth,innerHeight);};
   private draw=(now:number)=>{
     if(this.disposed)return;
-    const dt=Math.min(.05,(now-this.last)/1000);this.last=now;const k=1-Math.exp(-dt*14),f=this.target;
+    const dt=Math.min(.05,(now-this.last)/1000);this.last=now;const step=this.paused?0:dt;const k=1-Math.exp(-dt*14),f=this.target;
     if(f){
-      f.players.forEach((p,i)=>{const h=this.heroes[i];if(!h)return;const before=h.root.position.clone();h.root.position.lerp(new THREE.Vector3(p.x,p.y,p.z),k);const speed=before.distanceTo(h.root.position)/Math.max(dt,.001);h.root.rotation.y+=Math.atan2(Math.sin(p.yaw-h.root.rotation.y),Math.cos(p.yaw-h.root.rotation.y))*k;
-        h.animate(dt,speed,p.y<.1,speed);
-        if(p.hp<=0&&this.hp[i]>0)h.die();if(p.hp>0&&this.hp[i]>p.hp)h.flinch(this.hp[i]-p.hp);this.hp[i]=p.hp;
-        if(p.cast>this.cast[i]){h.play('push',.15);h.fight();this.cast[i]=p.cast;const ring=new THREE.Mesh(new THREE.RingGeometry(.4,.65,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:i===this.slot?0xffd75e:0x73cfff,transparent:true,opacity:.8,side:THREE.DoubleSide}));ring.position.set(p.x,.06,p.z);this.effects.push({mesh:ring,life:.5});this.scene.add(ring);}
+      this.heroes.forEach((h,i)=>{const p=f.players[i],player=h.player;Object.assign(tune,h.tuning);
+        const before=player.mesh.position.clone();player.pos.lerp(new THREE.Vector3(p.x,p.y,p.z),k);player.mesh.position.copy(player.pos);
+        const speed=before.distanceTo(player.pos)/Math.max(dt,.001);player.facing=p.yaw;player.mesh.rotation.y+=Math.atan2(Math.sin(p.yaw-player.mesh.rotation.y),Math.cos(p.yaw-player.mesh.rotation.y))*k;
+        player.model.animate(step,speed,p.y<.5,speed);
+        if(p.hp<=0&&this.hp[i]>0){player.model.die();playSfx('player_death',player.pos);}
+        if(p.hp>0&&this.hp[i]>p.hp){player.model.flinch(this.hp[i]-p.hp);playSfx('hit_player',player.pos);}
+        this.hp[i]=p.hp;h.stats.update(step);h.stats.hp=p.hp;h.stats.hpMax=p.max;h.stats.mana=p.mana;h.stats.manaMax=p.manaMax;
+        h.kit.update(step,()=>false,false);
+        if(p.casting){const a=ABILITIES.find(a=>a.id===p.slots[p.casting!.slot]?.id);a?.during?.(h.kit,p.casting.t/p.casting.total,step);}
+        h.kit.vfx.update(step);
       });
-      if(this.template)for(const m of f.mobs){let view=this.mobs.get(m.id);if(!view){view=this.pool.pop()??new FriarView(this.template);view.root.position.set(m.x,m.y,m.z);view.root.visible=true;this.mobs.set(m.id,view);this.scene.add(view.root);}const pos=view.root.position;const mob={...m,x:THREE.MathUtils.lerp(pos.x,m.x,k),z:THREE.MathUtils.lerp(pos.z,m.z,k),cc:control(),cd:0,struck:false,home:{x:m.x,z:m.z,yaw:0},mates:[]} as Friar;view.update(mob,dt,this.vfx,10);}
-      for(const [id,v]of this.mobs)if(!f.mobs.some(m=>m.id===id)){this.scene.remove(v.root);this.mobs.delete(id);this.pool.push(v);}
+      const vfx=this.heroes[0]?.kit.vfx;
+      if(vfx)for(const [id,e]of this.mobs){const m=f.mobs.find(m=>m.id===id);if(!m){this.scene.remove(e.view.root);this.mobs.delete(id);this.pool.push(e.view);continue;}const pos=e.view.root.position;const display={...e.mob,x:THREE.MathUtils.lerp(pos.x,m.x,k),z:THREE.MathUtils.lerp(pos.z,m.z,k)};e.view.update(display,step,vfx,10);}
+
     }
-    for(const e of this.effects){e.life-=dt;e.mesh.scale.multiplyScalar(1+dt*5);(e.mesh.material as THREE.MeshBasicMaterial).opacity=Math.max(0,e.life*1.6);if(e.life<=0){this.scene.remove(e.mesh);e.mesh.geometry.dispose();(e.mesh.material as THREE.Material).dispose();}}this.effects=this.effects.filter(e=>e.life>0);
-    this.vfx.update(dt);
-    const p=this.heroes[this.slot]?.root.position??new THREE.Vector3();this.camera.position.lerp(new THREE.Vector3(p.x,p.y+19,p.z+17),1-Math.exp(-dt*5));this.camera.lookAt(p.x,0,p.z-2);
-    this.renderer.render(this.scene,this.camera);requestAnimationFrame(this.draw);
+    const p=this.heroes[this.slot]?.player.pos??new THREE.Vector3();if(!this.blocked)this.dctl?.update(dt,this.input);else this.dctl?.stop();if(isDiablo())this.dcam.update(dt,this.input,p);else this.cam.update(dt,this.input,p);this.occlusion?.update(dt,p,this.camera);this.syncingTarget=true;this.targeting?.update(dt,p);this.syncingTarget=false;setListener(p,-Math.sin(isDiablo()?this.dcam.yaw:this.cam.yaw),-Math.cos(isDiablo()?this.dcam.yaw:this.cam.yaw));this.fx.update(dt,p);this.fx.render();requestAnimationFrame(this.draw);
   };
-  dispose():void {this.disposed=true;removeEventListener('resize',this.resize);for(const h of this.heroes)h.dispose();this.renderer.dispose();this.renderer.domElement.remove();}
+  dispose():void {this.disposed=true;removeEventListener('resize',this.resize);for(const h of this.heroes)h.player.model.dispose();setMusic('none');setAmbience(null);this.fx.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.renderer.domElement.remove();}
 }

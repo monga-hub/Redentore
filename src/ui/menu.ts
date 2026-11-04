@@ -106,6 +106,8 @@ export const playTime = (s: number) => {
 };
 
 export interface MenuHooks {
+  closed?(): void;
+  arena?: { automatic(): boolean; toggle(): void };
   opened?(): void; // the game is about to pause
   leave(): void; // "Cambia eroe": keep the run, back to the squad screen
   account?(): HTMLElement; // the account line, under the main panel's buttons
@@ -162,6 +164,7 @@ export class Menu {
     this.wait = null;
     this.el.classList.remove('show');
     this.el.innerHTML = '';
+    this.hooks.closed?.();
   }
 
   private show(v: View): void {
@@ -183,7 +186,8 @@ export class Menu {
     switch (v) {
       case 'main': return `<div class="panel"><h2>Menu</h2>${x}
         <button class="btn" data-do="close">Riprendi</button>
-        <button class="btn" data-do="leave">Cambia eroe<small>Salva e torna alla squadra</small></button><hr>
+        <button class="btn" data-do="leave">${this.hooks.arena?'Lascia arena<small>La campagna resta invariata</small>':'Cambia eroe<small>Salva e torna alla squadra</small>'}</button><hr>
+        ${this.hooks.arena?`<p class="hint">L’assedio continua mentre il menu è aperto.</p><button class="btn" data-do="automatic">Abilità automatiche: ${this.hooks.arena.automatic()?'attive':'disattivate'}</button>`:''}
         <button class="btn" data-go="audio">Audio</button>
         <button class="btn" data-go="keys">Comandi<small>Cambia i tasti di movimento e della barra</small></button>
         ${styleBtn()}${qualityBtn()}
@@ -250,6 +254,7 @@ export class Menu {
     else if (go) this.show(go as View);
     else if (d === 'close') this.close();
     else if (d === 'leave') this.hooks.leave();
+    else if (d === 'automatic' && this.hooks.arena) { this.hooks.arena.toggle(); this.show('main'); }
     else if (d === 'style') {
       setDiablo(!isDiablo());
       b.outerHTML = styleBtn();

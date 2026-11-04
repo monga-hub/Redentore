@@ -240,7 +240,14 @@ const edge = (d: number, far: number) => Math.min(1, Math.max(0, (far - d) / (fa
  * Returns the voice, or nothing when it is out of earshot, capped, too soon after the last one,
  * or its bank is still loading (it starts loading then).
  */
+let suppressed = false;
+/** Authoritative arena rules run without local audio; the replicated presentation plays it once. */
+export function quietSfx<T>(run: () => T): T {
+  const was = suppressed; suppressed = true;
+  try { return run(); } finally { suppressed = was; }
+}
 export function playSfx(name: Sound, pos?: V3 | null, o: PlayOpts = {}): Voice | undefined {
+  if (suppressed) return;
   if (!ctx || !unlocked || settings.muted) return;
   const def = SOUNDS[name], mix = MIX(name);
   const bank = banks.get(def.bank);

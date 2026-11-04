@@ -156,6 +156,25 @@ export class AbilitySystem<C extends Caster = Caster> {
     return a.offGcd ? 0 : this.gcds.get(a.school ?? '') ?? 0;
   }
 
+  /** Resolved fires, including channel ticks; observers never decide combat. */
+  fired?: (ability: Ability<C>, tick: number) => void;
+  private fire(a: Ability<C>, tick: number): void {
+    this.fired?.(a, tick);
+    a.fire(this.ctx, tick);
+  }
+
+  /** Same gates used by tryCast, exposed to a remote HUD without spending resources. */
+  unavailable(i: number): string {
+    const a = this.slots[i];
+    if (!a) return 'Slot vuoto';
+    if (this.cooldown(a) > 0 || this.gcd(a) > 0) return 'Ricarica';
+    if (this.casting && (!a.offGcd || a.swing)) return "Un'altra azione è in corso.";
+    if ((a.cast || (a.channel && !a.mobile)) && this.moving) return 'Non puoi farlo mentre ti muovi.';
+    if (!this.affordable(a)) return 'Mana insufficiente.';
+    if (!this.charged(a)) return 'La barra della furia non è piena.';
+    return a.check?.(this.ctx) ?? '';
+  }
+
   /** Press slot `i` (keyboard, click or tap). Returns true if something started. */
   tryCast(i: number): boolean {
     const a = this.slots[i];
@@ -177,7 +196,7 @@ export class AbilitySystem<C extends Caster = Caster> {
       if (a.channel) this.start(a); // channels start their cooldown at once
     } else {
       this.start(a);
-      a.fire(this.ctx, 0);
+      this.fire(a, 0);
     }
     return true;
   }
@@ -207,13 +226,13 @@ export class AbilitySystem<C extends Caster = Caster> {
         a.during?.(this.ctx, c.t / c.total, dt);
         if (c.channel) {
           const due = Math.floor(c.t / a.channel!.tick + 1e-6);
-          while (c.ticks < due) a.fire(this.ctx, ++c.ticks);
+          while (c.ticks < due) this.fire(a, ++c.ticks);
         }
         if (c.t >= c.total) {
           if (c.channel) this.stop(true);
           else if (!this.affordable(a)) { this.stop(false); this.fail('Mana insufficiente.'); }
           else if (a.check?.(this.ctx)) { const why = a.check(this.ctx)!; this.stop(false); this.fail(why); } // the target went out of sight: nothing spent
-          else { this.start(a); a.fire(this.ctx, 0); this.stop(true); }
+          else { this.start(a); this.fire(a, 0); this.stop(true); }
         }
       }
     }

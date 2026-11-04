@@ -88,7 +88,11 @@ export function resolve(current: Pick | undefined, kinds: readonly Kind[], p: { 
  * (#target, styled in index.html) shows its name and health. Dying clears the target.
  */
 export class Targeting {
-  target?: { kind: Kind; mob: Mob };
+  private selected?: { kind: Kind; mob: Mob };
+  /** A network encounter sends selections to its authority; solo needs no observer. */
+  onSelect?: (target: { kind: Kind; mob: Mob } | undefined) => void;
+  get target() { return this.selected; }
+  set target(value: { kind: Kind; mob: Mob } | undefined) { this.selected=value; this.onSelect?.(value); }
   private ring: THREE.Mesh;
   private frame = document.getElementById('target')!;
   private name = this.frame.querySelector<HTMLElement>('.name')!;

@@ -370,12 +370,12 @@ export class Forsaken {
     this.later.push({ t, f });
   }
 
-  update(dt: number, pressed: (code: string) => boolean): void {
+  update(dt: number, pressed: (code: string) => boolean, advanceSystem = true): void {
     this.time += dt;
     this.comboT += dt;
     this.fallSow -= dt;
     this.castOrbOn = false;
-    this.system.update(dt, pressed);
+    if (advanceSystem) this.system.update(dt, pressed);
     this.castOrb.on = this.castOrbOn;
     const p = this.player.pos, v = this.vfx;
 

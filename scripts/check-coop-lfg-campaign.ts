@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { saveForCoop } from '../src/coop/campaign.ts';
+import { lfgSnapshot } from '../src/coop/lfg.ts';
+const saved={hero:'tizian',build:{xp:100,picks:[],learned:['pyre'],main:'ember',banked:2,presets:[{name:'private'}],edit:{id:'private'}},quest:{boss2Dead:true,boss3Dead:false},gear:{arma:'canna-vetraio'},bag:{gold:1000}};
+let status:'ok'|'error'|'none'='ok',keeps=0,pushes=0,flushes=0;
+const cloud={ready:Promise.resolve(),get status(){return status;},error:'fixture upload failure',push:()=>{pushes++;},flush:async()=>{flushes++;}};
+const keep=()=>{keeps++;return true;};
+assert.deepEqual(await saveForCoop(cloud,'tizian',keep,()=>saved),lfgSnapshot(saved));
+assert.equal(keeps,1);assert.equal(pushes,1);assert.equal(flushes,1);
+const snap=lfgSnapshot(saved);assert.equal('banked' in snap.build,false);assert.equal('presets' in snap.build,false);assert.equal('edit' in snap.build,false);assert.equal('bag' in snap,false);
+await assert.rejects(()=>saveForCoop(cloud,'tizian',()=>false,()=>saved),/conservare/);assert.equal(flushes,1,'failed storage never uploads or prepares');
+status='error';await assert.rejects(()=>saveForCoop(cloud,'tizian',keep,()=>saved),/fixture upload failure/,'resolved flush with error status aborts departure');
+status='none';const previous=keeps;await assert.rejects(()=>saveForCoop(cloud,'tizian',keep,()=>saved),/Accedi/);assert.equal(keeps,previous);
+assert.equal(saved.build.banked,2);assert.equal(saved.build.presets[0].name,'private');assert.equal(saved.bag.gold,1000);
+console.log('LFG campaign PASS: truthful local save and caught-flush status gating, no departure on failure, combat whitelist excludes bank/presets/edit/bag; owner campaign unchanged.');

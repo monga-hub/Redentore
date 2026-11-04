@@ -36,12 +36,16 @@ create table public.coop_lfg_offer (
   guest_accept boolean not null default false,
   host_prepared boolean not null default false,
   guest_prepared boolean not null default false,
+  host_snapshot jsonb,
+  guest_snapshot jsonb,
   host_ticket uuid,
   guest_ticket uuid,
   host_claim uuid,
   guest_claim uuid,
   room uuid,
-  check(host_id<>guest_id)
+  check(host_id<>guest_id),
+  check(not host_prepared or host_snapshot is not null),
+  check(not guest_prepared or guest_snapshot is not null)
 );
 alter table public.coop_lfg_queue enable row level security;
 alter table public.coop_lfg_offer enable row level security;
@@ -143,11 +147,11 @@ create function public.coop_lfg(op text, lease uuid, proposal uuid default null,
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare who uuid:=auth.uid(); q public.coop_lfg_queue; peer public.coop_lfg_queue;
   o public.coop_lfg_offer; a public.coop_lfg_queue; b public.coop_lfg_queue;
-  result jsonb; admitted jsonb; ticket uuid; host boolean; entries jsonb; inspected jsonb;
+  result jsonb; admitted jsonb; canonical jsonb; snap jsonb; ticket uuid; host boolean; entries jsonb; inspected jsonb;
 begin
   if who is null or lease is null then raise exception 'Accedi con il tuo account'; end if;
   if op is null or op not in ('join','heartbeat','list','inspect','invite','accept','reject','leave','prepare','claim') then raise exception 'Operazione LFG non valida'; end if;
-  if octet_length(coalesce(payload::text,''))>1024 then raise exception 'Richiesta troppo grande'; end if;
+  if octet_length(coalesce(payload::text,''))>20480 then raise exception 'Richiesta troppo grande'; end if;
   perform pg_advisory_xact_lock(741270044);
   perform public.coop_lfg_cleanup();
   select * into q from public.coop_lfg_queue where user_id=who for update;
@@ -163,10 +167,14 @@ begin
         or (host and o.host_claim is not null) or (not host and o.guest_claim is not null) then raise exception 'Passaggio già usato o non valido'; end if;
       if host then
         admitted:=public.coop_beta_admit('create',lease,null,null,o.host_hero);
+        update public.coop_beta_room set host_snapshot=o.host_snapshot where id=(admitted->>'room')::uuid;
+        admitted:=public.coop_beta_admit('poll',lease,(admitted->>'room')::uuid);
         update public.coop_lfg_offer set room=(admitted->>'room')::uuid,host_claim=lease,host_ticket=null where singleton;
       else
         if o.room is null then return jsonb_build_object('status','claiming','expiresAt',o.expires_at,'waitingForHost',true); end if;
         admitted:=public.coop_beta_admit('join',lease,null,(select invite from public.coop_beta_room where id=o.room),o.guest_hero);
+        update public.coop_beta_room set guest_snapshot=o.guest_snapshot where id=o.room;
+        admitted:=public.coop_beta_admit('poll',lease,o.room);
         update public.coop_lfg_offer set guest_claim=lease,guest_ticket=null where singleton;
       end if;
       select * into o from public.coop_lfg_offer where singleton;
@@ -212,8 +220,13 @@ begin
       -- Local save success is the caller's declaration, never a remote campaign mutation.
       if payload->'saved' is distinct from 'true'::jsonb then raise exception 'Conserva prima la partita locale'; end if;
       perform public.coop_lfg_projection(who,q.hero);
-      if host then update public.coop_lfg_offer set host_prepared=true where singleton;
-      else update public.coop_lfg_offer set guest_prepared=true where singleton; end if;
+      select data into canonical from public.saves where user_id=who and game_id='redentore' and slot=q.hero;
+      snap:=jsonb_build_object('hero',q.hero,'build',jsonb_build_object('xp',canonical#>'{build,xp}','picks',canonical#>'{build,picks}',
+        'learned',coalesce(canonical#>'{build,learned}','[]'::jsonb),'main',coalesce(canonical#>>'{build,main}','')),
+        'gear',coalesce(canonical->'gear','{}'::jsonb),'quest',jsonb_build_object('boss2Dead',true,'boon',coalesce(canonical#>>'{quest,boon}','')));
+      if payload->'expected' is distinct from snap then raise exception 'La build cloud è cambiata: campagna locale conservata, riprova la ricerca'; end if;
+      if host then update public.coop_lfg_offer set host_prepared=true,host_snapshot=snap where singleton;
+      else update public.coop_lfg_offer set guest_prepared=true,guest_snapshot=snap where singleton; end if;
       update public.coop_lfg_offer set phase='claiming',expires_at=now()+interval '30 seconds',host_ticket=gen_random_uuid(),guest_ticket=gen_random_uuid()
         where singleton and phase='preparing' and host_prepared and guest_prepared;
     end if;

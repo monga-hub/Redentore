@@ -36,7 +36,7 @@ assert(calls.every(c=>c.name==='coop_lfg'));assert(calls.every(c=>!['accept','pr
 response={status:'offered',entry:id,expiresAt:new Date(Date.now()+35_000).toISOString(),proposal:{id:crypto.randomUUID(),epoch:crypto.randomUUID(),mode:'survival',capacity:2,source:'auto',host:true,accepted:false,peerAccepted:false,prepared:false,peer:{id:crypto.randomUUID(),hero:'bortolo',level:4},expiresAt:new Date(Date.now()+30_000).toISOString()}};
 await client.list();mock.timers.tick(2_000);await drain();assert.equal(client.state.status,'offered');
 await client.respond(response.proposal!.id,true);assert.equal(calls.at(-1)?.args.op,'accept');
-await client.prepare(response.proposal!.id,true);assert.deepEqual(calls.at(-1)?.args.payload,{saved:true});
+await client.prepare(response.proposal!.id,true);assert.deepEqual(calls.at(-1)?.args.payload,{saved:true,expected:undefined});
 channels[0].status?.('CHANNEL_ERROR');await drain();mock.timers.tick(700);await drain();assert.equal(channels.length,2);assert.equal(removed,1);assert.equal(calls[0].args.lease,client.lease,'reconnect retains same page lease');
 const beforeStale=calls.length;channels[0].event?.();mock.timers.tick(250);await drain();assert.equal(calls.length,beforeStale,'old channel cannot trigger polling');
 // An in-flight response after disposal cannot reopen the queue or schedule another heartbeat.

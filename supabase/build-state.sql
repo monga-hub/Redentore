@@ -9,12 +9,12 @@ create table if not exists public.redentore_build_guard (
  primary key(user_id,hero)
 );
 alter table public.redentore_build_guard enable row level security;
-revoke all on public.redentore_build_guard from anon,authenticated;
+revoke all on public.redentore_build_guard from public,anon,authenticated;
 
 -- A security-definer helper is needed only to read the guard, not to bypass caller identity.
 create or replace function public.redentore_build_is_guarded(p_who uuid,p_hero text) returns boolean
 language sql security definer set search_path=public,pg_temp as $$select exists(select 1 from public.redentore_build_guard g where p_who=auth.uid() and g.user_id=p_who and g.hero=p_hero)$$;
-revoke all on function public.redentore_build_is_guarded(uuid,text) from public;
+revoke all on function public.redentore_build_is_guarded(uuid,text) from public,anon;
 grant execute on function public.redentore_build_is_guarded(uuid,text) to authenticated;
 -- The trigger itself must execute as the invoker so it distinguishes direct writes from our owner-only RPC.
 create or replace function public.redentore_build_direct_guard() returns trigger
@@ -27,6 +27,7 @@ begin
  then raise exception 'Usa il salvataggio condizionale della build di Redentore.'; end if;
  if TG_OP='DELETE' then return OLD; end if; return NEW;
 end $$;
+revoke all on function public.redentore_build_direct_guard() from public,anon,authenticated;
 drop trigger if exists redentore_build_guard on public.saves;
 create trigger redentore_build_guard before insert or update or delete on public.saves for each row execute function public.redentore_build_direct_guard();
 
@@ -78,6 +79,6 @@ begin
  insert into public.saves(user_id,game_id,slot,data) values(who,'redentore',hero,payload) on conflict(user_id,game_id,slot) do update set data=excluded.data;
  return jsonb_build_object('token',(select token from public.redentore_build_guard where user_id=who and redentore_build_guard.hero=redentore_build_save.hero),'state',payload);
 end $$;
-revoke all on function public.redentore_build_save(text,text,uuid,jsonb) from public;
+revoke all on function public.redentore_build_save(text,text,uuid,jsonb) from public,anon;
 grant execute on function public.redentore_build_save(text,text,uuid,jsonb) to authenticated;
 COMMIT;

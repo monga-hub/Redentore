@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 const db=new PGlite();
-await db.exec(`create role anon;create role authenticated;create schema auth;grant usage on schema auth to authenticated,anon;
+await db.exec(`create role anon;create role authenticated;create role service_role;alter default privileges grant execute on functions to anon,authenticated,service_role;alter default privileges grant all on tables to anon,authenticated,service_role;create schema auth;grant usage on schema auth to authenticated,anon;
 create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
 create table auth.users(id uuid primary key);create table public.saves(user_id uuid,game_id text,slot text,data jsonb,updated_at timestamptz,primary key(user_id,game_id,slot));
 alter table public.saves enable row level security;grant select,insert,update,delete on public.saves to authenticated;
@@ -10,6 +10,20 @@ create policy own on public.saves to authenticated using(user_id=auth.uid()) wit
 create function public.saves_touch() returns trigger language plpgsql as $$begin NEW.updated_at=now();return NEW;end$$;
 create trigger saves_touch before insert or update on public.saves for each row execute function public.saves_touch();`);
 const sql=await readFile(new URL('../supabase/build-state.sql',import.meta.url),'utf8');await db.exec(sql);await db.exec(sql);
+const acl=(await db.query<{anon_rpc:boolean;anon_helper:boolean;anon_trigger:boolean;auth_rpc:boolean;auth_helper:boolean;auth_trigger:boolean;anon_table:boolean;auth_table:boolean}>(`select
+ has_function_privilege('anon','public.redentore_build_save(text,text,uuid,jsonb)','execute') anon_rpc,
+ has_function_privilege('anon','public.redentore_build_is_guarded(uuid,text)','execute') anon_helper,
+ has_function_privilege('anon','public.redentore_build_direct_guard()','execute') anon_trigger,
+ has_function_privilege('authenticated','public.redentore_build_save(text,text,uuid,jsonb)','execute') auth_rpc,
+ has_function_privilege('authenticated','public.redentore_build_is_guarded(uuid,text)','execute') auth_helper,
+ has_function_privilege('authenticated','public.redentore_build_direct_guard()','execute') auth_trigger,
+ has_table_privilege('anon','public.redentore_build_guard','select') anon_table,
+ has_table_privilege('authenticated','public.redentore_build_guard','select') auth_table`)).rows[0];
+assert.deepEqual(acl,{anon_rpc:false,anon_helper:false,anon_trigger:false,auth_rpc:true,auth_helper:true,auth_trigger:false,anon_table:false,auth_table:false});
+// Reproduce an already-installed production function retaining explicit anonymous EXECUTE, then patch atomically.
+await db.exec('grant execute on function public.redentore_build_save(text,text,uuid,jsonb),public.redentore_build_is_guarded(uuid,text),public.redentore_build_direct_guard() to anon');
+await db.exec(await readFile(new URL('../supabase/build-state-acl.sql',import.meta.url),'utf8'));
+assert.equal((await db.query<{allowed:boolean}>("select has_function_privilege('anon','public.redentore_build_save(text,text,uuid,jsonb)','execute') allowed")).rows[0].allowed,false);
 const u='11111111-1111-4111-8111-111111111111',v='22222222-2222-4222-8222-222222222222';
 await db.query('insert into auth.users values($1),($2)',[u,v]);
 async function who(id=u){await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${id}',false)`);}

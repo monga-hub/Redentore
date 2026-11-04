@@ -53,7 +53,7 @@ const CSS=`
 #coop-lfg .gear{margin:5px 0}#coop-lfg summary{cursor:pointer;min-height:32px;padding:3px 0;font:13px/1.4 Georgia}
 #coop-lfg .box{padding:9px;background:var(--tip-bg,#111520);color:#f3ecd8;border:1px solid var(--tip-border,#9a9fb8);border-radius:4px;font:12px/1.4 system-ui}#coop-lfg .box b,#coop-lfg .box .w,#coop-lfg .box .g{display:block}#coop-lfg .box small{display:flex;justify-content:space-between;gap:10px}#coop-lfg .box .g{color:#3fd84a}#coop-lfg .box .lore{color:#ffd75e}
 #coop-lfg .note{min-height:18px;color:#ffb27a;font:12px/1.4 system-ui}#coop-lfg .offer{padding:8px;border:1px solid #c9a45c;background:#0004;margin:6px 0}
-#coop-lfg-notice{position:fixed;z-index:25;top:12px;left:50%;transform:translateX(-50%);box-sizing:border-box;width:min(320px,calc(100vw - 400px));padding:9px 12px;color:#f3e2b0;border:2px solid #c9a45c;border-radius:6px;background:var(--panel,#241b12);box-shadow:var(--panel-shadow,0 8px 30px #000);font:13px/1.4 Georgia}
+#coop-lfg-notice{position:fixed;z-index:25;top:12px;left:50%;transform:translateX(-50%);box-sizing:border-box;width:min(320px,calc(100vw - 500px));padding:9px 12px;color:#f3e2b0;border:2px solid #c9a45c;border-radius:6px;background:var(--panel,#241b12);box-shadow:var(--panel-shadow,0 8px 30px #000);font:13px/1.4 Georgia}
 #coop-lfg-notice .peer,#coop-lfg .offer .peer{min-height:28px;padding:0;border:0;background:none;color:inherit;font:13px Georgia;text-decoration:underline;text-align:left}#coop-lfg-notice b{color:#ffd75e}#coop-lfg-notice p{margin:5px 0}#coop-lfg-notice .actions{margin-bottom:0}#coop-lfg-notice button{flex:1;padding:7px 8px}
 #coop-lfg-badge{position:fixed;z-index:22;left:50%;transform:translateX(-50%);top:12px;min-height:32px!important;font-size:12px!important}
 @media(max-height:500px){#coop-lfg{padding:6px}#coop-lfg .panel{padding:12px 10px 6px;max-height:calc(100dvh - 12px)}#coop-lfg h2{font-size:16px;margin-bottom:4px}#coop-lfg .actions{margin:4px 0}#coop-lfg .columns{margin-top:4px}#coop-lfg .disclosure{font-size:11px;line-height:1.3}#coop-lfg .offer{padding:5px;margin:3px 0}}
@@ -109,7 +109,7 @@ export class LfgUi {
     if(document.pointerLockElement)void document.exitPointerLock();this.render();this.el.querySelector<HTMLButtonElement>('[data-action=close]')!.focus();
     void this.refresh();this.refreshTimer=setInterval(()=>void this.refresh(),5000);
   }
-  close():void{this.opened=false;this.el.hidden=true;clearInterval(this.refreshTimer);this.render();if(this.previous?.isConnected)this.previous.focus();}
+  close():void{if(this.state.status==='preparing'||this.state.status==='claiming')return;this.opened=false;this.el.hidden=true;clearInterval(this.refreshTimer);this.render();if(this.previous?.isConnected)this.previous.focus();}
   update(state:LfgState):void {
     if(this.disposed)return;this.state=state;this.message=state.notice??'';
     if(state.entries)this.entries=state.entries.filter(p=>p.id!==state.entry);
@@ -132,6 +132,7 @@ export class LfgUi {
   }
   private render():void {
     if(this.disposed)return;
+    this.el.querySelector<HTMLButtonElement>('[data-action=close]')!.disabled=this.state.status==='preparing'||this.state.status==='claiming';
     const active=this.state.status!=='idle',p=this.state.proposal,pending=!!p&&['offered','preparing','claiming'].includes(this.state.status);
     this.el.querySelector<HTMLButtonElement>('[data-action=search]')!.hidden=active;this.el.querySelector<HTMLElement>('.disclosure')!.hidden=active;
     const leave=this.el.querySelector<HTMLButtonElement>('[data-action=leave]')!;leave.hidden=!active;

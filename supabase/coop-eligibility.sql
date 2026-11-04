@@ -29,7 +29,7 @@ begin
       if (saved->'build'->>'xp')::numeric not between 0 and 10000000 or saved->'quest'->'boss2Dead' is distinct from 'true'::jsonb then raise exception 'Sconfiggi la Governatrice del capitolo2 e salva nel cloud'; end if;
       if jsonb_typeof(saved->'build'->'picks') is distinct from 'array' or jsonb_array_length(saved->'build'->'picks')>500
         or jsonb_typeof(coalesce(saved->'build'->'learned','[]'::jsonb))<>'array' or jsonb_array_length(coalesce(saved->'build'->'learned','[]'::jsonb))>500 then raise exception 'Build non valida'; end if;
-      snap:=jsonb_build_object('hero',hero,'build',saved->'build','gear',coalesce(saved->'gear','{}'::jsonb),'quest',jsonb_build_object('boss2Dead',true,'boss3Dead',coalesce(saved->'quest'->'boss3Dead','false'::jsonb),'boon',saved->'quest'->'boon'));
+      snap:=jsonb_build_object('hero',hero,'build',jsonb_build_object('xp',saved->'build'->'xp','picks',saved->'build'->'picks','learned',coalesce(saved->'build'->'learned','[]'::jsonb),'main',coalesce(saved->'build'->>'main','')),'gear',coalesce(saved->'gear','{}'::jsonb),'quest',jsonb_build_object('boss2Dead',true,'boss3Dead',coalesce(saved->'quest'->'boss3Dead','false'::jsonb),'boon',saved->'quest'->'boon'));
       if octet_length(snap::text)>16384 then raise exception 'Build troppo grande'; end if;
       if op='create' then
         insert into public.coop_beta_room(host_id,host_lease,host_snapshot) values(who,lease,snap) returning * into r;

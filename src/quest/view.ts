@@ -550,7 +550,7 @@ export class QuestView {
       if (pr.service) {
         const id = pr.service, at = SANCTUARY[id];
         this.services[id].talking = true;
-        this.talk.show({ name: at.name, portrait: `${import.meta.env.BASE_URL}models/${id === 'maestro' ? 'iseppo' : 'zuane'}.webp` }, at.greeting, () => [{ title: id === 'maestro' ? 'Preparati per l’arena' : 'Redistribuisci i miei punti', state: 'talk', text: at.greeting, actionLabel: this.service ? (id === 'maestro' ? 'Cerca un gruppo' : 'Redistribuisci i miei punti') : undefined, act: () => this.service?.(id) }]);
+        this.talk.show({ name: at.name, portrait: `${import.meta.env.BASE_URL}models/${id === 'maestro' ? 'iseppo' : 'zuane'}.webp` }, at.greeting, () => [{ title: id === 'maestro' ? 'Avventura cooperativa' : 'Redistribuisci i miei punti', state: 'talk', text: at.greeting, actionLabel: this.service ? (id === 'maestro' ? 'Cooperativa' : 'Redistribuisci i miei punti') : undefined, act: () => this.service?.(id) }]);
       } else if (pr.talk === 'zuane') {
         this.npc.talking = true;
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, GREET.zuane, () => this.zuaneEntries());

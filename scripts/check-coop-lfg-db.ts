@@ -45,8 +45,10 @@ if(preflightPath){
 }
 const originalSavePolicies=(await db.query("select * from pg_policies where tablename='saves' order by policyname")).rows;
 const originalSaveAccess=(await db.query("select relacl::text,relrowsecurity from pg_class where oid='public.saves'::regclass")).rows;
-await db.exec(await sql('coop-eligibility.sql'));
-await db.exec(await sql('coop-lfg.sql'));
+await db.exec(await sql('build-state.sql'));
+if(process.env.COOP_LFG_BUNDLE)await db.exec(await readFile(process.env.COOP_LFG_BUNDLE,'utf8'));
+else {await db.exec(await sql('coop-eligibility.sql'));await db.exec(await sql('coop-lfg.sql'));await db.exec(await sql('coop-lfg-build.sql'));}
+console.log('LFG install metadata '+JSON.stringify((await db.query("select proname,prosecdef,md5(prosrc) source_md5 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and (proname like 'coop_lfg%' or proname in ('coop_beta','coop_beta_admit','redentore_build_save')) order by proname")).rows));
 const users=[1,2,3,4].map(n=>`${n}`.repeat(8)+'-'+`${n}`.repeat(4)+'-4'+`${n}`.repeat(3)+'-8'+`${n}`.repeat(3)+'-'+`${n}`.repeat(12));
 const leases=[1,2,3,4].map(n=>`${n+4}`.repeat(8)+'-'+`${n+4}`.repeat(4)+'-4'+`${n+4}`.repeat(3)+'-8'+`${n+4}`.repeat(3)+'-'+`${n+4}`.repeat(12));
 const newLeases=[crypto.randomUUID(),crypto.randomUUID(),crypto.randomUUID(),crypto.randomUUID()];
@@ -54,14 +56,16 @@ const save={hero:'tizian',build:{xp:100,picks:['pyre_hot','pyre_hot'],learned:['
 for(const user of users){await db.query('insert into auth.users values($1)',[user]);await db.query("insert into public.saves values($1,'redentore','tizian',$2)",[user,save]);}
 const admin=()=>db.exec('reset role');
 async function who(i:number){await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${users[i]}',false)`);}
+const expected={hero:save.hero,build:{xp:save.build.xp,picks:save.build.picks,learned:save.build.learned,main:save.build.main},gear:save.gear,quest:{boss2Dead:true,boon:''}};
 async function rpc(i:number,op:string,options:{proposal?:string;target?:string;payload?:unknown;lease?:string;hero?:string}={}){
- await who(i);return (await db.query<{value:any}>('select public.coop_lfg($1,$2,$3,$4,$5,$6) value',[op,options.lease??leases[i],options.proposal??null,options.target??null,options.hero??'tizian',options.payload??null])).rows[0].value;
+ await who(i);return (await db.query<{value:any}>('select public.coop_lfg($1,$2,$3,$4,$5,$6) value',[op,options.lease??leases[i],options.proposal??null,options.target??null,options.hero??'tizian',(op==='prepare'?{expected,...options.payload as object}:options.payload)??null])).rows[0].value;
 }
 async function beta(i:number,op:string,options:{room?:string;invite?:string;lease?:string}={}){
  await who(i);return (await db.query<{value:any}>('select public.coop_beta($1,$2,$3,$4,$5) value',[op,options.lease??leases[i],options.room??null,options.invite??null,'tizian'])).rows[0].value;
 }
 async function expireOffer(){await admin();await db.exec("update public.coop_lfg_offer set expires_at=now()-interval '1 second'");}
 async function clear(){await admin();await db.exec('delete from public.coop_lfg_offer;delete from public.coop_lfg_queue;delete from public.coop_beta_room');}
+
 const before=(await db.query('select * from public.saves order by user_id')).rows;
 // Legacy admission accepts boss2 without level31/boss3. Raw access stays owner-only.
 let room=await beta(0,'create');assert.equal(room.members[0].snapshot.quest.boss2Dead,true);assert.equal(room.members[0].snapshot.quest.boss3Dead,false);
@@ -94,14 +98,17 @@ await assert.rejects(()=>rpc(0,'prepare',{proposal,payload:{saved:true}}),/due a
 a=await rpc(0,'accept',{proposal});assert.equal(a.status,'offered');assert.equal(a.proposal.peerAccepted,false);
 await assert.rejects(()=>rpc(0,'claim',{proposal,payload:{ticket:crypto.randomUUID()},lease:newLeases[0]}),/Proposta non disponibile/);
 b=await rpc(1,'accept',{proposal});assert.equal(b.status,'preparing');
+await assert.rejects(()=>rpc(0,'prepare',{proposal,payload:{saved:true,expected:{}}}),/build cloud/);
 await assert.rejects(()=>rpc(0,'prepare',{proposal,payload:{saved:false}}),/Conserva/);
-await rpc(0,'prepare',{proposal,payload:{saved:true}});b=await rpc(1,'prepare',{proposal,payload:{saved:true}});assert.equal(b.status,'claiming');
+await rpc(0,'prepare',{proposal,payload:{saved:true}});await who(0);assert.equal((await db.query<{r:any}>("select public.redentore_build_save('load','tizian') r")).rows[0].r.busy,true,'prepared LFG freezes build before room creation');await assert.rejects(()=>db.query("select public.redentore_build_save('save','tizian',null,$1)",[{...save,v:1,build:{...save.build,edit:{id:'new-edit',lineage:'new-run',ancestors:[]}}}]),/multiplayer/,'prepared party cannot edit its build before room creation');b=await rpc(1,'prepare',{proposal,payload:{saved:true}});assert.equal(b.status,'claiming');
 a=await rpc(0,'heartbeat');assert(a.handoff.ticket);assert.notEqual(a.handoff.ticket,b.handoff.ticket);
+await admin();await db.query('update public.saves set data=$1 where user_id=$2',[{...save,gear:{arma:'new-canonical-gear-after-prepare'}},users[0]]);
 const hostIndex=a.proposal.host?0:1,guestIndex=hostIndex===0?1:0;
 const host=a.proposal.host?a:b,guest=a.proposal.host?b:a;
 assert.equal((await rpc(guestIndex,'claim',{proposal,payload:{ticket:guest.handoff.ticket},lease:newLeases[guestIndex]})).waitingForHost,true);
 await assert.rejects(()=>rpc(2,'claim',{proposal,payload:{ticket:host.handoff.ticket},lease:newLeases[2]}),/Proposta non disponibile/);
-let admitted=await rpc(hostIndex,'claim',{proposal,payload:{ticket:host.handoff.ticket},lease:newLeases[hostIndex]});room=admitted.admission;
+let admitted=await rpc(hostIndex,'claim',{proposal,payload:{ticket:host.handoff.ticket},lease:newLeases[hostIndex]});room=admitted.admission;assert.deepEqual(room.members[0].snapshot.gear,save.gear,'session uses frozen canonical preparation, not later cloud gear');
+await admin();await db.query('update public.saves set data=$1 where user_id=$2',[save,users[0]]);
 await assert.rejects(()=>beta(2,'join',{invite:room.invite}),/riservata/);
 await assert.rejects(()=>rpc(hostIndex,'claim',{proposal,payload:{ticket:host.handoff.ticket},lease:crypto.randomUUID()}),/già usato/);
 assert.equal((await rpc(hostIndex,'claim',{proposal,lease:newLeases[hostIndex]})).admission.room,room.room);
@@ -134,7 +141,7 @@ await assert.rejects(()=>rpc(3,'join'),/XP/);
 await admin();await db.query('update public.saves set data=$1 where user_id=$2',[{...save,build:{...save.build,xp:0}},users[3]]);
 assert.equal((await rpc(3,'join')).status,'searching');await rpc(3,'leave');
 await admin();await db.query('update public.saves set data=$1 where user_id=$2',[save,users[3]]);
-await assert.rejects(()=>rpc(0,'join',{payload:{blob:'x'.repeat(1025)}}),/troppo grande/);
+await assert.rejects(()=>rpc(0,'join',{payload:{blob:'x'.repeat(20481)}}),/troppo grande/);
 await db.exec('reset role;set role anon');await assert.rejects(()=>db.query("select public.coop_lfg('join',$1)",[leases[0]]),/permission denied/);
 // Direct invite uses exactly the same bilateral consent/reservation path.
 await clear();room=await beta(3,'create');a=await rpc(0,'join');b=await rpc(1,'join');assert.equal(b.arenaBusy,true);assert.equal(b.status,'searching');
@@ -148,7 +155,7 @@ const notifications=(await db.query<{payload:any}>('select payload from public.n
 assert(notifications.length>0);assert(notifications.every(n=>JSON.stringify(n.payload)==='{"changed":true}'));
 await db.exec(await sql('coop-lfg-rollback.sql'));
 room=await beta(0,'create');assert.equal(room.members[0].snapshot.quest.boss2Dead,true);
-await admin();assert.deepEqual((await db.query('select * from public.saves order by user_id')).rows,before);
+await admin();assert.equal((await db.query<{body:string}>("select md5(prosrc) body from pg_proc where oid='public.redentore_build_save(text,text,uuid,jsonb)'::regprocedure")).rows[0].body,'a445256430293816335c991d5eca601b','rollback restores standalone build guard body');assert.deepEqual((await db.query('select * from public.saves order by user_id')).rows,before);
 assert.deepEqual((await db.query("select * from pg_policies where tablename='saves' order by policyname")).rows,originalSavePolicies);
 assert.deepEqual((await db.query("select relacl::text,relrowsecurity from pg_class where oid='public.saves'::regclass")).rows,originalSaveAccess);
 await db.close();

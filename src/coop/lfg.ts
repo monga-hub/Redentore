@@ -1,4 +1,5 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { combatHero } from './protocol.ts';
 import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
 
 export interface LfgEntry { id:string; hero:Hero; level:number; status?:string; snapshotAt?:string }
@@ -26,6 +27,11 @@ export function lfgState(v:unknown):LfgState {
   if(v.proposal!==undefined){const p=v.proposal;if(!object(p)||typeof p.id!=='string'||!uuid.test(p.id)||typeof p.epoch!=='string'||!uuid.test(p.epoch)||p.mode!=='survival'||p.capacity!==2||!['auto','direct'].includes(String(p.source))||['host','accepted','peerAccepted','prepared'].some(k=>typeof p[k]!=='boolean')||typeof p.expiresAt!=='string'||!Number.isFinite(Date.parse(p.expiresAt))||(p.peer!==null&&!entry(p.peer)))throw Error('Proposta LFG non valida.');}
   if(v.handoff!==undefined){const h=v.handoff;if(!object(h)||typeof h.proposal!=='string'||!uuid.test(h.proposal)||(typeof h.ticket!=='string'||!uuid.test(h.ticket)))throw Error('Passaggio LFG non valido.');}
   return v as unknown as LfgState;
+}
+/** Only combat fields cross the arena boundary; campaign-only bank/presets/edit remain in the save. */
+export function lfgSnapshot(saved:unknown){
+  const h=combatHero(saved);
+  return {hero:h.hero,build:{xp:h.xp,picks:h.picks,learned:h.learned,main:h.main},gear:h.gear,quest:{boss2Dead:true,boon:h.boon}};
 }
 export const LFG_HANDOFF_KEY='redentore.lfg.handoff';
 /** Persist only an unclaimed, owner-bound one-use ticket across the route navigation, never a room lease. */
@@ -102,7 +108,7 @@ export class LfgClient {
   inspect(target:string):Promise<LfgState>{return this.run('inspect',{target});}
   invite(target:string):Promise<LfgState>{return this.run('invite',{target});}
   respond(proposal:string,accept:boolean):Promise<LfgState>{return this.run(accept?'accept':'reject',{proposal});}
-  prepare(proposal:string,saved:boolean):Promise<LfgState>{return this.run('prepare',{proposal,payload:{saved}});}
+  prepare(proposal:string,saved:boolean,expected?:unknown):Promise<LfgState>{return this.run('prepare',{proposal,payload:{saved,expected}});}
   /** Claim after navigation with this page's fresh BetaSession lease. Guest retries when host not yet claimed. */
   async claim(handoff:LfgHandoff):Promise<LfgState>{
     const next=await this.run('claim',{proposal:handoff.proposal,payload:{ticket:handoff.ticket}});

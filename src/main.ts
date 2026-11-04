@@ -1,3 +1,7 @@
+import { account } from './coop/account.ts';
+import { LfgClient, storeLfgHandoff, type LfgState } from './coop/lfg.ts';
+import { LfgUi } from './coop/lfg-ui.ts';
+import { saveForCoop } from './coop/campaign.ts';
 import { savePreset, renamePreset, loadPreset } from './player/presets.ts';
 import { nextEdit } from './core/build-state.ts';
 import { BuildPanel } from './ui/build.ts';
@@ -661,7 +665,7 @@ Object.assign(window, { arredi, dragoSet: drago, dragon, sandbox, zitelle, l2, s
 const FIGHTING = new Set(['chase', 'cast', 'swing', 'nova', 'spin', 'pour']); // 'spin': the Governatrice's fuso; 'pour': the Abate's Calice
 function buildBlocked(): string | undefined {
   if (dying > 0 || playerStats.dead || flying() || ferry.trip || sandbox || roused(drago.boss) || foes.some((m) => m.state !== 'dead' && m.state !== 'pray' && m.state !== 'hoe') || kit.system.casting) return 'Puoi modificare la build soltanto fuori dal combattimento e dai viaggi.';
-  if (new URLSearchParams(location.search).has('coop')) return 'La build non si modifica durante una sessione multiplayer.';
+  if (lfgFrozen || new URLSearchParams(location.search).has('coop')) return 'La build non si modifica durante una sessione multiplayer.';
   return undefined;
 }
 const KEEP = 5; // s
@@ -669,7 +673,36 @@ const PACK = 12, CALM = 22; // m: three fighting foes this close widen the frami
 const BOSSES = [priests.boss, zitelle.boss, sangiorgio.boss, bees.queen]; // framed wide in their fight, like the dragon
 let kept = KEEP;
 const save = keeper(serialize(game).player); // until a calm save this boot: where the load (or the new game) put him
-const keep = () => { if (!sandbox && !roused(drago.boss) && !flying() && !ferry.trip && save(serialize(game), dying <= 0 && !playerStats.dead && !mobs.some((m) => FIGHTING.has(m.state)))) cloud.push(hero); };
+const keep = ():boolean => {
+  if(sandbox||roused(drago.boss)||flying()||ferry.trip)return false;
+  if(!save(serialize(game),dying<=0&&!playerStats.dead&&!mobs.some(m=>FIGHTING.has(m.state))))return false;
+  cloud.push(hero);return true;
+};
+let lfgFrozen=false,lfgDeparting=false,lfgPreparing:string|undefined;
+const lfgClient=new LfgClient(account,handleLfg,message=>lfgUi.error(message));
+const conserve=()=>saveForCoop(cloud,hero,keep,()=>serialize(game));
+const lfgUi=new LfgUi(lfgClient,()=>hero,async()=>{await conserve();});
+Object.assign(window,{lfgClient,lfgUi});
+document.addEventListener('sanctuary-arena',()=>{lfgUi.open();kit.system.cancel();input.consume();dctl.stop();worldMap.close();bagPanel.close();book.close();buildPanel.close();});
+async function cancelLfg(id:string,message:string){try{await lfgClient.respond(id,false);}catch{/* server TTL handles an expired/offline proposal */}lfgFrozen=false;lfgPreparing=undefined;lfgUi.open();lfgUi.error(message);}
+function handleLfg(state:LfgState){
+  lfgUi.update(state);
+  const p=state.proposal;
+  if(state.status==='preparing'&&p?.accepted&&p.peerAccepted){
+    lfgFrozen=true;lfgUi.open();kit.system.cancel();input.consume();dctl.stop();worldMap.close();bagPanel.close();book.close();buildPanel.close();
+    if(lfgPreparing!==p.id){lfgPreparing=p.id;void(async()=>{
+      try{const expected=await conserve();if(lfgClient.state.proposal?.id===p.id&&lfgClient.state.status==='preparing')await lfgClient.prepare(p.id,true,expected);}
+      catch(e){await cancelLfg(p.id,(e as Error).message);}
+    })();}
+  }else if(state.status==='claiming'&&state.handoff&&!lfgDeparting){
+    lfgFrozen=true;
+    if(!storeLfgHandoff(state.handoff)){void cancelLfg(state.handoff.proposal,'Conservazione del passaggio non disponibile. La campagna resta sul dispositivo.');return;}
+    lfgDeparting=true;void lfgClient.stop();const url=new URL(location.pathname,location.origin);url.searchParams.set('coop','');url.searchParams.set('lfg',state.handoff.proposal);location.assign(url.href);
+  }else if(state.status!=='claiming'&&state.status!=='admitted'){
+    if(lfgFrozen)lfgUi.close();lfgFrozen=false;lfgPreparing=undefined;
+  }
+}
+addEventListener('pagehide',()=>{if(!lfgDeparting)void lfgClient.leave().catch(()=>{});});
 addEventListener('visibilitychange', () => { if (document.hidden) { keep(); void cloud.flush(); } }); // the account gets it too: iOS may kill the tab
 
 const timer = new THREE.Timer();
@@ -678,13 +711,13 @@ renderer.setAnimationLoop(() => {
   const real = Math.min(timer.getDelta(), 0.05);
   const since = FALLEN - dying; // s since the hero fell, while dying
   const dt = dying > 0 && since < SLOW_FOR ? real * (SLOW + (1 - SLOW) * since / SLOW_FOR) : real; // slow motion as the hero falls
-  if (menu.paused || worldMap.open || bagPanel.open || book.open || buildPanel.open || notes.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
+  if (lfgFrozen || lfgUi.opened || menu.paused || worldMap.open || bagPanel.open || book.open || buildPanel.open || notes.open || questView.talking || levelUp.open) { // the world holds still behind the menu, map, bag, book, dialogue or level-up; drags and wheel turns made meanwhile are dropped
     if (questView.talking && !menu.paused) questView.idle(dt, player.pos); // but the speaker talks on
     if (levelUp.open && !menu.paused) levelUp.update(dt);
     if (sheet.shown) { player.model.animate(dt, 0, true); figure.draw(); } // he idles on the sheet (and in the world behind it)
     input.consume();
     input.endFrame();
-    audio.update(dt, cam.camera, undefined, menu.paused || worldMap.open || bagPanel.open || book.open || buildPanel.open || notes.open, pressed); // the dialogue window ducks the music itself
+    audio.update(dt, cam.camera, undefined, lfgFrozen || lfgUi.opened || menu.paused || worldMap.open || bagPanel.open || book.open || buildPanel.open || notes.open, pressed); // the dialogue window ducks the music itself
     fx.render();
     return;
   }

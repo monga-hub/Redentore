@@ -4,6 +4,7 @@ const low={hero:'tizian',build:{xp:100,picks:[],learned:['pyre','cero']},quest:{
 assert.doesNotThrow(()=>combatHero(low),'boss2 victory admits below31 without boss3');
 import { setTimeout as wait } from 'node:timers/promises';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { arenaLevel } from '../src/coop/environment.ts';
 import { BetaSession, type PartyState } from '../src/coop/session.ts';
 import { idle, validHero } from '../src/coop/protocol.ts';
 import { LFG_HANDOFF_KEY, storeLfgHandoff, takeLfgHandoff } from '../src/coop/lfg.ts';
@@ -28,10 +29,10 @@ class Fixture {
  room=crypto.randomUUID();epoch=crypto.randomUUID();invite=crypto.randomUUID();
  snapshots=[low,{...low,hero:'bortolo',build:{xp:150,picks:[],learned:['frost','caligo']}}];
  claims:(string|null)[]=[null,null];ready=[false,false];phase='lobby';channels=new Set<Channel>();
- calls:{id:number;name:string;op:string}[]=[];holdGuest=true;tracks=0;
+ calls:{id:number;name:string;op:string;phase?:unknown;at:number}[]=[];holdGuest=true;tracks=0;
  client(id:number):SupabaseClient{return {
   auth:{getSession:async()=>({data:{session:{access_token:'fixture-'+id}}})},realtime:{setAuth:async()=>{}},
-  rpc:async(name:string,p:any)=>{this.calls.push({id,name,op:p.op});try{return {data:this.rpc(id,name,p),error:null};}catch(e){return {data:null,error:{message:(e as Error).message}};}},
+  rpc:async(name:string,p:any)=>{const call={id,name,op:p.op,at:performance.now(),phase:undefined as unknown};this.calls.push(call);try{const data=this.rpc(id,name,p);call.phase=(data as any)?.phase??(data as any)?.admission?.phase;return {data,error:null};}catch(e){return {data:null,error:{message:(e as Error).message}};}},
   channel:(topic:string,options:any)=>{assert.equal(options.config.private,true);return new Channel(this,id,topic);},
   removeChannel:async(c:Channel)=>{this.channels.delete(c);},
  } as unknown as SupabaseClient;}
@@ -64,19 +65,31 @@ class Channel {
   return 'ok';
  }
 }
+const transitions:unknown[]=[];
 const fixture=new Fixture();let host:PartyState|undefined,guest:PartyState|undefined;
 const errors:string[]=[];
-const a=new BetaSession(fixture.client(0),s=>{host=s;},idle,e=>errors.push(e));
-const b=new BetaSession(fixture.client(1),s=>{guest=s;},idle,e=>errors.push(e));
+let lobbyWorldReady=0;
+const capture=(who:'host'|'guest',s:PartyState)=>{
+  // Shipping client.handle mounts ArenaView for two lobby members BEFORE readiness/start.
+  // Reproduce its world construction here; a bare state collector first built it inside Survival after start.
+  if(s.phase==='lobby'&&s.members.length===2&&!lobbyWorldReady){const began=performance.now();arenaLevel();lobbyWorldReady=performance.now();transitions.push({worldReady:lobbyWorldReady,duration:lobbyWorldReady-began});}
+  const previous=who==='host'?host:guest;
+  if(previous?.phase!==s.phase)transitions.push({who,at:performance.now(),phase:s.phase,frame:!!s.frame});
+  if(who==='host')host=s;else guest=s;
+};
+const a=new BetaSession(fixture.client(0),s=>capture('host',s),idle,e=>errors.push(e));
+const b=new BetaSession(fixture.client(1),s=>capture('guest',s),idle,e=>errors.push(e));
 const guestEntry=b.enterLfg({proposal,ticket:tickets[1]});await wait(30);
 await a.enterLfg(handoff);assert.equal(fixture.ready[0],true);assert.equal(fixture.phase,'lobby');
 await wait(2250);assert.equal(fixture.claims[1],b.lease);assert.equal(fixture.ready[1],false,'claim alone does not mark an unsubscribed guest ready');assert.equal(fixture.phase,'lobby','no start before both private subscriptions');
 const duplicate=new BetaSession(fixture.client(0),()=>{},idle,e=>errors.push(e));await assert.rejects(()=>duplicate.enterLfg(handoff),/già usato/);
 fixture.releaseGuest();await guestEntry;
-const deadline=Date.now()+5000;while((!host?.frame||!guest?.frame)&&Date.now()<deadline)await wait(50);
+const deadline=Date.now()+5000;while((host?.phase!=='fight'||guest?.phase!=='fight'||!host?.frame||!guest?.frame)&&Date.now()<deadline)await wait(50);
+console.log('ADMISSION TRACE '+JSON.stringify({host:host?.phase,guest:guest?.phase,server:fixture.phase,ready:fixture.ready,transitions,calls:fixture.calls}));
 assert.equal(host?.phase,'fight');assert.equal(guest?.phase,'fight');assert(host?.frame&&guest?.frame,JSON.stringify({host:host?.phase,hostFrame:!!host?.frame,guest:guest?.phase,guestFrame:!!guest?.frame,calls:fixture.calls}));
 assert(host.frame.countdown>0&&guest.frame.countdown>0);assert.equal(host.frame.time,0);assert.equal(guest.frame.time,0);assert.equal(host.frame.mobs.length,0);
 assert(host.frame.players.every(p=>p.cast===0));assert(guest.frame.players.every(p=>p.cast===0));
+assert(lobbyWorldReady>0&&lobbyWorldReady<fixture.calls.find(c=>c.op==='start')!.at,'actual lobby world is ready before host starts');
 assert.equal(fixture.tracks,2,'existing three-channel transport only; Presence tracked once');
 assert.equal(fixture.calls.filter(c=>c.name==='coop_beta'&&c.op==='create').length,0,'LFG never creates an unrelated second room');
 assert.equal(fixture.calls.filter(c=>c.op==='start').length,1,'host starts exactly once after both ready');

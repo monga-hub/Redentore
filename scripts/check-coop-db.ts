@@ -16,6 +16,7 @@ const base={v:1,hero:'risorto',player:{x:0,y:0,z:0,yaw:0,hp:1280,mana:400,charge
 await db.query("insert into public.saves values($1,'redentore','risorto',$2),($3,'redentore','risorto',$2)",[uid,base,other]);
 const deny=async(sql:string,args:unknown[]=[])=>{await assert.rejects(()=>db.query(sql,args));};
 await db.exec('set role coop_referee');
+assert.equal((await db.query<{ok:boolean}>("select current_user='coop_referee' and has_function_privilege(current_user,'public.coop_award(uuid,jsonb)','EXECUTE') and not has_table_privilege(current_user,'public.saves','SELECT') and not (case when has_schema_privilege(current_user,'auth','USAGE') then has_table_privilege(current_user,'auth.users','SELECT') else false end) as ok")).rows[0].ok,true,'runtime startup privilege gate');
 await deny('select * from public.saves');await deny('select * from public.coop_rewards');await deny('select * from auth.users');await deny('select public.coop_claim($1,10)',[match]);
 const winners=[{user:uid,hero:'risorto',item},{user:other,hero:'risorto',item:'pezzo-risorto-3-leggendario-spalle'}];
 await db.query('select public.coop_award($1,$2)',[match,winners]);
@@ -30,7 +31,9 @@ const claim=async()=>((await db.query<{coop_claim:{save:typeof base;already:bool
 const first=await claim();assert.equal(first.already,false);assert.deepEqual(first.save.bag.items,[[item,1]]);assert.equal(first.save.bag.gold,100);
 const replay=await claim();assert.equal(replay.already,true);assert.deepEqual(replay.save.bag.items,[[item,1]],'response loss/replay does not double item');
 const repair={...base,at:10};await db.query("update public.saves set data=$1 where user_id=auth.uid()",[repair]);
-assert.equal((await claim()).save.bag.items.length,1,'old-client overwrite can be repaired from durable ledger');
+const retained=(await db.query<{data:typeof base}>("select data from public.saves where user_id=auth.uid()")).rows[0].data;
+assert.deepEqual(retained.bag.items,[[item,1]],'in-flight stale upload after claim cannot erase receipt/item at DB boundary');
+assert.equal((await claim()).already,true,'stale-upload protection does not require remint or double delivery');
 await db.exec('reset role');
 const fullMatch='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 await db.exec('set role coop_referee');await db.query('select public.coop_award($1,$2)',[fullMatch,[winners[0]]]);await db.exec('reset role');

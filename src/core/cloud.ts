@@ -71,7 +71,11 @@ export async function merge(cloud: Saves, store: Storage, skip?: Hero): Promise<
     if (back && hero !== skip && (!mine || lead(back, mine) < 0) && lay(store, hero, back, mine)) { mine = back; pulled.push(hero); }
     const theirs = runOf(await cloud.load(GAME, hero), hero);
     if (theirs && (!mine || lead(theirs, mine) < 0)) {
-      if (hero !== skip && lay(store, hero, theirs, mine) && !pulled.includes(hero)) pulled.push(hero);
+      if (hero !== skip) {
+        const combined = mergeArenaRewards(theirs, mine);
+        if (lay(store, hero, combined, mine) && !pulled.includes(hero)) pulled.push(hero);
+        if (JSON.stringify(combined) !== JSON.stringify(theirs)) await send(cloud, combined, hero, store);
+      }
     } else if (mine && (!theirs || lead(mine, theirs) < 0)) await send(cloud, mine, hero, store);
   }));
   return pulled;

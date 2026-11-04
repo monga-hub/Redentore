@@ -3,6 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { WebSocket, WebSocketServer } from 'ws';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AwardOutbox } from '../server/outbox.ts';
 import { Arena, type Socket, type Winner } from '../server/arena.ts';
 import { Survival } from '../server/simulation.ts';
 import { combatHero, controls, idle, validBar, frame, DURATION, MAX_MOBS, type CombatHero } from '../src/coop/protocol.ts';
@@ -52,7 +56,7 @@ a.close();b.close();third.close();wss.close();http.close();await once(http,'clos
 console.log('coop network ok: two actual loopback WebSocket clients, third refused, ready/start, duplicate/out-of-order/invalid input, account/room isolation, disconnect/rejoin/timeout. Fixture identities only.');
 
 // Distinct builds with delayed pyre impacts: no other hero tuning may leak into a callback.
-const damageCard=[...CARD.values()].find(c=>c.of==='pyre'&&c.id.includes('dmg'));
+const damageCard=[...CARD.values()].find(c=>c.id==='pyre_big');
 assert(damageCard);
 const weak:CombatHero={...h,bar:['ember','pyre',...Array(7).fill(null)]};const strong={...weak,picks:Array(6).fill(damageCard.id)};
 const sim=new Survival([weak,strong]);
@@ -87,3 +91,23 @@ autosave(base,storage,10);await merge(cloud,storage);assert.deepEqual(resume('ti
 autosave(stale,storage,30);await merge(cloud,storage);assert.deepEqual(remote.bag!.items,[[reward,1]],'stale more-XP session cannot erase receipt/item');assert.deepEqual(resume('tizian',storage)!.bag!.items,[[reward,1]],'upload reconciliation updates local storage for next solo keep');
 await merge(cloud,storage);assert.deepEqual(remote.bag!.items,[[reward,1]]);
 console.log('coop reward merge ok: cloud/local return, stale higher-XP upload, duplicate merge, consumed marker, full-bag deferred delivery.');
+
+const temp=await mkdtemp(join(tmpdir(),'redentore-coop-outbox-'));
+const outId=randomUUID(),outWinners=[{user:randomUUID(),hero:'tizian',item:reward}];
+let out=new AwardOutbox(join(temp,'awards.sqlite'));out.enqueue(outId,outWinners);out.close();
+out=new AwardOutbox(join(temp,'awards.sqlite'));assert.deepEqual(out.pending(),[{id:outId,winners:outWinners}]);
+assert.deepEqual(out.enqueue(outId,[]),outWinners,'restart/retry fixes original winner/item');out.delivered(outId);assert.equal(out.pending().length,0);out.close();await rm(temp,{recursive:true,force:true});
+console.log('coop outbox ok: durable reopen after undelivered win, fixed retry payload, delivered cleanup.');
+
+const victoryAwards:Winner[][]=[];const both=new Arena(async(_id,w)=>{victoryAwards.push(w);});
+const sock=()=>({bufferedAmount:0,send(){},close(){}});const s0=sock(),s1=sock(),u0=randomUUID(),u1=randomUUID();
+const joined=both.admit(u0,randomUUID(),h,s0,undefined,1000);const vr=both.rooms.get(joined.room)!;
+both.admit(u1,randomUUID(),h,s1,vr.invite,1000);both.message(u0,s0,{type:'ready'},1000);both.message(u1,s1,{type:'ready'},1000);both.message(u0,s0,{type:'start'},1000);
+vr.sim!.time=299.99;vr.sim!.players[1].stats.hp=0;vr.sim!.players[0].stats.immune=999;
+both.update(1050);await new Promise(r=>setTimeout(r,0));assert.equal(victoryAwards[0].length,2,'shared victory awards both admitted players, including dead spectator');assert.equal(vr.phase,'ended');
+both.update(1100);assert.equal(victoryAwards.length,1,'terminal updates do not repeat award');
+console.log('coop shared victory ok: one survivor, both eligible teammates awarded exactly once.');
+
+remote=stale;autosave(granted,storage,20);await merge(cloud,storage);assert.deepEqual(resume('tizian',storage)!.bag!.items,[[reward,1]],'newer cloud gameplay must retain local reward receipts');assert.deepEqual(remote.bag!.items,[[reward,1]],'merged receipt must be carried back to cloud too');
+
+const jitter=new Arena(async()=>{});const ja=sock(),jb=sock(),ju=randomUUID(),jv=randomUUID();const jid=jitter.admit(ju,randomUUID(),h,ja,undefined,1000);const jr=jitter.rooms.get(jid.room)!;jitter.admit(jv,randomUUID(),h,jb,jr.invite,1000);jitter.message(ju,ja,{type:'ready'},1000);jitter.message(jv,jb,{type:'ready'},1000);jitter.message(ju,ja,{type:'start'},1000);jitter.update(1050);jitter.update(1160);assert(Math.abs(jr.sim!.time-.16)<1e-8,'bounded timer jitter is subdivided, not dropped');jitter.update(2000);assert.equal(jr.phase,'ended','long server stall ends instead of phantom catch-up');

@@ -1,13 +1,15 @@
 import { Bag } from '../loot/bag.ts';
-import type { Hero } from '../player/heroes.ts';
+import { HERO_IDS, type Hero } from '../player/heroes.ts';
+import { isLegendaryComponentReward } from '../loot/gear.ts';
 import type { GameState } from './save.ts';
 
 export interface ArenaRewards { receipts: {id:string;item:string}[]; received:string[] }
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function metadata(s: GameState): ArenaRewards {
   const a=s.arenaRewards;
-  if(!a||!Array.isArray(a.receipts)||!Array.isArray(a.received))return {receipts:[],received:[]};
-  const receipts=a.receipts.slice(0,4096).filter(r=>r&&uuid.test(r.id)&&typeof r.item==='string'&&new RegExp(`^pezzo-${s.hero}-3-leggendario-(testa|spalle|torso|mani|gambe|piedi)$`).test(r.item));
+  const hero=HERO_IDS.includes(s.hero as Hero)?s.hero as Hero:undefined;
+  if(!hero||!a||!Array.isArray(a.receipts)||!Array.isArray(a.received))return {receipts:[],received:[]};
+  const receipts=a.receipts.slice(0,4096).filter(r=>r&&uuid.test(r.id)&&typeof r.item==='string'&&isLegendaryComponentReward(r.item,hero));
   return {receipts,received:a.received.filter(id=>receipts.some(r=>r.id===id))};
 }
 /** Carry earned receipts across the existing gameplay winner/loser merge. A full bag defers delivery. */

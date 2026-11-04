@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { AwardOutbox } from './outbox.ts';
 import { WebSocketServer } from 'ws';
 import { Pool } from 'pg';
 import { createClient } from '@supabase/supabase-js';
@@ -12,23 +12,22 @@ const required=(k:string)=>{const v=process.env[k];if(!v)throw Error(`Missing ${
 const url=required('SUPABASE_URL'),key=required('SUPABASE_PUBLISHABLE_KEY');
 const origins=new Set(required('ARENA_ORIGINS').split(',').map(x=>x.trim()));
 const dataDir=required('ARENA_DATA_DIR');mkdirSync(dataDir,{recursive:true,mode:0o700});
-const db=new DatabaseSync(resolve(dataDir,'awards.sqlite'));
-db.exec('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS outbox (id TEXT PRIMARY KEY, winners TEXT NOT NULL)');
+const outbox=new AwardOutbox(resolve(dataDir,'awards.sqlite'));
 const pool=new Pool({connectionString:required('REFEREE_DATABASE_URL'),max:2,connectionTimeoutMillis:5000,query_timeout:5000});
+pool.on('error',()=>console.warn('Arena database disconnected; queued awards retained.'));
 const auth=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 async function deliver(id:string,winners:Winner[]):Promise<void> {
-  db.prepare('INSERT OR IGNORE INTO outbox VALUES (?,?)').run(id,JSON.stringify(winners)); // fsync before announcing a reward
-  const row=db.prepare('SELECT winners FROM outbox WHERE id=?').get(id)!;
-  await pool.query('select public.coop_award($1::uuid,$2::jsonb)',[id,row.winners]);
-  db.prepare('DELETE FROM outbox WHERE id=?').run(id);
+  const fixed=outbox.enqueue(id,winners);
+  await pool.query('select public.coop_award($1::uuid,$2::jsonb)',[id,JSON.stringify(fixed)]);
+  outbox.delivered(id);
 }
 let delivering=false;
 async function recover():Promise<void> {
   if(delivering)return;delivering=true;
-  try {for(const r of db.prepare('SELECT id,winners FROM outbox').all())await deliver(String(r.id),JSON.parse(String(r.winners)));}catch{console.warn('Arena award delivery pending; durable outbox retained.');}finally{delivering=false;}
+  try {for(const r of outbox.pending())await deliver(r.id,r.winners);}catch{console.warn('Arena award delivery pending; durable outbox retained.');}finally{delivering=false;}
 }
 const arena=new Arena(deliver,Math.min(16,Math.max(1,Number(process.env.ARENA_MAX_ROOMS)||1)));
-const http=createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,protocol:VERSION,pending:db.prepare('SELECT count(*) AS n FROM outbox').get()!.n}));}else{res.writeHead(404);res.end();}});
+const http=createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,protocol:VERSION,pending:outbox.pending().length}));}else{res.writeHead(404);res.end();}});
 const ws=new WebSocketServer({noServer:true,maxPayload:4096,perMessageDeflate:false});
 http.on('upgrade',(req,socket,head)=>{
   if(req.url!=='/arena'||!origins.has(req.headers.origin??'')||ws.clients.size>=128){socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');socket.destroy();return;}
@@ -60,8 +59,9 @@ ws.on('connection',socket=>{
   });
 });
 const timer=setInterval(()=>arena.update(),50),retry=setInterval(()=>void recover(),5000);
-await pool.query('select 1'); // Fail startup without durable authority, never silently run rewardless.
+const scoped=await pool.query("select current_user='coop_referee' and has_function_privilege(current_user,'public.coop_award(uuid,jsonb)','EXECUTE') and not has_table_privilege(current_user,'public.saves','SELECT') and not (case when has_schema_privilege(current_user,'auth','USAGE') then has_table_privilege(current_user,'auth.users','SELECT') else false end) as ok");
+if(scoped.rows[0]?.ok!==true)throw Error('Arena requires the restricted coop_referee execute-only role.');
 http.listen(Number(process.env.PORT)||8787,process.env.HOST||'127.0.0.1',()=>console.log('Arena ready on configured interface.'));
 void recover();
-async function shutdown(){clearInterval(timer);clearInterval(retry);arena.shutdown();for(const s of ws.clients)s.close(1001,'Riavvio');http.close();await recover();await pool.end();db.close();process.exit(0);}
+async function shutdown(){clearInterval(timer);clearInterval(retry);arena.shutdown();for(const s of ws.clients)s.close(1001,'Riavvio');http.close();await recover();await pool.end();outbox.close();process.exit(0);}
 process.once('SIGTERM',()=>void shutdown());process.once('SIGINT',()=>void shutdown());

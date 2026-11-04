@@ -18,6 +18,7 @@ export class ArenaView {
   readonly controls: Controls = idle();
   private heroes: UndeadModel[]=[];
   private mobs=new Map<number,FriarView>();
+  private pool:FriarView[]=[];
   private template?: Awaited<ReturnType<typeof arenaFriarTemplate>>;
   private target?:Frame;
   private vfx=new Vfx();
@@ -67,8 +68,8 @@ export class ArenaView {
         if(p.hp<=0&&this.hp[i]>0)h.die();if(p.hp>0&&this.hp[i]>p.hp)h.flinch(this.hp[i]-p.hp);this.hp[i]=p.hp;
         if(p.cast>this.cast[i]){h.play('push',.15);h.fight();this.cast[i]=p.cast;const ring=new THREE.Mesh(new THREE.RingGeometry(.4,.65,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:i===this.slot?0xffd75e:0x73cfff,transparent:true,opacity:.8,side:THREE.DoubleSide}));ring.position.set(p.x,.06,p.z);this.effects.push({mesh:ring,life:.5});this.scene.add(ring);}
       });
-      if(this.template)for(const m of f.mobs){let view=this.mobs.get(m.id);if(!view){view=new FriarView(this.template);this.mobs.set(m.id,view);this.scene.add(view.root);}const pos=view.root.position;const mob={...m,x:THREE.MathUtils.lerp(pos.x,m.x,k),z:THREE.MathUtils.lerp(pos.z,m.z,k),cc:control(),cd:0,struck:false,home:{x:m.x,z:m.z,yaw:0},mates:[]} as Friar;view.update(mob,dt,this.vfx,10);}
-      for(const [id,v]of this.mobs)if(!f.mobs.some(m=>m.id===id)){this.scene.remove(v.root);this.mobs.delete(id);}
+      if(this.template)for(const m of f.mobs){let view=this.mobs.get(m.id);if(!view){view=this.pool.pop()??new FriarView(this.template);view.root.position.set(m.x,m.y,m.z);view.root.visible=true;this.mobs.set(m.id,view);this.scene.add(view.root);}const pos=view.root.position;const mob={...m,x:THREE.MathUtils.lerp(pos.x,m.x,k),z:THREE.MathUtils.lerp(pos.z,m.z,k),cc:control(),cd:0,struck:false,home:{x:m.x,z:m.z,yaw:0},mates:[]} as Friar;view.update(mob,dt,this.vfx,10);}
+      for(const [id,v]of this.mobs)if(!f.mobs.some(m=>m.id===id)){this.scene.remove(v.root);this.mobs.delete(id);this.pool.push(v);}
     }
     for(const e of this.effects){e.life-=dt;e.mesh.scale.multiplyScalar(1+dt*5);(e.mesh.material as THREE.MeshBasicMaterial).opacity=Math.max(0,e.life*1.6);if(e.life<=0){this.scene.remove(e.mesh);e.mesh.geometry.dispose();(e.mesh.material as THREE.Material).dispose();}}this.effects=this.effects.filter(e=>e.life>0);
     this.vfx.update(dt);

@@ -1,12 +1,12 @@
 import { randomUUID, randomInt } from 'node:crypto';
 import { Survival } from './simulation.ts';
 import { acceptInput, controls, idle, validBar, VERSION, type CombatHero, type Controls } from '../src/coop/protocol.ts';
-import { ARMOR_SLOTS, componentId } from '../src/loot/gear.ts';
+import { ARMOR_SLOTS, componentId, isLegendaryComponentReward } from '../src/loot/gear.ts';
 
 export interface Socket { send(data: string): void; close(code?: number,reason?: string): void; readonly bufferedAmount: number }
 export interface Winner { user: string; hero: string; item: string }
 interface Member { uid: string; lease: string; hero: CombatHero; socket?: Socket; seen: number; ready: boolean; input: Controls }
-interface Room { id: string; invite: string; members: Member[]; phase: 'lobby'|'fight'|'ended'; reason: string; sim?: Survival; born: number; result?: 'victory'|'defeat'; awarding?: boolean; awarded: boolean }
+interface Room { id: string; invite: string; members: Member[]; phase: 'lobby'|'fight'|'ended'; reason: string; sim?: Survival; born: number; result?: 'victory'|'defeat'; awarding?: boolean; retryAt?: number; awarded: boolean }
 export class Arena {
   readonly rooms = new Map<string,Room>();
   private users = new Map<string,Room>();
@@ -22,6 +22,11 @@ export class Arena {
       if(m.lease===lease && !m.socket && now-m.seen<8000 && old.phase!=='ended') {m.socket=socket;m.seen=now;this.broadcast(old);return {room:old.id,slot:old.members.indexOf(m)};}
       if(old.phase==='ended') this.users.delete(uid);
       else throw Error('Account già presente: chiudi l’altra scheda o attendi la fine della stanza.');
+    }
+    if(this.rooms.size>=this.maxRooms+32){
+      const expired=[...this.rooms.values()].find(r=>r.phase==='ended'&&!r.awarding);
+      if(!expired)throw Error('Arena occupata: riprova tra poco.');
+      expired.sim?.dispose();this.rooms.delete(expired.id);for(const m of expired.members)if(this.users.get(m.uid)===expired)this.users.delete(m.uid);
     }
     let r:Room;
     if(invite) {
@@ -42,7 +47,7 @@ export class Arena {
     if(!r||!m||!msg||typeof msg!=='object') throw Error('Sessione arena non valida.');
     m.seen=now;
     const x=msg as Record<string,unknown>;
-    if(x.type==='ping') return;
+    if(x.type==='ping') {socket.send(JSON.stringify({type:'pong'}));return;}
     if(x.type==='leave') {this.end(r,'Un giocatore ha lasciato o sospeso la partita.');return;}
     if(r.phase==='ended') return;
     if(x.type==='equip'&&r.phase==='lobby') {
@@ -75,21 +80,25 @@ export class Arena {
       if(r.phase==='fight'&&r.sim) {
         if(elapsed>500) {this.end(r,'Il server è stato sospeso. Partita interrotta senza premio.');continue;}
         // Reconnect grace pauses the entire simulation. It never advances while a peer is absent.
-        if(r.members.every(m=>m.socket)) r.sim.step(Math.min(elapsed/1000,.05));
+        if(r.members.every(m=>m.socket)) {
+          let remaining=elapsed/1000;
+          while(remaining>1e-6&&r.sim.outcome==='fight'){const step=Math.min(remaining,.05);r.sim.step(step);remaining-=step;}
+        }
         if(r.sim.outcome!=='fight') {
           r.result=r.sim.outcome;
-          if(r.result==='victory') {void this.finish(r);}
+          if(r.result==='victory') {if(!r.retryAt||now>=r.retryAt)void this.finish(r,now);}
           else this.end(r,'Entrambi gli eroi sono caduti.');
         }
         if(this.tick%2===0)this.broadcast(r);
       }
     }
   }
-  private async finish(r:Room):Promise<void> {
+  private async finish(r:Room,now:number):Promise<void> {
     if(r.awarding)return;r.awarding=true;
-    const winners=r.members.filter((_,i)=>!r.sim!.players[i].stats.dead).map(m=>({user:m.uid,hero:m.hero.hero,item:componentId(m.hero.hero,3,'leggendario',ARMOR_SLOTS[randomInt(ARMOR_SLOTS.length)])}));
-    try {await this.award(r.id,winners);r.awarded=true;this.end(r,'Cinque minuti superati! Premio personale custodito: ritiralo dalla schermata arena.');}
-    catch {r.reason='Vittoria verificata; registro premi temporaneamente non disponibile. Riprovo.';r.awarding=false;}
+    const winners=r.members.map(m=>({user:m.uid,hero:m.hero.hero,item:componentId(m.hero.hero,3,'leggendario',ARMOR_SLOTS[randomInt(ARMOR_SLOTS.length)])}));
+    if(winners.some(w=>!isLegendaryComponentReward(w.item,w.hero as CombatHero['hero'])))throw Error('Invalid legendary catalogue reward');
+    try {await this.award(r.id,winners);r.awarded=true;r.awarding=false;this.end(r,'Cinque minuti superati! Premio personale custodito: ritiralo dalla schermata arena.');}
+    catch {r.reason='Vittoria verificata; registro premi temporaneamente non disponibile. Riprovo.';r.awarding=false;r.retryAt=now+5000;}
   }
   private end(r:Room,reason:string):void {r.phase='ended';r.reason=reason;this.broadcast(r);}
   private broadcast(r:Room):void {

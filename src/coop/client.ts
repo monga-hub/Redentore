@@ -20,6 +20,8 @@ body.coop .actionbar,body.coop #unit,body.coop #target-controls,body.coop #minim
 #coop-partner{position:fixed;left:calc(16px + env(safe-area-inset-left));top:102px;width:190px;pointer-events:none;z-index:11;background:var(--panel);border:2px solid transparent;box-shadow:var(--panel-shadow);padding:5px 8px;border-radius:4px}
 #coop-partner .name{font:bold 11px Georgia;color:#82d7ff;margin-bottom:4px}#coop-partner .res{width:100%;margin-top:3px}
 body.touch #coop-partner{top:76px;transform:scale(var(--k));transform-origin:0 0}
+#coop-countdown{position:fixed;inset:0;z-index:12;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd75e;text-align:center;text-shadow:0 3px 5px #000,0 0 32px #b87e2b;font-family:Georgia,serif;background:radial-gradient(ellipse at center,#100d0a66,transparent 60%)}
+#coop-countdown[hidden]{display:none}#coop-countdown span{font-size:clamp(14px,3vw,22px);letter-spacing:.16em;text-transform:uppercase;color:#f3e2b0}#coop-countdown strong{font-size:clamp(88px,23vh,160px);line-height:1.15;font-weight:normal}
 
 #arena-canvas{position:fixed;inset:0;touch-action:none}
 #arena{position:fixed;inset:0;z-index:10;display:grid;place-items:center;pointer-events:none;padding:12px;box-sizing:border-box}

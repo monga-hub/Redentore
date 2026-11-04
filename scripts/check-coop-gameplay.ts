@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Survival } from '../server/simulation.ts';
 import { arenaLevel, COURT } from '../src/coop/environment.ts';
-import { combatHero, controls, idle } from '../src/coop/protocol.ts';
+import { COUNTDOWN, combatHero, controls, idle } from '../src/coop/protocol.ts';
 import { pack, unpack, MAX_PACKET } from '../src/coop/packets.ts';
 
 const heroes=['tizian','bortolo'].map(hero=>combatHero({hero,build:{xp:9300,picks:[],learned:hero==='tizian'?['pyre','cero']:['frost','caligo']},quest:{boss3Dead:true}}));
@@ -14,12 +14,29 @@ assert(level.world.blocked(COURT.hx,0,0),'campaign exit sealed only in arena wor
 assert(!controls({...idle(),seq:1,target:-1}));assert(!controls({...idle(),seq:1,jump:'yes'}));
 const sim=new Survival([heroes[0],heroes[1]]);
 assert(sim.players.every(p=>!p.input.auto),'host and guest enter with manual abilities');
+const initial=sim.snapshot();assert.equal(initial.countdown,COUNTDOWN);
+for(const p of sim.players){p.input.auto=true;p.input.casts.fill(1);}
+for(let n=0;n<200;n++){
+  sim.step(.05);const warmup=sim.snapshot();
+  assert.equal(warmup.time,0,'match clock waits until countdown completes');
+  assert.equal(warmup.mobs.length,0,'no monsters before zero');
+  assert.deepEqual(warmup.players,initial.players,'no movement, damage, resource spending or casting during countdown');
+  const decoded=unpack(pack(warmup,'countdown'),'countdown',heroes)!;
+  assert(decoded);assert(Math.abs(decoded.frame.countdown-warmup.countdown)<.006,'peers receive host countdown');
+}
+assert.equal(sim.countdown,0);
+const invalid=pack(sim.snapshot(),'countdown') as {d:any[]};invalid.d[6]=-1;
+assert(!unpack(invalid,'countdown',heroes),'invalid countdown rejected');
+for(const p of sim.players)p.input.auto=false;
+sim.step(.05);assert.equal(sim.time,.05,'fight starts once, only after zero');
+assert(sim.players.every(p=>p.cast===0),'warmup presses never queue combat skills');
+
 for(let n=0;n<45;n++)sim.step(.05);
 assert(sim.mobs.length>=2);
 assert(sim.players.every(p=>p.cast===0),'neither peer activates skills without manual input');
 assert.equal(sim.snapshot().events.length,0,'no default automatic skill events');
 for(let i=0;i<2;i++){
-  const c={...idle(),seq:1,x:.8,target:sim.mobs[i].id};c.casts[10]=1;sim.input(i,c);
+  const c={...idle(),seq:1,x:.8,target:sim.mobs[i].id,casts:[...sim.players[i].input.casts]};c.casts[10]++;sim.input(i,c);
 }
 sim.step(.05);
 let f=sim.snapshot();assert.notEqual(f.players[0].target,f.players[1].target,'independent authoritative targets');
@@ -42,6 +59,7 @@ assert(f.mobs.every(m=>Number.isFinite(m.y)&&Math.abs(m.x)<COURT.hx&&Math.abs(m.
 sim.dispose();
 const optional=new Survival([heroes[0],heroes[1]]);
 optional.players.forEach(p=>{p.stats.immune=1e9;});
+for(let n=0;n<200;n++)optional.step(.05);
 for(const slot of [0,1]){
   optional.players[slot].input.auto=true;
   const before=optional.players.map(p=>p.cast);

@@ -50,6 +50,7 @@ export class ArenaHud {
   private bar:ActionBar<Forsaken>;
   private abilities:SharedAbilities;
   private partner=document.createElement('div');
+  private countdown=document.createElement('div');
   private hp:Bar;
   private mp:Bar;
   private minimap:Minimap;
@@ -72,6 +73,9 @@ export class ArenaHud {
     this.partner.querySelector('.name')!.textContent='Compagno · '+HEROES[other.hero].name;
     this.hp=new Bar(this.partner.querySelector('.hp')!);this.mp=new Bar(this.partner.querySelector('.mp')!);
     document.body.append(this.partner);
+    this.countdown.id='coop-countdown';this.countdown.hidden=true;
+    this.countdown.innerHTML='<span>L’assedio comincia tra</span><strong></strong>';
+    document.body.append(this.countdown);
     const discovery=new Discovery(view.environment.areas);discovery.reveal(0,0,60);
     this.fog=new FogLayer(discovery);this.fog.update(0);
     this.minimap=new Minimap(view.environment.root,this.fog,()=>{});
@@ -85,8 +89,11 @@ export class ArenaHud {
     if(text&&text!==this.message)this.abilities.notices.push({kind:'error',text});
     this.message=text;
   }
-  close():void {this.menu.close();}
+  close():void {this.menu.close();this.countdown.remove();}
   update(f:Frame):void {
+    this.countdown.hidden=f.countdown<=0;
+    const numeral=String(Math.ceil(f.countdown)),number=this.countdown.querySelector('strong')!;
+    if(number.textContent!==numeral){number.textContent=numeral;number.getAnimations().forEach(a=>a.cancel());number.animate([{transform:'scale(1.18)',opacity:.65},{transform:'scale(1)',opacity:1}],{duration:240,easing:'ease-out'});}
     const p=f.players[this.slot],other=f.players[1-this.slot],s=this.view.own.stats;
     s.hp=p.hp;s.hpMax=p.max;s.mana=p.mana;s.manaMax=p.manaMax;
     this.hud.setStats(s);this.hp.set(other.hp,other.max);this.mp.set(other.mana,other.manaMax);

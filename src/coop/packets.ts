@@ -8,16 +8,16 @@ export function pack(f:Frame,epoch:string,paused=false,reason=''):unknown {
   return {v:VERSION,e:epoch,q:f.seq,p:paused,r:reason.slice(0,120),d:[round(f.time),f.kills,['fight','victory','defeat'].indexOf(f.outcome),
     f.players.map(p=>[round(p.x),round(p.y),round(p.z),round(p.yaw),round(p.hp),p.max,round(p.mana),p.manaMax,round(p.charge),p.cast,p.slots.map(a=>[round(a.cd),a.cost,a.reason]),p.target,p.feedback,p.casting?[p.casting.slot,round(p.casting.t),round(p.casting.total)]:null]),
     f.mobs.map(m=>[m.id,round(m.x),round(m.y),round(m.z),round(m.yaw),round(m.hp),m.max,['chase','swing','dead'].indexOf(m.state),round(m.t)]),
-    f.events.map(e=>[e.seq,e.player,e.slot,e.tick,e.target,round(e.x),round(e.y),round(e.z),round(e.yaw)])]};
+    f.events.map(e=>[e.seq,e.player,e.slot,e.tick,e.target,round(e.x),round(e.y),round(e.z),round(e.yaw)]),round(f.countdown)]};
 }
 export function unpack(value:unknown,epoch:string,heroes:CombatHero[]):{frame:Frame;paused:boolean;reason:string}|undefined {
   try{
     if(!value||typeof value!=='object'||JSON.stringify(value).length>MAX_PACKET)return;
     const p=value as {v:number;e:string;q:number;p:boolean;r:string;d:unknown[]};
-    if(p.v!==VERSION||p.e!==epoch||!Number.isSafeInteger(p.q)||p.q<0||typeof p.p!=='boolean'||typeof p.r!=='string'||p.r.length>120||!Array.isArray(p.d)||p.d.length!==6)return;
-    const [time,kills,outcome,players,mobs,events]=p.d as [number,number,number,unknown[][],number[][],number[][]];
+    if(p.v!==VERSION||p.e!==epoch||!Number.isSafeInteger(p.q)||p.q<0||typeof p.p!=='boolean'||typeof p.r!=='string'||p.r.length>120||!Array.isArray(p.d)||p.d.length!==7)return;
+    const [time,kills,outcome,players,mobs,events,countdown]=p.d as [number,number,number,unknown[][],number[][],number[][],number];
     if(!Array.isArray(players)||players.length!==2||!Array.isArray(mobs)||mobs.length>24||!Array.isArray(events)||events.length>24||heroes.length!==2||![0,1,2].includes(outcome))return;
-    const f:Frame={seq:p.q,time,stage:Math.min(5,1+Math.floor(time/60)),kills,outcome:(['fight','victory','defeat']as const)[outcome],players:players.map((a,i)=>{
+    const f:Frame={seq:p.q,countdown,time,stage:Math.min(5,1+Math.floor(time/60)),kills,outcome:(['fight','victory','defeat']as const)[outcome],players:players.map((a,i)=>{
       if(!Array.isArray(a)||a.length!==14||!Array.isArray(a[10])||a[10].length!==11)throw Error();
       const bar=arenaLayout(heroes[i]);const slots=a[10] as [number,number,string][];
       const casting=a[13] as number[]|null;

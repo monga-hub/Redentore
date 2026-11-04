@@ -9,7 +9,7 @@ import { Equipment, effects, crit, damageMultiplier } from '../src/loot/gear.ts'
 import { BOONS } from '../src/quest/progress.ts';
 import { FRIAR, hurt, separate, type Friar } from '../src/enemies/brain.ts';
 import { control, pace, tick } from '../src/enemies/control.ts';
-import { DURATION, MAX_MOBS, arenaLayout, idle, type CombatHero, type Controls, type Frame } from '../src/coop/protocol.ts';
+import { COUNTDOWN, DURATION, MAX_MOBS, arenaLayout, idle, type CombatHero, type Controls, type Frame } from '../src/coop/protocol.ts';
 
 export function arenaWorld() { return arenaLevel().world; }
 export class Survival {
@@ -17,6 +17,7 @@ export class Survival {
   readonly players;
   mobs: (Friar & { id: number; max: number; kind: { hp: number; radius: number } })[] = [];
   time = 0; kills = 0; seq = 0;
+  countdown = COUNTDOWN;
   outcome: Frame['outcome'] = 'fight';
   private spawnIn = 0;
   private nextMob = 0;
@@ -60,7 +61,14 @@ export class Survival {
   step(dt: number): void { quietSfx(() => this.advance(dt)); }
   private advance(dt: number): void {
     if (this.outcome !== 'fight') return;
-    dt = Math.min(.05, Math.max(0, dt)); this.time = Math.min(DURATION, this.time + dt);
+    dt = Math.min(.05, Math.max(0, dt));
+    if(this.countdown>0){
+      this.countdown=Math.max(0,Math.round((this.countdown-dt)*1e9)/1e9);
+      // Discard warmup presses, so no skill is queued or paid for before combat.
+      for(const p of this.players)p.consumed=[...p.input.casts];
+      this.seq++;return;
+    }
+    this.time = Math.min(DURATION, this.time + dt);
     const stage = Math.min(5, 1 + Math.floor(this.time / 60));
     this.spawnIn -= dt;
     if (this.spawnIn <= 0 && this.mobs.filter(m=>m.hp>0).length < MAX_MOBS) {
@@ -134,7 +142,7 @@ export class Survival {
   }
   input(slot: number,c: Controls): void { this.players[slot].input=c; }
   snapshot(): Frame {
-    return {events:[...this.events],seq:this.seq,time:this.time,stage:Math.min(5,1+Math.floor(this.time/60)),kills:this.kills,outcome:this.outcome,
+    return {events:[...this.events],seq:this.seq,countdown:this.countdown,time:this.time,stage:Math.min(5,1+Math.floor(this.time/60)),kills:this.kills,outcome:this.outcome,
       players:this.players.map(p=>{Object.assign(tune,p.tuning);return {x:p.player.pos.x,y:p.player.pos.y,z:p.player.pos.z,yaw:p.player.facing,hp:p.stats.hp,max:p.stats.hpMax,mana:p.stats.mana,manaMax:p.stats.manaMax,charge:p.kit.system.charge,cast:p.cast,target:(p.kit.aimed?.() as Friar & {id:number}|undefined)?.id??0,feedback:this.time<p.feedbackUntil?p.feedback:'',casting:p.kit.system.casting?{slot:p.kit.system.slots.indexOf(p.kit.system.casting.ability),t:p.kit.system.casting.t,total:p.kit.system.casting.total}:null,slots:p.kit.system.slots.map(a=>a?{id:a.id,name:a.name,cost:a.mana??0,reason:p.stats.dead?'Eroe caduto':p.kit.system.unavailable(p.kit.system.slots.indexOf(a)),cd:Math.max(p.kit.system.cooldown(a),p.kit.system.gcd(a))}:{id:'',name:'',cd:0,cost:0,reason:'Slot vuoto'})};}),
       mobs:this.mobs.map(m=>({id:m.id,x:m.x,y:m.y,z:m.z,yaw:m.yaw,hp:m.hp,max:m.max,state:m.hp<=0?'dead':m.state==='swing'?'swing':'chase',t:m.t}))};
   }

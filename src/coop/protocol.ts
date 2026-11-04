@@ -5,7 +5,7 @@ import type { GearState } from '../loot/gear.ts';
 export const VERSION = 2, DURATION = 300, MAX_MOBS = 24;
 export interface CombatHero { hero: Hero; xp: number; picks: string[]; learned: string[]; main: string; gear: GearState; boon: string; bar?: (string|null)[] }
 export interface Controls { seq: number; x: number; z: number; casts: number[]; auto: boolean; jump: boolean; target: number }
-export const idle = (): Controls => ({ seq: 0, x: 0, z: 0, casts: Array(11).fill(0), auto: true, jump: false, target: 0 });
+export const idle = (): Controls => ({ seq: 0, x: 0, z: 0, casts: Array(11).fill(0), auto: false, jump: false, target: 0 });
 const record = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 const ids = (x: unknown): x is string[] => Array.isArray(x) && x.length <= 500 && x.every(k => typeof k === 'string' && k.length <= 80);
 export function combatHero(s: unknown): CombatHero {

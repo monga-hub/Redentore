@@ -13,11 +13,13 @@ for(let x=-COURT.hx+1;x<COURT.hx;x+=1)for(let z=-COURT.hz+1;z<COURT.hz;z+=1){
 assert(level.world.blocked(COURT.hx,0,0),'campaign exit sealed only in arena world');
 assert(!controls({...idle(),seq:1,target:-1}));assert(!controls({...idle(),seq:1,jump:'yes'}));
 const sim=new Survival([heroes[0],heroes[1]]);
-for(const p of sim.players)p.input.auto=false;
+assert(sim.players.every(p=>!p.input.auto),'host and guest enter with manual abilities');
 for(let n=0;n<45;n++)sim.step(.05);
 assert(sim.mobs.length>=2);
+assert(sim.players.every(p=>p.cast===0),'neither peer activates skills without manual input');
+assert.equal(sim.snapshot().events.length,0,'no default automatic skill events');
 for(let i=0;i<2;i++){
-  const c={...idle(),seq:1,auto:false,x:.8,target:sim.mobs[i].id};c.casts[10]=1;sim.input(i,c);
+  const c={...idle(),seq:1,x:.8,target:sim.mobs[i].id};c.casts[10]=1;sim.input(i,c);
 }
 sim.step(.05);
 let f=sim.snapshot();assert.notEqual(f.players[0].target,f.players[1].target,'independent authoritative targets');
@@ -38,4 +40,23 @@ const decoded=unpack(payload,'gameplay',heroes);assert(decoded);assert.deepEqual
 const bad=structuredClone(payload) as {d:any[]};bad.d[5][0][2]=11;assert(!unpack(bad,'gameplay',heroes),'untrusted event cannot select outside the equipped slots');
 assert(f.mobs.every(m=>Number.isFinite(m.y)&&Math.abs(m.x)<COURT.hx&&Math.abs(m.z)<COURT.hz));
 sim.dispose();
+const optional=new Survival([heroes[0],heroes[1]]);
+optional.players.forEach(p=>{p.stats.immune=1e9;});
+for(const slot of [0,1]){
+  optional.players[slot].input.auto=true;
+  const before=optional.players.map(p=>p.cast);
+  for(let n=0;n<80;n++)optional.step(.05);
+  assert(optional.players[slot].cast>before[slot],'explicit opt-in enables own automatic skills');
+  assert.equal(optional.players[1-slot].cast,before[1-slot],'opt-in does not enable the other peer');
+  optional.players[slot].input.auto=false;
+  const stopped=optional.players.map(p=>p.cast);
+  for(let n=0;n<80;n++)optional.step(.05);
+  assert.deepEqual(optional.players.map(p=>p.cast),stopped,'turning auto off stops new activations');
+}
+optional.dispose();
+const next=new Survival([heroes[0],heroes[1]]);
+assert(next.players.every(p=>!p.input.auto),'new simulation never inherits either peer’s opt-in');
+assert.equal(idle().auto,false,'view, session and absent-view fallback start manual');
+assert(!controls({...idle(),seq:1,auto:undefined}),'missing auto is rejected rather than enabled');
+next.dispose();
 console.log(`coop gameplay ok: real court floors/bounds, independent targets, both moving potions, truthful moving-cast rejection, stationary spell completion and compact event roundtrip (${JSON.stringify(payload).length}B).`);

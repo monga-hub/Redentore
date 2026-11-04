@@ -1,0 +1,63 @@
+{
+  "newGeometryTask": "01a1a88c-651b-7756-aa6c-7032f3544c8b",
+  "newRigTask": "01a1a892-2e15-706e-b010-4824d44c32db",
+  "sourceSha256": "807e224f203a7528390c22f3918cae3a8d7f59f1383edcd75f805efc302753bf",
+  "sha256": "e6b889a02c0f1554566eaa4df737f08d73dc6f9ffa6a883a2348d462cc54f0cf",
+  "bytes": 4412920,
+  "triangles": [
+    {
+      "name": "garment",
+      "triangles": 28298,
+      "vertices": 28422
+    },
+    {
+      "name": "hands",
+      "triangles": 1900,
+      "vertices": 1523
+    }
+  ],
+  "maps": [
+    {
+      "kind": "normal",
+      "bytes": 1444890,
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "kind": "base",
+      "bytes": 1027816,
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "kind": "orm",
+      "bytes": 450170,
+      "width": 2048,
+      "height": 2048
+    }
+  ],
+  "restClothingBoundsMetres": {
+    "min": [
+      -0.4807652594265778,
+      3.042366566436387e-08,
+      -0.3235003855176286
+    ],
+    "max": [
+      0.46157206838936327,
+      1.8454980939201886,
+      0.3235005944400812
+    ]
+  },
+  "bootVertices": 981,
+  "glowMaskPixels": 56476,
+  "geometry": "One shared garment and original character hands, prebound attributes for original 24-bone Fosca rig; no garment slot partitions; no geometry change between rarity variants",
+  "compression": "Meshopt FILTER: positions, UVs, joints and weights unchanged (decoded comparison verified); normals octahedral8; WebP maps",
+  "mobile": "Runtime maps downsampled to at most 512 pixels; three finishes share map instances",
+  "reference": "Original project concept: fosca-3-concept-clean/image-0.png",
+  "newPhaseCredits": 35,
+  "originalHands": "Original clothed Fosca anatomy and UVs only; no historical garment geometry",
+  "runtimeRig": "24 original Fosca bones, original clips and held stiletto; GLB contains binding attributes and attaches to the original runtime skeleton",
+  "authoring": "New auto-rig weights; rigid shoulder/arm frame registration; Blender anatomical cuff loops; local weight fairing, no radius fitting or garment slot partitioning",
+  "appearanceKey": "hero=fosca/chapter=3, shared across three existing stat builds",
+  "finishes": "Green: coarse weave, matte restrained brass, suppressed fine normal detail. Rare: source brocade, ivory embroidery and double piping, midnight/ivory boot accents. Epic: precious gold, engraved original ward motifs and controlled jade focal emission. Rest-space authored ornament follows skinning; identical geometry across finishes."
+}

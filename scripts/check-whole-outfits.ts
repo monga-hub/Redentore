@@ -15,6 +15,10 @@ for (const [hero, builds] of Object.entries(OUTFIT_APPEARANCES) as [Hero, readon
   const sources = new Set<number>();
   for (const build of builds) for (const chapter of [1, 2, 3] as const) for (const rarity of ['comune', 'noncomune', 'raro', 'epico'] as const) {
     const selection = { build, chapter, rarity, legacy: false };
+    if (rarity === 'comune') {
+      assert.equal(wholeOutfitKey(hero, selection), undefined, 'Every white item retains the original clothed hero');
+      continue;
+    }
     const key = wholeOutfitKey(hero, selection)!;
     assert.ok(key); sources.add(key.world);
     assert.equal(wholeOutfitKey(hero, { ...selection, legacy: true }), undefined);

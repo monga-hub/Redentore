@@ -148,3 +148,16 @@ are derivatives, not fifteen newly sculpted character models. Build palettes and
 finishing are applied at runtime. `public/models/hero-outfits/whole-icons.webp` contains
 fifteen original painted empty full-garment illustrations generated using OpenAI's
 built-in ImageGen on 2026-11-03; no character screenshots or paid Meshy calls were used.
+
+Fosca chapter 3 tier pilot (2026-11-04): `public/models/tier-outfits/fosca/3/master.glb`
+uses NEW Meshy image-to-3D geometry (`01a1a88c-651b-7756-aa6c-7032f3544c8b`,
+30 existing credits) and its new auto-rig (`01a1a892-2e15-706e-b010-4824d44c32db`,
+5 existing credits). The reference is the project's original clean Fosca chapter 3
+concept; no protected model, texture or emblem was copied. The new whole garment
+was registered and weight-authored for Fosca's original 24-bone skeleton. Her original
+character hands, UVs and weapon grip are retained, joined at authored cuff contours.
+No historical garment geometry is used. Green, blue and purple share this geometry
+and its maps, with runtime material finishes. White outfits retain the original clothed
+hero bodies. Other chapters/heroes and unrelated legendary items retain their previous
+visual fallback pending separately verified replacements. `provenance.json` records
+source/output hashes, counts and processing. This is one new pilot, not all fifteen models.

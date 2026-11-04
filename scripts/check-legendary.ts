@@ -5,6 +5,7 @@ import { ARMOR_SLOTS, COMPONENTS, OUTFITS, Equipment, componentId, outfitChoices
 import { Assembly, assemblyProgress } from '../src/loot/assembly.ts';
 import { HERO_IDS, type Hero } from '../src/player/heroes.ts';
 import { wholeOutfitKey } from '../src/player/whole-outfit-key.ts';
+import { buildsFor } from '../src/loot/builds.ts';
 import { finishWholeMaterial } from '../src/player/whole-outfit-material.ts';
 import { itemTip } from '../src/ui/tooltip.ts';
 import { serialize, deserialize, valid, type Game } from '../src/core/save.ts';
@@ -71,7 +72,10 @@ for (const hero of HERO_IDS) {
     assert.deepEqual(restored.gear.totals, gear.totals);
     const selection = outfitSelection(hero, restored.gear.worn);
     const key = wholeOutfitKey(hero, selection)!; assert(key); assert.equal(key.finish, 'epic');
-    assert.deepEqual(key, wholeOutfitKey(hero, { ...selection, rarity: 'epico' }));
+    if (hero === 'fosca') {
+      assert.equal(key.tier, undefined, 'Legendary retains its historical source while the new chapter pilot replaces epic');
+      assert.equal(key.world, [2, 1, 3][buildsFor(hero).findIndex(b => b.id === selection.build)]);
+    } else assert.deepEqual(key, wholeOutfitKey(hero, { ...selection, rarity: 'epico' }));
     const material = new THREE.MeshStandardMaterial(); finishWholeMaterial(material, selection);
     const shader = { fragmentShader: '#include <color_fragment>\n#include <roughnessmap_fragment>', vertexShader: '', uniforms: {} };
     material.onBeforeCompile(shader as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { wholeOutfitKey, type OutfitSelection } from './whole-outfit-key.ts';
-import { hasHeroOutfits } from './hero-outfit-key.ts';
+import { CLOTH_SLOTS, hasHeroOutfits } from './hero-outfit-key.ts';
 import { HeroOutfits } from './hero-outfits.ts';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { arm, loadModel, shaft } from '../core/models.ts';
@@ -951,6 +951,10 @@ export class Outfit {
 
   wear(worn: GearState, selection?: OutfitSelection): void {
     selection ??= outfitSelection(this.hero, worn);
+    if (selection && !selection.legacy) {
+      worn = { ...worn };
+      for (const slot of CLOTH_SLOTS) delete worn[slot];
+    }
     const whole = !!wholeOutfitKey(this.hero, selection), key = whole ? JSON.stringify(selection) : '';
     const changedSelection = key !== this.selectionKey;
     this.selectionKey = key;

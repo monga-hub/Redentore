@@ -7,15 +7,16 @@ import { CLOTH_SLOTS, heroOutfitKey, type Finish } from './hero-outfit-key.ts';
 import { finishWholeMaterial, wholeMaterialKey } from './whole-outfit-material.ts';
 import { wholeOutfitKey, type OutfitSelection } from './whole-outfit-key.ts';
 import { copyFist } from './hero-outfit-fist.ts';
+import { finishFoscaTierMaterial } from './tier-outfit-material.ts';
 
-interface Master { geometries: THREE.BufferGeometry[]; cover: number[][]; seams: number[][]; materials: Map<string, THREE.MeshStandardMaterial> }
+interface Master { geometries: THREE.BufferGeometry[]; cover: number[][]; seams: number[][]; materials: Map<string, THREE.MeshStandardMaterial>; tier?: THREE.MeshStandardMaterial }
 
-/** Each slot owns a fitted piece, all sharing the hero's original skeleton and animations. */
+/** Atomic whole garments and legacy slot fallbacks share the hero's original skeleton and animations. */
 export class HeroOutfits {
   private readonly hero: Hero;
   private readonly body: THREE.SkinnedMesh;
   private readonly original: THREE.BufferAttribute;
-  private masters = new Map<number, Master>();
+  private masters = new Map<number | string, Master>();
   private parts: THREE.SkinnedMesh[] = [];
   private shells: THREE.SkinnedMesh[] = [];
   private wanted: GearState = {};
@@ -56,9 +57,51 @@ export class HeroOutfits {
     for (const shell of this.shells) shell.visible = visible;
   }
 
-  private async master(world: number): Promise<Master> {
-    const cached = this.masters.get(world);
+  private async master(world: number, tier = false): Promise<Master> {
+    const id = tier ? `tier:${world}` : world;
+    const cached = this.masters.get(id);
     if (cached) return cached;
+    if (tier) {
+      const gltf = await loadModel(`tier-outfits/${this.hero}/${world}/master.glb`, Infinity);
+      gltf.scene.updateMatrixWorld(true);
+      try {
+        let source: THREE.MeshStandardMaterial | undefined;
+        const geometries = ['garment', 'hands'].map((name) => {
+          const mesh = gltf.scene.getObjectByName(name) as THREE.Mesh;
+          if (!mesh?.isMesh || !mesh.geometry.index || !['position', 'normal', 'uv', 'skinIndex', 'skinWeight'].every(a => mesh.geometry.hasAttribute(a))) throw new Error(`Invalid whole outfit ${name}`);
+          const g = mesh.geometry;
+          g.applyMatrix4(mesh.matrixWorld);
+          if (name === 'hands') copyFist(this.body.geometry, g);
+          else g.setAttribute('aFist', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count * 3), 3));
+          g.setAttribute('aBoot', g.getAttribute('_boot') ?? new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count), 1));
+          g.setAttribute('aTierRest', g.getAttribute('_rest') ?? new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count * 3), 3));
+          if (name === 'garment') source = mesh.material as THREE.MeshStandardMaterial;
+          else for (const material of [mesh.material].flat()) material.dispose();
+          return g;
+        });
+        if (!source) throw new Error('Whole outfit material missing');
+        if (PHONE) for (const texture of this.textures(source)) {
+          const image = texture.image as ImageBitmap | HTMLImageElement;
+          if (!image || Math.max(image.width, image.height) <= 512) continue;
+          try {
+            const scale = 512 / Math.max(image.width, image.height);
+            texture.image = await createImageBitmap(image, { resizeWidth: Math.round(image.width * scale), resizeHeight: Math.round(image.height * scale), resizeQuality: 'high' });
+            if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) image.close();
+            texture.needsUpdate = true;
+          } catch { /* Keep the source on browsers without bitmap resizing. */ }
+        }
+        const master: Master = { geometries, cover: [Array.from({ length: this.original.count / 3 }, (_, i) => i), []], seams: [], materials: new Map(), tier: source };
+        this.masters.set(id, master);
+        return master;
+      } catch (error) {
+        gltf.scene.traverse(o => {
+          const mesh = o as THREE.Mesh;
+          mesh.geometry?.dispose();
+          for (const material of [mesh.material ?? []].flat()) { this.freeTextures(material as THREE.MeshStandardMaterial); material.dispose(); }
+        });
+        throw error;
+      }
+    }
     const dir = `hero-outfits/${this.hero}/${world}/`;
     const [gltf, response] = await Promise.all([loadModel(`${dir}master.glb`), fetch(`${import.meta.env.BASE_URL}models/${dir}cover.json`)]);
     if (!response.ok) throw new Error(`Outfit coverage HTTP ${response.status}`);
@@ -81,10 +124,17 @@ export class HeroOutfits {
     return master;
   }
 
-  private async material(master: Master, world: number, finish: Finish, selection?: OutfitSelection): Promise<THREE.MeshStandardMaterial> {
-    const cacheKey = wholeMaterialKey(finish, selection);
+  private async material(master: Master, world: number, finish: Finish, selection?: OutfitSelection, part = 0): Promise<THREE.MeshStandardMaterial> {
+    const cacheKey = master.tier ? (part === 1 ? 'hands' : finish) : wholeMaterialKey(finish, selection);
     const cached = master.materials.get(cacheKey);
     if (cached) return cached;
+    if (master.tier) {
+      const material = (part === 1 ? this.body.material as THREE.MeshStandardMaterial : master.tier).clone();
+      this.configureMaterial(material);
+      if (part === 0) finishFoscaTierMaterial(material, finish);
+      master.materials.set(cacheKey, material);
+      return material;
+    }
     const loader = new THREE.TextureLoader();
     const dir = `${import.meta.env.BASE_URL}models/hero-outfits/${this.hero}/${world}/${this.hero === 'risorto' ? 'outfit' : finish}`;
     const maps: THREE.Texture[] = [];
@@ -121,13 +171,14 @@ export class HeroOutfits {
         attempted = version;
         const selection = this.selection;
         const whole = wholeOutfitKey(this.hero, selection);
-        const keys = CLOTH_SLOTS.map((s) => whole ?? heroOutfitKey(this.hero, this.wanted[s]));
+        const white = selection && !selection.legacy && selection.rarity === 'comune';
+        const keys = white ? [] : whole?.tier ? [whole, whole] : CLOTH_SLOTS.map((s) => whole ?? heroOutfitKey(this.hero, this.wanted[s]));
         const ready: { slot: number; master: Master; material: THREE.MeshStandardMaterial }[] = [];
         for (let slot = 0; slot < keys.length; slot++) {
           const key = keys[slot];
           if (!key) continue;
-          const master = await this.master(key.world);
-          ready.push({ slot, master, material: await this.material(master, key.world, key.finish, whole ? selection : undefined) });
+          const master = await this.master(key.world, !!whole?.tier);
+          ready.push({ slot, master, material: await this.material(master, key.world, key.finish, whole ? selection : undefined, slot) });
         }
         if (this.disposed) break;
         if (version !== this.version) continue;
@@ -144,7 +195,7 @@ export class HeroOutfits {
           part.boundingSphere = body.boundingSphere?.clone() ?? null;
           part.castShadow = body.castShadow;
           part.userData.xray = true;
-          part.name = `outfit-${CLOTH_SLOTS[slot]}`;
+          part.name = master.tier ? `outfit-${slot ? 'hands' : 'whole'}` : `outfit-${CLOTH_SLOTS[slot]}`;
           body.parent!.add(part);
           this.parts.push(part);
           for (const triangle of master.cover[slot]) hidden.add(triangle);
@@ -161,16 +212,17 @@ export class HeroOutfits {
         index.needsUpdate = true;
         this.body.geometry.setDrawRange(0, visible.length);
         // Keep only currently worn worlds and finishes; changing gear must not accumulate GPU textures.
-        for (const [world, master] of this.masters) {
-          const finishes = new Set(keys.filter((k) => k?.world === world).map((k) => wholeMaterialKey(k!.finish, whole ? selection : undefined)));
-          for (const [finish, material] of master.materials) if (!finishes.has(finish)) {
-            for (const t of new Set([material.map, material.normalMap, material.roughnessMap])) if (t) {
-              if (typeof ImageBitmap !== 'undefined' && t.image instanceof ImageBitmap) t.image.close();
-              t.dispose();
-            }
+        for (const [id, master] of this.masters) {
+          const current = new Set(ready.filter(r => r.master === master).map(r => r.material));
+          for (const [finish, material] of master.materials) if (!current.has(material)) {
+            if (!master.tier) this.freeTextures(material);
             material.dispose(); master.materials.delete(finish);
           }
-          if (!finishes.size) { for (const g of master.geometries) g.dispose(); this.masters.delete(world); }
+          if (!current.size) {
+            for (const g of master.geometries) g.dispose();
+            if (master.tier) { this.freeTextures(master.tier); master.tier.dispose(); }
+            this.masters.delete(id);
+          }
         }
         break;
       }
@@ -179,6 +231,17 @@ export class HeroOutfits {
       this.busy = false;
       if (this.disposed) this.dispose();
       else if (attempted !== this.version) void this.refresh();
+    }
+  }
+
+  private textures(material: THREE.MeshStandardMaterial): Set<THREE.Texture> {
+    return new Set([material.map, material.normalMap, material.roughnessMap, material.metalnessMap, material.emissiveMap].filter((t): t is THREE.Texture => !!t));
+  }
+
+  private freeTextures(material: THREE.MeshStandardMaterial): void {
+    for (const texture of this.textures(material)) {
+      if (typeof ImageBitmap !== 'undefined' && texture.image instanceof ImageBitmap) texture.image.close();
+      texture.dispose();
     }
   }
 
@@ -192,12 +255,10 @@ export class HeroOutfits {
     for (const master of this.masters.values()) {
       for (const geometry of master.geometries) geometry.dispose();
       for (const material of master.materials.values()) {
-        for (const texture of new Set([material.map, material.normalMap, material.roughnessMap])) if (texture) {
-          if (typeof ImageBitmap !== 'undefined' && texture.image instanceof ImageBitmap) texture.image.close();
-          texture.dispose();
-        }
+        if (!master.tier) this.freeTextures(material);
         material.dispose();
       }
+      if (master.tier) { this.freeTextures(master.tier); master.tier.dispose(); }
     }
     this.masters.clear();
   }

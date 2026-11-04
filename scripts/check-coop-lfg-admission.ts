@@ -81,9 +81,9 @@ assert.equal(fixture.tracks,2,'existing three-channel transport only; Presence t
 assert.equal(fixture.calls.filter(c=>c.name==='coop_beta'&&c.op==='create').length,0,'LFG never creates an unrelated second room');
 assert.equal(fixture.calls.filter(c=>c.op==='start').length,1,'host starts exactly once after both ready');
 await assert.rejects(()=>a.enterLfg(handoff),/già aperta/);
-await a.leave();await b.leave();assert.equal(fixture.channels.size,0);assert.deepEqual(errors,[]);
+await a.leave();await b.leave();assert.equal(fixture.channels.size,0);
 const cancelledFixture=new Fixture();const cancelled=new BetaSession(cancelledFixture.client(1),()=>{},idle,e=>errors.push(e));
 const pendingEntry=cancelled.enterLfg({proposal,ticket:tickets[1]});await wait(30);await cancelled.leave();await pendingEntry;
 assert.equal(cancelledFixture.channels.size,0);assert.equal(cancelledFixture.calls.length,1,'leaving a guest-first claim stops retries before any arena exists');
-assert.equal(cancelledFixture.calls.filter(c=>c.op==='start').length,0);
+assert.equal(cancelledFixture.calls.filter(c=>c.op==='start').length,0);assert.deepEqual(errors,[]);
 console.log('LFG admission PASS: boss2-only/XP0, shape validation, safe consumed ticket storage, fresh BetaSession leases, guest-first claim/retry, duplicate replay denial, private-subscription readiness before one start, native synchronized countdown/manual inputs and cleanup. Fixture transport only.');

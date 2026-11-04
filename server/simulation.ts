@@ -18,7 +18,7 @@ export function arenaWorld(): World {
 export class Survival {
   readonly world = arenaWorld();
   readonly players;
-  mobs: (Friar & { id: number; max: number })[] = [];
+  mobs: (Friar & { id: number; max: number; kind: { hp: number; radius: number } })[] = [];
   time = 0; kills = 0; seq = 0;
   outcome: Frame['outcome'] = 'fight';
   private spawnIn = 0;
@@ -62,7 +62,7 @@ export class Survival {
       if (this.mobs.length < MAX_MOBS) {
         const angle = Math.random()*Math.PI*2, x=Math.sin(angle)*16, z=Math.cos(angle)*16;
         const max = 300 + stage * 160;
-        this.mobs.push({ id: ++this.nextMob, max, x,y:0,z,yaw:0,hp:max,state:'chase',t:0,cd:0,struck:false,home:{x,z,yaw:0},mates:[],cc:control() });
+        this.mobs.push({ id: ++this.nextMob, max, kind:{hp:max,radius:FRIAR.radius}, x,y:0,z,yaw:0,hp:max,state:'chase',t:0,cd:0,struck:false,home:{x,z,yaw:0},mates:[],cc:control() });
       }
       this.spawnIn = Math.max(.25, 1.15-stage*.15);
     }

@@ -61,7 +61,7 @@ assert(damageCard);
 const weak:CombatHero={...h,bar:['ember','pyre',...Array(7).fill(null)]};const strong={...weak,picks:Array(6).fill(damageCard.id)};
 const sim=new Survival([weak,strong]);
 sim.players.forEach((p,i)=>{p.player.respawn({x:i?7:-7,z:0,yaw:0});p.input.auto=false;p.stats.immune=999;p.tuning.pyreCast=0;});
-for(const [i,x]of [-7,7].entries())sim.mobs.push({id:i+1,max:1e6,x,y:0,z:-5,yaw:0,hp:1e6,state:'chase',t:0,cd:0,struck:false,home:{x,z:-5,yaw:0},mates:[],cc:{...control(),root:999}});
+for(const [i,x]of [-7,7].entries())sim.mobs.push({id:i+1,max:1e6,kind:{hp:1e6,radius:.4},x,y:0,z:-5,yaw:0,hp:1e6,state:'chase',t:0,cd:0,struck:false,home:{x,z:-5,yaw:0},mates:[],cc:{...control(),root:999}});
 for(const p of sim.players){Object.assign(tune,p.tuning);assert(p.kit.system.tryCast(1));}
 for(let i=0;i<30;i++)sim.step(.05);
 const damages=sim.mobs.slice(0,2).map(m=>1e6-m.hp);assert(damages[0]>0&&damages[1]>damages[0]*1.5,`distinct delayed spell damage: ${damages}`);
@@ -111,3 +111,11 @@ console.log('coop shared victory ok: one survivor, both eligible teammates award
 remote=stale;autosave(granted,storage,20);await merge(cloud,storage);assert.deepEqual(resume('tizian',storage)!.bag!.items,[[reward,1]],'newer cloud gameplay must retain local reward receipts');assert.deepEqual(remote.bag!.items,[[reward,1]],'merged receipt must be carried back to cloud too');
 
 const jitter=new Arena(async()=>{});const ja=sock(),jb=sock(),ju=randomUUID(),jv=randomUUID();const jid=jitter.admit(ju,randomUUID(),h,ja,undefined,1000);const jr=jitter.rooms.get(jid.room)!;jitter.admit(jv,randomUUID(),h,jb,jr.invite,1000);jitter.message(ju,ja,{type:'ready'},1000);jitter.message(jv,jb,{type:'ready'},1000);jitter.message(ju,ja,{type:'start'},1000);jitter.update(1050);jitter.update(1160);assert(Math.abs(jr.sim!.time-.16)<1e-8,'bounded timer jitter is subdivided, not dropped');jitter.update(2000);assert.equal(jr.phase,'ended','long server stall ends instead of phantom catch-up');
+
+// Escalated arena enemies must expose their real maximum to missing-health abilities.
+const executionHero:CombatHero={hero:'risorto',xp:9300,picks:[],learned:['grace'],main:'fall',gear:{},boon:''};
+const execute=new Survival([executionHero,executionHero]);execute.players.forEach(p=>p.input.auto=false);execute.step(.05);
+const mark=execute.mobs[0],executioner=execute.players[0];executioner.player.respawn({x:mark.x,z:mark.z+1,yaw:0});
+Object.assign(tune,executioner.tuning);const fullHp=mark.hp;executioner.kit.magic.grace();const fullHit=fullHp-mark.hp;assert(fullHit>0,'Colpo di grazia must damage a full-health scaled arena mob');
+mark.hp=mark.max/2;const woundedHp=mark.hp;executioner.kit.magic.grace();assert(woundedHp-mark.hp>fullHit,'missing-health bonus uses escalated max HP, not campaign friar base120');execute.dispose();
+console.log('coop scaled enemy maximum ok: real Colpo di grazia full/wounded damage through arena target adapter.');

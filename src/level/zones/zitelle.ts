@@ -4,6 +4,7 @@ import { material } from '../materials.ts';
 import { groundPatch } from '../ground.ts';
 import { Props, cypress, fruitTree, shrub, wellTop } from '../props.ts';
 import { front } from '../facades.ts';
+import { churchSurfaces } from './churchWear.ts';
 
 // Santa Maria della Presentazione, "le Zitelle", and the Pia Casa that wraps it (see the task's
 // DESIGN.md): a white stucco front in two orders under a pediment with a great thermal window,
@@ -28,7 +29,10 @@ export function buildZitelle(b: LevelBuilder): void {
   b.zone('zitelle');
   const p = new Props(b, 83);
   b.area('Sagrato delle Zitelle', -284, -196, 0, 10);
+  const finishSurfaces = churchSurfaces(b);
   church(b, p);
+  p.flush();
+  finishSurfaces();
   ospizio(b, p);
   court(b, p);
   orto(b, p);

@@ -30,3 +30,42 @@ assert.equal(pewDrawn,true,'sanctuary pew geometry is missing');
 const side=level.cameraBlockers.find((m)=>Math.abs(m.position.x+126)<0.01&&Math.abs(m.position.z+27)<0.01);
 const back=level.cameraBlockers.find((m)=>Math.abs(m.position.x+118)<0.01&&Math.abs(m.position.z+40)<0.01);
 assert.ok(side&&back);assert.notEqual(side.userData.piece,back.userData.piece,'sanctuary shell is one opaque occlusion piece');
+
+// The wider pews leave a continuous central aisle, side aisles and both service approaches.
+for (const x of [-124.4, -118, -111.6]) for (let z = -16; z >= -33.5; z -= 0.25)
+  assert.equal(level.world.blocked(x, z, 0), false, `sanctuary walking lane ${x},${z}`);
+for (const z of [-20.5, -23.5, -26.5, -29.5, -30.5, -33.5]) for (let x = -124.4; x <= -111.6; x += 0.25)
+  assert.equal(level.world.blocked(x, z, 0), false, `sanctuary cross aisle ${x},${z}`);
+for (const x of [-122, -114]) for (const z of [-19, -22, -25, -28]) {
+  assert.equal(level.world.blocked(x, z, 0), true, 'pew collider missing');
+  const at = { x, z }; level.world.resolve(at, 0);
+  assert.equal(level.world.blocked(at.x, at.z, 0), false, 'pew traps the hero');
+}
+assert.equal(level.world.blocked(-125.3, -27, 0), true, 'projecting pier has no collider');
+// Candle FX reuse the existing budget: no new lamp/torch/glow sources or texture assets.
+const churchLights = level.lights.filter(l => l.x > -126 && l.x < -110 && l.z < -14 && l.z > -40);
+assert.equal(churchLights.filter(l => l.kind !== 'candle').length, 13);
+assert.ok(churchLights.length <= 25);
+console.log('sanctuary art ok: side/cross aisles, pew escape, pier collisions and bounded lighting');
+
+// Weathering must stay local even though the builder normally merges a whole zone per role.
+level.root.updateMatrixWorld(true);
+const aged = new Set<THREE.Material>();
+let croceWorn = false, zitelleWorn = false, outsideStone = false;
+level.root.traverse(o => {
+  if (!(o instanceof THREE.Mesh) || Array.isArray(o.material)) return;
+  if (o.material.name.startsWith('church-worn-')) {
+    aged.add(o.material);
+    o.geometry.computeBoundingBox();
+    const bounds = o.geometry.boundingBox!.clone().applyMatrix4(o.matrixWorld);
+    // Merged decor uses world coordinates; instanced meshes retain unit geometry.
+    if (o instanceof THREE.InstancedMesh) { o.computeBoundingBox(); bounds.copy(o.boundingBox!); }
+    const center = bounds.getCenter(new THREE.Vector3());
+    assert.ok(center.x > -255 && center.x < -109, 'worn church material escaped to another building');
+    if (center.x > -130) croceWorn = true;
+    if (center.x < -225) zitelleWorn = true;
+  } else if (o.userData.role === 'stone' && o.position.x > -100) outsideStone = true;
+});
+assert.ok(croceWorn && zitelleWorn && outsideStone);
+assert.ok(aged.size <= 6, 'church material variants exceeded their budget');
+console.log('church materials ok: both churches aged, neighbouring stone unchanged, at most six shared variants');

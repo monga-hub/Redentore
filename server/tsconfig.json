@@ -1,0 +1,1 @@
+{"extends":"../tsconfig.json","include":["./*.ts","../src/coop/protocol.ts"],"compilerOptions":{"types":["node","vite/client"]}}

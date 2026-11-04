@@ -12,6 +12,7 @@ import type { SideState } from '../quest/squero.ts';
 import { recoverItem, type Bag, type BagState } from '../loot/bag.ts';
 import type { Equipment, GearState } from '../loot/gear.ts';
 import { HEROES, heroOf, type Hero } from '../player/heroes.ts';
+import type { ArenaRewards } from './arena-rewards.ts';
 
 const VERSION = 1;
 /** Flags on Quest saved as they are: the second quest's, Fra' Zuane's corona found and given back, the third quest's. */
@@ -25,6 +26,7 @@ const OLD_EAST = 60;
 const STILETTO: Record<string, string> = { lance: 'caligo', lance_dmg: 'caligo_big', lance_split: 'caligo_freeze' };
 
 export interface GameState {
+  arenaRewards?: ArenaRewards;
   v: number;
   hero?: string; // player/heroes.ts; absent in saves from before the choice: the Risorto (who then started with Nube di peste, gone with the Peste)
   player: { x: number; y: number; z: number; yaw: number; hp: number; mana: number; charge: number };
@@ -60,6 +62,7 @@ export interface GameState {
 
 /** The live objects a save reads and writes. `mobs` must list every enemy in a fixed order (friars, then priests). */
 export interface Game {
+  arenaRewards?: ArenaRewards;
   hero: Hero;
   player: { pos: { x: number; y: number; z: number }; facing: number };
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
@@ -86,6 +89,7 @@ export function serialize(g: Game): GameState {
     again: g.mobs.flatMap((m, i) => (m.again ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
+    arenaRewards: g.arenaRewards,
     build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks], learned: [...g.levels.learned], main: g.levels.main },
     bag: g.bag.encode(),
     gear: g.gear.encode(),
@@ -95,6 +99,7 @@ export function serialize(g: Game): GameState {
 
 /** Lay `s` over a freshly booted game. */
 export function deserialize(g: Game, s: GameState): void {
+  g.arenaRewards = structuredClone(s.arenaRewards);
   const p = s.player;
   Object.assign(g.player.pos, { x: p.x, y: p.y, z: p.z });
   g.player.facing = p.yaw;

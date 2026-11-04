@@ -219,8 +219,9 @@ export class UndeadModel {
   private worn: GearState = {};
   private disposed = false;
 
-  constructor(hero: Hero) {
+  constructor(hero: Hero, visual = true) {
     this.pace = GAIT[hero];
+    if (!visual) return; // Server simulation uses the same kit without loading browser assets.
     loadModel(HEROES[hero].file).then((gltf) => {
       if (this.disposed) return;
       const model = gltf.scene;

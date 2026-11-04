@@ -7,7 +7,7 @@ import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import { BASES, SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { engaged } from '../enemies/brain.ts';
-import { AbilitySystem, loadBar, type Ability } from './system.ts';
+import { AbilitySystem, loadBar, type Ability, type Layout } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
 import { Grimoire, ORB_BURST, type BaseBolt, type Bolt, type BoltKind, type SpellEvent } from './grimoire.ts';
 import { L, type Shell, type ShellStyle } from './shells.ts';
@@ -333,10 +333,10 @@ export class Forsaken {
   foes?: () => Iterable<Mob>;
 
   /** `schools`: the hero's (player/heroes.ts), his base attack on the big button. */
-  constructor(player: PlayerController, stats: PlayerStats, schools?: readonly School[]) {
+  constructor(player: PlayerController, stats: PlayerStats, schools?: readonly School[], layout?: Layout) {
     this.player = player;
     this.stats = stats;
-    const start = startOf(schools), { bar, off } = loadBar([start[0], ...BAR.slice(1)], undefined, ABILITIES.map((a) => a.id));
+    const start = startOf(schools), { bar, off } = layout ?? loadBar([start[0], ...BAR.slice(1)], undefined, ABILITIES.map((a) => a.id));
     this.system = new AbilitySystem(ABILITIES, bar, this, start, off);
     this.magic = new Grimoire(this, tune);
     this.system.pool = stats;

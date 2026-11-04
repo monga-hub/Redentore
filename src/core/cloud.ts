@@ -12,6 +12,7 @@
 // No DOM, so `npm run check` drives it in Node with a fake client (scripts/check-cloud.ts).
 import { ahead, autosave, resume, valid, type GameState } from './save.ts';
 import { HERO_IDS, heroOf, type Hero } from '../player/heroes.ts';
+import { mergeArenaRewards } from './arena-rewards.ts';
 
 export const GAME = 'redentore'; // the hub's game_id
 /** A device run the cloud's newer one replaced, kept as it was. */
@@ -37,8 +38,15 @@ const stamp = (s?: GameState) => s?.at ?? 0;
 const lead = (a: GameState, b: GameState) => ahead(a, b) || stamp(b) - stamp(a);
 const parse = (r: string | null): unknown => { try { return JSON.parse(r ?? 'null'); } catch { return null; } };
 /** Sends `s` as `hero`'s slot; false from the hub (no session after all) is an error too. */
-async function send(cloud: Saves, s: GameState, hero: Hero): Promise<void> {
-  if (!await cloud.save(GAME, s, hero)) throw new Error('nessuna sessione');
+async function send(cloud: Saves, s: GameState, hero: Hero, store: Storage): Promise<void> {
+  const remote = runOf(await cloud.load(GAME, hero), hero);
+  const combined = mergeArenaRewards(s, remote);
+  if (!await cloud.save(GAME, combined, hero)) throw new Error('nessuna sessione');
+  const current = resume(hero, store);
+  if (current) {
+    const next = mergeArenaRewards(current, combined);
+    if (JSON.stringify(next) !== JSON.stringify(current)) autosave(next, store, current.at);
+  }
 }
 
 /** `hero`'s run as `got` holds it, or undefined. */
@@ -64,7 +72,7 @@ export async function merge(cloud: Saves, store: Storage, skip?: Hero): Promise<
     const theirs = runOf(await cloud.load(GAME, hero), hero);
     if (theirs && (!mine || lead(theirs, mine) < 0)) {
       if (hero !== skip && lay(store, hero, theirs, mine) && !pulled.includes(hero)) pulled.push(hero);
-    } else if (mine && (!theirs || lead(mine, theirs) < 0)) await send(cloud, mine, hero);
+    } else if (mine && (!theirs || lead(mine, theirs) < 0)) await send(cloud, mine, hero, store);
   }));
   return pulled;
 }
@@ -126,7 +134,7 @@ export class CloudSync {
       this.dirty.clear();
       this.set('sync');
       try {
-        for (const hero of heroes) { const s = resume(hero, this.store); if (s) await send(this.client, s, hero); }
+        for (const hero of heroes) { const s = resume(hero, this.store); if (s) await send(this.client, s, hero, this.store); }
         this.set('ok');
       } catch (e) {
         for (const h of heroes) this.dirty.add(h); // tried again with the next push

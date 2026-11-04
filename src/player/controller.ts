@@ -39,8 +39,8 @@ export class PlayerController {
   readonly world: World;
   private spawn: { x: number; z: number; yaw: number };
 
-  constructor(world: World, spawn: { x: number; z: number; yaw: number }, hero: Hero) {
-    this.model = new UndeadModel(hero);
+  constructor(world: World, spawn: { x: number; z: number; yaw: number }, hero: Hero, visual = true) {
+    this.model = new UndeadModel(hero, visual);
     this.world = world;
     this.spawn = spawn;
     this.mesh.add(this.model.root);
@@ -71,7 +71,7 @@ export class PlayerController {
    * `camYaw`: camera heading; movement is relative to it. `turnToCamera`: right mouse held.
    * `steer`: world-space direction (length <= 1) to run along when no key or stick is held (click-to-move).
    */
-  update(dt: number, input: Input, camYaw: number, turnToCamera: boolean, steer?: { x: number; z: number }): void {
+  update(dt: number, input: Pick<Input, 'down' | 'buttons' | 'stickX' | 'stickY'>, camYaw: number, turnToCamera: boolean, steer?: { x: number; z: number }): void {
     let f = (input.down('KeyW', 'ArrowUp') ? 1 : 0) - (input.down('KeyS', 'ArrowDown') ? 1 : 0);
     let r = (input.down('KeyD', 'ArrowRight') ? 1 : 0) - (input.down('KeyA', 'ArrowLeft') ? 1 : 0);
     if ((input.buttons & 3) === 3) f = 1; // both mouse buttons: auto-forward

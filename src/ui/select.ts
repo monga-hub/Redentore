@@ -68,6 +68,7 @@ const CSS = `
 #select .hero.sel .who b { color: #ffe3a0; }
 #select .hero.sel .who i { display: block; }
 #select .hero.sel .who .schools { display: flex; }
+#select .coop-entry { color: #ffd75e; font: bold 16px Georgia; padding: 12px; background: #140e08cc; border: 1px solid #8e743e; border-radius: 4px; }
 #select .foot { position: absolute; right: calc(28px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 #select .lore { max-width: 420px; margin: 0; text-align: right; font-style: italic; font-size: 16px; color: #d9cdb2; text-shadow: 0 1px 3px #000, 0 0 10px #000; }
 #select .go { position: relative; padding: 13px 46px; white-space: nowrap; font: bold 25px Georgia, serif; letter-spacing: 4px; color: #ffe3a0; cursor: pointer; text-shadow: 0 2px 3px #000;
@@ -92,7 +93,8 @@ body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px 
   #select .again { min-height: 40px; padding: 6px 14px; font-size: 13px; }
   #select .schools { font-size: 11px; gap: 5px; }
   #select .schools small { font-size: 10px; }
-  #select .foot { right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); gap: 6px; }
+  #select .coop-entry { color: #ffd75e; font: bold 16px Georgia; padding: 12px; background: #140e08cc; border: 1px solid #8e743e; border-radius: 4px; }
+#select .foot { right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom)); gap: 6px; }
   #select .lore { max-width: 270px; font-size: 11px; }
   #select .go { padding: 8px 26px; font-size: 17px; letter-spacing: 3px; }
 }
@@ -102,7 +104,8 @@ body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px 
   #select .who b { font-size: 14px; white-space: normal; }
   #select .hero.sel .who i, #select .hero.sel .who .schools { display: none; } /* no room beside him: the name only */
   #select .go { padding: 10px 28px; font-size: 20px; letter-spacing: 3px; }
-  #select .foot { left: 16px; right: 16px; align-items: center; }
+  #select .coop-entry { color: #ffd75e; font: bold 16px Georgia; padding: 12px; background: #140e08cc; border: 1px solid #8e743e; border-radius: 4px; }
+#select .foot { left: 16px; right: 16px; align-items: center; }
   #select .who .run { font-size: 11px; }
   #select .lore { text-align: center; }
 }`;
@@ -143,7 +146,7 @@ export function chooseHero(sync: CloudSync): Promise<{ hero: Hero; start: Start 
     <div class="roster" role="listbox">${HERO_IDS.map((id) => { const h = HEROES[id]; return `<div class="hero" data-id="${id}" role="option" tabindex="0" aria-label="${h.name}">
       <div class="gem"><div class="frame"><img alt="" src="${import.meta.env.BASE_URL}models/${h.portrait}"></div><span class="lv"></span></div>
       <div class="who"><b>${h.name}</b><span class="run"></span><i>${h.title}</i><div class="schools">${school(h.school[0], 0)}${school(h.school[1], 1)}</div></div></div>`; }).join('')}</div>
-    <div class="foot"><p class="lore"></p><div class="acts"><button type="button" class="again"></button><button type="button" class="go"></button></div></div>`;
+    <div class="foot"><a class="coop-entry" href="?coop">Arena cooperativa · 2 giocatori</a><p class="lore"></p><div class="acts"><button type="button" class="again"></button><button type="button" class="go"></button></div></div>`;
   el.querySelector('h1')!.after(accountLine(sync));
   document.body.append(el);
   const stage = new SelectStage(el);

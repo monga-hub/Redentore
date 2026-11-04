@@ -75,6 +75,7 @@ const fbm = (x: number, y: number, o = 5) => { let s = 0, a = 0.5, f = 1; for (l
 
 /** A 4×4 atlas of `S`-px tiles; `draw(i, g, px)` paints tile i with canvas calls or raw pixels. */
 function atlas(S: number, tiles: ((g: CanvasRenderingContext2D, px: ImageData) => boolean)[]): THREE.Texture {
+  if (typeof document === 'undefined') return new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
   const c = document.createElement('canvas');
   c.width = c.height = S * 4;
   const g = c.getContext('2d', { willReadFrequently: true })!; // kept on the CPU: uploads without a GPU readback
@@ -813,14 +814,16 @@ export class Vfx {
     this.smoke = new Particles(1024, this.map, THREE.NormalBlending);
     this.floorGlow = new Decals(320, dmap, THREE.AdditiveBlending); // the casters hold 18 for their telegraphs, level 2 up to 54 more for its own and the lace, level 3 ~100 (the Calice's wine, bells, isles, ink), the dragon ~90 (its breath's wedge, foam, its spots)
     this.floorDark = new Decals(24, dmap, THREE.NormalBlending);
-    const beam = document.createElement('canvas');
+    const beam = typeof document === 'undefined' ? undefined : document.createElement('canvas');
+    if (beam) {
     beam.width = 4; beam.height = 128;
     const g = beam.getContext('2d')!, r = g.createLinearGradient(0, 128, 0, 0);
     r.addColorStop(0, '#fff'); r.addColorStop(0.3, 'rgba(255,255,255,.5)'); r.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = r; g.fillRect(0, 0, 4, 128);
+    }
     this.column = new THREE.Mesh(
       new THREE.CylinderGeometry(0.55, 0.8, 14, 24, 1, true).translate(0, 7, 0),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(beam), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }),
+      new THREE.MeshBasicMaterial({ map: beam ? new THREE.CanvasTexture(beam) : new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }),
     );
     this.column.visible = false;
     this.textures = [this.map, dmap, this.column.material.map!, this.shells.noise];

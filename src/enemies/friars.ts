@@ -251,3 +251,11 @@ export class Friars {
     });
   }
 }
+
+/** Existing friar art/animation for the isolated network arena; no campaign brains are started. */
+export { View as FriarView };
+export async function arenaFriarTemplate(): Promise<Template> {
+  const [gltf, spade] = await Promise.all([loadModel('frate.glb'), loadModel('zappa.glb')]);
+  dress(gltf.scene, spade.scene);
+  return { scene: gltf.scene, clips: gltf.animations };
+}

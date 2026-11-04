@@ -104,6 +104,7 @@ body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px 
   #select .go { padding: 10px 28px; font-size: 20px; letter-spacing: 3px; }
 #select .foot { left: 16px; right: 16px; align-items: center; }
   #select .who .run { font-size: 11px; }
+  #select .acts { max-width: 100%; flex-wrap: wrap; justify-content: center; gap: 8px; }
   #select .lore { text-align: center; }
 }`;
 

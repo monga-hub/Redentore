@@ -15,15 +15,21 @@ await db.query('insert into auth.users values($1),($2)',[u,v]);
 async function who(id=u){await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${id}',false)`);}
 const state=(id='a',ancestors:string[]=[],lineage='run1')=>({v:1,hero:'risorto',player:{x:0,y:0,z:0,yaw:0,hp:50,mana:20,charge:0},quest:{key:false,bossDead:false,gates:[]},dead:[],time:1,build:{xp:100,lv:3,picks:['fall_dmg'],learned:[],edit:{lineage,id,ancestors}}});
 const rpc=async(op:string,expected:string|null=null,payload:unknown=null)=>(await db.query<{r:any}>('select public.redentore_build_save($1,$2,$3,$4) r',[op,'risorto',expected,payload])).rows[0].r;
-await who();assert.deepEqual(await rpc('load'),{token:null,state:null});const first=await rpc('save',null,state());assert.ok(first.token);
+await who();assert.deepEqual(await rpc('load'),{token:null,state:null,busy:false});const first=await rpc('save',null,state());assert.ok(first.token);
 await assert.rejects(()=>rpc('save',null,state('b',['a'])),/Conflitto/,'stale concurrent token refused');
+const lower=state();lower.build.xp=20;await assert.rejects(()=>rpc('save',first.token,lower),/esperienza/);
+
 await assert.rejects(()=>db.query("update saves set data=$1 where game_id='redentore'",[state('forged')]),/condizionale/);
 await assert.rejects(()=>db.query("delete from saves where game_id='redentore'"),/condizionale/);
 const bad=state('bad',['a']);bad.build.picks=Array(20).fill('fall_dmg');await assert.rejects(()=>rpc('save',first.token,bad),/Punti/);
+await db.exec('reset role;create table public.coop_beta_room(host_id uuid,guest_id uuid,phase text,deadline timestamptz,host_seen timestamptz)');
+await db.query(`insert into coop_beta_room values($1,null,'fight',now()+interval '5 minutes',now())`,[u]);await who();
+assert.equal((await rpc('load')).busy,true);await assert.rejects(()=>rpc('save',first.token,state('b',['a'])),/multiplayer/);
+await db.exec('reset role;delete from coop_beta_room');await who();
 const second=await rpc('save',first.token,state('b',['a']));
 await assert.rejects(()=>rpc('save',second.token,state('fork',['a'])),/concorrenti/);
 const stale=state();stale.time=9999;stale.build.xp=10000;await assert.rejects(()=>rpc('save',second.token,stale),/concorrenti/);
-await who(v);assert.deepEqual(await rpc('load'),{token:null,state:null});const other=await rpc('save',null,state('other'));assert.ok(other.token);
+await who(v);assert.deepEqual(await rpc('load'),{token:null,state:null,busy:false});const other=await rpc('save',null,state('other'));assert.ok(other.token);
 await who();assert.equal((await rpc('load')).state.build.edit.id,'b');
 await db.query("insert into saves values($1,'another-game','slot','{}',null)",[u]);await db.query("update saves set data='{}' where game_id='another-game'");
 const reset=await rpc('reset',second.token);assert.equal(reset.state,null);await assert.rejects(()=>rpc('save',reset.token,state('old',['a','b'])),/ricominciata/);

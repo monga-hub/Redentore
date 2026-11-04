@@ -1,3 +1,4 @@
+import { presetValid, type BuildPreset } from '../player/presets.ts';
 import { checkBuild } from '../player/build.ts';
 import { editValid, type BuildEdit } from './build-state.ts';
 // Saved games: the state worth keeping as plain JSON (the hero chosen, player, quest flags, who is dead, play
@@ -56,7 +57,7 @@ export interface GameState {
   // learned: abilities taught by the merchants' tomes (player/levels.ts TOMES); absent in older saves: none. Picks and learned
   // of a school not the hero's (saves from before the two schools) load dropped: picks offered again, tomes paid back.
   // main: the base attack the book put on the big button (player/levels.ts BASE_ATTACK); absent: the hero's own.
-  build?: { xp: number; lv: number; picks: string[]; learned?: string[]; main?: string; banked?: number; edit?: BuildEdit };
+  build?: { xp: number; lv: number; picks: string[]; learned?: string[]; main?: string; banked?: number; presets?: BuildPreset[]; edit?: BuildEdit };
   bag?: BagState; // gold and items picked up; absent in saves from before the loot, which load with an empty bag
   gear?: GearState; // slot -> item id worn; absent in saves from before the equipment, which load in the starter set
   side?: SideState; // the side quests taken, handed in, their kill counts and steps; absent in saves from before Mastro Iseppo: none (steps absent: the first)
@@ -70,7 +71,7 @@ export interface Game {
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
   kit: { charge: number };
   /** `apply` lays the picks on the kit and stats (raising hpMax), so a load runs it before restoring hp. */
-  levels: { xp: number; picks: string[]; learned: string[]; main: string; banked?: number; edit?: BuildEdit; apply(): void };
+  levels: { xp: number; picks: string[]; learned: string[]; main: string; banked?: number; presets?: BuildPreset[]; edit?: BuildEdit; apply(): void };
   quest: Quest;
   mobs: { state: string; hp: number; t: number; again?: boolean }[];
   time: number;
@@ -91,7 +92,7 @@ export function serialize(g: Game): GameState {
     again: g.mobs.flatMap((m, i) => (m.again ? [i] : [])),
     time: g.time,
     fog: g.fog.encode(),
-    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks], learned: [...g.levels.learned], main: g.levels.main, ...(g.levels.banked ? {banked:g.levels.banked} : {}), ...(g.levels.edit ? {edit:structuredClone(g.levels.edit)} : {}) },
+    build: { xp: g.levels.xp, lv: levelOf(g.levels.xp).lv, picks: [...g.levels.picks], learned: [...g.levels.learned], main: g.levels.main, ...(g.levels.presets?.length ? {presets:structuredClone(g.levels.presets)} : {}), ...(g.levels.banked ? {banked:g.levels.banked} : {}), ...(g.levels.edit ? {edit:structuredClone(g.levels.edit)} : {}) },
     bag: g.bag.encode(),
     gear: g.gear.encode(),
     side: g.quest.side.encode(),
@@ -110,6 +111,7 @@ export function deserialize(g: Game, s: GameState): void {
   // medals) too, its level-up offered again and a tome's ability paid back (levels.ts ownSchools). The Risorto's old start,
   // Nube di peste, went with the Peste.
   const own = ownSchools((s.build?.picks ?? []).map(was).filter((id) => CARD.has(id)), (s.build?.learned ?? []).map(was).filter((id) => CARD.get(id)?.kind === 'ability'), HEROES[g.hero].school);
+  g.levels.presets = structuredClone(s.build?.presets ?? []);
   g.levels.edit = s.build?.edit ? structuredClone(s.build.edit) : undefined;
   g.levels.picks = own.picks;
   g.levels.banked = Math.min(Math.max(0, Math.floor(s.build?.banked ?? 0)), Math.max(0, levelOf(g.levels.xp).lv - 1 - own.picks.length));
@@ -177,6 +179,7 @@ export function valid(s: unknown): s is GameState {
     && [undefined, true, false].includes(o.quest.asked) && (o.quest.heads === undefined || num(o.quest.heads)) && (o.quest.boon === undefined || typeof o.quest.boon === 'string')
     && Array.isArray(o.dead) && o.dead.every(Number.isInteger) && (o.again === undefined || (Array.isArray(o.again) && o.again.every(Number.isInteger))) && num(o.time) && (o.fog === undefined || typeof o.fog === 'string')
     && (o.build === undefined || (!!o.build && num(o.build.xp) && num(o.build.lv) && Array.isArray(o.build.picks) && o.build.picks.every((x) => typeof x === 'string')
+      && (o.build.presets === undefined || (Array.isArray(o.build.presets) && o.build.presets.length <= 128 && o.build.presets.every(presetValid)))
       && (o.build.edit === undefined || editValid(o.build.edit))
       && (o.build.banked === undefined || (Number.isSafeInteger(o.build.banked) && o.build.banked >= 0))
       && (o.build.learned === undefined || (Array.isArray(o.build.learned) && o.build.learned.every((x) => typeof x === 'string')))))

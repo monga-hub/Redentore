@@ -1,3 +1,4 @@
+import type { BuildPreset } from './presets.ts';
 import type { BuildEdit } from '../core/build-state.ts';
 // Experience levels and the choose-a-card upgrades, Vampire Survivors style but on a finite budget:
 // nobody respawns, so XP is the worth of the mobs lying dead (main.ts derives it every frame) and the
@@ -473,6 +474,7 @@ export class Levels {
   /** The base attack on the big button, if the player put his secondary school's there (the book); else his own. */
   main = '';
   /** Refunded choices left for the build panel; they must not reopen random level-up dialogs. */
+  presets: BuildPreset[] = [];
   banked = 0;
   edit?: BuildEdit;
   picks: string[] = [];

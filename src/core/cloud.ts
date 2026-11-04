@@ -24,6 +24,7 @@ export interface Saves {
   save(game: string, data: unknown, slot?: string): Promise<boolean>;
   remove(game: string, slot?: string): Promise<boolean>;
   /** Called now and on every login, logout and token refresh. */
+  canEditBuild?(hero: Hero): Promise<boolean>;
   onUserChange(cb: (u: { id: string; email: string } | null) => void): () => void;
 }
 
@@ -60,11 +61,17 @@ export async function merge(cloud: Saves, store: Storage, skip?: Hero): Promise<
   const pulled: Hero[] = [];
   await Promise.all(HERO_IDS.map(async (hero) => {
     let mine = resume(hero, store);
-    const back = runOf(parse(store.getItem(REPLACED(hero))), hero);
+    let back = runOf(parse(store.getItem(REPLACED(hero))), hero);
+    if (back?.build?.edit && mine?.build?.edit && back.build.edit.lineage !== mine.build.edit.lineage) back = undefined; // an old run is a backup, never a restore candidate
     if (back && mine) { const next = reconcileBuild(mine, back); if (next !== mine) { if (!autosave(next, store, stamp(mine))) throw Error('Salvataggio locale non disponibile.'); mine = next; } }
     const restored = back ? reconcileBuild(back,mine) : undefined;
     if (restored && hero !== skip && (!mine || lead(restored, mine) < 0) && lay(store, hero, restored, mine)) { mine = restored; pulled.push(hero); }
     const theirs = runOf(await cloud.load(GAME, hero), hero);
+    if (mine?.build?.edit && theirs?.build?.edit && mine.build.edit.lineage !== theirs.build.edit.lineage) {
+      if (hero === skip) throw Error('La partita cloud è cambiata: copia locale conservata. Esci e riprendi.');
+      if (!lay(store,hero,theirs,mine)) throw Error('Salvataggio locale non disponibile.');
+      pulled.push(hero); return;
+    }
     if (mine && theirs) {
       const w = lead(theirs,mine)<0 ? theirs : mine, d = w === theirs ? mine : theirs;
       const combined = reconcileBuild(w,d);
@@ -118,6 +125,11 @@ export class CloudSync {
         c.onUserChange((u) => { this.run(() => this.login(u)).then(() => first()); });
       } catch (e) { this.fail(e); first(); }
     }));
+  }
+
+  async buildEditAllowed(hero: Hero): Promise<string | undefined> {
+    if (this.status === 'none' || this.status === 'out') return undefined;
+    try { return await this.client?.canEditBuild?.(hero) === false ? 'Non puoi modificare la build durante una sessione multiplayer.' : undefined; } catch { return 'Verifica della sessione non disponibile: riprova prima di modificare la build.'; }
   }
 
   /** Call `f` on every change; it is dropped once it returns false (a screen gone). */

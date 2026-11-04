@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import assert from 'node:assert/strict';
 import { buildLevel } from '../src/level/index.ts';
 import { Quest } from '../src/quest/progress.ts';
@@ -19,3 +20,8 @@ for(const [id,npc] of Object.entries(SANCTUARY)) {
 const boxes=level.world.boxes.length;q.win2();assert.equal(level.world.boxes.length,boxes);
 q.accept3();q.win3();assert.equal(gate.open,true);
 console.log('sanctuary ok: boss2 permanent gate, sealed shell, clear aisle and both normal service prompts');
+
+// The pews must be drawn as well as collidable (an unflushed Props batch used to leave invisible furniture).
+let pewDrawn=false;const matrix=new THREE.Matrix4(),position=new THREE.Vector3();
+level.root.traverse((o)=>{if(o instanceof THREE.InstancedMesh&&o.userData.role==='wood')for(let i=0;i<o.count;i++){o.getMatrixAt(i,matrix);position.setFromMatrixPosition(matrix);if(Math.abs(position.x+122)<0.01&&Math.abs(position.z+19)<0.2&&position.y<1)pewDrawn=true;}});
+assert.equal(pewDrawn,true,'sanctuary pew geometry is missing');

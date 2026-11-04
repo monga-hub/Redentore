@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { Levels } from '../src/player/levels.ts';
+import { budget,reset,spend } from '../src/player/build.ts';
+import { loadPreset,renamePreset,savePreset,presetValid } from '../src/player/presets.ts';
+const b=new Levels();b.xp=600;b.picks=['step','fall_dmg','hp'];b.learned=[];b.main='fall';
+assert.equal(savePreset(b,'prima'),undefined);const id=b.presets[0].id;
+assert.equal(reset(b),undefined);assert.equal(b.banked,2);assert.equal(loadPreset(b,id),undefined);assert.equal(b.banked,0);assert.deepEqual(b.picks,['step','fall_dmg','hp']);
+const available=budget(b);for(let i=0;i<10;i++)assert.equal(loadPreset(b,id),undefined);assert.equal(budget(b),available);assert.equal(b.banked,0);
+assert.equal(renamePreset(b,id,'  altra  '),undefined);assert.equal(b.presets[0].name,'altra');assert.equal(b.main,'fall');
+b.presets.push({id:'locked',name:'non appresa',picks:['pyre_big']});let before=JSON.stringify(b);assert.ok(loadPreset(b,'locked'));assert.equal(JSON.stringify(b),before);
+b.presets.push({id:'cost',name:'troppi punti',picks:Array(30).fill('fall_dmg')});before=JSON.stringify(b);assert.ok(loadPreset(b,'cost'));assert.equal(JSON.stringify(b),before);
+assert.equal(presetValid({id:'x',name:'x',picks:['step']}),false,'presets never learn abilities');assert.equal(presetValid({id:'x',name:'x',picks:['unknown']}),false);
+assert.equal(spend(b,'fall_dmg'),undefined);assert.equal(loadPreset(b,id),undefined);assert.equal(b.banked,1);
+console.log('presets ok: allocation only, rename/view metadata, idempotent load, current ability/prerequisite/budget validation, no partial mutation or duplicated points');

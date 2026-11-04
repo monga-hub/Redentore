@@ -1,3 +1,4 @@
+import { savePreset, renamePreset, loadPreset } from './player/presets.ts';
 import { nextEdit } from './core/build-state.ts';
 import { BuildPanel } from './ui/build.ts';
 import { reset as resetBuild, spend as spendBuild } from './player/build.ts';
@@ -447,15 +448,17 @@ const sheet = new SheetPanel(bagPanel, bag, gear, () => ({ // C or the figure bu
   name: HEROES[hero].name, lv: levels.lv, schools: HEROES[hero].school, hp: playerStats.hpMax, mana: playerStats.manaMax, armor: gear.totals.armatura, cut: 1 - playerStats.armor,
   dmg: tune.dmg * worn.dmg, physical: tune.dmg * worn.physical, magic: tune.dmg * worn.magic, crit: worn.crit, haste: worn.haste / quest.castMul, regen: playerStats.regen,
 }));
-const buildPanel = new BuildPanel(levels, () => ({ name: HEROES[hero].name, title: HEROES[hero].title, schools: HEROES[hero].school, names: Object.fromEntries(ABILITIES.map((a)=>[a.id,a.name])) }), () => buildBlocked(), (op, id) => {
-  const why = buildBlocked(); if (why) return why;
-  const before = { picks: [...levels.picks], banked: levels.banked, edit: levels.edit }, hp = playerStats.hp, mana = playerStats.mana;
+const buildPanel = new BuildPanel(levels, () => ({ name: HEROES[hero].name, title: HEROES[hero].title, schools: HEROES[hero].school, names: Object.fromEntries(ABILITIES.map((a)=>[a.id,a.name])) }), () => buildBlocked(), async (op, id, name) => {
+  let why = buildBlocked(); if (why) return why;
+  why = await cloud.buildEditAllowed(hero); if (why) return why;
+  why = buildBlocked(); if (why) return why;
+  const before = { picks: [...levels.picks], banked: levels.banked, presets:structuredClone(levels.presets), edit: levels.edit }, hp = playerStats.hp, mana = playerStats.mana;
   let edit; try { edit = nextEdit(levels.edit); } catch (e) { return (e as Error).message; }
-  const error = op === 'reset' ? resetBuild(levels) : spendBuild(levels, id!);
+  const error = op === 'reset' ? resetBuild(levels) : op === 'save' ? savePreset(levels,name??'') : op === 'rename' ? renamePreset(levels,id??'',name??'') : op === 'load' ? loadPreset(levels,id??'') : spendBuild(levels,id!);
   if (error) return error;
   levels.edit = edit;
   levels.apply(); playerStats.hp = Math.min(hp, playerStats.hpMax); playerStats.mana = Math.min(mana, playerStats.manaMax);
-  if (!autosave(serialize(game))) { levels.picks = before.picks; levels.banked = before.banked; levels.edit = before.edit; levels.apply(); playerStats.hp = hp; playerStats.mana = mana; return 'Salvataggio non disponibile: nessun punto modificato.'; }
+  if (!autosave(serialize(game))) { levels.picks = before.picks; levels.banked = before.banked; levels.presets = before.presets; levels.edit = before.edit; levels.apply(); playerStats.hp = hp; playerStats.mana = mana; return 'Salvataggio non disponibile: nessun punto modificato.'; }
   cloud.push(hero); return undefined;
 });
 buildPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); book.close(); };

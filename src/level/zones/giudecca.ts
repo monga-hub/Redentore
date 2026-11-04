@@ -206,10 +206,23 @@ function santaCroce(b: LevelBuilder): void {
     for (const x of [-125.3, -110.7]) b.lights.push({ x, y: 2.5, z, kind: 'torch', nx: x < -118 ? 1 : -1, nz: 0 });
   }
   for (const x of [-119, -118, -117]) {
-    p.disc(x, 1.43, -36.4, 0.06, 0.3, 'flower');
-    b.lights.push({ x, y: 1.75, z: -36.4, kind: 'candle' });
+    p.disc(x, 1.705, -36.4, 0.1, 0.55, 'flower');
+    p.disc(x, 2.07, -36.4, 0.055, 0.18, 'lantern');
+    b.lights.push({ x, y: 2.15, z: -36.4, kind: 'candle' });
   }
   b.lights.push({ x: -118, y: 3, z: -35, kind: 'glow', color: 0xffb36a });
+  for (const z of [-22, -30]) {
+    p.rod(-118, 5.8, z, -118, 3.5, z, 0.035, 'iron');
+    p.disc(-118, 3.4, z, 0.45, 0.12, 'iron');
+    for (const dx of [-0.3, 0.3]) for (const dz of [-0.2, 0.2]) {
+      p.disc(-118 + dx, 3.635, z + dz, 0.075, 0.35, 'flower');
+      p.disc(-118 + dx, 3.87, z + dz, 0.04, 0.15, 'lantern');
+      b.lights.push({ x: -118 + dx, y: 4.02, z: z + dz, kind: 'candle' });
+    }
+    b.lights.push({ x: -118, y: 3.8, z, kind: 'lamp' });
+  }
+  for (const x of [-120.7, -115.3]) b.lights.push({ x, y: 1.55, z: -35.5, kind: 'candelabrum' });
+  p.flush();
 
 }
 

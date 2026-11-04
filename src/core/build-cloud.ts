@@ -2,12 +2,14 @@ import type { Saves } from './cloud.ts';
 import { account } from '../coop/account.ts';
 /** The existing authenticated account, with a Redentore-only compare-and-swap RPC. No service credentials. */
 export function guardedSaves(hub:Saves):Saves {
+  const busy=new Map<string,boolean>();
   const tokens=new Map<string,string|null>();
   const read=async(slot:string)=>{
     const {data,error}=await account.rpc('redentore_build_save',{op:'load',hero:slot});
-    if(error)throw error;tokens.set(slot,data.token??null);return data.state;
+    if(error)throw error;tokens.set(slot,data.token??null);busy.set(slot,data.busy===true);return data.state;
   };
   return {
+    async canEditBuild(hero){await read(hero);return !busy.get(hero);},
     async load(game,slot='default'){return game==='redentore'?read(slot):hub.load(game,slot);},
     async save(game,state,slot='default'){
       if(game!=='redentore'||!(state as {build?:{edit?:unknown}})?.build?.edit)return hub.save(game,state,slot);

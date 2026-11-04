@@ -27,6 +27,7 @@ import { PHONE, weakness } from '../core/device.ts';
 
 /** 0 = open air, 1 = closed interior; covered cloister walks sit in between. */
 function indoorness(zone: string | undefined, label: string | undefined): number {
+  if (zone === 'giudecca' && label?.startsWith('Santa Croce:')) return 1;
   if (zone === 'chiesa' || zone === 'corpo-nord') return 1;
   if (label === 'Ingresso al convento' || label === 'Corridoio del convento' || label === 'Foresteria') return 1;
   if (zone === 'sangiorgio' && label?.startsWith('Chiostr')) return 0.05; // San Giorgio's two are wide open to the moon: more sky in them, the arcades' lamps do the rest
@@ -391,7 +392,10 @@ export class Atmosphere {
 
     const mood = this.mood, u = this.grade.uniforms;
     const open = mood === DIABLO_MOOD ? 1 - Math.min(k / 0.45, 1) : 0;
-    this.hemi.intensity = lerp(mood.hemi, k) + DIABLO_OPEN.hemi * open;
+    const sanctuary = a?.zone === 'giudecca' && a.label.startsWith('Santa Croce:');
+    this.hemi.color.setHex(sanctuary ? 0xffe0bb : 0x9baecd);
+    this.hemi.groundColor.setHex(sanctuary ? 0x826349 : 0x596070);
+    this.hemi.intensity = lerp(mood.hemi, k) + DIABLO_OPEN.hemi * open + (sanctuary ? 0.45 : 0);
     this.moon.intensity = (MOON + DIABLO_OPEN.moon * open) * (this.lite ? 1 - k : 1); // without shadows no roof stops it: indoors it goes
     const B = BACINO, ss = THREE.MathUtils.smoothstep, bacino = ss(focus.z, B.z0, B.z0 + 8) * (1 - ss(focus.z, B.z1 - 8, B.z1)) * ss(focus.x, B.x0, B.x0 + 6) * (1 - ss(focus.x, B.x1 - 15, B.x1));
     this.fog.density = (lerp(mood.fog, k) + LAGOON_FOG * lagoon * (1 - k)) * (1 - B.clear * bacino * (1 - k)) * (1 - ALOFT.clear * ss(focus.y, ALOFT.y0, ALOFT.y1));

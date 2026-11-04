@@ -68,7 +68,7 @@ const PLACES: Record<string, Place> = {
 const placeOf = (zone: string | undefined, label = ''): Place =>
   zone === 'orto' || zone === 'giardini' || label === 'Orto delle Zitelle' || /^Giardino di San|^Teatro Verde/.test(label) ? PLACES.orto
     : zone === 'convento' || label === 'Cortile delle Zitelle' || /^Chiostro d/.test(label) ? PLACES.chiostro
-    : zone === 'chiesa' || /^Le Zitelle:|^Altar maggiore delle|^Basilica di San|^Crociera|^Presbiterio di San|^Coro dei monaci|^Cenacolo|^Antirefettorio|^Biblioteca del|^Scalone del/.test(label) ? PLACES.chiesa : zone === 'corpo-nord' || (zone === 'zitelle' && !/^Sagrato/.test(label)) ? PLACES.interno : PLACES.laguna;
+    : zone === 'chiesa' || /^Santa Croce:|^Le Zitelle:|^Altar maggiore delle|^Basilica di San|^Crociera|^Presbiterio di San|^Coro dei monaci|^Cenacolo|^Antirefettorio|^Biblioteca del|^Scalone del/.test(label) ? PLACES.chiesa : zone === 'corpo-nord' || (zone === 'zitelle' && !/^Sagrato/.test(label)) ? PLACES.interno : PLACES.laguna;
 
 interface Seen { state: string; hp: number; struck: boolean; cast?: Voice; x: number; z: number }
 

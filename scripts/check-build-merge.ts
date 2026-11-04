@@ -17,3 +17,10 @@ let remote:unknown=stale;
 const cloud:Saves={load:async(_g,slot)=>slot==='risorto'?remote:null,save:async(_g,s)=>{remote=structuredClone(s);return true;},remove:async()=>true,onUserChange:()=>()=>{}};
 await merge(cloud,store);assert.deepEqual(resume('risorto',store)?.build?.picks,[]);assert.deepEqual((remote as GameState).build?.picks,[]);assert.equal((remote as GameState).build?.banked,2);
 console.log('build merge ok: stale higher-XP and REPLACED copies cannot resurrect ranks/refunds, one atomic component, fork/new-lineage conflicts preserve copies');
+
+// A server-confirmed restart is canonical even with less XP; the replaced old run stays a backup.
+remote={...structuredClone(reset),build:{...reset.build!,xp:20,lv:2,banked:0,edit:nextEdit()}};
+const lineage=(remote as GameState).build!.edit!.lineage;
+await merge(cloud,store);assert.equal(resume('risorto',store)?.build?.edit?.lineage,lineage);
+assert.notEqual(JSON.parse(store.getItem(REPLACED('risorto'))!).build.edit.lineage,lineage);
+await merge(cloud,store);assert.equal(resume('risorto',store)?.build?.edit?.lineage,lineage,'old REPLACED run cannot resurrect after restart');

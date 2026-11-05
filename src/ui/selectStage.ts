@@ -4,6 +4,7 @@ import type { GearState } from '../loot/gear.ts';
 import { HEROES, type Hero } from '../player/heroes.ts';
 import { UndeadModel } from '../player/undead.ts';
 import { SelectBackdrop } from './selectBackdrop.ts';
+import { SelectFraming, type SelectArea } from './selectFraming.ts';
 
 // A painted sanctuary behind the same live, draggable hero. Scenery owns no hero resources.
 const TURN = 0.01;
@@ -39,6 +40,7 @@ function free(root: THREE.Object3D): void {
 
 export class SelectStage {
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly host: HTMLElement;
   private readonly scene = new THREE.Scene();
   private readonly cam = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
   private readonly holder = new THREE.Group(); // the hero's turn
@@ -47,8 +49,12 @@ export class SelectStage {
   private readonly reduced = matchMedia('(prefers-reduced-motion: reduce)');
   private model?: UndeadModel;
   private yaw = -0.35; // a three-quarter view, toward the fire
-  /** Where his chest faces in the holder (eased: each body's idle turns him its own way), as the sheet's figure (ui/figure.ts). */
+  /** Each loaded body's still pose faces its own way; user dragging is the only turn. */
   private facing?: number;
+  private facingRoot?: THREE.Object3D;
+  private readonly framing = new SelectFraming();
+  private readonly layout: ResizeObserver;
+  private area: SelectArea = { left: 0, right: 1, top: 0, bottom: 1 };
   private far = 1; // the lens backed off for a tall hero, so his hat stays under the title
   private t = 0;
   private last = performance.now();
@@ -56,6 +62,7 @@ export class SelectStage {
   private gone = false;
 
   constructor(host: HTMLElement) {
+    this.host = host;
     this.renderer = new THREE.WebGLRenderer({ antialias: !PHONE, alpha: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.25 : 2)); // one body: no need for the phone's DPR 3
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -86,6 +93,8 @@ export class SelectStage {
     const up = () => { px = -1; };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
+    this.layout = new ResizeObserver(this.resize);
+    for (const el of [host, ...host.querySelectorAll('.roster, .foot, h1, .account')]) this.layout.observe(el);
     addEventListener('resize', this.resize);
     document.addEventListener('visibilitychange', this.visibility);
     this.reduced.addEventListener('change', this.motion);
@@ -109,7 +118,14 @@ export class SelectStage {
     this.renderer.setSize(w, h);
     c.aspect = w / h;
     c.fov = c.aspect < 1 ? FOV * 1.25 : FOV; // upright: a little more of him and the night
+    c.clearViewOffset();
     c.updateProjectionMatrix();
+    const rect = (selector: string) => this.host.querySelector(selector)?.getBoundingClientRect();
+    const roster = rect('.roster'), foot = rect('.foot'), title = rect('h1'), account = rect('.account');
+    const strip = roster && roster.width > w * .8;
+    this.area = { left: strip ? 12 : (roster?.right ?? 0) + 8, right: w - 12,
+      top: Math.max(title?.bottom ?? 0, account?.bottom ?? 0, strip ? roster.bottom : 0) + 12, bottom: (foot?.top ?? h) - 12 };
+    this.framing.invalidate();
     // The roster covers the left: the hero stands at about 3/5 of the width, his feet near the bottom.
     const d = DIST * this.far, half = d * Math.tan(THREE.MathUtils.degToRad(c.fov / 2)) * c.aspect;
     c.position.set(-0.2 * half, 1.3 * this.far, d);
@@ -133,11 +149,13 @@ export class SelectStage {
     this.last = now;
     this.model?.present();
     const root = this.model?.root, l = root?.getObjectByName('LeftArm'), r = root?.getObjectByName('RightArm');
-    if (l && r) { // his chest's way, from the line of his shoulders (his left is -X at rest), turned to the lens
+    if (l && r && root?.children[0] !== this.facingRoot) { // his chest's way, from the line of his shoulders (his left is -X at rest), turned to the lens
       const a = this.holder.worldToLocal(l.getWorldPosition(new THREE.Vector3())).sub(this.holder.worldToLocal(r.getWorldPosition(new THREE.Vector3()))), f = Math.atan2(a.z, -a.x);
-      this.facing = this.facing === undefined ? f : this.facing + Math.atan2(Math.sin(f - this.facing), Math.cos(f - this.facing)) * 0.1;
+      this.facing = f;
+      this.facingRoot = root?.children[0];
     }
     this.holder.rotation.y = this.yaw - (this.facing ?? 0) - Math.PI;
+    if (root) this.framing.fit(root, this.cam, innerWidth, innerHeight, this.area, DIST * this.far);
     this.fire.intensity = this.reduced.matches ? 23 : 26 * (0.82 + 0.1 * Math.sin(t * 9.1) + 0.06 * Math.sin(t * 23.7) + 0.04 * Math.sin(t * 4.3));
     this.renderer.render(this.scene, this.cam);
   };
@@ -147,6 +165,7 @@ export class SelectStage {
     if (this.gone) return;
     this.gone = true;
     this.backdrop.dispose();
+    this.layout.disconnect();
     this.model?.dispose();
     cancelAnimationFrame(this.raf);
     removeEventListener('resize', this.resize);

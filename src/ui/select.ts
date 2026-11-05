@@ -97,11 +97,14 @@ body.diablo #select .hero.sel .frame { box-shadow: 0 0 0 1px #000, 0 0 16px 3px 
   #select .go { padding: 8px 26px; font-size: 17px; letter-spacing: 3px; }
 }
 @media (max-width: 560px) and (min-height: 521px) { /* a phone upright */
-  #select .roster { max-width: 42vw; padding-left: calc(10px + env(safe-area-inset-left)); }
-  #select .hero { --gem: 50px; gap: 6px; }
-  #select .who b { font-size: 14px; white-space: normal; }
-  #select .hero.sel .who i, #select .hero.sel .who .schools { display: none; } /* no room beside him: the name only */
-  #select .go { padding: 10px 28px; font-size: 20px; letter-spacing: 3px; }
+  #select .roster { top: calc(66px + env(safe-area-inset-top)); bottom: auto; width: 100%; max-width: none;
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
+    padding: 0 calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left)); overflow: visible; }
+  #select .hero { --gem: clamp(32px, 9vw, 44px); flex-direction: column; gap: 4px; min-width: 0; text-align: center; }
+  #select .who { width: 100%; }
+  #select .who b { font-size: 12px; white-space: normal; }
+  #select .hero.sel .who i, #select .hero.sel .who .schools { display: none; } /* the compact portrait strip keeps the name and progress */
+  #select .go { padding: 10px 18px; font-size: clamp(15px, 4.6vw, 20px); letter-spacing: 2px; }
 #select .foot { left: 16px; right: 16px; align-items: center; }
   #select .who .run { font-size: 11px; }
   #select .acts { max-width: 100%; flex-wrap: wrap; justify-content: center; gap: 8px; }

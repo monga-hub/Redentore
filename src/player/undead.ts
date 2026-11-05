@@ -4,8 +4,8 @@ import type { GearState } from '../loot/gear.ts';
 import { Outfit } from './outfit.ts';
 import { HEROES, type Hero } from './heroes.ts';
 import { relaxFoscaHands } from './fosca-idle.ts';
-import { NativeOutfit, NATIVE_FOSCA, nativeAppearance, freeCharacter } from './native-character.ts';
-import { poseNativeFosca } from './selector-pose.ts';
+import { NativeOutfit, nativeCharacter, NATIVE_CHARACTERS, freeCharacter } from './native-character.ts';
+import { poseNativeCharacter } from './selector-pose.ts';
 
 // Native appearance replacement owns its complete rig, clips, mixer and prop socket; only the visual root changes.
 // The base hero: an undead warrior generated, auto-rigged and animated with Meshy AI
@@ -238,7 +238,7 @@ export class UndeadModel {
   }
 
   private replace(file: string): void {
-    const hero = this.hero, native = file === NATIVE_FOSCA, request = ++this.request;
+    const hero = this.hero, native = Object.values(NATIVE_CHARACTERS).some(asset => asset.file === file), request = ++this.request;
     this.requestedKey = file;
     this.load(file).then(async (gltf) => {
       if (this.disposed || request !== this.request) { freeCharacter(gltf.scene); return; }
@@ -258,7 +258,7 @@ export class UndeadModel {
       if (!native && hero === 'fosca') relaxFoscaHands(model, gltf.animations);
       const up = UPRIGHT[hero];
       if (up && !native) upright(model, gltf.animations, up);
-      const outfit = native ? new NativeOutfit(model) : new Outfit(model, body!, hero);
+      const outfit = native ? new NativeOutfit(model, hero) : new Outfit(model, body!, hero);
       let preparedTip: THREE.Object3D | undefined;
       outfit.onWeapon = top => { preparedTip = top; };
       try {
@@ -275,7 +275,8 @@ export class UndeadModel {
       this.mixer?.stopAllAction();
       if (this.representation) { this.mixer?.uncacheRoot(this.representation); freeCharacter(this.representation, this.aura.material); }
       this.representation = model; this.outfit = outfit; this.visualKey = file;
-      this.pace = native ? { walk: 1.44, run: 4.54, up: .6, down: .93 } : GAIT[hero];
+      const nativePace = nativeCharacter(hero, this.worn);
+      this.pace = nativePace ? { walk: nativePace.walk, run: nativePace.run, up: .6, down: .93 } : GAIT[hero];
       this.shells = []; this.layers.clear(); this.actions = {} as Record<Loco, THREE.AnimationAction>; this.dying = undefined;
       this.tip = preparedTip; this.club = preparedTip?.parent ?? undefined;
       this.aura.material.uniforms.uHat = outfit instanceof Outfit ? outfit.uniforms.uHat : { value: 0 };
@@ -342,7 +343,7 @@ export class UndeadModel {
   wear(worn: GearState): void {
     this.worn = { ...worn };
     if (!this.visual || this.disposed) return;
-    const key = nativeAppearance(this.hero, this.worn) ? NATIVE_FOSCA : HEROES[this.hero].file;
+    const key = nativeCharacter(this.hero, this.worn)?.file ?? HEROES[this.hero].file;
     if (key !== this.requestedKey) {
       if (key === this.visualKey) { this.request++; this.requestedKey = key; }
       else this.replace(key);
@@ -370,7 +371,7 @@ export class UndeadModel {
     this.actions.idle.time = this.actions.idle.getClip().duration * .15;
     this.state = 'idle';
     this.mixer.update(0);
-    if (this.visualKey === NATIVE_FOSCA && this.representation) poseNativeFosca(this.representation);
+    if (Object.values(NATIVE_CHARACTERS).some(asset => asset.file === this.visualKey) && this.representation) poseNativeCharacter(this.representation);
     this.outfit?.clear(1, 1);
     for (const shell of this.shells) shell.visible = false;
     this.outfit?.showAura(this.aura.material, false);

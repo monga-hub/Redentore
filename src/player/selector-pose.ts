@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Preserve this newly generated character's own neutral reference pose, including its native arm/hand orientation. */
-export function poseNativeFosca(scene: THREE.Group): void {
+export function poseNativeCharacter(scene: THREE.Group): void {
   let skin: THREE.SkinnedMesh | undefined;
   scene.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) skin ??= o; });
   if (!skin) return;

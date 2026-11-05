@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Finish } from './hero-outfit-key.ts';
 
 /** One Fosca garment: restrained cloth, embroidered regalia, then engraved reliquary vestments. */
-export function finishFoscaTierMaterial(material: THREE.MeshStandardMaterial, finish: Finish): void {
+export function finishFoscaTierMaterial(material: THREE.MeshStandardMaterial, finish: Finish, nativePalette = false): void {
   const sober = finish === 'green', epic = finish === 'epic';
   material.metalness = sober ? .18 : epic ? .72 : .48;
   material.roughness = sober ? 1 : epic ? .76 : .9;
@@ -39,10 +39,10 @@ export function finishFoscaTierMaterial(material: THREE.MeshStandardMaterial, fi
           ${epic ? `
             diffuseColor.rgb = mix(tierBase, tierBase * vec3(1.38, 1.19, .96), tierGold * .75);
           ` : `
-            diffuseColor.rgb = mix(tierBase, vec3(.13, .28, .48) * (.12 + tierLight * 1.6), tierWine * .86);
+            ${nativePalette ? '' : 'diffuseColor.rgb = mix(tierBase, vec3(.13, .28, .48) * (.12 + tierLight * 1.6), tierWine * .86);'}
             diffuseColor.rgb = mix(diffuseColor.rgb, tierBase * vec3(1.10, 1.06, .98), tierGold * .45);
             vec3 tierBoot = mix(vec3(.025, .075, .16), vec3(.80, .82, .74), smoothstep(.035, .20, tierLight) * .8);
-            diffuseColor.rgb = mix(diffuseColor.rgb, tierBoot * (.35 + tierLight * 2.0), vTierBoot);
+            ${nativePalette ? '' : 'diffuseColor.rgb = mix(diffuseColor.rgb, tierBoot * (.35 + tierLight * 2.0), vTierBoot);'}
           `}
           // Rest-space tailoring follows the skinned surface without changing its geometry or adding draws.
           float tierY = vTierRest.y;
@@ -71,5 +71,5 @@ export function finishFoscaTierMaterial(material: THREE.MeshStandardMaterial, fi
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance = diffuseColor.rgb * ${sober ? '.12' : epic ? '.23' : '.18'};\ntotalEmissiveRadiance += vec3(.18, .28, .07) * tierRune * .65;`)
       .replace('* uGlow;', `* uGlow * ${sober ? '0.0' : epic ? '1.2' : '.06'};`);
   };
-  material.customProgramCacheKey = () => `${previousKey}:fosca-tier:${finish}`;
+  material.customProgramCacheKey = () => `${previousKey}:fosca-tier:${finish}:${nativePalette}`;
 }

@@ -128,3 +128,5 @@ swapping.wear(worn('epico'));await settle(NATIVE_FOSCA);
 assert.equal(internal.playing!.layer.upper.time, actionTime, 'White to native preserves the strike pose');
 swapping.dispose();freeCharacter(swapping.root);
 console.log('native swap: real legacy/native rigs preserve in-flight action pose and timing in both directions');
+
+await import('./check-native-chapters.ts');

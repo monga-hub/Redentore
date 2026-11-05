@@ -1,15 +1,24 @@
 import * as THREE from 'three';
 import { arm, loadModel } from '../core/models.ts';
 import { outfitSelection, type GearState } from '../loot/gear.ts';
-import type { Hero } from './heroes.ts';
+import { HEROES, type Hero } from './heroes.ts';
 import { WEAPONS } from './outfit.ts';
 import { finishFoscaTierMaterial } from './tier-outfit-material.ts';
 import type { Finish } from './hero-outfit-key.ts';
 
 export const NATIVE_FOSCA = 'native-characters/fosca-3.glb';
+// Register a chapter only after its complete native asset has passed the visual and gameplay gates.
+export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, { file: string; walk: number; run: number }>> = {
+  'fosca-3': { file: NATIVE_FOSCA, walk: 1.44, run: 4.54 },
+};
+export function nativeCharacter(hero: Hero, worn: GearState) {
+  const s = outfitSelection(hero, worn);
+  if (s.legacy || !['noncomune', 'raro', 'epico'].includes(s.rarity)) return;
+  return NATIVE_CHARACTERS[`${hero}-${s.chapter}`];
+}
 export function nativeAppearance(hero: Hero, worn: GearState): Finish | undefined {
   const s = outfitSelection(hero, worn);
-  if (hero !== 'fosca' || s.legacy || s.chapter !== 3) return;
+  if (!nativeCharacter(hero, worn)) return;
   return s.rarity === 'noncomune' ? 'green' : s.rarity === 'raro' ? 'blue' : s.rarity === 'epico' ? 'epic' : undefined;
 }
 
@@ -45,8 +54,9 @@ export class NativeOutfit {
   private gripPosition = new THREE.Vector3();
   private gripRotation = new THREE.Quaternion();
   private root: THREE.Group;
-  constructor(root: THREE.Group) {
-    this.root = root;
+  private hero: Hero;
+  constructor(root: THREE.Group, hero: Hero = 'fosca') {
+    this.root = root; this.hero = hero;
     root.traverse(o => {
       if (o instanceof THREE.SkinnedMesh) {
         this.originals.set(o, o.material as THREE.MeshStandardMaterial);
@@ -57,6 +67,7 @@ export class NativeOutfit {
         for (let i = 0; i < p.count; i++) {
           v.fromBufferAttribute(p, i).applyMatrix4(o.bindMatrix).applyMatrix4(root.matrixWorld);
           v.x = -v.x; v.z = -v.z;
+          v.multiplyScalar(1.85 / HEROES[hero].height);
           v.toArray(rest, i * 3); boot[i] = v.y < .34 ? 1 : 0;
         }
         o.geometry.setAttribute('aTierRest', new THREE.BufferAttribute(rest, 3));
@@ -90,7 +101,7 @@ export class NativeOutfit {
     });
   }
   async wear(worn: GearState): Promise<void> {
-    const finish = nativeAppearance('fosca', worn);
+    const finish = nativeAppearance(this.hero, worn);
     if (finish && finish !== this.finish) {
       this.finish = finish;
       for (const [mesh, original] of this.originals) {
@@ -98,7 +109,7 @@ export class NativeOutfit {
         const material = original.clone();
         material.side = THREE.DoubleSide;
         material.emissive.setRGB(.12, .12, .12); material.emissiveMap = material.map;
-        finishFoscaTierMaterial(material, finish);
+        finishFoscaTierMaterial(material, finish, this.hero !== 'fosca' || outfitSelection(this.hero, worn).chapter !== 3);
         mesh.material = material;
       }
     }

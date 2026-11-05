@@ -7,10 +7,14 @@ import { finishFoscaTierMaterial } from './tier-outfit-material.ts';
 import type { Finish } from './hero-outfit-key.ts';
 
 export const NATIVE_FOSCA = 'native-characters/fosca-3.glb';
+type NativeCharacter = { file: string; walk: number; run: number; finishes?: Record<Finish, readonly [number, number, number]> };
 // Register a chapter only after its complete native asset has passed the visual and gameplay gates.
-export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, { file: string; walk: number; run: number }>> = {
+export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCharacter>> = {
   'fosca-3': { file: NATIVE_FOSCA, walk: 1.44, run: 4.54 },
-  'tizian-1': { file: 'native-characters/tizian-1.glb', walk: 1.25, run: 3.92 },
+  'tizian-1': { file: 'native-characters/tizian-1.glb', walk: 1.25, run: 3.92,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
+  'bortolo-1': { file: 'native-characters/bortolo-1.glb', walk: 1.7, run: 5.3,
+    finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
 };
 export function nativeCharacter(hero: Hero, worn: GearState) {
   const s = outfitSelection(hero, worn);
@@ -110,8 +114,9 @@ export class NativeOutfit {
         const material = original.clone();
         material.side = THREE.DoubleSide;
         material.emissive.setRGB(.12, .12, .12); material.emissiveMap = material.map;
-        if (this.hero === 'tizian' && outfitSelection(this.hero, worn).chapter === 1) {
-          const [metalness, roughness, relief] = { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] }[finish];
+        const pbr = nativeCharacter(this.hero, worn)?.finishes?.[finish];
+        if (pbr) {
+          const [metalness, roughness, relief] = pbr;
           material.metalness = metalness; material.roughness = roughness;
           material.normalScale.multiplyScalar(relief);
         } else finishFoscaTierMaterial(material, finish, this.hero !== 'fosca' || outfitSelection(this.hero, worn).chapter !== 3);

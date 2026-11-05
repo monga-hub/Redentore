@@ -54,9 +54,12 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.wear({ abito: outfitChoices(hero, chapter, 'epico')[0].id }); await wait(entry.file);
   actor.present();
   let skin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) skin ??= o; });
-  if (hero === 'tizian' && chapter === 1) {
+  if ((hero === 'tizian' || hero === 'bortolo') && chapter === 1) {
     const scene = actor.root.children[0];
-    for (const [rarity, metalness, roughness, relief] of [['noncomune', .25, .88, .7], ['raro', .5, .62, 1], ['epico', .72, .42, 1.2]] as const) {
+    const contract = hero === 'tizian'
+      ? [['noncomune', .25, .88, .7], ['raro', .5, .62, 1], ['epico', .72, .42, 1.2]] as const
+      : [['noncomune', .2, .9, .7], ['raro', .48, .64, 1], ['epico', .72, .44, 1.2]] as const;
+    for (const [rarity, metalness, roughness, relief] of contract) {
       actor.wear({ abito: outfitChoices(hero, chapter, rarity)[0].id });
       const material = skin.material as THREE.MeshStandardMaterial;
       assert.equal(actor.root.children[0], scene, 'Finishes retain the accepted complete geometry');
@@ -75,7 +78,10 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
     assert.ok(p.distanceTo(v) < .00001, 'Native selector preserves its own inverse-bind pose');
   }
   actor.animate(.1, 4.2, true, 4.2); actor.play('slash1', .2); actor.animate(.2, 0, true);
+  const nativeBinds = skin.skeleton.boneInverses.map(m => m.elements);
   actor.wear({ abito: outfitChoices(hero, chapter, 'comune')[0].id }); await wait(HEROES[hero].file);
+  let legacySkin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) legacySkin ??= o; });
+  assert.notDeepEqual(nativeBinds, legacySkin.skeleton.boneInverses.map(m => m.elements), 'New chapter owns newly generated binds rather than the old hero rig');
   actor.wear({ abito: outfitChoices(hero, chapter, 'raro')[2].id }); await wait(entry.file);
   actor.dispose(); freeCharacter(actor.root);
 }

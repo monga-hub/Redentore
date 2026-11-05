@@ -1,0 +1,284 @@
+{
+  "nativeRigSha256": "23a9c9be178eb591491cae6090378ada944164b30c915ea5b0a22fa3f86f6cd7",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 29068,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "bortolo-1.glb",
+  "bytes": 3263976,
+  "sha256": "820bead9b1ca088adf3e17be184b809c3d5420255dd9c38b96448ae7b936765b",
+  "sourceJob": "01a1ab68-e93b-736e-9f08-8853a4a2f24e",
+  "sourceSha256": "93884dd2674591ac3360e667b83a37c977bb65feccc3d3c114ef2abaca2e2c4a",
+  "rigJob": "01a1abd6-241e-7341-87f4-891a1a754fd8",
+  "animationJob": "01a1abdc-dc86-727c-af7c-9ae5713a158b",
+  "referenceSha256": "8be817293803d13e021ee1b313515427ae1ec993caabe46a179382d7e43eb3f5",
+  "geometryGeneration": "Original built-in ImageGen reference with zero input images, fresh image-to-3D geometry, fresh rig and native animation exports. No historical images, geometry, hands, binds or animations reused.",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "equippedWeapon": "Existing inventory prop measured onto the new native hand",
+  "runtime": "Complete fresh body/outfit/hands and own native skeleton/mixer. Twelve native exports supply27 semantic aliases. Three finishes share new geometry. Native inverse-bind neutral selector; live gameplay animations.",
+  "paceMetresPerSecond": {
+    "walk": 1.7,
+    "run": 5.3
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 15029980,
+      "sha256": "93884dd2674591ac3360e667b83a37c977bb65feccc3d3c114ef2abaca2e2c4a"
+    },
+    "rig.glb": {
+      "bytes": 16679836,
+      "sha256": "23a9c9be178eb591491cae6090378ada944164b30c915ea5b0a22fa3f86f6cd7"
+    },
+    "native-actions.glb": {
+      "bytes": 18776408,
+      "sha256": "90fc3fa2f84186c59eb88c9cd50793505e1214ea7a30a3b8b0fa374c6fcef4a8"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 16659840,
+      "sha256": "be8980907d8937bf0782dda88cbaa102efbd1b7ac3390bdbc85dab49306a186b"
+    },
+    "running_glb_url.glb": {
+      "bytes": 16649236,
+      "sha256": "38bb2e4bcefcc3cabc9ac9813d0083af27f30789c5712fa4d2b897e47926e140"
+    }
+  },
+  "credits": {
+    "geometry": 30,
+    "rig": 5,
+    "animations": 30,
+    "total": 65
+  },
+  "limits": [
+    "No articulated fingers",
+    "Shared semantic action performances",
+    "Cloth and pauldrons can intersect at extreme poses",
+    "No physical phone guarantee"
+  ],
+  "referenceGeneration": {
+    "reference.png": "8be817293803d13e021ee1b313515427ae1ec993caabe46a179382d7e43eb3f5",
+    "mode": "Built-in ImageGen, zero image inputs, single new generation",
+    "promptFile": "reference-prompts.txt",
+    "geometryInput": "reference.png",
+    "visualGate": "Inspected adult robust patriarch, natural hands inward, boots complete, clear arm/torso gaps, fitted sleeves, attached regal shoulders, no dangling geometry",
+    "prompt": "Use case: stylized-concept. Original full-character 2D image-to-3D reference, no input images. Bortolo chapter1, heroic clerical patriarch of a Venetian dark-fantasy game: robust broad adult male body, mature lined face, strong human features, short silver beard, imposing but natural seven-and-a-half-head proportions. Original sacred armor and robes: compact ivory patriarchal mitre with bronze relief, substantial integrated regal layered shoulder pauldrons, fitted ivory-and-midnight-blue armored tunic with bronze sacred sun/wave motifs, short split tabard ending ABOVE THE KNEES, separate dark trousers, stout grounded armored boots. Full fitted sleeves and leather gloves, tight cuff joins. Crucial 3D topology reference: arms comfortably abducted about20degrees from sides with a CLEAR VISIBLE BACKGROUND GAP along BOTH armpits and whole forearms to hips; elbows relaxed, palms inward to thighs, fingers relaxed slightly curled, natural complete hands. No cloth, web, strap or ornament bridges wrists/arms to torso. Fitted sleeves never wide or hanging. Shoulder armor visibly attaches to upper arms and torso without loose dangling pieces. Frontal centered full body with generous margin around boots and mitre, level stance feet hip-width. Light-gray studio background, soft even lighting, detailed painterly high fantasy game production art. No weapon, staff, cross prop, flasks, beads, chains, dangling geometry, floor robe, cape, floating ornament, text, base, watermark or copied franchise design. Chapter1 already rich and heroic, not generic starter equipment.\n"
+  },
+  "nativeBounds": {
+    "min": [
+      -0.4862938007436105,
+      -4.115256090214744e-09,
+      -0.23873746473691485
+    ],
+    "max": [
+      0.4862937978410791,
+      2.2499997127851636,
+      0.23873749585030843
+    ]
+  },
+  "materialFinishes": {
+    "palette": "Original ivory/midnight-blue/bronze source colors retained in every rarity; no added engraving shader or forced blue",
+    "green": {
+      "metalness": 0.2,
+      "roughness": 0.9,
+      "normalScaleMultiplier": 0.7
+    },
+    "blue": {
+      "metalness": 0.48,
+      "roughness": 0.64,
+      "normalScaleMultiplier": 1
+    },
+    "epic": {
+      "metalness": 0.72,
+      "roughness": 0.44,
+      "normalScaleMultiplier": 1.2
+    }
+  }
+}

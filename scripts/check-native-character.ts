@@ -8,8 +8,9 @@ const worn = (rarity: string): GearState => ({ abito: `abito-fosca-untora-3-${ra
 assert.equal(nativeAppearance('fosca', worn('epico')), 'epic');
 assert.equal(nativeAppearance('fosca', worn('raro')), 'blue');
 assert.equal(nativeAppearance('fosca', worn('noncomune')), 'green');
-for (const r of ['comune', 'leggendario']) assert.equal(nativeAppearance('fosca', worn(r)), undefined);
-assert.equal(nativeAppearance('bortolo', worn('epico')), undefined);
+assert.equal(nativeAppearance('fosca', worn('comune')), 'starter');
+for (const r of ['leggendario']) assert.equal(nativeAppearance('fosca', worn(r)), undefined);
+assert.equal(nativeAppearance('bortolo', worn('epico')), 'starter');
 assert.equal(nativeAppearance('fosca', { abito: 'abito-fosca-untora-2-epico' }), undefined);
 const names = ['Idle_Breathe','Idle_Combat','Idle','Walking','Run_Charge','Jump_Run','Right_Hand_Sword_Slash','Slash_Back','Smash','Judgment','Cast_Throw','Cast_Spread','Ground_Slam','Scream','Roll','Cast_Push','Cast_Raise','Execute','Leap','Victory','Hit_Light','Hit_Heavy','Cast_Channel','Cast_Gather','Spin','Rush','Death'];
 function fixture() {
@@ -26,20 +27,20 @@ function fixture() {
 const jobs: { file: string; resolve: (g: GLTF) => void }[] = [];
 const load = (file: string) => new Promise<GLTF>(resolve => jobs.push({file,resolve}));
 const model = new UndeadModel('fosca', true, load);
-model.wear(worn('epico')); assert.deepEqual(jobs.map(j => j.file), ['fosca.glb', NATIVE_FOSCA]);
-model.wear(worn('raro'));assert.equal(jobs.length, 2, 'Rarity uses the same native geometry request');
-const native = fixture();jobs[1].resolve(native);await new Promise(r => setTimeout(r, 0));
+model.wear(worn('epico')); assert.deepEqual(jobs.map(j => j.file), [NATIVE_FOSCA]);
+model.wear(worn('raro'));assert.equal(jobs.length, 1, 'Rarity uses the same native geometry request');
+const native = fixture();jobs[0].resolve(native);await new Promise(r => setTimeout(r, 0));
 assert.equal(model.root.children[0], native.scene);
 model.animate(.1, 0, true);model.animate(.1, 4.2, true, 4.2);assert.ok(model.gait >= 0);
 model.play('slash1', .2);model.animate(.2, 4.2, true, 4.2);model.play('throw', .2);model.channel(true);model.animate(.2, 0, true);model.die();model.animate(.3, 0, true);model.revive();model.animate(.1, 0, true);
-model.wear(worn('comune'));assert.equal(model.root.children[0], native.scene, 'White waits atomically for the complete replacement');
-model.wear(worn('epico'));assert.equal(jobs.length, 3, 'Returning to the visible native cancels white without downloading it twice');
+model.wear({ abito: 'abito-fosca-untora-2-epico' });assert.equal(model.root.children[0], native.scene, 'Unfinished chapter waits atomically for the complete replacement');
+model.wear(worn('epico'));assert.equal(jobs.length, 2, 'Returning to the visible native cancels unfinished chapter without downloading it twice');
 const stale = fixture();let freed = 0;(stale.scene.children[0] as THREE.Mesh).geometry.addEventListener('dispose', () => freed++);
-jobs[2].resolve(stale);await new Promise(r => setTimeout(r, 0));assert.equal(freed, 1, 'Stale white result released');
-model.wear(worn('comune'));
+jobs[1].resolve(stale);await new Promise(r => setTimeout(r, 0));assert.equal(freed, 1, 'Stale fallback result released');
+model.wear({ abito: 'abito-fosca-untora-2-epico' });
 const late = fixture();let lateFreed = 0;(late.scene.children[0] as THREE.Mesh).geometry.addEventListener('dispose', () => lateFreed++);
-model.dispose();jobs[3].resolve(late);await new Promise(r => setTimeout(r, 0));assert.equal(lateFreed, 1, 'Disposed actor rejects late native result');
-freeCharacter(model.root);jobs[0].resolve(fixture());await new Promise(r => setTimeout(r, 0));
+model.dispose();jobs[2].resolve(late);await new Promise(r => setTimeout(r, 0));assert.equal(lateFreed, 1, 'Disposed actor rejects late native result');
+freeCharacter(model.root);await new Promise(r => setTimeout(r, 0));
 console.log('native character: pilot key boundaries, one native asset across rarities, complete atomic swap, locomotion/actions/death, stale loads and disposal');
 
 // Exercise the shipped native skin and clips, without browser image decoding.
@@ -121,12 +122,12 @@ assert.ok(posed.mixer.time > beforeClock && swapping.gait >= 0, 'Normal gameplay
 swapping.animate(.3, 0, true);swapping.play('slash1', .2);swapping.animate(.07, 0, true);
 const actionTime = internal.playing!.layer.upper.time, elapsed = internal.playing!.t;
 assert.ok(actionTime > .38);
-swapping.wear(worn('comune'));await settle('fosca.glb');
-assert.equal(internal.playing!.layer.upper.time, actionTime, 'Native to white preserves the strike pose before the old mixer resets');
+swapping.wear(worn('comune'));await settle(NATIVE_FOSCA);
+assert.equal(internal.playing!.layer.upper.time, actionTime, 'Epic to starter preserves the strike pose before the old mixer resets');
 assert.equal(internal.playing!.t, elapsed, 'Equip never restarts the gameplay strike timer');
 swapping.wear(worn('epico'));await settle(NATIVE_FOSCA);
-assert.equal(internal.playing!.layer.upper.time, actionTime, 'White to native preserves the strike pose');
+assert.equal(internal.playing!.layer.upper.time, actionTime, 'Starter to epic preserves the strike pose');
 swapping.dispose();freeCharacter(swapping.root);
-console.log('native swap: real legacy/native rigs preserve in-flight action pose and timing in both directions');
+console.log('native swap: real starter/equipped native rigs preserve in-flight action pose and timing in both directions');
 
 await import('./check-native-chapters.ts');

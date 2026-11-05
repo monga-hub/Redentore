@@ -19,19 +19,32 @@ export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCha
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'zanetto-2': { file: 'native-characters/zanetto-2.glb', walk: 1.47, run: 4.62,
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
+  'zanetto-3': { file: 'native-characters/zanetto-3.glb', walk: 1.51, run: 4.77,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
+  'risorto-1': { file: 'native-characters/risorto-1.glb', walk: 1.54, run: 4.83,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
+  'risorto-2': { file: 'native-characters/risorto-2.glb', walk: 1.58, run: 4.96,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
+  'risorto-3': { file: 'native-characters/risorto-3.glb', walk: 1.55, run: 4.87,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'bortolo-1': { file: 'native-characters/bortolo-1.glb', walk: 1.7, run: 5.3,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
   'bortolo-3': { file: 'native-characters/bortolo-3.glb', walk: 1.7, run: 5.37,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
 };
+// Starter geometry reuses accepted native chapters; it grants no assembled outfit or stats.
+export const NATIVE_STARTERS = { fosca: 'fosca-3', bortolo: 'bortolo-1', tizian: 'tizian-1', zanetto: 'zanetto-1', risorto: 'risorto-1' } as const;
+type NativeFinish = Finish | 'starter';
 export function nativeCharacter(hero: Hero, worn: GearState) {
   const s = outfitSelection(hero, worn);
-  if (s.legacy || !['noncomune', 'raro', 'epico'].includes(s.rarity)) return;
+  if (s.legacy || s.rarity === 'comune') return NATIVE_CHARACTERS[NATIVE_STARTERS[hero]];
+  if (!['noncomune', 'raro', 'epico'].includes(s.rarity)) return;
   return NATIVE_CHARACTERS[`${hero}-${s.chapter}`];
 }
-export function nativeAppearance(hero: Hero, worn: GearState): Finish | undefined {
+export function nativeAppearance(hero: Hero, worn: GearState): NativeFinish | undefined {
   const s = outfitSelection(hero, worn);
   if (!nativeCharacter(hero, worn)) return;
+  if (s.legacy || s.rarity === 'comune') return 'starter';
   return s.rarity === 'noncomune' ? 'green' : s.rarity === 'raro' ? 'blue' : s.rarity === 'epico' ? 'epic' : undefined;
 }
 
@@ -62,7 +75,7 @@ export class NativeOutfit {
   private weaponId?: string;
   private version = 0;
   private disposed = false;
-  private finish?: Finish;
+  private finish?: NativeFinish;
   private originals = new Map<THREE.Mesh, THREE.MeshStandardMaterial>();
   private gripPosition = new THREE.Vector3();
   private gripRotation = new THREE.Quaternion();
@@ -122,6 +135,13 @@ export class NativeOutfit {
         const material = original.clone();
         material.side = THREE.DoubleSide;
         material.emissive.setRGB(.12, .12, .12); material.emissiveMap = material.map;
+        if (finish === 'starter') {
+          material.metalness = 0; material.roughness = 1;
+          material.emissive.setRGB(0, 0, 0); material.emissiveMap = null;
+          material.normalScale.multiplyScalar(.5);
+          mesh.material = material;
+          continue;
+        }
         const pbr = nativeCharacter(this.hero, worn)?.finishes?.[finish];
         if (pbr) {
           const [metalness, roughness, relief] = pbr;

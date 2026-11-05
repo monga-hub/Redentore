@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { NATIVE_CHARACTERS, nativeCharacter, nativeAppearance, freeCharacter } from '../src/player/native-character.ts';
+import { NATIVE_CHARACTERS, NATIVE_STARTERS, nativeCharacter, nativeAppearance, freeCharacter } from '../src/player/native-character.ts';
 import { HERO_IDS, HEROES } from '../src/player/heroes.ts';
 import { outfitChoices } from '../src/loot/gear.ts';
 import { UndeadModel } from '../src/player/undead.ts';
@@ -21,8 +21,8 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
       assert.equal(nativeAppearance(hero, { abito: item.id }), entry ? finish : undefined);
     }
   }
-  for (const item of outfitChoices(hero, chapter, 'comune')) assert.equal(nativeCharacter(hero, { abito: item.id }), undefined);
-  assert.equal(nativeCharacter(hero, { torso: 'tunica-peste' }), undefined);
+  for (const item of outfitChoices(hero, chapter, 'comune')) assert.equal(nativeCharacter(hero, { abito: item.id }), NATIVE_CHARACTERS[NATIVE_STARTERS[hero]]);
+  assert.equal(nativeCharacter(hero, { torso: 'tunica-peste' }), NATIVE_CHARACTERS[NATIVE_STARTERS[hero]]);
   if (!entry) continue;
   const meta = JSON.parse(fs.readFileSync('public/models/' + entry.file.replace('.glb', '.json'), 'utf8'));
   assert.equal(createHash('sha256').update(fs.readFileSync('public/models/' + entry.file)).digest('hex'), meta.sha256);
@@ -54,7 +54,7 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.wear({ abito: outfitChoices(hero, chapter, 'epico')[0].id }); await wait(entry.file);
   actor.present();
   let skin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) skin ??= o; });
-  if (((hero === 'tizian' || hero === 'zanetto') && (chapter === 1 || chapter === 2)) || (hero === 'bortolo' && (chapter === 1 || chapter === 3))) {
+  if (entry.finishes) {
     const scene = actor.root.children[0];
     const contract = hero !== 'bortolo'
       ? [['noncomune', .25, .88, .7], ['raro', .5, .62, 1], ['epico', .72, .42, 1.2]] as const
@@ -79,22 +79,17 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   }
   actor.animate(.1, 4.2, true, 4.2); actor.play('slash1', .2); actor.animate(.2, 0, true);
   const nativeBinds = skin.skeleton.boneInverses.map(m => m.elements);
-  if (hero === 'zanetto') {
-    // His legacy yoke needs Vite's browser asset loader; actual white/equip/sheet swaps are covered in browser proof.
-    const legacy = await parse(HEROES[hero].file);
-    const legacySkin = legacy.scene.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
-    assert.notDeepEqual(nativeBinds, legacySkin.skeleton.boneInverses.map(m => m.elements));
-    freeCharacter(legacy.scene); actor.dispose(); freeCharacter(actor.root); continue;
-  }
-  actor.wear({ abito: outfitChoices(hero, chapter, 'comune')[0].id }); await wait(HEROES[hero].file);
-  let legacySkin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) legacySkin ??= o; });
-  assert.notDeepEqual(nativeBinds, legacySkin.skeleton.boneInverses.map(m => m.elements), 'New chapter owns newly generated binds rather than the old hero rig');
+  const legacy = await parse(HEROES[hero].file);
+  const legacySkin = legacy.scene.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
+  assert.notDeepEqual(nativeBinds, legacySkin.skeleton.boneInverses.map(m => m.elements), 'Accepted chapter owns its new rig');
+  freeCharacter(legacy.scene);
+  actor.wear({ abito: outfitChoices(hero, chapter, 'comune')[0].id }); await wait(NATIVE_CHARACTERS[NATIVE_STARTERS[hero]]!.file);
   actor.wear({ abito: outfitChoices(hero, chapter, 'raro')[2].id }); await wait(entry.file);
   actor.dispose(); freeCharacter(actor.root);
 }
 console.log('native chapters: all three stat builds/finishes, unfinished fallback, exact shipped hashes/skin/clips, native neutral pose, normalized finish regions and white/native swaps');
 
-for (const hero of ['tizian', 'zanetto', 'bortolo'] as const) {
+for (const hero of HERO_IDS) {
   const chapters = ([1, 2, 3] as const).filter(chapter => NATIVE_CHARACTERS[`${hero}-${chapter}`]);
   const actor = new UndeadModel(hero, true, parse), root = actor.root;
   const state = actor as unknown as { visualKey: string; playing?: { layer: { upper: THREE.AnimationAction } } };
@@ -110,4 +105,4 @@ for (const hero of ['tizian', 'zanetto', 'bortolo'] as const) {
   }
   actor.dispose(); freeCharacter(actor.root);
 }
-console.log('native chapter transitions: Tizian, Zanetto and Bortolo in both directions preserve actor identity, one owned body and live strike timing');
+console.log('native chapter transitions: all available chapters in both directions preserve actor identity, one owned body and live strike timing');

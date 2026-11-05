@@ -184,3 +184,23 @@ one geometry. White and non-pilot keys retain published assets. The selector
 shows the new rig's neutral source pose; gameplay uses its full animation set.
 Exact hashes, provenance and mapping are in
 `public/models/native-characters/fosca-3.json`. No new runtime dependency.
+
+
+### Native starters and accepted bellkeeper/grave-warrior chapters (2026-11-05)
+
+All five initial/no-outfit appearances now reuse accepted complete native characters:
+Fosca chapter 3, Bortolo chapter 1, Tizian chapter 1, Zanetto chapter 1 and Risorto
+chapter 1 (accepted retry). These are existing newly generated bodies and their own
+rigs, not five additional generated starter geometries. Starter materials are matte
+and nonemissive; source chapter selection grants no outfit, item, rarity or statistics.
+The retained original bodies are load-error/unfinished-chapter fallbacks.
+
+`native-characters/zanetto-3.glb`, `risorto-1.glb` (accepted retry), `risorto-2.glb`
+and `risorto-3.glb`, their JSON manifests and original ImageGen references were
+imported from immutable producer commit `3998edd0b40558f96f4f7d398e38dc2104892350`.
+Each is a newly generated complete Meshy body with its own native skeleton, skin,
+inverse binds and native motions. No old body or garment attachments are transplanted.
+The manifests record exact SHA-256 hashes, ImageGen/Meshy provenance, native gait
+and 27 semantic action aliases from 12 source motions. Three equipped PBR finishes
+preserve the source palette. Existing inventory weapons use measured native hand
+sockets. This integration made no generation/service calls or purchases.

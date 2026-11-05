@@ -234,7 +234,7 @@ export class UndeadModel {
     this.hero = hero; this.visual = visual; this.load = load;
     this.pace = GAIT[hero];
     if (!visual) return; // Server simulation uses the same kit without loading browser assets.
-    this.replace(HEROES[hero].file);
+    this.replace(nativeCharacter(hero, this.worn)!.file);
   }
 
   private replace(file: string): void {
@@ -275,7 +275,7 @@ export class UndeadModel {
       this.mixer?.stopAllAction();
       if (this.representation) { this.mixer?.uncacheRoot(this.representation); freeCharacter(this.representation, this.aura.material); }
       this.representation = model; this.outfit = outfit; this.visualKey = file;
-      const nativePace = nativeCharacter(hero, this.worn);
+      const nativePace = native ? nativeCharacter(hero, this.worn) : undefined;
       this.pace = nativePace ? { walk: nativePace.walk, run: nativePace.run, up: .6, down: .93 } : GAIT[hero];
       this.shells = []; this.layers.clear(); this.actions = {} as Record<Loco, THREE.AnimationAction>; this.dying = undefined;
       this.tip = preparedTip; this.club = preparedTip?.parent ?? undefined;
@@ -334,8 +334,10 @@ export class UndeadModel {
       mixer.update(0);
       this.root.add(model);
     }).catch((e) => {
-      if (request === this.request) this.requestedKey = this.visualKey;
+      if (this.disposed || request !== this.request) return;
+      this.requestedKey = this.visualKey;
       console.error('player model failed to load', e);
+      if (native && !this.representation) this.replace(HEROES[hero].file);
     });
   }
 

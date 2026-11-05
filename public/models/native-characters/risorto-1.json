@@ -1,0 +1,572 @@
+{
+  "nativeRigSha256": "42f8a21a88dd61c40ca64b616e80663ae7a61c4ad8ed88384c7dedb13a562ee6",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 28953,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "risorto-1.glb",
+  "bytes": 2977752,
+  "sha256": "067175b122f4b5cc8b9720d61c7de0fbb5caf2fdedf03792c15c6d98aa4c5882",
+  "hero": "risorto",
+  "chapter": 1,
+  "sourceJob": "01a1ac63-e096-75f0-9f24-ea168cdfe359",
+  "sourceSha256": "8e9a690a0815e79f3848661361b59a8c11bf9fc9ef5061a3d49d680b37140f8b",
+  "rigJob": "01a1ac68-f090-76d3-8d25-a7ddfb9f72ea",
+  "animationJob": "01a1ac6b-c9c0-71c4-b604-b77028045e36",
+  "geometryGeneration": "Entirely original built-in ImageGen reference with zero image inputs; newly generated complete image-to-3D geometry, native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "18558b29be1b11145afe2377933b91fa2c5eb67b884754c084eddc2532831f4a",
+  "referenceMode": "Built-in ImageGen from TEXT ONLY, ZERO image inputs, entirely new Risorto1 recovery reference; no old concept reuse",
+  "referencePrompt": "ENTIRELY ORIGINAL high fantasy videogame complete character reference generated from TEXT ONLY, ZERO image inputs. Il Risorto chapter one, the Grave-Oath Vanguard: a powerful broad-shouldered undead male human warrior, balanced natural adult proportions, ordinary human-sized hands, clean weathered ivory skull with small subtle violet eye sockets inside a low open-faced dark iron war helmet, full lower jaw visible, no hood. Rich coherent complete first-chapter heroic armor, never generic starter equipment: broad massive firmly attached angular grave-slab pauldrons with inset thick bone ribs and aged bronze oath medallions, layered dark iron breastplate bearing a shallow ivory sternum plate and flush funerary relief, fitted charcoal quilt with restrained muted moss-grey panels, strong armored waist and short split armored hip-skirt ending on upper thighs, clearly separate fitted trouser legs, complete substantial plated boots with coherent knee and shin guards. Original grave/bone/shadow warrior identity, no bell-housing or glass chapel design. Armor protects a strong fully clothed body, not a frail exposed skeleton. CRITICAL rig-friendly relaxed low A stance: arms down and OUT about35degrees, straight softly relaxed elbows, wrists and entire hands a FULL hand-width outside thighs and hip-skirt with large clear empty background gaps, clean open armpits and forearms; fitted sleeves and articulated close iron/bone bracers without any hanging cloth or arm-torso webs. Palms MUST face inward toward thighs, back/side of gloves visible from front, naturally softly curled fingers into gentle half-fists, thumbs resting naturally against curled index fingers, NEVER splayed fingers or open palms facing forward. Centered single full character front view with subtle3Ddepth, natural head size, feet hipwidth parallel firmly grounded on same floor, entire helmet/head/hands and both complete boot soles uncropped with margin, light grey studio backdrop, even soft studio lighting, detailed textured stylized realistic game sculpt. No weapon, cape, long robe, chain, bottle, beads, floating ornaments, detached bones, long spikes, wing, halo, gore, pedestal, UI or text. Original design with no franchise copying.",
+  "sourceReference": "references/risorto-1.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 13143644,
+      "sha256": "8e9a690a0815e79f3848661361b59a8c11bf9fc9ef5061a3d49d680b37140f8b"
+    },
+    "rig.glb": {
+      "bytes": 14568056,
+      "sha256": "42f8a21a88dd61c40ca64b616e80663ae7a61c4ad8ed88384c7dedb13a562ee6"
+    },
+    "native-actions.glb": {
+      "bytes": 16709576,
+      "sha256": "cd3e2c04bbad12c9a657616547b761255e555c3919d28837cc3b6073465f62bd"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 14548360,
+      "sha256": "61cdc48506878af04642123e16a08ea2777131ddfae8393d495a3e5280c71b91"
+    },
+    "running_glb_url.glb": {
+      "bytes": 14537744,
+      "sha256": "caaf866b16fd906c58e8403b0a06a146fc0de5e4bec1a39910af21e8a5e73442"
+    }
+  },
+  "heightMetres": 2,
+  "bounds": {
+    "min": [
+      -0.6551197248478371,
+      -1.8768257925349575e-09,
+      -0.23843329566882326
+    ],
+    "max": [
+      0.6551195136049034,
+      2.0000003378065467,
+      0.23843330037458288
+    ]
+  },
+  "nativeHandBounds": [
+    {
+      "min": [
+        -10.657037600245076,
+        4.769587350237998,
+        -8.559639179724172
+      ],
+      "max": [
+        6.049367598878021,
+        24.69962782473641,
+        6.301772180931152
+      ]
+    }
+  ],
+  "paceMetresPerSecond": {
+    "walk": 1.54,
+    "run": 4.83
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "risorto",
+    "chapter": 1,
+    "coordinates": "Native metre inverse-bind frame including transformed Armature parent; own native hand samples for weapon socket",
+    "palette": [
+      "dark iron",
+      "ivory bone ribs",
+      "aged bronze oath medallions",
+      "charcoal quilt",
+      "muted moss-grey",
+      "violet eyes"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": {
+      "green": {
+        "name": "worked grave-oath vanguard",
+        "metalness": 0.25,
+        "roughness": 0.88,
+        "normalScale": 0.7,
+        "detail": "Entirely new source dark iron/bone/bronze/moss-grey maps; preserved palette with increasing existing relief and metal edge quality"
+      },
+      "blue": {
+        "name": "master grave-oath vanguard",
+        "metalness": 0.5,
+        "roughness": 0.62,
+        "normalScale": 1,
+        "detail": "Entirely new source dark iron/bone/bronze/moss-grey maps; preserved palette with increasing existing relief and metal edge quality"
+      },
+      "epic": {
+        "name": "consecrated grave-oath vanguard",
+        "metalness": 0.72,
+        "roughness": 0.42,
+        "normalScale": 1.2,
+        "detail": "Entirely new source dark iron/bone/bronze/moss-grey maps; preserved palette with increasing existing relief and metal edge quality"
+      }
+    },
+    "limits": "Actual external fixture PBR values multiplied with source ORM/normal maps; no additional engraving geometry/shader, production registration by integrator."
+  },
+  "acceptance": {
+    "shipEligible": true,
+    "gate": "CLEARED: framing fix665dc4b and actual production registration verified with exact served GLB hash, selector86 matrix and real local-game desktop finish/motion/weapon checks; publication belongs to sole publisher.",
+    "generated": true,
+    "integratedInProduction": true,
+    "published": false,
+    "tests": {
+      "status": "PASS",
+      "scope": "Actual shared selector/player/sheet through EXTERNAL task-only registry/material/gait fixture; production integration/publication belongs to root",
+      "source": {
+        "status": "PASS",
+        "method": "Entirely NEW recovery source diagnostic through actual shared selector renderer; not reused failed source",
+        "proof": "preview-source.glb.png",
+        "generationPose": "a-pose, absent first rejected Risorto1 generation",
+        "observations": "Complete strong natural undead warrior, skull/open iron helm, integrated grave-slab bone/oath shoulders, full breastplate with muted moss-grey/charcoal quilt and short upper-thigh skirt. Generated hands relaxed inward/downward clearly separated from thighs and torso, fitted sleeves, complete grounded boots. No obvious connecting web, stray ornaments or conspicuous limb intersections."
+      },
+      "rig": {
+        "status": "PASS",
+        "nativeBones": 24,
+        "mixedHandLegVertices": 0,
+        "includedRunEdge": {
+          "rest": 0.2317022337400199,
+          "posed": 0.25484354252698416,
+          "ratio": 1.0998752079918652
+        },
+        "proof": "preview-running_glb_url.glb.png",
+        "observations": "Entirely new raw rig/included run reviewed before optional actions; no broken limbs/long wrist-thigh strips, natural complete hands and coherent grave-slab shoulders. Prior rejected rig772mixedHandLeg and19.56xstretch absent; no old source/skin/bind/hand/weight data transplanted. Minor extreme armor/cloth overlaps remain possible."
+      },
+      "motions": {
+        "status": "PASS",
+        "weapon": "clava-osso",
+        "observations": "Entirely NEW reference/source/rig/actions. Source/raw run and fresh idle/run/slash/cast, desktop/phone neutral selector and real desktop/phone slash/Mend reviewed. Complete strong natural undead warrior, integrated grave-slab shoulders and skull helm, ordinary newly generated hands with actual clava-osso native RightHand grip. Earlier772mixed-hand-leg and19.56xraw native failure absent; current mixed0/basic-run1.10x. Full boots/head visible, no long wrist-thigh strips or broken limbs. Minor underarm/armor/cloth overlap/stretch possible at raised-arm extremes. Real3second Mend uses Cast_Channel_upper weight1 then Cast_Spread, heals and pays mana.",
+        "openProductionFramingGate": "Phone selector390x844: wide1.310m native A stance crops outer left-hand fingers at right viewport edge; same shared camera issue as Zanetto3/Risorto2/Risorto3. Desktop and actual gameplay pass; root must fit native bounds before publication. No extra geometry/rig spend needed."
+      },
+      "selector": "Five actual choices, two seconds each, exact zero local-bone/mixer-clock change desktop and phone emulation",
+      "finishes": "Real Equipment.wear green/rare/epic use same new geometry with PBR quality details and original class palette; white fallback remains original",
+      "gameDesktop": {
+        "run": {
+          "from": [
+            -573.187124492246,
+            0,
+            -13.581417743017335
+          ],
+          "to": [
+            -571.0267620922813,
+            0,
+            -13.581417743017335
+          ],
+          "distance": 2.160362399964697,
+          "state": "run",
+          "gait": 0.6709199799940628,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip, volatile sandbox health60% permits canonical self-heal check; actual3second cast completes below"
+          },
+          "ability": "mend",
+          "castAccepted": true,
+          "manaBefore": 580,
+          "hpBefore": 870,
+          "actionAtCapture": "Cast_Channel_upper",
+          "held": [
+            "channel"
+          ],
+          "channelWeight": 1,
+          "hand": "LeftHand",
+          "key": "native-characters/risorto-1.glb",
+          "castingAtCapture": "mend",
+          "manaAfter": 460.5669299999416,
+          "hpAfter": 1377.5,
+          "completed": true,
+          "actionAtCompletion": "Cast_Spread"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -570.0233543834187,
+            1.2200448180531769,
+            -13.077935239862722
+          ],
+          "tip": [
+            -569.7521726259235,
+            1.753954866775761,
+            -13.313504068269571
+          ],
+          "distance": 0.6434999290148169,
+          "hand": "RightHand"
+        }
+      },
+      "gamePhone": {
+        "run": {
+          "from": [
+            -572.9987398582165,
+            0,
+            -13.606219050594405
+          ],
+          "to": [
+            -570.6363970580585,
+            0,
+            -13.606219050594405
+          ],
+          "distance": 2.3623428001579896,
+          "state": "run",
+          "gait": 0.733646810482823,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip, volatile sandbox health60% permits canonical self-heal check; actual3second cast completes below"
+          },
+          "ability": "mend",
+          "castAccepted": true,
+          "manaBefore": 580,
+          "hpBefore": 870,
+          "actionAtCapture": "Cast_Channel_upper",
+          "held": [
+            "channel"
+          ],
+          "channelWeight": 1,
+          "hand": "LeftHand",
+          "key": "native-characters/risorto-1.glb",
+          "castingAtCapture": "mend",
+          "manaAfter": 460.85112999994163,
+          "hpAfter": 1377.5,
+          "completed": true,
+          "actionAtCompletion": "Cast_Spread"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -569.6503990783818,
+            1.146609112702434,
+            -13.079144450945599
+          ],
+          "tip": [
+            -569.3004317974008,
+            1.6464147195796652,
+            -13.283617961838594
+          ],
+          "distance": 0.6434999293551268,
+          "hand": "RightHand"
+        }
+      },
+      "weapon": "Existing clava-osso inventory prop, own new native RightHand socket and active edge checked",
+      "integrity": "Exact new positions/UV/joints/weights/inverse binds preserved after compression; normals/textures lossy",
+      "limitations": [
+        "No articulated finger bones",
+        "Rigid armor/cloth can intersect in extreme motion",
+        "27 semantic aliases from12 fresh native sources, not27 independent performances",
+        "Phone emulation only, no physical device or live coop proof",
+        "Production registration and publication not performed by asset lane"
+      ]
+    },
+    "producerGate": "Native asset/motion and actual desktop/phone game PASS; OPEN root commoncamera phone-selector framing gate: outer left fingers crop at390x844, native width1.310m; reframe native bounds before publication",
+    "productionRegistration": {
+      "status": "PASS",
+      "sourceCommit": "3998edd0b40558f96f4f7d398e38dc2104892350",
+      "framingCommit": "665dc4bf8135a2bee3f2eeec9165bc6ce0e62bb8",
+      "evidence": "redentore-native-starters-release/{validation.json,game-validation.json,lifecycle-proof.json,review.html}",
+      "selector": "Actual production registry, all11 native mappings at320x740 touch/390x844 touch/844x390 touch/1440x900 desktop, all3 finishes at390x844; still pose/camera and complete posed bounds PASS",
+      "game": "Actual local game, real Equipment.wear for green/rare/epic, native locomotion/strike/class spell/RightHand socket, one owned representation and no GL errors; all5 actual no-outfit saves also PASS on desktop and390x844 touch",
+      "limitations": [
+        "Phone emulation, no physical phone",
+        "Coop fixtures only; no live two-client session",
+        "Source rig motion aliases/armor deformation limitations retained"
+      ]
+    }
+  },
+  "ownCandidateCredits": 65,
+  "taskCapCredits": 685,
+  "equippedWeapon": "Existing clava-osso inventory prop, own new native RightHand socket and active edge checked",
+  "runtime": "Complete NEW character and its own native skeleton/mixer. Twelve native clip exports feed27semantic aliases. Neutral inverse-bind presentation includes transformed Armature parent. Three parameter-only PBR quality finishes preserve class colors. Existing inventory weapon prop uses newly measured native hand socket. Actual shared renderer tested through external task-only mapping/material fixture; production registration belongs to integrator.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test",
+    "Fixture animation pace may differ until integrator registers measured gait",
+    "Production mapping/material integration and publication not performed by asset lane",
+    "Native asset/motion and actual desktop/phone game PASS; OPEN root commoncamera phone-selector framing gate: outer left fingers crop at390x844, native width1.310m; reframe native bounds before publication"
+  ],
+  "generationPose": "Official pose_mode a-pose, absent prior rejected candidate; entirely new original reference and model chain",
+  "wristLegInfluences": {
+    "method": "Read-only audit of unmodified fresh native rig: hand and leg weights both>0.05 on same vertex. Suspicious cross-limb influence, reviewed together with raw gait/stretch and visual proof; never repairs weights.",
+    "meshes": [
+      {
+        "mesh": "char1",
+        "vertices": 36875,
+        "mixedHandLegVertices": 0,
+        "worst": []
+      }
+    ]
+  },
+  "ownLaneCreditsAtHandoff": 685,
+  "nativeEventSummary": [
+    {
+      "clip": "Right_Hand_Sword_Slash",
+      "bone": "RightHand",
+      "peaks": [
+        {
+          "time": 0.5083333333333333,
+          "speed": 17.91778740964762
+        },
+        {
+          "time": 0.5,
+          "speed": 17.74673390472341
+        },
+        {
+          "time": 0.5166666666666667,
+          "speed": 17.74531167585187
+        }
+      ]
+    },
+    {
+      "clip": "mage_soell_cast",
+      "bone": "LeftHand",
+      "peaks": [
+        {
+          "time": 0.5,
+          "speed": 1.532502281622734
+        },
+        {
+          "time": 0.49166666666666664,
+          "speed": 1.5295165141712936
+        },
+        {
+          "time": 0.48333333333333334,
+          "speed": 1.5265038232556445
+        }
+      ]
+    },
+    {
+      "clip": "Charged_Spell_Cast",
+      "bone": "LeftHand",
+      "peaks": [
+        {
+          "time": 1.675,
+          "speed": 7.781197417111834
+        },
+        {
+          "time": 1.6833333333333333,
+          "speed": 7.747986087212327
+        },
+        {
+          "time": 1.6916666666666667,
+          "speed": 7.7010557748045345
+        }
+      ]
+    }
+  ],
+  "rejectedPriorCandidate": {
+    "credits": 35,
+    "excluded": true,
+    "mixedHandLegVertices": 772,
+    "rawRunStretchRatio": 19.56,
+    "reason": "Intrinsic fresh native skin failure; no old source/rig/weights/binds/hands or clips retained in this accepted new chain"
+  }
+}

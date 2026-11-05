@@ -1,0 +1,564 @@
+{
+  "nativeRigSha256": "4acf9ea19801efbe9edf77344a77cc973bd0ec7a42352ad6cc84ca5a29b9e887",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 29066,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "risorto-2.glb",
+  "bytes": 3039444,
+  "sha256": "3d9e5729ea8e7de9984c5c047b5e8ee33fadf85e8ad4bb6253b2208967de6a99",
+  "hero": "risorto",
+  "chapter": 2,
+  "sourceJob": "01a1ac40-af84-707d-b49d-8affbb85156d",
+  "sourceSha256": "0d6ebafab421571e527dfec98b7048afb9d6060df54c6851667f1f5e7402c046",
+  "rigJob": "01a1ac44-982b-72d6-bdfd-5c5c1fce336a",
+  "animationJob": "01a1ac46-0a4a-7231-9f8b-650e060fa169",
+  "geometryGeneration": "Entirely original built-in ImageGen reference with zero image inputs; newly generated complete image-to-3D geometry, native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "0062a2a2c6fd2d7f76cf76b6d7cf5e59e9fb5423c5455f531ad94ce09d3736e2",
+  "referenceMode": "Built-in ImageGen, ZERO image inputs, original chapter2reference",
+  "referencePrompt": "Entirely original high fantasy full-body videogame character reference from TEXT ONLY, ZERO image inputs. Il Risorto chapter2, the Ossuary Devourer: very tall powerful undead human warrior2metres, natural balanced human anatomy and normal-sized hands. Pale weathered human skull face with small violet glowing eyes, enclosed by a strong open-faced blackened iron war helmet with cheek guards and low angular brow, no hood. Complete richly crafted heavy battle armor: huge coherent integrated blackened-steel pauldrons like layered ossuary tomb guards, broad solid bone-inlay ribs and thick worn iron rims firmly attached to shoulders, bone sternum relief inset in dark steel breastplate, muted ivory bone and restrained oxblood quilted padding. Strong covered torso, not exposed fragile ribs or a thin mannequin. Short split oxblood/charcoal armored battle-tabard above knees, separate dark fitted trouser legs, substantial full dark steel-plated boots and coherent knee guards. Tight fitted sleeves and articulated iron/bone bracers, close leather-and-plate gloves with ordinary human fingers gently curled and palms inward toward thighs. Rig-friendly relaxed lowA stance, arms20degrees clear of body with visible background at armpits/elbows/forearms/wrists, nearly straight soft elbows, absolutely no hanging sleeve folds or cloth webs joining arm to torso. Feet hipwidth parallel naturally grounded on same floor. Heroic heavier chapter2silhouette with original grave/bone/shadow warrior identity, distinct from bell-housing shoulder armor or a glassmaker friar. Single centered front view with subtle3Ddepth, natural head size, complete helmet/head/body/hands and both boot soles uncropped with margin, pale grey studio backdrop, even soft lighting, high-quality textured stylized realistic game sculpt. No weapon, cape, floor robe, wings, long spikes, chains, beads, bottles, floating ornaments, gore, detached bones, limb intersections, pedestal, UI or text. Original design, no franchise copying.",
+  "sourceReference": "references/risorto-2.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 13544404,
+      "sha256": "0d6ebafab421571e527dfec98b7048afb9d6060df54c6851667f1f5e7402c046"
+    },
+    "rig.glb": {
+      "bytes": 15037988,
+      "sha256": "4acf9ea19801efbe9edf77344a77cc973bd0ec7a42352ad6cc84ca5a29b9e887"
+    },
+    "native-actions.glb": {
+      "bytes": 17226568,
+      "sha256": "b15f09c9bd342e6e6812cf2a587b2f803645b7f6e3e46fe0901476b48c675b97"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 15018332,
+      "sha256": "87b8ea7201fe3bbb225f0ba2f0a3f7cb442d6083bfcad8c7d682fe8fb4000d2a"
+    },
+    "running_glb_url.glb": {
+      "bytes": 15007708,
+      "sha256": "6856cec148538c4a914428cc996cd85714e7de74e3bb38baca446ab7cdf4f9e3"
+    }
+  },
+  "heightMetres": 2,
+  "bounds": {
+    "min": [
+      -0.6671864520374465,
+      7.178318201206958e-09,
+      -0.2369380104442168
+    ],
+    "max": [
+      0.6671864678313125,
+      1.9999999825316115,
+      0.2369380307997404
+    ]
+  },
+  "nativeHandBounds": [
+    {
+      "min": [
+        -10.854441072791587,
+        6.62199418952973,
+        -6.332564352396105
+      ],
+      "max": [
+        5.3059971050613655,
+        24.093571009650248,
+        6.776304349917837
+      ]
+    }
+  ],
+  "paceMetresPerSecond": {
+    "walk": 1.58,
+    "run": 4.96
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "risorto",
+    "chapter": 2,
+    "coordinates": "Native metre inverse-bind frame including transformed Armature parent; own native hand samples for weapon socket",
+    "palette": [
+      "blackened steel",
+      "ivory bone",
+      "oxblood quilt",
+      "charcoal",
+      "violet eyes"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": {
+      "green": {
+        "name": "worked ossuary warrior",
+        "metalness": 0.25,
+        "roughness": 0.88,
+        "normalScale": 0.7,
+        "detail": "Original new blackened steel/ivory/oxblood maps, preserved class colors with increasing existing relief and metallic edge finish"
+      },
+      "blue": {
+        "name": "master ossuary warrior",
+        "metalness": 0.5,
+        "roughness": 0.62,
+        "normalScale": 1,
+        "detail": "Original new blackened steel/ivory/oxblood maps, preserved class colors with increasing existing relief and metallic edge finish"
+      },
+      "epic": {
+        "name": "consecrated ossuary warrior",
+        "metalness": 0.72,
+        "roughness": 0.42,
+        "normalScale": 1.2,
+        "detail": "Original new blackened steel/ivory/oxblood maps, preserved class colors with increasing existing relief and metallic edge finish"
+      }
+    },
+    "limits": "Actual external fixture PBR values multiplied with source ORM/normal maps; no additional engraving geometry/shader, production registration by integrator."
+  },
+  "acceptance": {
+    "shipEligible": true,
+    "gate": "CLEARED: framing fix665dc4b and actual production registration verified with exact served GLB hash, selector86 matrix and real local-game desktop finish/motion/weapon checks; publication belongs to sole publisher.",
+    "generated": true,
+    "integratedInProduction": true,
+    "published": false,
+    "tests": {
+      "status": "PASS",
+      "scope": "Actual shared selector/player/sheet through EXTERNAL task-only registry/material/gait fixture; production integration/publication belongs to root",
+      "source": {
+        "status": "PASS",
+        "method": "NEW raw full source GLB diagnostic through actual shared selector renderer",
+        "proof": "preview-source.glb.png",
+        "generationPose": "a-pose",
+        "observations": "Complete powerful undead warrior, distinct open-faced iron helmet and integrated layered ossuary shoulders, bone breastplate/oxblood quilt, natural limbs/head/ordinary relaxed inward hands, clear wrists and arm-torso gaps, full grounded boots; no detached ornament or visible limb intersection."
+      },
+      "rig": {
+        "status": "PASS",
+        "nativeBones": 24,
+        "mixedHandLegVertices": 0,
+        "includedRunEdge": {
+          "rest": 0.12231760611648383,
+          "posed": 0.21843448318264944,
+          "ratio": 1.785797565189699
+        },
+        "proof": "preview-running_glb_url.glb.png",
+        "observations": "Fresh raw included run reviewed before optional actions; complete natural hands/limbs, no long wrist-thigh/sleeve strips, coherent helmet and ossuary shoulders. No anatomy/weight edits; minor extreme armor/cloth overlap possible."
+      },
+      "motions": {
+        "status": "PASS",
+        "weapon": "clava-osso",
+        "observations": "Entirely new ref/source/rig/actions. Raw run and packaged idle/run/slash/cast, neutral selector desktop/phone and actual slash plus full3second Mend inspected. Complete natural powerful undead warrior, distinctive open war helm and ossuary pauldrons, new hands stable on actual clava-osso native RightHand. No long wrist-leg webs; minor extreme armor/cloth overlap disclosed. Real Mend uses Cast_Channel_upper weight1, releases Cast_Spread, pays mana and restores health.",
+        "openProductionFramingGate": "PHONE selector390x844: wide1.334m A stance clips outer left-hand fingertips at right viewport edge, same shared framing issue as Zanetto3. Full head/boots visible, desktop and actual gameplay pass. Root integrator must fit native bounds before publication; asset lane cannot edit shared selector."
+      },
+      "selector": "Five actual choices, two seconds each, exact zero local-bone/mixer-clock change desktop and phone emulation",
+      "finishes": "Real Equipment.wear green/rare/epic use same new geometry with PBR quality details and original class palette; white fallback remains original",
+      "gameDesktop": {
+        "run": {
+          "from": [
+            -571.2790134849129,
+            0,
+            -13.832625322806736
+          ],
+          "to": [
+            -569.1890757849849,
+            0,
+            -13.832625322806736
+          ],
+          "distance": 2.0899376999279866,
+          "state": "run",
+          "gait": 0.6320375920291306,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip, volatile sandbox health60% permits canonical self-heal check; actual3second cast completes below"
+          },
+          "ability": "mend",
+          "castAccepted": true,
+          "manaBefore": 640,
+          "hpBefore": 906,
+          "actionAtCapture": "Cast_Channel_upper",
+          "held": [
+            "channel"
+          ],
+          "channelWeight": 1,
+          "hand": "LeftHand",
+          "key": "native-characters/risorto-2.glb",
+          "castingAtCapture": "mend",
+          "manaAfter": 520.6615,
+          "hpAfter": 1434.5,
+          "completed": true,
+          "actionAtCompletion": "Cast_Spread"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -568.1636851488167,
+            1.2200874661044279,
+            -13.358762652450384
+          ],
+          "tip": [
+            -567.8662454174263,
+            1.6938744731647768,
+            -13.676799962101645
+          ],
+          "distance": 0.6435000017086567,
+          "hand": "RightHand"
+        }
+      },
+      "gamePhone": {
+        "run": {
+          "from": [
+            -571.1524407334849,
+            0,
+            -13.849288941658738
+          ],
+          "to": [
+            -568.8543849333687,
+            0,
+            -13.849288941658738
+          ],
+          "distance": 2.298055800116231,
+          "state": "run",
+          "gait": 0.6949765317425906,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip, volatile sandbox health60% permits canonical self-heal check; actual3second cast completes below"
+          },
+          "ability": "mend",
+          "castAccepted": true,
+          "manaBefore": 640,
+          "hpBefore": 906,
+          "actionAtCapture": "Cast_Channel_upper",
+          "held": [
+            "channel"
+          ],
+          "channelWeight": 1,
+          "hand": "LeftHand",
+          "key": "native-characters/risorto-2.glb",
+          "castingAtCapture": "mend",
+          "manaAfter": 520.8591399999679,
+          "hpAfter": 1434.5,
+          "completed": true,
+          "actionAtCompletion": "Cast_Spread"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -567.8366156237288,
+            1.1783563684587692,
+            -13.357199791578823
+          ],
+          "tip": [
+            -567.4920957077616,
+            1.6196614701815713,
+            -13.674450617855054
+          ],
+          "distance": 0.6435000016142876,
+          "hand": "RightHand"
+        }
+      },
+      "weapon": "Existing clava-osso inventory prop, own new native RightHand socket and active edge checked",
+      "integrity": "Exact new positions/UV/joints/weights/inverse binds preserved after compression; normals/textures lossy",
+      "limitations": [
+        "No articulated finger bones",
+        "Rigid armor/cloth can intersect in extreme motion",
+        "27 semantic aliases from12 fresh native sources, not27 independent performances",
+        "Phone emulation only, no physical device or live coop proof",
+        "Production registration and publication not performed by asset lane"
+      ]
+    },
+    "producerGate": "Asset/native motion and real desktop/phone game PASS; OPEN root phone-selector framing gate: outer left fingertips crop at390x844, native width1.334m; reframe shared selector before publication",
+    "productionRegistration": {
+      "status": "PASS",
+      "sourceCommit": "3998edd0b40558f96f4f7d398e38dc2104892350",
+      "framingCommit": "665dc4bf8135a2bee3f2eeec9165bc6ce0e62bb8",
+      "evidence": "redentore-native-starters-release/{validation.json,game-validation.json,lifecycle-proof.json,review.html}",
+      "selector": "Actual production registry, all11 native mappings at320x740 touch/390x844 touch/844x390 touch/1440x900 desktop, all3 finishes at390x844; still pose/camera and complete posed bounds PASS",
+      "game": "Actual local game, real Equipment.wear for green/rare/epic, native locomotion/strike/class spell/RightHand socket, one owned representation and no GL errors; all5 actual no-outfit saves also PASS on desktop and390x844 touch",
+      "limitations": [
+        "Phone emulation, no physical phone",
+        "Coop fixtures only; no live two-client session",
+        "Source rig motion aliases/armor deformation limitations retained"
+      ]
+    }
+  },
+  "ownCandidateCredits": 65,
+  "taskCapCredits": 685,
+  "equippedWeapon": "Existing clava-osso inventory prop, own new native RightHand socket and active edge checked",
+  "runtime": "Complete NEW character and its own native skeleton/mixer. Twelve native clip exports feed27semantic aliases. Neutral inverse-bind presentation includes transformed Armature parent. Three parameter-only PBR quality finishes preserve class colors. Existing inventory weapon prop uses newly measured native hand socket. Actual shared renderer tested through external task-only mapping/material fixture; production registration belongs to integrator.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test",
+    "Fixture animation pace may differ until integrator registers measured gait",
+    "Production mapping/material integration and publication not performed by asset lane",
+    "Asset/native motion and real desktop/phone game PASS; OPEN root phone-selector framing gate: outer left fingertips crop at390x844, native width1.334m; reframe shared selector before publication"
+  ],
+  "generationPose": "Official pose_mode a-pose",
+  "wristLegInfluences": {
+    "method": "Read-only audit of unmodified fresh native rig: hand and leg weights both>0.05 on same vertex. Suspicious cross-limb influence, reviewed together with raw gait/stretch and visual proof; never repairs weights.",
+    "meshes": [
+      {
+        "mesh": "char1",
+        "vertices": 38796,
+        "mixedHandLegVertices": 0,
+        "worst": []
+      }
+    ]
+  },
+  "ownLaneCreditsAtHandoff": 555,
+  "nativeEventSummary": [
+    {
+      "clip": "Right_Hand_Sword_Slash",
+      "bone": "RightHand",
+      "peaks": [
+        {
+          "time": 0.5083333333333333,
+          "speed": 18.420188940631473
+        },
+        {
+          "time": 0.5,
+          "speed": 18.24056765897228
+        },
+        {
+          "time": 0.5166666666666667,
+          "speed": 18.21682757400858
+        }
+      ]
+    },
+    {
+      "clip": "mage_soell_cast",
+      "bone": "LeftHand",
+      "peaks": [
+        {
+          "time": 0.5,
+          "speed": 1.5748221171779004
+        },
+        {
+          "time": 0.49166666666666664,
+          "speed": 1.5714953635337272
+        },
+        {
+          "time": 0.48333333333333334,
+          "speed": 1.5681471850594428
+        }
+      ]
+    },
+    {
+      "clip": "Charged_Spell_Cast",
+      "bone": "LeftHand",
+      "peaks": [
+        {
+          "time": 1.675,
+          "speed": 8.025652309190543
+        },
+        {
+          "time": 1.6833333333333333,
+          "speed": 7.991308347378117
+        },
+        {
+          "time": 1.6916666666666667,
+          "speed": 7.942801590731307
+        }
+      ]
+    }
+  ]
+}

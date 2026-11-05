@@ -41,5 +41,5 @@ for (const time of [0, .25, .5, .75, .999]) {
   }
 }
 mixer.stopAllAction();
-assert.match(fs.readFileSync('src/player/undead.ts', 'utf8'), /if \(hero === 'fosca'\) relaxFoscaHands\(model, gltf.animations\)/);
+assert.match(fs.readFileSync('src/player/undead.ts', 'utf8'), /if \(!native && hero === 'fosca'\) relaxFoscaHands\(model, gltf.animations\)/);
 console.log('Fosca idle: palms use forearm twist; wrist positions, other tracks/clips and other heroes preserved.');

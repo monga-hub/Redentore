@@ -24,7 +24,6 @@ export class Figure {
   private yaw = 0;
   /** Where his chest faces (eased: the idle sways). */
   private facing?: number;
-  private bones?: { l: THREE.Object3D; r: THREE.Object3D; head: THREE.Object3D };
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, hero: THREE.Object3D, canvas: HTMLCanvasElement) {
     this.renderer = renderer;
@@ -54,7 +53,7 @@ export class Figure {
     if (!w || !h || w > gl.width || h > gl.height) return;
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
     this.hero.traverse((o) => o.layers.enable(LAYER)); // pieces come and go: every time
-    const b = (this.bones ??= ((l, r, head) => (l && r && head ? { l, r, head } : undefined))(this.hero.getObjectByName('LeftArm'), this.hero.getObjectByName('RightArm'), this.hero.getObjectByName('Head')));
+    const b = (((l, r, head) => (l && r && head ? { l, r, head } : undefined))(this.hero.getObjectByName('LeftArm'), this.hero.getObjectByName('RightArm'), this.hero.getObjectByName('Head')));
     const at = this.hero.getWorldPosition(new THREE.Vector3()), ahead = this.hero.getWorldDirection(new THREE.Vector3()).negate().setY(0).normalize(); // he faces -Z
     let top = 1.95;
     if (b) { // his chest's way: from the line of his shoulders (his left is -X at rest), and the top of his head with a hat or a mitre on

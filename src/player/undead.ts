@@ -4,8 +4,11 @@ import type { GearState } from '../loot/gear.ts';
 import { Outfit } from './outfit.ts';
 import { HEROES, type Hero } from './heroes.ts';
 import { relaxFoscaHands } from './fosca-idle.ts';
+import { NativeOutfit, NATIVE_FOSCA, nativeAppearance, freeCharacter } from './native-character.ts';
+import { poseNativeFosca } from './selector-pose.ts';
 
-// The hero: a Forsaken-style undead warrior generated, auto-rigged and animated with Meshy AI
+// Native appearance replacement owns its complete rig, clips, mixer and prop socket; only the visual root changes.
+// The base hero: an undead warrior generated, auto-rigged and animated with Meshy AI
 // (see ATTRIBUTION.md), every clip merged into one meshopt/WebP GLB (each hero, player/heroes.ts, on the same rig with
 // his own idle, walk, run, jump, roll, swings, cast, flinches and death from Meshy's library, retimed onto the clip names
 // and the moments below, so a move hits, loops and ends the same on each), dressed in what it wears (player/outfit.ts:
@@ -189,6 +192,7 @@ export class UndeadModel {
   readonly root = new THREE.Group();
   readonly aura = new Aura();
   private mixer?: THREE.AnimationMixer;
+  private presentedMixer?: THREE.AnimationMixer;
   private actions = {} as Record<Loco, THREE.AnimationAction>;
   private state?: State;
   private weight = { idle: 0, combat: 0, fidget: 0, walk: 0, run: 0, air: 0 } as Record<Loco, number>;
@@ -197,7 +201,7 @@ export class UndeadModel {
   private airT = 0;
   private landT = 0;
   private deadK = 0;
-  private readonly pace: (typeof GAIT)[Hero];
+  private pace: (typeof GAIT)[Hero];
   private layers = new Map<string, Layer>();
   private playing?: Shot;
   private holdK = new Map<Hold, number>();
@@ -215,35 +219,78 @@ export class UndeadModel {
   private club?: THREE.Object3D;
   private tip?: THREE.Object3D;
   private leftHand?: THREE.Object3D;
-  private outfit?: Outfit;
+  private outfit?: Outfit | NativeOutfit;
+  private representation?: THREE.Group;
+  private visualKey?: string;
+  private requestedKey?: string;
+  private request = 0;
   private worn: GearState = {};
   private disposed = false;
 
-  constructor(hero: Hero, visual = true) {
+  private readonly hero: Hero;
+  private readonly visual: boolean;
+  private readonly load: typeof loadModel;
+  constructor(hero: Hero, visual = true, load = loadModel) {
+    this.hero = hero; this.visual = visual; this.load = load;
     this.pace = GAIT[hero];
     if (!visual) return; // Server simulation uses the same kit without loading browser assets.
-    loadModel(HEROES[hero].file).then((gltf) => {
-      if (this.disposed) return;
+    this.replace(HEROES[hero].file);
+  }
+
+  private replace(file: string): void {
+    const hero = this.hero, native = file === NATIVE_FOSCA, request = ++this.request;
+    this.requestedKey = file;
+    this.load(file).then(async (gltf) => {
+      if (this.disposed || request !== this.request) { freeCharacter(gltf.scene); return; }
       const model = gltf.scene;
+      if (native) {
+        const names = [...Object.values(LOCO), ...Object.values(MOVES).map(m => m.clip), ...Object.values(HOLDS), DEATH];
+        const bones = ['Head', 'LeftArm', 'RightArm', 'LeftHand', 'RightHand', 'RightForeArm'];
+        if (names.some(n => !THREE.AnimationClip.findByName(gltf.animations, n)) || bones.some(n => !model.getObjectByName(n))) {
+          freeCharacter(model); throw new Error('Incomplete native character rig or action set');
+        }
+      }
       stand(model, HEROES[hero].height);
       const head = model.getObjectByName('Head');
       if (head) head.userData.crown = HEROES[hero].height - head.getWorldPosition(new THREE.Vector3()).y; // m from the joint to his crown (ui/figure.ts)
       let body: THREE.SkinnedMesh | undefined;
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh) body ??= o; });
-      if (hero === 'fosca') relaxFoscaHands(model, gltf.animations);
+      if (!native && hero === 'fosca') relaxFoscaHands(model, gltf.animations);
       const up = UPRIGHT[hero];
-      if (up) upright(model, gltf.animations, up);
-      const outfit = (this.outfit = new Outfit(model, body!, hero));
-      this.aura.material.uniforms.uHat = outfit.uniforms.uHat;
-      this.aura.material.uniforms.uBeak = outfit.uniforms.uBeak;
+      if (up && !native) upright(model, gltf.animations, up);
+      const outfit = native ? new NativeOutfit(model) : new Outfit(model, body!, hero);
+      let preparedTip: THREE.Object3D | undefined;
+      outfit.onWeapon = top => { preparedTip = top; };
+      try {
+        let worn: GearState;
+        do { worn = this.worn; await outfit.wear(worn); } while (worn !== this.worn && request === this.request && !this.disposed);
+      } catch (error) { outfit.dispose(); freeCharacter(model); throw error; }
+      if (this.disposed || request !== this.request) { outfit.dispose(); freeCharacter(model); return; }
+      const previousShot = this.playing, deathPhase = this.dying ? this.dying.time / this.dying.getClip().duration : 0;
+      const previousActions = Object.fromEntries(Object.entries(this.actions).map(([key, a]) => [key, { phase: a.time / a.getClip().duration, rate: a.timeScale }]));
+      const shotPose = previousShot && (['upper', 'lower'] as const).map(part => {
+        const a = previousShot.layer[part]; return { time: a.time, rate: a.timeScale, weight: a.getEffectiveWeight() };
+      });
+      this.outfit?.dispose();
+      this.mixer?.stopAllAction();
+      if (this.representation) { this.mixer?.uncacheRoot(this.representation); freeCharacter(this.representation, this.aura.material); }
+      this.representation = model; this.outfit = outfit; this.visualKey = file;
+      this.pace = native ? { walk: 1.44, run: 4.54, up: .6, down: .93 } : GAIT[hero];
+      this.shells = []; this.layers.clear(); this.actions = {} as Record<Loco, THREE.AnimationAction>; this.dying = undefined;
+      this.tip = preparedTip; this.club = preparedTip?.parent ?? undefined;
+      this.aura.material.uniforms.uHat = outfit instanceof Outfit ? outfit.uniforms.uHat : { value: 0 };
+      this.aura.material.uniforms.uBeak = outfit instanceof Outfit ? outfit.uniforms.uBeak : { value: 0 };
       outfit.onWeapon = (top) => { this.tip = top; this.club = top?.parent ?? undefined; };
-      outfit.wear(this.worn);
       this.leftHand = model.getObjectByName('LeftHand');
       const mixer = (this.mixer = new THREE.AnimationMixer(model));
       const clip = (name: string) => THREE.AnimationClip.findByName(gltf.animations, name);
       for (const [s, name] of Object.entries(LOCO) as [Loco, string][]) {
         const c = clip(name);
-        if (c) this.actions[s] = mixer.clipAction(c).setEffectiveWeight(0).play();
+        if (c) {
+          const a = this.actions[s] = mixer.clipAction(c).setEffectiveWeight(this.weight[s] * (this.dead ? 1 - this.deadK : 1)).play();
+          const old = previousActions[s];
+          if (old) { a.time = old.phase * c.duration; a.timeScale = old.rate; }
+        }
       }
       for (const s of ['air', 'fidget'] as const) {
         this.actions[s].setLoop(THREE.LoopOnce, 1);
@@ -263,6 +310,15 @@ export class UndeadModel {
       }
       const death = clip(DEATH);
       if (death) { this.dying = mixer.clipAction(death); this.dying.setLoop(THREE.LoopOnce, 1); this.dying.clampWhenFinished = true; }
+      if (previousShot) {
+        const layer = this.layers.get(previousShot.move.clip);
+        this.playing = layer ? { ...previousShot, layer } : undefined;
+        if (layer && shotPose) for (const [i, part] of (['upper', 'lower'] as const).entries()) {
+          const pose = shotPose[i], a = layer[part];
+          a.reset().setEffectiveWeight(pose.weight).play(); a.time = pose.time; a.timeScale = pose.rate;
+        }
+      }
+      if (this.dead && this.dying) { this.dying.reset().setEffectiveWeight(this.deadK).play(); this.dying.time = deathPhase * this.dying.getClip().duration; }
       const bodies: THREE.SkinnedMesh[] = [];
       model.traverse((o) => { if (o instanceof THREE.SkinnedMesh && o.parent) bodies.push(o); });
       for (const o of bodies) { // the aura: a skinned copy of each body mesh, sharing the skeleton
@@ -274,21 +330,50 @@ export class UndeadModel {
         o.parent!.add(shell);
         this.shells.push(shell);
       }
+      mixer.update(0);
       this.root.add(model);
-    }, (e) => console.error('player model failed to load', e));
+    }).catch((e) => {
+      if (request === this.request) this.requestedKey = this.visualKey;
+      console.error('player model failed to load', e);
+    });
   }
 
   /** Dress the hero in `worn` (now, or once the body has loaded). */
   wear(worn: GearState): void {
     this.worn = { ...worn };
-    this.outfit?.wear(this.worn);
+    if (!this.visual || this.disposed) return;
+    const key = nativeAppearance(this.hero, this.worn) ? NATIVE_FOSCA : HEROES[this.hero].file;
+    if (key !== this.requestedKey) {
+      if (key === this.visualKey) { this.request++; this.requestedKey = key; }
+      else this.replace(key);
+    }
+    if (key === this.visualKey) void Promise.resolve(this.outfit?.wear(this.worn)).catch(e => console.error('character equipment failed to load', e));
   }
 
   /** Stop asynchronous equipment loading before the selection stage frees the model's resources. */
   dispose(): void {
     this.disposed = true;
+    this.request++;
     this.outfit?.dispose();
     this.mixer?.stopAllAction();
+  }
+
+  /** The selector is deliberately still. Gameplay uses a separate model instance and its normal animator. */
+  present(): void {
+    if (!this.mixer || this.presentedMixer === this.mixer) return;
+    this.presentedMixer = this.mixer;
+    this.mixer.stopAllAction();
+    for (const [key, action] of Object.entries(this.actions) as [Loco, THREE.AnimationAction][]) {
+      this.weight[key] = key === 'idle' ? 1 : 0;
+      action.reset().setEffectiveWeight(this.weight[key]).play();
+    }
+    this.actions.idle.time = this.actions.idle.getClip().duration * .15;
+    this.state = 'idle';
+    this.mixer.update(0);
+    if (this.visualKey === NATIVE_FOSCA && this.representation) poseNativeFosca(this.representation);
+    this.outfit?.clear(1, 1);
+    for (const shell of this.shells) shell.visible = false;
+    this.outfit?.showAura(this.aura.material, false);
   }
 
   /** Play a move over whatever the legs are doing, its blow landing `after` s from now. */

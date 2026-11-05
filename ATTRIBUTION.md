@@ -161,3 +161,26 @@ and its maps, with runtime material finishes. White outfits retain the original 
 hero bodies. Other chapters/heroes and unrelated legendary items retain their previous
 visual fallback pending separately verified replacements. `provenance.json` records
 source/output hashes, counts and processing. This is one new pilot, not all fifteen models.
+
+### Fosca chapter 3: complete native character pilot
+
+`public/models/native-characters/fosca-3.glb` comes from an entirely new 2D
+reference generated from scratch with OpenAI ImageGen, then refined using only
+that new image. Its approved reference SHA-256 is
+`77b570231cd7c7153cadb9307e7aff954a57c9d2ba5c9d2836c0444047706c24`.
+Meshy geometry task `01a1aab8-c9f7-739e-901d-75e5416b8a25`, native rig task
+`01a1aabc-e76e-711c-8e27-f4e0723f3944` and animation task
+`01a1aac1-4da1-73c5-904a-5ca34e89cee8` supply the complete clothed character,
+its own 24 bones, inverse binds, skin weights and compatible motions. No earlier
+character geometry, hands, rig, UVs or maps are transplanted. The existing game
+weapon prop attaches to the new hand; the character's native hands remain intact.
+
+Twelve native motions map onto 27 existing semantic action names, sharing attack
+and cast motions. Strike/release landmarks preserve gameplay timing. Hip X/Z
+travel is removed for controller authority; native sole measurements correct
+vertical grounding and calibrate gait. Meshopt and 1024px WebP maps reduce the
+package; normals and texture encoding are lossy. Three rarity finishes share
+one geometry. White and non-pilot keys retain published assets. The selector
+shows the new rig's neutral source pose; gameplay uses its full animation set.
+Exact hashes, provenance and mapping are in
+`public/models/native-characters/fosca-3.json`. No new runtime dependency.

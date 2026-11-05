@@ -807,6 +807,8 @@ export class Outfit {
   private worn: GearState = {};
   private pieces = new Map<Worn, THREE.SkinnedMesh>();
   private weapon?: THREE.Object3D;
+  private disposed = false;
+  private weaponReady: Promise<void> = Promise.resolve();
   private t = 0;
   onWeapon: (top?: THREE.Object3D) => void = () => {};
 
@@ -949,7 +951,7 @@ export class Outfit {
     this.body.geometry.setAttribute('aBeak', new THREE.BufferAttribute(out, 3));
   }
 
-  wear(worn: GearState, selection?: OutfitSelection): void {
+  wear(worn: GearState, selection?: OutfitSelection): Promise<void> {
     selection ??= outfitSelection(this.hero, worn);
     if (selection && !selection.legacy) {
       worn = { ...worn };
@@ -972,13 +974,14 @@ export class Outfit {
     }
     if (changed && !whole) this.paint?.paint(REGION_SLOT.map((s) => { const id = this.worn[s]; return id ? lookOf(id) : undefined; }));
     if (changed) this.heroOutfits?.wear(this.worn, selection);
+    return this.weaponReady;
   }
 
   showAura(material: THREE.ShaderMaterial, visible: boolean): void {
     this.heroOutfits?.showAura(material, visible);
   }
 
-  dispose(): void { this.heroOutfits?.dispose(); }
+  dispose(): void { this.disposed = true; this.heroOutfits?.dispose(); }
 
   /** The piece of what `slot` wears now, in place of the one there: loaded, then baked onto its bones. */
   private piece(slot: Worn): void {
@@ -990,7 +993,7 @@ export class Outfit {
     if (!p) return;
     loadModel(`${DIR}${look}-${slot}.glb`, 256).then((gltf) => {
       const now = this.worn[slot];
-      if (this.whole || this.pieces.has(slot) || !now || lookOf(now) !== look) { dispose(gltf.scene); return; } // swapped again meanwhile
+      if (this.disposed || this.whole || this.pieces.has(slot) || !now || lookOf(now) !== look) { dispose(gltf.scene); return; } // swapped again meanwhile
       const m = this.bake(slot, p, gltf.scene);
       this.pieces.set(slot, m);
       if (slot === 'spalle') this.uniforms.uPad.value = 1;
@@ -1056,12 +1059,13 @@ export class Outfit {
   }
 
   private arm(id?: string): void {
+    this.weaponReady = Promise.resolve();
     if (this.weapon) { dispose(this.weapon); this.weapon = undefined; this.guard.hold(); this.onWeapon(); this.uniforms.uFist.value = 0; }
     const w = id ? WEAPONS[id] : undefined;
     if (!w) return;
-    loadModel(w.file).then((gltf) => {
+    this.weaponReady = loadModel(w.file).then((gltf) => {
       const prop = gltf.scene;
-      if (this.worn.arma !== id || this.weapon) { dispose(prop); return; } // swapped again meanwhile
+      if (this.disposed || this.worn.arma !== id || this.weapon) { dispose(prop); return; } // swapped again meanwhile
       prop.traverse((o) => {
         o.userData.xray = true; // no x-ray twin either
         const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
@@ -1082,7 +1086,7 @@ export class Outfit {
       this.uniforms.uFist.value = 1;
       this.guard.hold(held, walk);
       this.onWeapon(top);
-    }, (e) => console.error('weapon failed to load', e));
+    });
   }
 
   /** After the animation's update: a staff stood up while he is at `ease` (0..1: no blow or spell under way), the weapon kept out of him. */

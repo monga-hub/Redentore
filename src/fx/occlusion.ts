@@ -567,6 +567,15 @@ class XRay {
 
   /** Twins for the bodies loaded since the last look. */
   scan(): void {
+    // A complete appearance swap detaches its old meshes; twins borrow their resources.
+    for (const [c, b] of this.chars) {
+      if (!this.bodies.some(([root]) => root.children.includes(c))) { this.chars.delete(c); continue; }
+      b.twins = b.twins.filter(t => {
+        let parent: THREE.Object3D | null = t.parent;
+        while (parent && parent !== c) parent = parent.parent;
+        return parent === c;
+      });
+    }
     for (const [root, mat] of this.bodies) for (const c of root.children) c.traverse((o) => {
       const src = o as THREE.SkinnedMesh;
       if (!src.isMesh || src.userData.xray || src.userData.twin) return;

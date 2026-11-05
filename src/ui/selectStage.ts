@@ -131,7 +131,7 @@ export class SelectStage {
     this.raf = requestAnimationFrame(this.frame);
     const dt = Math.min(0.1, (now - this.last) / 1000), t = (this.t += dt);
     this.last = now;
-    this.model?.animate(this.reduced.matches ? 0 : dt, 0, true);
+    this.model?.present();
     const root = this.model?.root, l = root?.getObjectByName('LeftArm'), r = root?.getObjectByName('RightArm');
     if (l && r) { // his chest's way, from the line of his shoulders (his left is -X at rest), turned to the lens
       const a = this.holder.worldToLocal(l.getWorldPosition(new THREE.Vector3())).sub(this.holder.worldToLocal(r.getWorldPosition(new THREE.Vector3()))), f = Math.atan2(a.z, -a.x);

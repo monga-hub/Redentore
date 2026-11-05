@@ -1,0 +1,605 @@
+{
+  "nativeRigSha256": "39d1dfd402934847ccab990da27d44ed41bbc53f1a5728e6a4bdad22e0f92913",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 29065,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "zanetto-1.glb",
+  "bytes": 3125988,
+  "sha256": "3df95d3fd8387b1cff9c7130039f164db7655b6736b29d35f917f5a43fa53e55",
+  "hero": "zanetto",
+  "chapter": 1,
+  "sourceJob": "01a1abfd-93b4-732c-917d-ce3ce2ee43a7",
+  "sourceSha256": "4d830e3740b6cf91149d1b1537e171e0f0bcf7e8b2bd2b2c8b677aea5249aa30",
+  "rigJob": "01a1ac02-0d86-77ac-ac9e-31513915e4ba",
+  "animationJob": "01a1ac05-574b-77fd-97ac-0c74666e6a4e",
+  "geometryGeneration": "Entirely original built-in ImageGen reference with zero image inputs; newly generated complete image-to-3D geometry, native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "ba2a6c951b46c4a95a1c0a858941587107b627f71058a4822d873308329041b2",
+  "referenceMode": "Built-in ImageGen from scratch with ZERO image inputs; ONE original Zanetto1replacement reference authorized inbox003",
+  "referencePrompt": "Create an ENTIRELY NEW ORIGINAL full-body high fantasy game character reference from TEXT ONLY, ZERO image inputs. Zanetto chapter1, undead bellringer of the Venetian Redentore, storm/bone class: tall strong natural adult body, ivory human skull under short charcoal hood, warm golden eye sockets. Rich coherent complete dark slate-green armored doublet and short fitted split storm tabard ending at upper thigh, separate charcoal trousers, substantial complete bronze/ivory armored boots, fitted articulated bracers and ordinary light brown leather gloves. Large important fantasy pauldrons shaped as firmly integrated protective verdigris bronze bell housings with thick warm bronze engraved lips, pale bone relief and restrained inlaid gold storm channels. No detached bells, clappers or floating parts. Strong full protected torso, bone bellmaker seal flush on chest, flush braided belt. CRITICAL clearly rig-friendly A STANCE: arms angled down and outward about35degrees from torso, nearly straight soft elbows, wrists and entire gloved hands held distinctly OUTSIDE the outer silhouette of thighs and short tabard. There must be a wide clearly visible empty background gap of at least one full hand-width between each glove/wrist and the nearest thigh/tabard, including behind wrists. Clean open armpits and forearms, tight sleeves, NO connecting sleeve/coat/tabard surfaces to hands, no hanging cloth or webs anywhere. Hands natural sized with softly curled fingers, palms face inward toward torso; no palms facing viewer. Balanced calm stable full-body reference stance, not attack/action pose; natural human proportions, normal head size, parallel feet hipwidth grounded on same floor. Entire skull, head, body, all fingers and both boot soles uncropped with generous margin. Single centered front view with subtle3Ddepth, pale grey seamless studio backdrop, evenly lit highly textured stylized realistic game sculpt. No weapon, cape, long robe, hanging chains, beads, bottles, external lightning, wings, halo, separate props, base, UI or text. Entirely original sacred bell/storm/bone armor, no franchise copying.",
+  "sourceReference": "references/zanetto-1.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 13681960,
+      "sha256": "4d830e3740b6cf91149d1b1537e171e0f0bcf7e8b2bd2b2c8b677aea5249aa30"
+    },
+    "rig.glb": {
+      "bytes": 15321112,
+      "sha256": "39d1dfd402934847ccab990da27d44ed41bbc53f1a5728e6a4bdad22e0f92913"
+    },
+    "native-actions.glb": {
+      "bytes": 17307940,
+      "sha256": "604952b7b1ff324c985d6bf10e39229706d40ad04fb69acec10f22b6967f2f45"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 15302060,
+      "sha256": "b95860e7e4f662a64371e3542e398bdde498e78d85cd94d981942f1c809addc6"
+    },
+    "running_glb_url.glb": {
+      "bytes": 15291452,
+      "sha256": "2839bf05f2f0f6cd7ca32dea6a8586b47b31d91f93d1d756b7d11cea6e930287"
+    }
+  },
+  "heightMetres": 1.95,
+  "bounds": {
+    "min": [
+      -0.5916717231833729,
+      3.444057627352191e-09,
+      -0.19719919452886228
+    ],
+    "max": [
+      0.5916717223491142,
+      1.950000309395998,
+      0.19719918095752348
+    ]
+  },
+  "nativeHandBounds": [
+    {
+      "min": [
+        -8.1965866302329,
+        4.14769987470325,
+        -7.421935294786579
+      ],
+      "max": [
+        3.499270642981088,
+        22.74612496497022,
+        4.051320148484592
+      ]
+    }
+  ],
+  "paceMetresPerSecond": {
+    "walk": 1.49,
+    "run": 4.72
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "zanetto",
+    "chapter": 1,
+    "coordinates": "native metre bind frame; account for transformed Armature parent; use new hand samples for socket",
+    "palette": [
+      "verdigris bronze",
+      "charcoal stormcoat",
+      "slate green",
+      "ivory bone",
+      "gold eye sockets"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": {
+      "green": {
+        "name": "worked furnace armor",
+        "metalness": 0.25,
+        "roughness": 0.88,
+        "normalScale": 0.7,
+        "detail": "Original generated charcoal/verdigris/ivory maps, subdued bell bronze and coarse relief"
+      },
+      "blue": {
+        "name": "master glassmaker armor",
+        "metalness": 0.5,
+        "roughness": 0.62,
+        "normalScale": 1,
+        "detail": "Original maps, clearer bell bronze relief and metallic finish, no forced blue garment"
+      },
+      "epic": {
+        "name": "consecrated furnace armor",
+        "metalness": 0.72,
+        "roughness": 0.42,
+        "normalScale": 1.2,
+        "detail": "Original maps, strongest existing funerary relief and polished bronze edges, same storm/bone identity"
+      }
+    },
+    "limits": "These are the actual task-only fixture PBR parameter sets, multiplied with the original generated ORM/normal maps; production registration belongs to integrator. No extra ornament shader implemented."
+  },
+  "acceptance": {
+    "shipEligible": true,
+    "gate": "Worker visual and fixture PASS; integrator production gates still required",
+    "generated": true,
+    "integratedInProduction": false,
+    "published": false,
+    "tests": {
+      "status": "PASS",
+      "scope": "Worker visual plus actual shared app renderer through EXTERNAL task-only registry/PBR/gait fixture on5319; not production registration/publication",
+      "source": "Entirely NEW original wide-A reference and image-to-3D geometry with official pose_mode a-pose; source, rig and included run reviewed before optional actions",
+      "rig": "Fresh24bones, normalized weights, zero mixedHandLegvertices; old733-vertex failure absent. No geometry/weights/bind/hand repair or old-data transplant.",
+      "motions": "Fresh idle/run/slash/cast/death diagnostic frames reviewed, no long wrist/leg webs. Minor coat/large-pauldron intersections possible in extreme motion.",
+      "selector": "Desktop/phone all five actual choices two seconds each exactzero bone/clock deltas; own inverse-bind neutral source stance, full grounded boots and natural palms",
+      "finishes": "Actual green/rare/epic PBR quality variants preserve source slate/charcoal/bronze/bone colors; white remains original fallback",
+      "gameDesktop": "Real sandbox keyboard run, real swingCombo/trail, actual starter Toll equip/tryCast with mana580to537.09 and Cast_Raise/LeftHand release",
+      "gamePhone": "390x844x3 mobile/touch CPU4; real game run/slash/Toll, mana580to537.37, not a physical phone",
+      "weapon": "Existing martello-campana inventory prop attached to newly measured RightHand socket; grip and active0.572mstrike edge reviewed",
+      "integrity": "Exact fresh positions/UV/joints/weights/inverse binds after compression, triangle winding preserved modulo cyclic order; normals and textures lossy",
+      "resources": "Both live reports GLerror0/shaderfail0; shared native regression passed",
+      "limitations": [
+        "No finger bones",
+        "Possible extreme-motion cloth/shoulder intersections",
+        "27semantic aliases from12fresh native sources, not27unique performances",
+        "No physical phone or live two-client coop proof",
+        "Production integration/publication belong to root"
+      ]
+    }
+  },
+  "ownCandidateCredits": 65,
+  "taskCapCredits": 685,
+  "equippedWeapon": "Existing martello-campana inventory prop attached to newly measured RightHand socket; grip and active0.572mstrike edge reviewed",
+  "runtime": "Complete NEW character and its own native skeleton/mixer. Twelve native clip exports feed27semantic aliases. Neutral inverse-bind presentation includes transformed Armature parent. Three parameter-only PBR quality finishes preserve class colors. Existing inventory weapon prop uses newly measured native hand socket. Actual shared renderer tested through external task-only mapping/material fixture; production registration belongs to integrator.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test",
+    "Production mapping/material integration and publication not performed by asset lane"
+  ],
+  "generationPose": "a-pose, explicit official image-to-3D parameter",
+  "selectorPoseOrigin": "Own newly generated inverse binds including transformed Armature; no custom hand or old-pose repair",
+  "mixedHandLegVertices": 0,
+  "nativeAnimationBindRoundingMaxWorldMetres": 3.948306722438187e-06,
+  "nativeEventReview": [
+    {
+      "clip": "Right_Hand_Sword_Slash",
+      "bone": "RightHand",
+      "duration": 1.5,
+      "peak": {
+        "time": 0.5083333333333333,
+        "speed": 17.792418424569387
+      }
+    },
+    {
+      "clip": "mage_soell_cast",
+      "bone": "LeftHand",
+      "duration": 2.2666666507720947,
+      "peak": {
+        "time": 0.5,
+        "speed": 1.482694693565876
+      }
+    },
+    {
+      "clip": "Charged_Spell_Cast",
+      "bone": "LeftHand",
+      "duration": 2.6666667461395264,
+      "peak": {
+        "time": 1.675,
+        "speed": 7.610274238657296
+      }
+    }
+  ],
+  "supersededRejectedCandidate": {
+    "sourceJob": "01a1ab6e-d959-714c-8ec8-aaaf8e04225d",
+    "rigJob": "01a1abd6-80c6-7694-975a-253b9a5d6bcf",
+    "paidCredits": 35,
+    "optionalActionsSubmitted": false,
+    "reason": "Raw native run26xstretch/733mixedHandLegvertices",
+    "geometryRetainedInAcceptedCandidate": false
+  },
+  "neutralSelectorStability": [
+    {
+      "hero": "risorto",
+      "key": "reietto.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.6899999618530273,
+        1.6899999618530273
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.315090545014988,
+        -3.315090545014988
+      ]
+    },
+    {
+      "hero": "bortolo",
+      "key": "bortolo.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        0.2800000011920929,
+        0.2800000011920929
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.3021359115474804,
+        -3.3021359115474804
+      ]
+    },
+    {
+      "hero": "fosca",
+      "key": "fosca.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1050000190734863,
+        1.1050000190734863
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.5814097191408196,
+        -3.5814097191408196
+      ]
+    },
+    {
+      "hero": "tizian",
+      "key": "tizian.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.05,
+        1.05
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.6605145559855625,
+        -3.6605145559855625
+      ]
+    },
+    {
+      "hero": "zanetto",
+      "key": "native-characters/zanetto-1.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1750000238418579,
+        1.1750000238418579
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.492179855766812,
+        -3.492179855766812
+      ]
+    }
+  ],
+  "phoneNeutralSelectorStability": [
+    {
+      "hero": "risorto",
+      "key": "reietto.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.6899999618530273,
+        1.6899999618530273
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.315090545014988,
+        -3.315090545014988
+      ]
+    },
+    {
+      "hero": "bortolo",
+      "key": "bortolo.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        0.2800000011920929,
+        0.2800000011920929
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.3021359115474804,
+        -3.3021359115474804
+      ]
+    },
+    {
+      "hero": "fosca",
+      "key": "fosca.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1050000190734863,
+        1.1050000190734863
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.5814097191408196,
+        -3.5814097191408196
+      ]
+    },
+    {
+      "hero": "tizian",
+      "key": "tizian.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.05,
+        1.05
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.6605145559855625,
+        -3.6605145559855625
+      ]
+    },
+    {
+      "hero": "zanetto",
+      "key": "native-characters/zanetto-1.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1750000238418579,
+        1.1750000238418579
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.492179855766812,
+        -3.492179855766812
+      ]
+    }
+  ]
+}

@@ -1,0 +1,492 @@
+{
+  "nativeRigSha256": "84d0646b08dd50ce8d4d3a61da7bc229f8b3f9ad4034870eb369dec7d68cb7d4",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 28942,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "tizian-2.glb",
+  "bytes": 3166772,
+  "sha256": "349f13a53929df338bfca3b02b81cade71f4dfcb451c1b26d3e35b7f9e092146",
+  "hero": "tizian",
+  "chapter": 2,
+  "sourceJob": "01a1ac1c-1003-702a-9b9c-349be1739f8a",
+  "sourceSha256": "eac1b17c611d1fd97f6a2ac72c596518044e9d0775ce092365527daf055370e8",
+  "rigJob": "01a1ac1e-f139-7081-a836-ad843351fbfa",
+  "animationJob": "01a1ac1f-bc04-705c-abd1-6444da490325",
+  "geometryGeneration": "Entirely original built-in ImageGen reference with zero image inputs; newly generated complete image-to-3D geometry, native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "b4b1fe4872f1ce3e79b68f59cf64646bf10d96bda57bde0907f7520f20455a65",
+  "referenceMode": "Built-in ImageGen, ZERO image inputs, original chapter2reference",
+  "referencePrompt": "Original high fantasy videogame FULL CHARACTER reference generated from TEXT ONLY with ZERO image inputs. Fra Tizian chapter2, compact sturdy Murano holy-fire glassmaker friar, adult human male with weathered burned face, short grey beard, cropped greying hair, strong natural stocky proportions and ordinary hands. Chapter2 Votive Glass Brother: a rich coherent complete outfit of warm ivory enameled plate and restrained gilded bronze supporting opaline amber sacred glass panels, deep charcoal-teal fitted padded underarmor and a short split ivory-and-dark-wine monastic tabard ending just above knees, distinct separate charcoal trousers and substantial full ivory-trimmed leather boots. Major fantasy shoulders integrated firmly into armor, shaped as elegant protective miniature votive-glass chapel housings with broad coherent bronze rims and ivory sculpted relief, no tall towers or pieces floating away. Chest is protected by a subtle glass kiln heart inset behind flush bronze ribs. Class identity clearly Venetian holy fire and glass craftsmanship, never plague mask, skull robe, warrior helmet or generic starter gear. Rig friendly construction: tightly fitted sleeves without hanging cloth or elbow folds bridging the torso, close articulated bracers and fitted leather gloves. Both arms held comfortably20degrees clear of body in relaxed lowA stance, clear visible background along armpits/elbows/wrists, elbows almost straight softly relaxed, inward palms toward thighs with naturally gently curled fingers. Complete coherent new head/body/outfit/hands/boots, natural head size and believable anatomy. Centered single full character front view with subtle3Ddepth, stable neutral feet hipwidth parallel grounded on same floor, all head and soles visible with margin, pale grey studio backdrop, even soft light, highly detailed textured stylized realistic game sculpt. No weapons, cape, long robe, bottles, beads, chains, hanging sleeves, floating ornaments, separate props, pedestal, text or UI. Original design without franchise copying.",
+  "sourceReference": "references/tizian-2.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 14394896,
+      "sha256": "eac1b17c611d1fd97f6a2ac72c596518044e9d0775ce092365527daf055370e8"
+    },
+    "rig.glb": {
+      "bytes": 16000704,
+      "sha256": "84d0646b08dd50ce8d4d3a61da7bc229f8b3f9ad4034870eb369dec7d68cb7d4"
+    },
+    "native-actions.glb": {
+      "bytes": 18007668,
+      "sha256": "33120767259cf31650b34e855b6df2859933ab1269798f62db0eabd378ad6afb"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 15981448,
+      "sha256": "af6c2205ff76a17d01d3530c225321aae21adec332862f8cb0ec7e255ba53965"
+    },
+    "running_glb_url.glb": {
+      "bytes": 15970832,
+      "sha256": "573d614372227175d63451bb9a8dcbdfdd8dc6eba52bc0ba867c3f26e98c8b3c"
+    }
+  },
+  "heightMetres": 1.68,
+  "bounds": {
+    "min": [
+      -0.5589837914290713,
+      -4.706815900143211e-09,
+      -0.207903665388383
+    ],
+    "max": [
+      0.5589837777308356,
+      1.680000086497468,
+      0.20790366139555688
+    ]
+  },
+  "nativeHandBounds": [
+    {
+      "min": [
+        -7.165367315797539,
+        3.494592212054343,
+        -8.007821586846461
+      ],
+      "max": [
+        4.7292653401355125,
+        21.2309284055888,
+        4.873986743111686
+      ]
+    }
+  ],
+  "paceMetresPerSecond": {
+    "walk": 1.32,
+    "run": 4.16
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "tizian",
+    "chapter": 2,
+    "coordinates": "Native metre inverse-bind frame including transformed Armature parent; own native hand samples for weapon socket",
+    "palette": [
+      "ivory enamel",
+      "opaline amber glass",
+      "aged bronze",
+      "charcoal teal underarmor",
+      "dark wine tabard"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": {
+      "green": {
+        "name": "votive apprentice",
+        "metalness": 0.25,
+        "roughness": 0.88,
+        "normalScale": 0.7,
+        "detail": "Original generated maps; stronger relief and polished edges with higher quality, preserved ivory/amber/bronze palette"
+      },
+      "blue": {
+        "name": "votive artisan",
+        "metalness": 0.5,
+        "roughness": 0.62,
+        "normalScale": 1,
+        "detail": "Original generated maps; stronger relief and polished edges with higher quality, preserved ivory/amber/bronze palette"
+      },
+      "epic": {
+        "name": "consecrated glass chapel",
+        "metalness": 0.72,
+        "roughness": 0.42,
+        "normalScale": 1.2,
+        "detail": "Original generated maps; stronger relief and polished edges with higher quality, preserved ivory/amber/bronze palette"
+      }
+    },
+    "limits": "Actual external fixture PBR values multiplied with source ORM/normal maps; no additional engraving geometry/shader, production registration by integrator."
+  },
+  "acceptance": {
+    "shipEligible": true,
+    "gate": "Worker visual and fixture PASS; integrator production gates still required",
+    "generated": true,
+    "integratedInProduction": false,
+    "published": false,
+    "tests": {
+      "status": "PASS",
+      "scope": "Actual shared selector/player/sheet through EXTERNAL task-only registry/material/gait fixture; production integration/publication belongs to root",
+      "source": {
+        "status": "PASS",
+        "method": "Unmodified new source GLB rendered by actual shared selector renderer as diagnostic, not registered gameplay",
+        "reference": "reference.png",
+        "proof": "preview-source.glb.png",
+        "observations": "Compact natural sturdy proportions, complete head/hands/boots, clear wrists outside thighs, fitted sleeves/arm-torso gaps, coherent major ivory/glass shoulders; faithful source palette, no floating ornaments or conspicuous limb intersections",
+        "generationPose": "a-pose"
+      },
+      "rig": {
+        "status": "PASS",
+        "nativeBones": 24,
+        "mixedHandLegVertices": 0,
+        "includedRunEdge": {
+          "rest": 0.1498585978694531,
+          "posed": 0.25490593276464896,
+          "ratio": 1.7009763629758912
+        },
+        "proof": "preview-running_glb_url.glb.png",
+        "observations": "Raw included running animation inspected before optional actions: complete natural limbs and hands, no wrist-thigh or sleeve webs, no large stretching strips; major shoulders remain coherent; expected rigid armor/cloth overlap possible."
+      },
+      "motions": {
+        "status": "PASS",
+        "weapon": "canna-vetraio",
+        "observations": "Reference, raw source/run, packaged fresh idle/run/slash/cast, neutral front/three-quarter desktop/phone, all rarity finishes and real phone gameplay slash/Hallow inspected. Complete natural compact proportions and hands, coherent ivory glass chapel shoulders, stable grounded initial selector; no long wrist-thigh webs or visible stretched strips. Existing weapon seated in newly measured native RightHand. Extreme raised-arm motion can show minor rigid-pauldron/underarm-cloth overlap, not repaired. Phone is emulated."
+      },
+      "selector": "Five actual choices, two seconds each, exact zero local-bone/mixer-clock change desktop and phone emulation",
+      "finishes": "Real Equipment.wear green/rare/epic use same new geometry with PBR quality details and original class palette; white fallback remains original",
+      "gameDesktop": {
+        "run": {
+          "from": [
+            -571.193393968591,
+            0,
+            -13.843897345972746
+          ],
+          "to": [
+            -569.0673401684829,
+            0,
+            -13.843897345972746
+          ],
+          "distance": 2.126053800108025,
+          "state": "run",
+          "gait": 0.7666059146923145,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip in volatile task-only sandbox; deterministic proof despite randomized level18card choices"
+          },
+          "ability": "hallow",
+          "castAccepted": true,
+          "manaBefore": 820,
+          "manaAfter": 781.8932399999678,
+          "action": "Ground_Slam",
+          "actionAtCapture": "Ground_Slam",
+          "hand": "LeftHand",
+          "key": "native-characters/tizian-2.glb"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -568.1354770166113,
+            1.0755373911156005,
+            -13.359366784635009
+          ],
+          "tip": [
+            -567.7385463301335,
+            1.6706932141227593,
+            -13.494346291530347
+          ],
+          "distance": 0.7279999250059849,
+          "hand": "RightHand"
+        }
+      },
+      "gamePhone": {
+        "run": {
+          "from": [
+            -573.9754385404897,
+            0,
+            -13.471167074704967
+          ],
+          "to": [
+            -571.6813478288202,
+            0,
+            -13.467730268445704
+          ],
+          "distance": 2.2940932860294487,
+          "state": "run",
+          "gait": 0.8272244450676906,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip in volatile task-only sandbox; deterministic proof despite randomized level18card choices"
+          },
+          "ability": "hallow",
+          "castAccepted": true,
+          "manaBefore": 820,
+          "manaAfter": 782.0433600000321,
+          "action": "Ground_Slam",
+          "actionAtCapture": "Ground_Slam",
+          "hand": "LeftHand",
+          "key": "native-characters/tizian-2.glb"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -570.7632578709267,
+            1.1062317608555596,
+            -13.001175952816634
+          ],
+          "tip": [
+            -570.3909948852385,
+            1.7089565307022148,
+            -13.168887051372746
+          ],
+          "distance": 0.7279999253290854,
+          "hand": "RightHand"
+        }
+      },
+      "weapon": "Existing canna-vetraio inventory prop, own new native RightHand socket and active edge checked",
+      "integrity": "Exact new positions/UV/joints/weights/inverse binds preserved after compression; normals/textures lossy",
+      "limitations": [
+        "No articulated finger bones",
+        "Rigid armor/cloth can intersect in extreme motion",
+        "27 semantic aliases from12 fresh native sources, not27 independent performances",
+        "Phone emulation only, no physical device or live coop proof",
+        "Production registration and publication not performed by asset lane"
+      ]
+    }
+  },
+  "ownCandidateCredits": 65,
+  "taskCapCredits": 685,
+  "equippedWeapon": "Existing canna-vetraio inventory prop, own new native RightHand socket and active edge checked",
+  "runtime": "Complete NEW character and its own native skeleton/mixer. Twelve native clip exports feed27semantic aliases. Neutral inverse-bind presentation includes transformed Armature parent. Three parameter-only PBR quality finishes preserve class colors. Existing inventory weapon prop uses newly measured native hand socket. Actual shared renderer tested through external task-only mapping/material fixture; production registration belongs to integrator.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test",
+    "Fixture animation pace may differ until integrator registers measured gait",
+    "Production mapping/material integration and publication not performed by asset lane"
+  ],
+  "generationPose": "Official image-to-3D pose_mode a-pose",
+  "nativeEventMetrics": [
+    {
+      "time": 0.5083333333333333,
+      "speed": 15.822202255348163
+    },
+    {
+      "time": 0.5,
+      "speed": 15.67645918341894
+    },
+    {
+      "time": 0.5166666666666667,
+      "speed": 15.67357342085397
+    }
+  ],
+  "wristLegInfluences": {
+    "method": "Read-only audit of unmodified fresh native rig: hand and leg weights both>0.05 on same vertex. Suspicious cross-limb influence, reviewed together with raw gait/stretch and visual proof; never repairs weights.",
+    "meshes": [
+      {
+        "mesh": "char1",
+        "vertices": 41867,
+        "mixedHandLegVertices": 0,
+        "worst": []
+      }
+    ]
+  },
+  "selectorPresentation": "Stable own inverse-bind neutral pose, full transformed Armature parent; desktop/phone exactzero bone and clock delta",
+  "ownLaneCreditsAtHandoff": 330
+}

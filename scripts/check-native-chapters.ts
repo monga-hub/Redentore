@@ -54,9 +54,9 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.wear({ abito: outfitChoices(hero, chapter, 'epico')[0].id }); await wait(entry.file);
   actor.present();
   let skin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) skin ??= o; });
-  if ((hero === 'tizian' && chapter === 1) || (hero === 'bortolo' && (chapter === 1 || chapter === 3))) {
+  if (((hero === 'tizian' || hero === 'zanetto') && (chapter === 1 || chapter === 2)) || (hero === 'bortolo' && (chapter === 1 || chapter === 3))) {
     const scene = actor.root.children[0];
-    const contract = hero === 'tizian'
+    const contract = hero !== 'bortolo'
       ? [['noncomune', .25, .88, .7], ['raro', .5, .62, 1], ['epico', .72, .42, 1.2]] as const
       : [['noncomune', .2, .9, .7], ['raro', .48, .64, 1], ['epico', .72, .44, 1.2]] as const;
     for (const [rarity, metalness, roughness, relief] of contract) {
@@ -79,6 +79,13 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   }
   actor.animate(.1, 4.2, true, 4.2); actor.play('slash1', .2); actor.animate(.2, 0, true);
   const nativeBinds = skin.skeleton.boneInverses.map(m => m.elements);
+  if (hero === 'zanetto') {
+    // His legacy yoke needs Vite's browser asset loader; actual white/equip/sheet swaps are covered in browser proof.
+    const legacy = await parse(HEROES[hero].file);
+    const legacySkin = legacy.scene.getObjectByProperty('isSkinnedMesh', true) as THREE.SkinnedMesh;
+    assert.notDeepEqual(nativeBinds, legacySkin.skeleton.boneInverses.map(m => m.elements));
+    freeCharacter(legacy.scene); actor.dispose(); freeCharacter(actor.root); continue;
+  }
   actor.wear({ abito: outfitChoices(hero, chapter, 'comune')[0].id }); await wait(HEROES[hero].file);
   let legacySkin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) legacySkin ??= o; });
   assert.notDeepEqual(nativeBinds, legacySkin.skeleton.boneInverses.map(m => m.elements), 'New chapter owns newly generated binds rather than the old hero rig');
@@ -86,3 +93,21 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.dispose(); freeCharacter(actor.root);
 }
 console.log('native chapters: all three stat builds/finishes, unfinished fallback, exact shipped hashes/skin/clips, native neutral pose, normalized finish regions and white/native swaps');
+
+for (const hero of ['tizian', 'zanetto', 'bortolo'] as const) {
+  const chapters = ([1, 2, 3] as const).filter(chapter => NATIVE_CHARACTERS[`${hero}-${chapter}`]);
+  const actor = new UndeadModel(hero, true, parse), root = actor.root;
+  const state = actor as unknown as { visualKey: string; playing?: { layer: { upper: THREE.AnimationAction } } };
+  for (const chapter of [...chapters, ...[...chapters].reverse()]) {
+    const entry = NATIVE_CHARACTERS[`${hero}-${chapter}`]!;
+    const time = state.playing?.layer.upper.time;
+    actor.wear({ abito: outfitChoices(hero, chapter, 'epico')[1].id });
+    for (let i = 0; state.visualKey !== entry.file; i++) { assert.ok(i < 400); await new Promise(r => setTimeout(r, 5)); }
+    assert.equal(actor.root, root, 'Native chapter swap preserves the game actor root');
+    assert.equal(root.children.length, 1, 'Only the complete current representation remains');
+    if (time !== undefined) assert.ok(Math.abs(state.playing!.layer.upper.time - time) < .00001, 'Native-to-native chapter swap preserves the in-flight strike');
+    actor.play('slash1', .2); actor.animate(.1, 0, true);
+  }
+  actor.dispose(); freeCharacter(actor.root);
+}
+console.log('native chapter transitions: Tizian, Zanetto and Bortolo in both directions preserve actor identity, one owned body and live strike timing');

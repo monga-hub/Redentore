@@ -1,0 +1,532 @@
+{
+  "nativeRigSha256": "d27cd383e7e26984dd194acdfe2838fea5a1fb84a1a8390c855a77b942101016",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 29154,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "zanetto-2.glb",
+  "bytes": 3013340,
+  "sha256": "db6d631795aacfa8e7c2a2d8a7ea4ffb079833f0d89dfe7c5b205ce84bffbdb7",
+  "hero": "zanetto",
+  "chapter": 2,
+  "sourceJob": "01a1ac2b-b245-7526-8a4f-952c6b6c7b3c",
+  "sourceSha256": "72bdd3eec6d12ea560d5748f97d0efe7b4bccef9aad4ee2479194c07c4830de6",
+  "rigJob": "01a1ac2e-95f9-7457-90d1-54fd476f7bd9",
+  "animationJob": "01a1ac2f-dfcb-76c6-93c4-c057014ce7dd",
+  "geometryGeneration": "Entirely original built-in ImageGen reference with zero image inputs; newly generated complete image-to-3D geometry, native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "f41a6f6bfa7256651b45be1734098fef0d98e96804e8e3cdea553ed8c147fdb1",
+  "referenceMode": "Built-in ImageGen, ZERO image inputs, original chapter2reference",
+  "referencePrompt": "Generate an ENTIRELY ORIGINAL full-body high fantasy videogame character reference from TEXT ONLY with ZERO image inputs. Zanetto chapter2, undead bellringer of the Redentore, storm-and-bone class, tall strong adult with natural human proportions and a pale ivory human skull face under a short charcoal hood; warm golden glowing eye sockets. Coherent complete Ossuary Bellkeeper outfit: substantial aged ivory and pale bronze armor layered over fitted midnight teal padding, broad major integrated bell-housing pauldrons with solid bone-inlay supporting ribs, engraved bell lips and restrained silver lightning channels. Armor is clearly attached to natural broad shoulders, protective and architectural but no tall towers, hanging bells or dangling clappers. Strong covered torso with funerary bone relief and a flush bronze bell seal, short split midnight teal-and-ivory armored tabard above knees, separate fitted charcoal trousers, broad complete leather boots protected by ivory/bronze shin armor. Skeletal head contrasts with full clothed strong body; not a frail exposed skeleton or skinny robed mannequin. Rig friendly: tightly fitted sleeves and articulated forearm bracers, ordinary fitted leather gloves, no cloth webs or hanging folds between wrists/armpits/torso. Relaxed lowA stance arms20degrees clear of body, almost straight soft elbows, clear visible background gaps at armpits and all along forearms, palms inward toward thighs, normal-sized gently curled gloved fingers. Feet hipwidth parallel firmly grounded on same floor, single centered full character front view with subtle depth, natural head size, entire skull and both full boot soles uncropped with margin. Pale grey studio background, even soft lighting, detailed textured stylized realistic game sculpt. No weapons, cape, long robe, bottles, beads, hanging chains, floating ornaments, detached lightning, limb intersections, pedestal, UI or text. Original Venetian funerary bell/storm imagery; no franchise copying.",
+  "sourceReference": "references/zanetto-2.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 13502772,
+      "sha256": "72bdd3eec6d12ea560d5748f97d0efe7b4bccef9aad4ee2479194c07c4830de6"
+    },
+    "rig.glb": {
+      "bytes": 14877200,
+      "sha256": "d27cd383e7e26984dd194acdfe2838fea5a1fb84a1a8390c855a77b942101016"
+    },
+    "native-actions.glb": {
+      "bytes": 17004212,
+      "sha256": "1662bcfa5656650d81194e89f360a0ef0848cb68c57ac855db2d0b9262bde343"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 14857060,
+      "sha256": "c0686a4509d22f600d90e29c5315240442d91215377a56447ffc6a12c0016a9d"
+    },
+    "running_glb_url.glb": {
+      "bytes": 14846432,
+      "sha256": "db0be68b7b786dcd2af9160fa93d526813667b7912fa9301681030d90c681698"
+    }
+  },
+  "heightMetres": 1.95,
+  "bounds": {
+    "min": [
+      -0.6122885974091264,
+      -4.527929908631246e-09,
+      -0.22531830851625523
+    ],
+    "max": [
+      0.6122887135799588,
+      1.9500001649738077,
+      0.2253183015501765
+    ]
+  },
+  "nativeHandBounds": [
+    {
+      "min": [
+        -8.155925344412424,
+        6.0816851240936955,
+        -9.672365073714786
+      ],
+      "max": [
+        6.896659369008717,
+        24.42291019375125,
+        3.95244666440135
+      ]
+    }
+  ],
+  "paceMetresPerSecond": {
+    "walk": 1.47,
+    "run": 4.62
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "zanetto",
+    "chapter": 2,
+    "coordinates": "native metre bind frame; account for transformed Armature parent; use new hand samples for socket",
+    "palette": [
+      "aged ivory",
+      "pale bronze",
+      "midnight teal",
+      "charcoal",
+      "silver lightning channels"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": {
+      "green": {
+        "name": "worked ossuary bellkeeper",
+        "metalness": 0.25,
+        "roughness": 0.88,
+        "normalScale": 0.7,
+        "detail": "Original new ivory/bronze/midnight-teal maps with silver lightning detail, preserved palette and increasing existing relief/metal quality"
+      },
+      "blue": {
+        "name": "master ossuary bellkeeper",
+        "metalness": 0.5,
+        "roughness": 0.62,
+        "normalScale": 1,
+        "detail": "Original new ivory/bronze/midnight-teal maps with silver lightning detail, preserved palette and increasing existing relief/metal quality"
+      },
+      "epic": {
+        "name": "consecrated ossuary bellkeeper",
+        "metalness": 0.72,
+        "roughness": 0.42,
+        "normalScale": 1.2,
+        "detail": "Original new ivory/bronze/midnight-teal maps with silver lightning detail, preserved palette and increasing existing relief/metal quality"
+      }
+    },
+    "limits": "These are the actual task-only fixture PBR parameter sets, multiplied with the original generated ORM/normal maps; production registration belongs to integrator. No extra ornament shader implemented."
+  },
+  "acceptance": {
+    "shipEligible": true,
+    "gate": "Worker visual and fixture PASS; integrator production gates still required",
+    "generated": true,
+    "integratedInProduction": false,
+    "published": false,
+    "tests": {
+      "status": "PASS",
+      "scope": "Actual shared selector/player/sheet through EXTERNAL task-only registry/material/gait fixture; production integration/publication belongs to root",
+      "source": {
+        "status": "PASS",
+        "method": "Unmodified new source in shared selector renderer, diagnostic only",
+        "proof": "preview-source.glb.png",
+        "observations": "Complete natural strong skull-hood bellringer, substantial attached ivory/bronze bell shoulders, hands relaxed inward/downward clear of thighs, fitted sleeves and full grounded boots, coherent class colors; no obvious intersections or floating ornaments",
+        "generationPose": "a-pose"
+      },
+      "rig": {
+        "status": "PASS",
+        "nativeBones": 24,
+        "mixedHandLegVertices": 0,
+        "includedRunEdge": {
+          "rest": 0.24098061433920934,
+          "posed": 0.253697434959212,
+          "ratio": 1.0527711353665246
+        },
+        "proof": "preview-running_glb_url.glb.png",
+        "observations": "Fresh raw included running export inspected before optional action spend. Complete natural limbs/hands, no long wrist-leg/sleeve strips, coherent integrated bell shoulders; minor extreme-motion armor overlaps possible."
+      },
+      "motions": {
+        "status": "PASS",
+        "weapon": "martello-campana",
+        "observations": "Original ref, raw source/run, packaged idle/run/slash/cast/death, neutral selector desktop/phone and actual game slash/Toll inspected. Full natural proportional storm-bone bellkeeper with major attached ivory/bronze bell shoulders, complete boots and relaxed inward hands. No long wrist-thigh/sleeve strips or visible limb breaks. RightHand grip/strike arc consistent on actual bell hammer. All tier finishes retain source palette; minor extreme armor/cloth overlap remains possible."
+      },
+      "selector": "Five actual choices, two seconds each, exact zero local-bone/mixer-clock change desktop and phone emulation",
+      "finishes": "Real Equipment.wear green/rare/epic use same new geometry with PBR quality details and original class palette; white fallback remains original",
+      "gameDesktop": {
+        "run": {
+          "from": [
+            -571.1896949180689,
+            0,
+            -13.844384335212679
+          ],
+          "to": [
+            -569.0720144181737,
+            0,
+            -13.844384335212679
+          ],
+          "distance": 2.1176804998951866,
+          "state": "run",
+          "gait": 0.687558583371231,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip in volatile task-only sandbox; deterministic proof despite randomized level18card choices"
+          },
+          "ability": "toll",
+          "castAccepted": true,
+          "manaBefore": 640,
+          "manaAfter": 597.4205200000821,
+          "action": "Cast_Raise",
+          "actionAtCapture": "Cast_Raise",
+          "hand": "LeftHand",
+          "key": "native-characters/zanetto-2.glb"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -568.1171399964468,
+            1.0757814393995595,
+            -13.235482590182974
+          ],
+          "tip": [
+            -567.7787322698666,
+            1.524341118782369,
+            -13.342515818243882
+          ],
+          "distance": 0.5719979783935414,
+          "hand": "RightHand"
+        }
+      },
+      "gamePhone": {
+        "run": {
+          "from": [
+            -571.0392526933997,
+            0,
+            -13.864190429832979
+          ],
+          "to": [
+            -568.7369353934718,
+            0,
+            -13.864190429832979
+          ],
+          "distance": 2.3023172999279495,
+          "state": "run",
+          "gait": 0.7475055945823211,
+          "actualKeys": "KeyD"
+        },
+        "cast": {
+          "setup": {
+            "learnedBefore": true,
+            "method": "Real AbilitySystem.learn/equip in volatile task-only sandbox; deterministic proof despite randomized level18card choices"
+          },
+          "ability": "toll",
+          "castAccepted": true,
+          "manaBefore": 640,
+          "manaAfter": 597.800710000041,
+          "action": "Cast_Raise",
+          "actionAtCapture": "Cast_Raise",
+          "hand": "LeftHand",
+          "key": "native-characters/zanetto-2.glb"
+        },
+        "aura": {
+          "visibleShells": 1,
+          "glError": 0,
+          "failedShaders": 0
+        },
+        "attachment": {
+          "edges": true,
+          "base": [
+            -567.8038423597127,
+            1.1638066031648164,
+            -13.305790462588487
+          ],
+          "tip": [
+            -567.5133288696735,
+            1.626665810557152,
+            -13.47475327540921
+          ],
+          "distance": 0.5720010191240061,
+          "hand": "RightHand"
+        }
+      },
+      "weapon": "Existing martello-campana inventory prop, own new native RightHand socket and active edge checked",
+      "integrity": "Exact new positions/UV/joints/weights/inverse binds preserved after compression; normals/textures lossy",
+      "limitations": [
+        "No articulated finger bones",
+        "Rigid armor/cloth can intersect in extreme motion",
+        "27 semantic aliases from12 fresh native sources, not27 independent performances",
+        "Phone emulation only, no physical device or live coop proof",
+        "Production registration and publication not performed by asset lane"
+      ]
+    }
+  },
+  "ownCandidateCredits": 65,
+  "taskCapCredits": 685,
+  "equippedWeapon": "Existing martello-campana inventory prop, own new native RightHand socket and active edge checked",
+  "runtime": "Complete NEW character and its own native skeleton/mixer. Twelve native clip exports feed27semantic aliases. Neutral inverse-bind presentation includes transformed Armature parent. Three parameter-only PBR quality finishes preserve class colors. Existing inventory weapon prop uses newly measured native hand socket. Actual shared renderer tested through external task-only mapping/material fixture; production registration belongs to integrator.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test",
+    "Fixture animation pace may differ until integrator registers measured gait",
+    "Production mapping/material integration and publication not performed by asset lane"
+  ],
+  "generationPose": "Official pose_mode a-pose; no hand/body geometry edits",
+  "wristLegInfluences": {
+    "method": "Read-only audit of unmodified fresh native rig: hand and leg weights both>0.05 on same vertex. Suspicious cross-limb influence, reviewed together with raw gait/stretch and visual proof; never repairs weights.",
+    "meshes": [
+      {
+        "mesh": "char1",
+        "vertices": 35503,
+        "mixedHandLegVertices": 0,
+        "worst": []
+      }
+    ]
+  },
+  "ownLaneCreditsAtHandoff": 425,
+  "nativeEventSummary": [
+    {
+      "clip": "Right_Hand_Sword_Slash",
+      "bone": "RightHand",
+      "peaks": [
+        {
+          "time": 0.5083333333333333,
+          "speed": 18.218432442051014
+        },
+        {
+          "time": 0.5,
+          "speed": 18.04176654553277
+        },
+        {
+          "time": 0.5166666666666667,
+          "speed": 18.035121748830722
+        }
+      ]
+    },
+    {
+      "clip": "mage_soell_cast",
+      "bone": "LeftHand",
+      "peaks": [
+        {
+          "time": 0.5,
+          "speed": 1.5251824550054511
+        },
+        {
+          "time": 0.49166666666666664,
+          "speed": 1.522165969861718
+        },
+        {
+          "time": 0.48333333333333334,
+          "speed": 1.5191246554201752
+        }
+      ]
+    },
+    {
+      "clip": "Charged_Spell_Cast",
+      "bone": "LeftHand",
+      "peaks": [
+        {
+          "time": 1.675,
+          "speed": 7.789631860326297
+        },
+        {
+          "time": 1.6833333333333333,
+          "speed": 7.758070445730189
+        },
+        {
+          "time": 1.6916666666666667,
+          "speed": 7.713120262397555
+        }
+      ]
+    }
+  ]
+}

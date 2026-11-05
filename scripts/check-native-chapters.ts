@@ -54,7 +54,7 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.wear({ abito: outfitChoices(hero, chapter, 'epico')[0].id }); await wait(entry.file);
   actor.present();
   let skin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) skin ??= o; });
-  if ((hero === 'tizian' || hero === 'bortolo') && chapter === 1) {
+  if ((hero === 'tizian' && chapter === 1) || (hero === 'bortolo' && (chapter === 1 || chapter === 3))) {
     const scene = actor.root.children[0];
     const contract = hero === 'tizian'
       ? [['noncomune', .25, .88, .7], ['raro', .5, .62, 1], ['epico', .72, .42, 1.2]] as const

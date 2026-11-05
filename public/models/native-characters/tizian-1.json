@@ -1,0 +1,617 @@
+{
+  "nativeRigSha256": "fac894e0dba5225278d99c0d2c6e60bf45fa58c0bd8bea37e4ff427e216f933b",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 28881,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "tizian-1.glb",
+  "bytes": 2987668,
+  "sha256": "048bdc16169a3299f7af229f5915235e5d383946966f90821d9d5dd481aa03b7",
+  "hero": "tizian",
+  "chapter": 1,
+  "sourceJob": "01a1ab63-05cc-7732-8cd3-a8dc68efa324",
+  "sourceSha256": "b74cbbbff45b829073086630d663986dd8d4a3be25c1143d6aa9fa2a59a97836",
+  "rigJob": "01a1ab65-a6f8-72b9-99cf-5cefa2f4d3aa",
+  "animationJob": "01a1abba-50b7-77e3-be18-8b69f2272936",
+  "geometryGeneration": "Entirely original built-in ImageGen reference with zero image inputs; newly generated complete image-to-3D geometry, native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "326d8135a87cecfb09d4717050c5b985d07097536e307509e3c247c1e0272a75",
+  "referenceMode": "built-in ImageGen, zero image inputs, entirely new reference for authorized one retry",
+  "referencePrompt": "Original high fantasy full-character 3D-game reference, Fra Tizian chapter1: sturdy compact adult male Murano glassmaker friar, weathered burned face, grey cropped hair and short beard, natural stocky human proportions and ordinary sized hands. NEW original design. Large coherent attached bronze furnace pauldrons featuring protected amber blown-glass insets and ivory votive bas-reliefs. Tailored charcoal padded torso and russet fitted leather brigandine, short split armored monastic apron to knees, separate natural trouser legs, sturdy complete grounded leather boots. CRITICAL rig-friendly construction: close-fitting sleeves from shoulder to elbow and fitted forearm bracers, smooth clean sleeve outlines without hanging folds or cloth webs, fitted leather gloves. Both arms held comfortably 20 degrees away from body in a relaxed low A stance, clear visible open background gap all along each forearm, elbow and armpit. No surface connecting arm to waist or chest. Elbows almost straight softly relaxed, palms facing inward toward thighs, fingers naturally gently curled and separated from tunic, no fingers facing viewer. No hanging cloth attached to wrists, no loose sleeves, drapery, cape, chains, beads, bottles, weapon, pedestal or floating ornaments. Broad believable shoulders integrated into torso silhouette without interfering with armpits. Complete coherent head/body/outfit/hands/boots, richly crafted heroic armor rather than starter clothes, balanced stable feet hipwidth parallel on floor. One centered front-view character with slight depth, entire body uncropped with margin, plain pale grey studio background, evenly lit textured stylized realistic game sculpt. No text, no UI, no franchise copying.",
+  "sourceReference": "references/tizian-1.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 13448732,
+      "sha256": "b74cbbbff45b829073086630d663986dd8d4a3be25c1143d6aa9fa2a59a97836"
+    },
+    "rig.glb": {
+      "bytes": 14912296,
+      "sha256": "fac894e0dba5225278d99c0d2c6e60bf45fa58c0bd8bea37e4ff427e216f933b"
+    },
+    "native-actions.glb": {
+      "bytes": 16582816,
+      "sha256": "e33adbe76cd0f693d5907ec259fc112ede1968e57f25d41cfbc96191ba0653d6"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 14892432,
+      "sha256": "8ba7d4c11828a67a3a316753925c9d4583aabd40b7e58bd360cadc176851cbbf"
+    },
+    "running_glb_url.glb": {
+      "bytes": 14881840,
+      "sha256": "b4bc273b987f5655fa648110052074368b87cd46b625f5f70957b62e27adc9d5"
+    }
+  },
+  "heightMetres": 1.68,
+  "bounds": {
+    "min": [
+      -0.43357625695649615,
+      -7.052639374251269e-09,
+      -0.19208943985331922
+    ],
+    "max": [
+      0.4335762808013557,
+      1.6799997218697431,
+      0.19208942391737954
+    ]
+  },
+  "nativeHandBounds": [
+    {
+      "min": [
+        -5.79843766019826,
+        3.444894264975403,
+        -5.361133049067462
+      ],
+      "max": [
+        6.283541810900488,
+        22.48225880719417,
+        3.8679681155082335
+      ]
+    }
+  ],
+  "paceMetresPerSecond": {
+    "walk": 1.25,
+    "run": 3.92
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "tizian",
+    "chapter": 1,
+    "coordinates": "native metre bind frame; account for transformed Armature parent; use new hand samples for socket",
+    "palette": [
+      "russet leather",
+      "charcoal quilt",
+      "bronze",
+      "amber furnace glass",
+      "ivory relief"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": {
+      "green": {
+        "name": "worked furnace armor",
+        "metalness": 0.25,
+        "roughness": 0.88,
+        "normalScale": 0.7,
+        "detail": "Original new maps, subdued bronze and coarser normal relief; source russet/charcoal/amber colors unchanged"
+      },
+      "blue": {
+        "name": "master glassmaker armor",
+        "metalness": 0.5,
+        "roughness": 0.62,
+        "normalScale": 1,
+        "detail": "Original new maps, cleaner bronze specular and full normal relief; garment is never forced blue"
+      },
+      "epic": {
+        "name": "consecrated furnace armor",
+        "metalness": 0.72,
+        "roughness": 0.42,
+        "normalScale": 1.2,
+        "detail": "Original new maps, stronger existing engraved relief and polished bronze specular; no new engraving shader or hue change"
+      }
+    },
+    "limits": "These are the actual task-only fixture PBR parameter sets, multiplied with the original generated ORM/normal maps; production registration belongs to integrator. No extra ornament shader implemented."
+  },
+  "acceptance": {
+    "shipEligible": true,
+    "gate": "Worker visual and fixture PASS; integrator production gates still required",
+    "generated": true,
+    "integratedInProduction": false,
+    "published": false,
+    "tests": {
+      "status": "PASS",
+      "scope": "Worker visual/actual shared-renderer EXTERNAL mapping+material+gait fixture on5319; no production registration/publication",
+      "source": "New fitted-sleeve reference, raw generated source and fresh rig/basic-run reviewed before optional action spend",
+      "motions": "Fresh idle/run/slash/cast/death reviewed; prior31xwrist sleeve webs absent; minor cloth/pauldron intersections remain possible",
+      "selector": "All five actual choices, two seconds each desktop/phone, exactzero local bone and mixer-clock deltas; new Tizian neutral inverse-bind pose, complete grounded boots",
+      "finishes": "green/blue/epic PBR quality parameters keep russet/charcoal/bronze/amber source palette; all three actual Equipment.wear variants plus white fallback tested",
+      "gameDesktop": "Actual local sandbox keyboard movement, real swingCombo/trail, ability Hallow via real learn/equip and tryCast, mana710to671.69, Ground_Slam, LeftHand cast and RightHand prop",
+      "gamePhone": "390x844x3 touch/PHONE CPU4 emulation; same actual game movement/slash/Hallow, mana710to671.87, no physical device",
+      "weapon": "Existing inventory canna-vetraio prop; measured new native hand socket; actual RightHand grip and active0.728mblade edge segment reviewed",
+      "resources": "Both live reports GLerror0, failedShaders0; shared native regression passes",
+      "integrity": "Exact NEW positions/UV/joints/weights/inverse binds and cyclic triangle winding preserved after compression; normals/textures lossy",
+      "limitations": [
+        "No articulated finger bones",
+        "Skinned cloth/large shoulders can intersect in extreme motion",
+        "Shared semantic aliases are27names from12fresh native source clips, not27unique performances",
+        "No physical phone or live two-client coop proof",
+        "Production mapping/finishes and publication are integrator work"
+      ]
+    }
+  },
+  "ownCandidateCredits": 65,
+  "taskCapCredits": 650,
+  "equippedWeapon": "Existing inventory canna-vetraio prop; measured new native hand socket; actual RightHand grip and active0.728mblade edge segment reviewed",
+  "runtime": "Complete NEW character and its own native skeleton/mixer. Twelve native clip exports feed27semantic aliases. Neutral inverse-bind presentation includes transformed Armature parent. Three parameter-only PBR quality finishes preserve class colors. Existing inventory weapon prop uses newly measured native hand socket. Actual shared renderer tested through external task-only mapping/material fixture; production registration belongs to integrator.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test",
+    "Production mapping/material integration and publication not performed by asset lane"
+  ],
+  "supersededRejectedCandidate": {
+    "commit": "3dae1e866a2ed52a68fd7fdd77240f348ffd2e10",
+    "sourceJob": "01a1ab42-d380-751c-a85c-a6eefa7ffd29",
+    "reason": "Severe31xnative sleeve stretch; never registered or published",
+    "paidCredits": 65,
+    "geometryRetainedInAcceptedCandidate": false
+  },
+  "technicalFailedJobs": [
+    {
+      "id": "01a1abad-238b-723b-b0bd-27702af8ff8f",
+      "status": "FAILED",
+      "consumedCredits": 0,
+      "error": {
+        "type": "server_error",
+        "message": "A processing error occurred. Please retry."
+      },
+      "replacement": "01a1abba-50b7-77e3-be18-8b69f2272936"
+    }
+  ],
+  "nativeEventReview": {
+    "handSpeedPeaks": [
+      {
+        "clip": "Right_Hand_Sword_Slash",
+        "bone": "RightHand",
+        "duration": 1.5,
+        "peak": {
+          "time": 0.5083333333333333,
+          "speed": 15.717905948645367
+        }
+      },
+      {
+        "clip": "mage_soell_cast",
+        "bone": "LeftHand",
+        "duration": 2.2666666507720947,
+        "peak": {
+          "time": 0.5,
+          "speed": 1.320813348268592
+        }
+      },
+      {
+        "clip": "Charged_Spell_Cast",
+        "bone": "LeftHand",
+        "duration": 2.6666667461395264,
+        "peak": {
+          "time": 1.675,
+          "speed": 6.791634173863859
+        }
+      }
+    ],
+    "strikePeakOffsetFromRetimingLandmarkSeconds": 0.011666666666666714,
+    "note": "Own fresh-hand peak within one60Hzframe of chosen native strike landmark; gameplay hit/release timing remains authoritative"
+  },
+  "nativeAnimationBindRoundingMaxWorldMetres": 2.6145285060973135e-06,
+  "nativeHandBoundsCoordinates": "Generated native hand bone-local coordinates from own inverse binds; preserve Armature parent scale0.01 and native hierarchy",
+  "neutralSelectorStability": [
+    {
+      "hero": "risorto",
+      "key": "reietto.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.6899999618530273,
+        1.6899999618530273
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.315090545014988,
+        -3.315090545014988
+      ]
+    },
+    {
+      "hero": "bortolo",
+      "key": "bortolo.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        0.2800000011920929,
+        0.2800000011920929
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.3021359115474804,
+        -3.3021359115474804
+      ]
+    },
+    {
+      "hero": "fosca",
+      "key": "fosca.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1050000190734863,
+        1.1050000190734863
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.5814097191408196,
+        -3.5814097191408196
+      ]
+    },
+    {
+      "hero": "tizian",
+      "key": "native-characters/tizian-1.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1750000238418579,
+        1.1750000238418579
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.488006667591109,
+        -3.488006667591109
+      ]
+    },
+    {
+      "hero": "zanetto",
+      "key": "zanetto.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.7050000190734862,
+        1.7050000190734862
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -2.7866469811877583,
+        -2.7866469811877583
+      ]
+    }
+  ],
+  "phoneNeutralSelectorStability": [
+    {
+      "hero": "risorto",
+      "key": "reietto.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.6899999618530273,
+        1.6899999618530273
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.315090545014988,
+        -3.315090545014988
+      ]
+    },
+    {
+      "hero": "bortolo",
+      "key": "bortolo.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        0.2800000011920929,
+        0.2800000011920929
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.3021359115474804,
+        -3.3021359115474804
+      ]
+    },
+    {
+      "hero": "fosca",
+      "key": "fosca.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1050000190734863,
+        1.1050000190734863
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.5814097191408196,
+        -3.5814097191408196
+      ]
+    },
+    {
+      "hero": "tizian",
+      "key": "native-characters/tizian-1.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.1750000238418579,
+        1.1750000238418579
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -3.488006667591109,
+        -3.488006667591109
+      ]
+    },
+    {
+      "hero": "zanetto",
+      "key": "zanetto.glb",
+      "boneComponents": 168,
+      "maxLocalBoneDelta": 0,
+      "mixerTime": [
+        0,
+        0
+      ],
+      "idleTime": [
+        1.7050000190734862,
+        1.7050000190734862
+      ],
+      "states": [
+        "idle",
+        "idle"
+      ],
+      "holder": [
+        -2.7866469811877583,
+        -2.7866469811877583
+      ]
+    }
+  ]
+}

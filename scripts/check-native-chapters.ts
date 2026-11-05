@@ -54,6 +54,17 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.wear({ abito: outfitChoices(hero, chapter, 'epico')[0].id }); await wait(entry.file);
   actor.present();
   let skin!: THREE.SkinnedMesh; actor.root.traverse(o => { if (o instanceof THREE.SkinnedMesh && !o.userData.aura) skin ??= o; });
+  if (hero === 'tizian' && chapter === 1) {
+    const scene = actor.root.children[0];
+    for (const [rarity, metalness, roughness, relief] of [['noncomune', .25, .88, .7], ['raro', .5, .62, 1], ['epico', .72, .42, 1.2]] as const) {
+      actor.wear({ abito: outfitChoices(hero, chapter, rarity)[0].id });
+      const material = skin.material as THREE.MeshStandardMaterial;
+      assert.equal(actor.root.children[0], scene, 'Finishes retain the accepted complete geometry');
+      assert.equal(material.metalness, metalness); assert.equal(material.roughness, roughness);
+      assert.deepEqual(material.normalScale.toArray(), [relief, relief]);
+      assert.equal(material.onBeforeCompile, THREE.Material.prototype.onBeforeCompile, 'Source colors and original relief need no engraving or recolor shader');
+    }
+  }
   const rest = skin.geometry.attributes.aTierRest, boot = skin.geometry.attributes.aBoot;
   let maxY = 0, boots = 0; for (let i = 0; i < rest.count; i++) { maxY = Math.max(maxY, rest.getY(i)); boots += boot.getX(i); }
   assert.ok(maxY > 1.7 && maxY < 2, 'Finish regions normalize own height to metres');

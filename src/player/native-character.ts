@@ -10,6 +10,7 @@ export const NATIVE_FOSCA = 'native-characters/fosca-3.glb';
 // Register a chapter only after its complete native asset has passed the visual and gameplay gates.
 export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, { file: string; walk: number; run: number }>> = {
   'fosca-3': { file: NATIVE_FOSCA, walk: 1.44, run: 4.54 },
+  'tizian-1': { file: 'native-characters/tizian-1.glb', walk: 1.25, run: 3.92 },
 };
 export function nativeCharacter(hero: Hero, worn: GearState) {
   const s = outfitSelection(hero, worn);
@@ -109,7 +110,11 @@ export class NativeOutfit {
         const material = original.clone();
         material.side = THREE.DoubleSide;
         material.emissive.setRGB(.12, .12, .12); material.emissiveMap = material.map;
-        finishFoscaTierMaterial(material, finish, this.hero !== 'fosca' || outfitSelection(this.hero, worn).chapter !== 3);
+        if (this.hero === 'tizian' && outfitSelection(this.hero, worn).chapter === 1) {
+          const [metalness, roughness, relief] = { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] }[finish];
+          material.metalness = metalness; material.roughness = roughness;
+          material.normalScale.multiplyScalar(relief);
+        } else finishFoscaTierMaterial(material, finish, this.hero !== 'fosca' || outfitSelection(this.hero, worn).chapter !== 3);
         mesh.material = material;
       }
     }

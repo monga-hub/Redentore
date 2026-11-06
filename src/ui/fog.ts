@@ -18,12 +18,9 @@ export class FogLayer {
   private fog: Float32Array; // shown fog per cell, 1 -> 0 as it lifts
   private grain: Uint8Array; // per-cell noise
   private snap = true; // first update: show what was loaded at once, no fade
-  private rgb: readonly number[];
 
-  /** `rgb`: the mist's tone; the parchment map's fog is blank paper. */
-  constructor(d: Discovery, rgb: readonly number[] = FOG) {
+  constructor(d: Discovery) {
     this.d = d;
-    this.rgb = rgb;
     this.mask.width = d.cols;
     this.mask.height = d.rows;
     this.ctx = this.mask.getContext('2d')!;
@@ -50,9 +47,9 @@ export class FogLayer {
     for (let i = 0; i < this.fog.length; i++) {
       const g = this.grain[i] / 255, f = this.fog[i];
       const o = i * 4, t = (g - 0.5) * 10;
-      px[o] = this.rgb[0] + t;
-      px[o + 1] = this.rgb[1] + t;
-      px[o + 2] = this.rgb[2] + t;
+      px[o] = FOG[0] + t;
+      px[o + 1] = FOG[1] + t;
+      px[o + 2] = FOG[2] + t;
       px[o + 3] = 255 * f * f * (0.95 + 0.05 * g); // eased so the last of it melts away gently
     }
     this.ctx.putImageData(this.img, 0, 0);
@@ -65,7 +62,7 @@ export class FogLayer {
   draw(c: CanvasRenderingContext2D, ox: number, oz: number, k: number, w: number, h: number): void {
     const x = (this.d.x0 - ox) * k, y = (this.d.z0 - oz) * k, gw = this.d.cols * CELL * k, gh = this.d.rows * CELL * k;
     c.save();
-    c.fillStyle = `rgb(${this.rgb})`;
+    c.fillStyle = `rgb(${FOG})`;
     c.beginPath();
     c.rect(0, 0, w, h);
     c.rect(x, y, gw, gh);

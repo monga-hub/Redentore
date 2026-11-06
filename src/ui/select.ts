@@ -26,7 +26,7 @@ const CSS = `
 #select .stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 #select .stage:active { cursor: grabbing; }
 #select .shade { position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, rgba(3,4,7,.85), rgba(3,4,7,.45) 22%, transparent 40%), linear-gradient(0deg, rgba(3,4,7,.6), transparent 22%); }
+  background: linear-gradient(90deg, rgba(3,4,7,.85), rgba(3,4,7,.45) 22%, transparent 40%), linear-gradient(0deg, rgba(3,4,7,.45), transparent 22%); }
 #select h1 { position: absolute; top: calc(14px + env(safe-area-inset-top)); right: calc(22px + env(safe-area-inset-right)); margin: 0; pointer-events: none;
   font: bold 18px Georgia, serif; letter-spacing: 3px; color: rgba(224,181,90,.75); text-shadow: 0 2px 4px #000; }
 #select .account { position: absolute; top: calc(40px + env(safe-area-inset-top)); right: calc(22px + env(safe-area-inset-right)); max-width: 46vw; margin: 0; text-align: right; }

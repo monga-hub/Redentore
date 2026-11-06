@@ -3,7 +3,7 @@ const CSS = `
 #select .sanctuary { position:absolute; inset:0; overflow:hidden; pointer-events:none;
   background:radial-gradient(ellipse at 60% 40%, #334c62, #121e2d 65%, #080f18); }
 #select .sanctuary-plate { position:absolute; width:max(100%, 177.778vh); height:max(100%, 56.25vw); container-type:inline-size; left:60%; top:50%; transform:translate(-60%, -50%); }
-#select .sanctuary-art { width:100%; height:100%; object-fit:fill; display:block; }
+#select .sanctuary-art { width:100%; height:100%; object-fit:fill; display:block; filter:brightness(1.22) saturate(1.06); } /* moonlit, not murky */
 #select .sanctuary-fx { position:absolute; inset:0; opacity:0; transition:opacity 1s; }
 #select .sanctuary.ready .sanctuary-fx { opacity:1; }
 #select .sanctuary .cloud { position:absolute; left:24%; top:15%; width:53%; height:22%; opacity:.18;

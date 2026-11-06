@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { SelectFraming, type SelectArea } from '../src/ui/selectFraming.ts';
+import { SelectFraming, freeAreas, type SelectArea } from '../src/ui/selectFraming.ts';
 
 const root = new THREE.Group(), bone = new THREE.Bone();
 const geometry = new THREE.BoxGeometry(1.36, 2, .42).translate(0, 1, 0), n = geometry.attributes.position.count;
@@ -14,13 +14,13 @@ bone.position.x = .21;
 const hidden = new THREE.Mesh(new THREE.BoxGeometry(100, 100, 100)); hidden.visible = false; root.add(hidden);
 const aura = hidden.clone(); aura.visible = true; aura.userData.aura = true; root.add(aura);
 const framing = new SelectFraming(), camera = new THREE.PerspectiveCamera(35, 1, .1, 200);
-function check(width: number, height: number, area: SelectArea, reset = true) {
+function check(width: number, height: number, area: SelectArea, reset = true, areas: SelectArea | SelectArea[] = area) {
   if (reset) {
     camera.aspect = width / height; camera.fov = width < height ? 43.75 : 35;
     camera.position.set(0, 1.3, 4.3); camera.lookAt(0, 1.02, 0); camera.clearViewOffset();
     framing.invalidate();
   }
-  framing.fit(root, camera, width, height, area, 4.3);
+  framing.fit(root, camera, width, height, areas, 1.5);
   const point = new THREE.Vector3();
   root.traverseVisible(o => {
     if (!(o instanceof THREE.Mesh) || o.userData.aura) return;
@@ -32,7 +32,7 @@ function check(width: number, height: number, area: SelectArea, reset = true) {
     }
   });
   const position = camera.position.clone(), projection = camera.projectionMatrix.clone();
-  for (let i = 0; i < 120; i++) framing.fit(root, camera, width, height, area, 4.3);
+  for (let i = 0; i < 120; i++) framing.fit(root, camera, width, height, areas, 1.5);
   assert.ok(camera.position.equals(position) && camera.projectionMatrix.equals(projection), 'Still frames never breathe');
   assert.ok(root.scale.equals(new THREE.Vector3(1, 1, 1)), 'Only the selector camera changes');
   assert.ok(camera.position.distanceTo(root.position) < 15, 'Invisible shells do not force a tiny hero');
@@ -48,4 +48,21 @@ for (const [width, height, left, bottom] of [[320,740,12,528], [390,844,12,652],
   check(width,height,area,false);
   root.remove(replacement); root.add(body);
 }
-console.log('selector framing: posed skin/props, hidden/aura exclusion, portrait/landscape/desktop, rotation, late equipment, swaps, resize and still frames');
+// The free areas around a top-right title and a bottom-right foot: none touches either, and the hero takes the roomiest.
+const title = { left: 600, right: 830, top: 8, bottom: 42 }, lore = { left: 560, right: 830, top: 300, bottom: 330 }, acts = { left: 420, right: 830, top: 337, bottom: 378 };
+const bounds = { left: 293, right: 832, top: 12, bottom: 378 }, free = freeAreas(bounds, [title, lore, acts], 12);
+assert.ok(free.length > 1, 'Several shapes of free room');
+for (const a of free) for (const o of [title, lore, acts]) assert.ok(a.right + 12 <= o.left || a.left >= o.right + 12 || a.bottom + 12 <= o.top || a.top >= o.bottom + 12, 'Free areas keep clear of the HUD');
+assert.ok(free.some(a => a.top === 12 && a.bottom === 325 && a.right === 548), 'The tall column beside the title and the lore');
+root.rotation.y = 0;
+const size = () => { // the projected height of what shows
+  let lo = Infinity, hi = -Infinity; const p = new THREE.Vector3();
+  root.traverseVisible(o => { if (o instanceof THREE.Mesh && !o.userData.aura) for (let i = 0; i < o.geometry.attributes.position.count; i++) {
+    const y = o.getVertexPosition(i, p).applyMatrix4(o.matrixWorld).project(camera).y; lo = Math.min(lo, y); hi = Math.max(hi, y); } });
+  return hi - lo;
+};
+const sizes = free.map(a => { camera.clearViewOffset(); framing.invalidate(); framing.fit(root, camera, 844, 390, a, 1.5); return size(); }), roomiest = free[sizes.findIndex(v => v > Math.max(...sizes) - 1e-9)];
+check(844, 390, roomiest, true, free); // every vertex inside the roomiest area, and as large as it alone allows
+assert.ok(Math.abs(size() - Math.max(...sizes)) < 1e-6, 'The hero takes the roomiest free area');
+assert.ok(roomiest.bottom - roomiest.top > 378 - 42 - 24 - 50, 'Taller than the band between title and foot');
+console.log('selector framing: free areas around the HUD, the roomiest taken, posed skin/props, hidden/aura exclusion, portrait/landscape/desktop, rotation, late equipment, swaps, resize and still frames');

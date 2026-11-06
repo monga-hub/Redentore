@@ -4,12 +4,13 @@ import type { GearState } from '../loot/gear.ts';
 import { HEROES, type Hero } from '../player/heroes.ts';
 import { UndeadModel } from '../player/undead.ts';
 import { SelectBackdrop } from './selectBackdrop.ts';
-import { SelectFraming, type SelectArea } from './selectFraming.ts';
+import { SelectFraming, freeAreas, type SelectArea } from './selectFraming.ts';
 
 // A painted sanctuary behind the same live, draggable hero. Scenery owns no hero resources.
 const TURN = 0.01;
 const DIST = 4.3;
 const FOV = 35;
+const NEAR = 1.5; // the closest lens: the hero fills whatever free area the layout leaves, up to this
 
 /** Soft contact shadow, fading to clear. */
 function dot(size = 64, falloff = 0.4): THREE.CanvasTexture {
@@ -54,7 +55,7 @@ export class SelectStage {
   private facingRoot?: THREE.Object3D;
   private readonly framing = new SelectFraming();
   private readonly layout: ResizeObserver;
-  private area: SelectArea = { left: 0, right: 1, top: 0, bottom: 1 };
+  private areas: SelectArea[] = [{ left: 0, right: 1, top: 0, bottom: 1 }];
   private far = 1; // the lens backed off for a tall hero, so his hat stays under the title
   private t = 0;
   private last = performance.now();
@@ -66,6 +67,7 @@ export class SelectStage {
     this.renderer = new THREE.WebGLRenderer({ antialias: !PHONE, alpha: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, PHONE ? 1.25 : 2)); // one body: no need for the phone's DPR 3
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.25;
     const canvas = this.renderer.domElement;
     canvas.className = 'stage';
     host.prepend(canvas);
@@ -74,13 +76,16 @@ export class SelectStage {
 
     s.add(this.holder);
 
-    // Light: a cold moon behind him (his rim), a faint blue fill from the lens, the brazier's warm flicker on his right.
-    const moonLight = new THREE.DirectionalLight(0xa9bcff, 2.2);
+    // Light: he is the protagonist, lit like one. A pale moonlit key from high front-left, a warm fill from the brazier's side,
+    // a cold moon behind him (his rim), the brazier's warm flicker on his right; the night stays in the colours, not the exposure.
+    const key = new THREE.DirectionalLight(0xe4ebff, 3.2);
+    key.position.set(-3, 6, 6);
+    const fill = new THREE.DirectionalLight(0xffc89a, 1.3);
+    fill.position.set(4, 2, 5);
+    const moonLight = new THREE.DirectionalLight(0xa9bcff, 3.5);
     moonLight.position.set(-5, 9, -12);
-    const fill = new THREE.DirectionalLight(0x8396c8, 0.9);
-    fill.position.set(-3, 3, 6);
     this.fire.position.set(3.5, 1.5, -3.6);
-    s.add(new THREE.HemisphereLight(0x50618a, 0x1a140f, 0.9), moonLight, fill, this.fire);
+    s.add(new THREE.HemisphereLight(0x8293c0, 0x2e241a, 1.6), key, fill, moonLight, this.fire);
 
     // Contact shadow grounds the live model on the painted paving without hiding the artwork.
     const pool = new THREE.Mesh(new THREE.CircleGeometry(0.7, 24).rotateX(-Math.PI / 2).translate(0, 0.01, 0),
@@ -94,7 +99,7 @@ export class SelectStage {
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', up);
     this.layout = new ResizeObserver(this.resize);
-    for (const el of [host, ...host.querySelectorAll('.roster, .foot, h1, .account')]) this.layout.observe(el);
+    for (const el of [host, ...host.querySelectorAll('.roster, .foot, .lore, .acts, h1, .account')]) this.layout.observe(el);
     addEventListener('resize', this.resize);
     document.addEventListener('visibilitychange', this.visibility);
     this.reduced.addEventListener('change', this.motion);
@@ -121,10 +126,13 @@ export class SelectStage {
     c.clearViewOffset();
     c.updateProjectionMatrix();
     const rect = (selector: string) => this.host.querySelector(selector)?.getBoundingClientRect();
-    const roster = rect('.roster'), foot = rect('.foot'), title = rect('h1'), account = rect('.account');
+    const roster = rect('.roster'), title = rect('h1'), account = rect('.account'), lore = rect('.lore'), acts = rect('.acts');
     const strip = roster && roster.width > w * .8;
-    this.area = { left: strip ? 12 : (roster?.right ?? 0) + 8, right: w - 12,
-      top: Math.max(title?.bottom ?? 0, account?.bottom ?? 0, strip ? roster.bottom : 0) + 12, bottom: (foot?.top ?? h) - 12 };
+    // Anywhere clear of the roster, the title and account line, the lore and the buttons (whose edges keep the safe area):
+    // he takes the roomiest of it, his feet no lower than the buttons.
+    this.areas = freeAreas({ left: strip ? 12 : (roster?.right ?? 0) + 8, right: Math.min(w - 12, title?.right ?? w),
+      top: strip ? roster.bottom + 12 : 12, bottom: Math.min(h - 12, acts?.bottom ?? h) },
+      [title, account, lore, acts].filter(r => r !== undefined), 12);
     this.framing.invalidate();
     // The roster covers the left: the hero stands at about 3/5 of the width, his feet near the bottom.
     const d = DIST * this.far, half = d * Math.tan(THREE.MathUtils.degToRad(c.fov / 2)) * c.aspect;
@@ -155,7 +163,7 @@ export class SelectStage {
       this.facingRoot = root?.children[0];
     }
     this.holder.rotation.y = this.yaw - (this.facing ?? 0) - Math.PI;
-    if (root) this.framing.fit(root, this.cam, innerWidth, innerHeight, this.area, DIST * this.far);
+    if (root) this.framing.fit(root, this.cam, innerWidth, innerHeight, this.areas, NEAR);
     this.fire.intensity = this.reduced.matches ? 23 : 26 * (0.82 + 0.1 * Math.sin(t * 9.1) + 0.06 * Math.sin(t * 23.7) + 0.04 * Math.sin(t * 4.3));
     this.renderer.render(this.scene, this.cam);
   };

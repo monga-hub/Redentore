@@ -2,14 +2,27 @@ import * as THREE from 'three';
 
 export interface SelectArea { left: number; right: number; top: number; bottom: number }
 
-/** Fit the still, dressed selector pose, including skinned hands and late equipment. Never scale the actor. */
+/** Every rectangle inside `bounds` whose edges run along the obstacles' (kept `gap` away) and that touches none of them. */
+export function freeAreas(bounds: SelectArea, obstacles: readonly SelectArea[], gap: number): SelectArea[] {
+  const solid = obstacles.filter(o => o.right > o.left && o.bottom > o.top);
+  const rights = [bounds.right, ...solid.map(o => o.left - gap)], tops = [bounds.top, ...solid.map(o => o.bottom + gap)];
+  const bottoms = [bounds.bottom, ...solid.map(o => o.top - gap)], out: SelectArea[] = [];
+  for (const right of rights) for (const top of tops) for (const bottom of bottoms) {
+    const a = { left: bounds.left, right: Math.min(right, bounds.right), top: Math.max(top, bounds.top), bottom: Math.min(bottom, bounds.bottom) };
+    if (a.right > a.left && a.bottom > a.top && !solid.some(o => a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top)) out.push(a);
+  }
+  return out;
+}
+
+/** Fit the still, dressed selector pose, including skinned hands and late equipment, as large as the roomiest free area allows,
+ * never nearer than `distance`. Never scale the actor. */
 export class SelectFraming {
   private meshes: { mesh: THREE.Mesh; geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
   private dirty = true;
 
   invalidate(): void { this.dirty = true; }
 
-  fit(root: THREE.Object3D, camera: THREE.PerspectiveCamera, width: number, height: number, area: SelectArea, distance: number): void {
+  fit(root: THREE.Object3D, camera: THREE.PerspectiveCamera, width: number, height: number, areas: SelectArea | readonly SelectArea[], distance: number): void {
     root.updateWorldMatrix(true, true);
     const meshes: THREE.Mesh[] = [];
     root.traverseVisible(o => { if (o instanceof THREE.Mesh && !o.userData.aura) meshes.push(o); });
@@ -26,12 +39,19 @@ export class SelectFraming {
         box.expandByPoint(point);
       }
     }
-    if (box.isEmpty() || area.right <= area.left || area.bottom <= area.top) return;
+    if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
     const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), tanX = tanY * camera.aspect;
     // Include depth: a hand closer to the lens projects wider than the body's centre plane.
     const halfWidth = (box.max.x - box.min.x) / 2, halfHeight = (box.max.y - box.min.y) / 2, depth = box.max.z - center.z;
-    const d = Math.max(distance, depth + halfWidth / (tanX * (area.right - area.left) / width), depth + halfHeight / (tanY * (area.bottom - area.top) / height));
+    // The nearest lens (the largest hero) any free area takes.
+    let area: SelectArea | undefined, d = Infinity;
+    for (const a of [areas].flat()) {
+      if (a.right <= a.left || a.bottom <= a.top) continue;
+      const fit = Math.max(distance, depth + halfWidth / (tanX * (a.right - a.left) / width), depth + halfHeight / (tanY * (a.bottom - a.top) / height));
+      if (fit < d) { d = fit; area = a; }
+    }
+    if (!area) return;
     const projectedWidth = halfWidth / ((d - depth) * tanX) * width;
     const projectedHeight = halfHeight / ((d - depth) * tanY) * height;
     // Keep the established low, slightly rightward composition wherever the usable area permits it.

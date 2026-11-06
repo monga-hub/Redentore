@@ -109,7 +109,7 @@ scene.add(level.root);
 const discovery = new Discovery(level.areas); // fog of war: what the player has seen
 const fog = new FogLayer(discovery);
 const minimap = new Minimap(level.root, fog, () => openMap()); // top-down chart of the level, top right
-const worldMap = new WorldMap(discovery, fog, minimap, level.areas); // M: the whole map
+const worldMap = new WorldMap(discovery, minimap, level.areas); // M: the whole map
 const quest = new Quest(level.world); // church shut, key in the chest on the pontile, Fra' Zuane on the fondamenta
 
 const input = new Input(renderer.domElement);
@@ -615,7 +615,7 @@ function openMap(): void {
   if (menu.paused) return;
   kit.system.cancel();
   input.consume();
-  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, view: isDiablo() ? dcam.yaw : cam.yaw, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), also: sidePins(), npcs: questView.pins(), quests: questLog(), level: questLevel() });
+  worldMap.show({ x: player.pos.x, z: player.pos.z, facing: player.facing, area: level.areaAt(player.pos.x, player.pos.z)?.label, goal: goal(), also: sidePins(), npcs: questView.pins(), quests: questLog(), level: questLevel() });
 }
 const pressed = (code: string) => input.pressed(code);
 /**

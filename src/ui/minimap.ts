@@ -57,6 +57,8 @@ export class Minimap {
   private ctx = this.canvas.getContext('2d')!;
   /** The baked chart, PX texels per metre; the big map draws it too. */
   readonly chart: HTMLCanvasElement;
+  /** The footprints the chart was baked from; the big map inks its parchment from them (ui/worldMap.ts). */
+  readonly shapes: readonly Shape[];
   readonly x0: number; // world x/z of the chart's top-left texel
   readonly z0: number;
   private fog: FogLayer;
@@ -70,7 +72,7 @@ export class Minimap {
   /** `root`: the level's meshes (after flush). `openMap`: the book button. */
   constructor(root: THREE.Object3D, fog: FogLayer, openMap: () => void) {
     this.fog = fog;
-    const shapes = bake(root);
+    const shapes = (this.shapes = bake(root));
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const s of shapes) for (const [x, z] of s.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     const M = 40; // m of open water around the complex so the window never shows the chart's edge
@@ -202,7 +204,7 @@ export class Minimap {
   }
 }
 
-interface Shape { pts: [number, number][]; color: string; wall: boolean; top: number }
+export interface Shape { pts: [number, number][]; color: string; role: string; wall: boolean; top: number }
 
 /** Top-down footprints of the level's boxes and flat floors, lowest first so higher things paint over. */
 function bake(root: THREE.Object3D): Shape[] {
@@ -233,7 +235,7 @@ function bake(root: THREE.Object3D): Shape[] {
     if (bottom > OVERHEAD) return;
     if (Math.hypot(pts[0][0] - pts[2][0], pts[0][1] - pts[2][1]) > 800) return; // the sea plane: that's the background (San Giorgio lies 600 m east)
     const wall = top - bottom > WALL;
-    shapes.push({ pts, top, wall, color: wall ? lighten(color) : color });
+    shapes.push({ pts, top, wall, role: o.userData.role, color: wall ? lighten(color) : color });
   });
   return shapes.sort((a, b) => a.top - b.top);
 }

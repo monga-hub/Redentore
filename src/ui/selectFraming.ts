@@ -14,31 +14,48 @@ export function freeAreas(bounds: SelectArea, obstacles: readonly SelectArea[], 
   return out;
 }
 
+/** Each element within `eps`: a turn's float noise is no change of shape. */
+const near = (a: THREE.Matrix4, b: THREE.Matrix4, eps = 1e-6) => a.elements.every((v, i) => Math.abs(v - b.elements[i]) < eps);
+
 /** Fit the still, dressed selector pose, including skinned hands and late equipment, as large as the roomiest free area allows,
- * never nearer than `distance`. Never scale the actor. */
+ * never nearer than `distance`. The hero turns about his own upright axis (the middle of his feet), stood on his parent's origin,
+ * and a turn is no change of shape: the lens holds still and a drag spins him in place. Moves the actor only onto that axis;
+ * never scales him. */
 export class SelectFraming {
   private meshes: { mesh: THREE.Mesh; geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
   private dirty = true;
+  private readonly axis = new THREE.Vector3(); // his upright axis, in his own frame
 
   invalidate(): void { this.dirty = true; }
 
   fit(root: THREE.Object3D, camera: THREE.PerspectiveCamera, width: number, height: number, areas: SelectArea | readonly SelectArea[], distance: number): void {
-    root.updateWorldMatrix(true, true);
+    // updateMatrixWorld, not updateWorldMatrix, below him: only it keeps a skin's bind inverse in step once he has moved.
+    root.updateWorldMatrix(true, false); root.updateMatrixWorld(true);
     const meshes: THREE.Mesh[] = [];
     root.traverseVisible(o => { if (o instanceof THREE.Mesh && !o.userData.aura) meshes.push(o); });
-    if (!this.dirty && meshes.length === this.meshes.length && meshes.every((mesh, i) => {
+    // Shapes in his own frame: a turn of him or of his stage changes none of them.
+    const own = root.matrixWorld.clone().invert(), local = meshes.map(mesh => own.clone().multiply(mesh.matrixWorld));
+    const same = !this.dirty && meshes.length === this.meshes.length && meshes.every((mesh, i) => {
       const old = this.meshes[i];
-      return mesh === old.mesh && mesh.geometry === old.geometry && mesh.matrixWorld.equals(old.matrix);
-    })) return;
-    this.meshes = meshes.map(mesh => ({ mesh, geometry: mesh.geometry, matrix: mesh.matrixWorld.clone() }));
-    this.dirty = false;
-    const box = new THREE.Box3(), point = new THREE.Vector3(), inverse = camera.quaternion.clone().invert();
-    for (const mesh of meshes) {
-      for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
-        mesh.getVertexPosition(i, point).applyMatrix4(mesh.matrixWorld).applyQuaternion(inverse);
-        box.expandByPoint(point);
-      }
+      return mesh === old.mesh && mesh.geometry === old.geometry && near(local[i], old.matrix);
+    });
+    const points: THREE.Vector3[] = [];
+    if (!same) {
+      this.meshes = meshes.map((mesh, i) => ({ mesh, geometry: mesh.geometry, matrix: local[i] }));
+      this.dirty = false;
+      meshes.forEach((mesh, m) => { for (let i = 0; i < mesh.geometry.attributes.position.count; i++) points.push(mesh.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(local[m])); });
+      // His axis: the middle of what stands on the ground.
+      const bottom = Math.min(...points.map(p => p.y)), top = Math.max(...points.map(p => p.y)), feet = new THREE.Box3();
+      for (const p of points) if (p.y <= bottom + (top - bottom) * .08) feet.expandByPoint(p);
+      if (!feet.isEmpty()) feet.getCenter(this.axis).setY(0);
     }
+    // His axis over his parent's origin, whichever way he faces.
+    const offset = this.axis.clone().applyQuaternion(root.quaternion);
+    root.position.x = -offset.x; root.position.z = -offset.z;
+    root.updateMatrixWorld(true);
+    if (same) return;
+    const box = new THREE.Box3(), inverse = camera.quaternion.clone().invert();
+    for (const p of points) box.expandByPoint(p.applyMatrix4(root.matrixWorld).applyQuaternion(inverse));
     if (box.isEmpty()) return;
     const center = box.getCenter(new THREE.Vector3());
     const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), tanX = tanY * camera.aspect;

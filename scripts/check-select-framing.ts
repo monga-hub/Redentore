@@ -65,4 +65,23 @@ const sizes = free.map(a => { camera.clearViewOffset(); framing.invalidate(); fr
 check(844, 390, roomiest, true, free); // every vertex inside the roomiest area, and as large as it alone allows
 assert.ok(Math.abs(size() - Math.max(...sizes)) < 1e-6, 'The hero takes the roomiest free area');
 assert.ok(roomiest.bottom - roomiest.top > 378 - 42 - 24 - 50, 'Taller than the band between title and foot');
-console.log('selector framing: free areas around the HUD, the roomiest taken, posed skin/props, hidden/aura exclusion, portrait/landscape/desktop, rotation, late equipment, swaps, resize and still frames');
+// A drag turns his stage: he spins in place about his own axis (the middle of his feet, off his origin here), the lens still
+// (framed in the area as he stood; a turn is no reframe).
+const stage = new THREE.Group(); stage.add(root); root.rotation.y = 0;
+const column = { left: 293, right: 548, top: 12, bottom: 325 };
+check(844, 390, column);
+const lens = camera.position.clone(), feet = () => {
+  const box = new THREE.Box3(), p = new THREE.Vector3();
+  for (let i = 0; i < body.geometry.attributes.position.count; i++) { body.getVertexPosition(i, p).applyMatrix4(body.matrixWorld); if (p.y < .1) box.expandByPoint(p); }
+  const c = box.getCenter(p).project(camera); return new THREE.Vector2((c.x + 1) * 422, (1 - c.y) * 195);
+};
+const spot = feet();
+assert.ok(Math.abs(root.position.x + .21) < 1e-9, 'His axis, not his origin, stands on the stage spot');
+for (let k = 1; k < 16; k++) {
+  stage.rotation.y = k * Math.PI / 8;
+  framing.fit(root, camera, 844, 390, column, 1.5);
+  assert.ok(camera.position.equals(lens), 'The lens holds still while he turns');
+  assert.ok(feet().distanceTo(spot) < .5, `He spins in place (${(k * 22.5).toFixed(1)}°)`);
+}
+stage.remove(root);
+console.log('selector framing: spin in place about his own axis, free areas around the HUD, the roomiest taken, posed skin/props, hidden/aura exclusion, portrait/landscape/desktop, rotation, late equipment, swaps, resize and still frames');

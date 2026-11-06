@@ -204,3 +204,12 @@ The manifests record exact SHA-256 hashes, ImageGen/Meshy provenance, native gai
 and 27 semantic action aliases from 12 source motions. Three equipped PBR finishes
 preserve the source palette. Existing inventory weapons use measured native hand
 sockets. This integration made no generation/service calls or purchases.
+
+### Native glassmaker chapter three (2026-11-06)
+
+`native-characters/tizian-3.glb`, its JSON manifest and original ImageGen reference
+are the fresh Tizian chapter 3 recovery chain (new reference, new complete Meshy body,
+own native skeleton, skin, inverse binds and native motions). No old body, hand or
+garment geometry is transplanted. The manifest records exact SHA-256 hashes,
+ImageGen/Meshy provenance and cost, native gait and the three equipped PBR finishes.
+This registration made no generation/service calls or purchases.

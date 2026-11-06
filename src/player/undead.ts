@@ -5,7 +5,6 @@ import { Outfit } from './outfit.ts';
 import { HEROES, type Hero } from './heroes.ts';
 import { relaxFoscaHands } from './fosca-idle.ts';
 import { NativeOutfit, nativeCharacter, NATIVE_CHARACTERS, freeCharacter } from './native-character.ts';
-import { poseNativeCharacter } from './selector-pose.ts';
 
 // Native appearance replacement owns its complete rig, clips, mixer and prop socket; only the visual root changes.
 // The base hero: an undead warrior generated, auto-rigged and animated with Meshy AI
@@ -361,7 +360,7 @@ export class UndeadModel {
     this.mixer?.stopAllAction();
   }
 
-  /** The selector is deliberately still. Gameplay uses a separate model instance and its normal animator. */
+  /** The selector is deliberately still, held on a relaxed frame of his own idle (arms down, not the bind pose). Gameplay uses a separate model instance and its normal animator. */
   present(): void {
     if (!this.mixer || this.presentedMixer === this.mixer) return;
     this.presentedMixer = this.mixer;
@@ -373,7 +372,6 @@ export class UndeadModel {
     this.actions.idle.time = this.actions.idle.getClip().duration * .15;
     this.state = 'idle';
     this.mixer.update(0);
-    if (Object.values(NATIVE_CHARACTERS).some(asset => asset.file === this.visualKey) && this.representation) poseNativeCharacter(this.representation);
     this.outfit?.clear(1, 1);
     for (const shell of this.shells) shell.visible = false;
     this.outfit?.showAura(this.aura.material, false);

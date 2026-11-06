@@ -72,10 +72,12 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   let maxY = 0, boots = 0; for (let i = 0; i < rest.count; i++) { maxY = Math.max(maxY, rest.getY(i)); boots += boot.getX(i); }
   assert.ok(maxY > 1.7 && maxY < 2, 'Finish regions normalize own height to metres');
   assert.ok(boots > 0 && boots / boot.count < .35);
-  for (let i = 0; i < skin.geometry.attributes.position.count; i += 31) {
-    const p = new THREE.Vector3().fromBufferAttribute(skin.geometry.attributes.position, i).applyMatrix4(skin.bindMatrix).applyMatrix4(actor.root.children[0].matrixWorld);
-    const v = skin.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(skin.matrixWorld);
-    assert.ok(p.distanceTo(v) < .00001, 'Native selector preserves its own inverse-bind pose');
+  // The selector holds the native idle: arms hang relaxed, hands well under the shoulders and near the body (not the bind T/A pose).
+  actor.root.updateWorldMatrix(true, true);
+  const at = (name: string) => actor.root.getObjectByName(name)!.getWorldPosition(new THREE.Vector3());
+  for (const side of ['Left', 'Right']) {
+    const shoulder = at(`${side}Arm`), hand = at(`${side}Hand`), drop = shoulder.y - hand.y, out = Math.hypot(hand.x - shoulder.x, hand.z - shoulder.z);
+    assert.ok(drop > .4 && out < .2, `${hero}-${chapter} ${side} arm hangs relaxed (drop ${drop.toFixed(2)}, out ${out.toFixed(2)})`);
   }
   actor.animate(.1, 4.2, true, 4.2); actor.play('slash1', .2); actor.animate(.2, 0, true);
   const nativeBinds = skin.skeleton.boneInverses.map(m => m.elements);
@@ -87,7 +89,7 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
   actor.wear({ abito: outfitChoices(hero, chapter, 'raro')[2].id }); await wait(entry.file);
   actor.dispose(); freeCharacter(actor.root);
 }
-console.log('native chapters: all three stat builds/finishes, unfinished fallback, exact shipped hashes/skin/clips, native neutral pose, normalized finish regions and white/native swaps');
+console.log('native chapters: all three stat builds/finishes, unfinished fallback, exact shipped hashes/skin/clips, relaxed native idle pose, normalized finish regions and white/native swaps');
 
 for (const hero of HERO_IDS) {
   const chapters = ([1, 2, 3] as const).filter(chapter => NATIVE_CHARACTERS[`${hero}-${chapter}`]);

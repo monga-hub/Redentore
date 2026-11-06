@@ -111,7 +111,7 @@ swapping.root.traverse(o => {
     referenceError = Math.max(referenceError, expected.distanceTo(v));
   }
 });
-assert.ok(referenceError < 1e-5, 'Selector preserves the actual NEW reference anatomy under a transformed Armature parent');
+assert.ok(referenceError < 1e-5, 'Selector skin follows its own bind frame under a transformed Armature parent');
 const posed = swapping as unknown as { mixer: THREE.AnimationMixer };
 const beforePose = swapping.root.getObjectByName('Head')!.quaternion.clone(), beforeClock = posed.mixer.time;
 swapping.present();

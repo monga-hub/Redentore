@@ -29,7 +29,8 @@ const CSS = `
 #worldmap .up { left: 12px; background: linear-gradient(#5a4128, #241709); }
 #worldmap .up[hidden] { display: none; }
 @media (max-height: 500px) { /* a phone on its side: the buttons sit on the sheet's corners, the map keeps the height */
-  #worldmap .panel { padding-top: 8px; } #worldmap .x, #worldmap .up { top: 16px; } #worldmap .up { left: 22px; } #worldmap .x { right: 22px; } }
+  #worldmap .panel { width: calc(100vw - 8px - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - 8px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); padding: 6px 8px 4px; }
+  #worldmap .foot { padding-top: 3px; font-size: 11px; line-height: 14px; } #worldmap .x, #worldmap .up { top: 16px; } #worldmap .up { left: 22px; } #worldmap .x { right: 22px; } }
 #worldmap .body { position: relative; flex: 1; min-height: 0; display: flex; }
 #worldmap .col { position: absolute; bottom: 10px; z-index: 1; width: 220px; max-width: calc(50% - 16px); max-height: calc(100% - 70px);
   overflow-y: auto; overscroll-behavior: contain; cursor: default;
@@ -88,6 +89,8 @@ const LANDMARKS: Record<number, [string, string][]> = {
 const ROT = Math.PI; // north (+Z, level/plan.ts) up and east (-X) right, as a paper map: the world turned half round
 const TOP = 54; // px kept for the banner over the map
 const EDGE = 22; // px of torn, burnt border round the sheet
+/** The banner's band and the border for a sheet h px tall: slimmer on a phone on its side, so the map keeps the height. */
+const frame = (h: number) => (h < 500 ? { top: 42, edge: 12 } : { top: TOP, edge: EDGE });
 const S = 6; // texels per metre of a level's baked floors
 const S0 = 1.5; // texels per metre of the Giudecca's baked island and regions
 const PAPER = '#cfa65f'; // the parchment, before its mottle
@@ -95,8 +98,8 @@ const INK = '#3a2611';
 const LABEL = (px: number) => `bold ${px}px Georgia, 'Times New Roman', serif`;
 // The raised stone (sampled off WoW's parchment maps, a shade lighter): the outline, the wall band and its lit inner
 // edge, the floor; the garden washes over it.
-const STONE = { line: '#5a3e1c', wall: '#ab8d5c', lit: '#d6bf8e', floor: '#c8ad7c' };
-const WASH: Partial<Record<string, string>> = { grass: 'rgba(110,118,62,.38)', hedge: 'rgba(92,100,50,.5)', foliage: 'rgba(100,108,54,.45)', soil: 'rgba(120,90,52,.28)', water: 'rgba(96,110,100,.45)' };
+const STONE = { line: '#4f3517', wall: '#cbb07e', lit: '#f3e6c4', floor: '#e4d0a2' };
+const WASH: Partial<Record<string, string>> = { grass: 'rgba(110,118,62,.2)', hedge: 'rgba(92,100,50,.3)', foliage: 'rgba(100,108,54,.26)', soil: 'rgba(120,90,52,.18)', water: 'rgba(96,110,100,.45)' };
 
 export class WorldMap {
   private el = document.createElement('div');
@@ -134,7 +137,7 @@ export class WorldMap {
     this.fog = new FogLayer(d);
     this.chart = chart;
     this.areas = [...areas].sort((a, b) => size(b) - size(a)); // big places label first, small ones fit around them
-    const M = 8; // m of shore around the areas
+    const M = 4; // m of shore around the areas
     this.all = [0, 1, 2, 3].map((m) => {
       const as = areas.filter((a) => !m || lvl(a) === m);
       return { x0: Math.min(...as.map((a) => a.x0)) - M, x1: Math.max(...as.map((a) => a.x1)) + M, z0: Math.min(...as.map((a) => a.z0)) - M, z1: Math.max(...as.map((a) => a.z1)) + M };
@@ -271,9 +274,9 @@ export class WorldMap {
     const c = this.ctx, b = this.all[this.map];
     // fit the map north up between the banner and the burnt edge, centred, 1 m = k px
     const cos = Math.cos(ROT), sin = Math.sin(ROT);
-    const fit = Math.min((w - 2 * EDGE) / (b.x1 - b.x0), (h - TOP - EDGE) / (b.z1 - b.z0));
+    const { top, edge } = frame(h), fit = Math.min((w - 2 * edge) / (b.x1 - b.x0), (h - top - edge) / (b.z1 - b.z0));
     const k = (this.k = this.zoom * fit);
-    const cx = this.c.x, cz = this.c.z, o = (this.o = { x: w / 2, y: (h + TOP - EDGE) / 2 });
+    const cx = this.c.x, cz = this.c.z, o = (this.o = { x: w / 2, y: (h + top - edge) / 2 });
     const at = (x: number, z: number) => [o.x + ((x - cx) * cos - (z - cz) * sin) * k, o.y + ((x - cx) * sin + (z - cz) * cos) * k] as const;
     const R = Math.hypot(w, h) / k + 1, ox = cx - R, oz = cz - R; // m: a square 2R wide from (ox, oz) covers the window
     const turn = (g: CanvasRenderingContext2D) => { // g in world metres from (ox, oz), turned north up
@@ -388,7 +391,7 @@ export class WorldMap {
     c.stroke();
     c.fill();
     c.restore();
-    banner(c, w, MAPS[this.map], art.mottle);
+    banner(c, w, h, MAPS[this.map], art.mottle);
 
     this.place.replaceChildren(...(v.area ? ['Sei in: ', Object.assign(document.createElement('b'), { textContent: v.area })] : []));
     this.found.textContent = this.map ? `Luoghi scoperti: ${known.size}/${names.size}` : `Livelli esplorati: ${known.size}/${MAPS.length - 1}`;
@@ -418,13 +421,13 @@ export class WorldMap {
     if (key === this.bareKey) return this.bareAt;
     const M = this.map ? 4 : 16; // m kept clear round each place (the Giudecca's regions swell 9 m past their floors)
     const G = 10, cols = Math.floor(w / G), rows = Math.floor(h / G), b = this.all[this.map];
-    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, ox = w / 2, oy = (h + TOP - EDGE) / 2;
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, ox = w / 2, { top, edge } = frame(h), oy = (h + top - edge) / 2;
     const world = (sx: number, sy: number) => [cx - (sx - ox) / fit, cz - (sy - oy) / fit] as const; // ROT: the world half round
     const run = new Int16Array(cols * rows);
     let best = 0, end = 0;
     for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { // the classic largest-square sweep
       const sx = (q + 0.5) * G, sy = (r + 0.5) * G, [x, z] = world(sx, sy), i = r * cols + q;
-      const free = sy > TOP + 4 && sy < h - EDGE - 6 && sx > EDGE + 6 && sx < w - EDGE - 6
+      const free = sy > top + 4 && sy < h - edge - 6 && sx > edge + 6 && sx < w - edge - 6
         && !this.areas.some((a) => x > a.x0 - M && x < a.x1 + M && z > a.z0 - M && z < a.z1 + M);
       run[i] = !free ? 0 : r && q ? 1 + Math.min(run[i - 1], run[i - cols], run[i - cols - 1]) : 1;
       if (run[i] > best) { best = run[i]; end = i; }
@@ -623,7 +626,7 @@ function seeded(a: number): () => number {
  */
 function emboss(mask: HTMLCanvasElement, u: number, pal = STONE, wash?: HTMLCanvasElement): HTMLCanvasElement {
   const out = canvas(mask.width, mask.height), g = pen(out);
-  soft(g, mask, 'rgba(36,20,6,.6)', 1.3 * u, -0.5 * u, -0.7 * u);
+  soft(g, mask, 'rgba(30,16,4,.7)', 1.6 * u, -0.7 * u, -0.9 * u);
   g.drawImage(tint(grow(mask, 0.28 * u), pal.line), 0, 0);
   g.drawImage(tint(mask, pal.wall), 0, 0);
   const inner = grow(mask, 0.6 * u, true);
@@ -635,7 +638,7 @@ function emboss(mask: HTMLCanvasElement, u: number, pal = STONE, wash?: HTMLCanv
     t.drawImage(inner, 0, 0);
     g.drawImage(wash, 0, 0);
   }
-  for (const [color, d] of [['rgba(255,244,212,.5)', -0.22 * u], ['rgba(40,22,6,.45)', 0.22 * u]] as const) {
+  for (const [color, d] of [['rgba(255,250,230,.75)', -0.3 * u], ['rgba(40,22,6,.5)', 0.3 * u]] as const) {
     const t = tint(mask, color), tg = pen(t);
     tg.globalCompositeOperation = 'destination-out';
     tg.drawImage(mask, d, d);
@@ -824,8 +827,8 @@ function label(c: CanvasRenderingContext2D, text: string, x: number, y: number, 
 }
 
 /** The map's name on a parchment scroll across the top: a plaque with the letters raised in pale gilt, its ribbon ends rolled up at the sides. */
-function banner(c: CanvasRenderingContext2D, w: number, text: string, mottle: HTMLCanvasElement): void {
-  const px = Math.round(Math.min(26, Math.max(14, w / 42)));
+function banner(c: CanvasRenderingContext2D, w: number, h: number, text: string, mottle: HTMLCanvasElement): void {
+  const px = Math.round(Math.min(26, Math.max(14, Math.min(w / 42, h / 22))));
   c.save();
   c.font = LABEL(px);
   c.letterSpacing = `${px * 0.16}px`;

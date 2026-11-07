@@ -12,10 +12,12 @@ import { control, exposed, pace, tick } from '../src/enemies/control.ts';
 import { COUNTDOWN, PREP, DURATION, MAX_MOBS, arenaLayout, idle, type CombatHero, type Controls, type Frame, type Mode } from '../src/coop/protocol.ts';
 
 type Body = Friar & { id: number; max: number; kind: { hp: number; radius: number } };
-/** Duel: spell damage between heroes is scaled down, tuned for mob health; the hero's own armor, veil and guard still apply. */
-export const PVP = 0.3;
-/** Duel spawns: the two short ends of the court, facing each other. */
-export const DUEL_SPAWN = [{ x: -(COURT.hx - 3), z: 0, yaw: -Math.PI / 2 }, { x: COURT.hx - 3, z: 0, yaw: Math.PI / 2 }];
+/** Duel: spells are tuned for mob health, so damage between heroes is scaled down (armor, veil and guard still apply)
+ * and healing is damped alike, or a healer outlasts the five minutes (a two-account test: 4047 dealt, 4027 healed at 0.3/1). */
+export const PVP = 0.5, PVP_HEAL = 0.5;
+/** Duel spawns: 14 m apart down z = 3, the one line across the garden clear of the well, the tree and the planters,
+ * and far enough from the arcade (x = ±12) that a close camera behind each hero stays inside the court. */
+export const DUEL_SPAWN = [{ x: -7, z: 3, yaw: -Math.PI / 2 }, { x: 7, z: 3, yaw: Math.PI / 2 }];
 
 export function arenaWorld() { return arenaLevel().world; }
 export class Survival {
@@ -70,7 +72,7 @@ export class Survival {
       };
       const state = { kills:0, healing:0, survived:0, dealt:0, taken:0, hero: h, player, stats, kit, tuning, input: idle(), consumed: Array(11).fill(0) as number[], cast: 0, feedback: '', feedbackUntil: 0 };
       const heal=stats.heal.bind(stats);
-      stats.heal=n=>{const restored=heal(n);state.healing+=restored;return restored;};
+      stats.heal=n=>{const restored=heal(duel?n*PVP_HEAL:n);state.healing+=restored;return restored;};
       const take=stats.takeDamage.bind(stats);
       stats.takeDamage=n=>{const d=take(n);state.taken+=d;return d;};
       kit.system.fired = (a,tick) => {

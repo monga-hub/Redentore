@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Survival, DUEL_SPAWN, PVP } from '../server/simulation.ts';
+import { Survival, DUEL_SPAWN, PVP, PVP_HEAL } from '../server/simulation.ts';
 import { PREP, combatHero, idle, frame } from '../src/coop/protocol.ts';
 import { pack, unpack } from '../src/coop/packets.ts';
 import { duelRecap, duelWinner, recap } from '../src/coop/recap.ts';
@@ -12,7 +12,9 @@ const duel=new Survival([heroes[0],heroes[1]],'duel');
 assert.equal(duel.countdown,PREP);
 const start=duel.snapshot();
 assert(start.players.every((p,i)=>p.x===DUEL_SPAWN[i].x&&p.z===DUEL_SPAWN[i].z),'heroes start at the two ends');
-assert(Math.hypot(start.players[0].x-start.players[1].x,start.players[0].z-start.players[1].z)>20,'opposite sides of the court');
+assert(Math.hypot(start.players[0].x-start.players[1].x,start.players[0].z-start.players[1].z)>=14,'opposite sides of the court');
+for(let t=0;t<=1;t+=.02)assert(!duel.world.blocked(DUEL_SPAWN[0].x+(DUEL_SPAWN[1].x-DUEL_SPAWN[0].x)*t,DUEL_SPAWN[0].z,0,.5),'a clear walk between the two spawns');
+assert(duel.world.sees({...DUEL_SPAWN[0],y:0},{...DUEL_SPAWN[1],y:0}),'the duellists see each other from the start');
 assert(start.players.every(p=>p.hp===p.max&&p.mana===p.manaMax&&p.slots.every(s=>s.cd===0)),'fair start: full health and mana, no cooldowns');
 const seq=[0,0],press=(i:number,slot:number,move={x:0,z:0})=>{const c={...idle(),seq:++seq[i],...move,casts:[...duel.players[i].input.casts]};c.casts[slot]++;duel.input(i,c);};
 for(let n=0;n<Math.round(PREP/.05)-1;n++){
@@ -30,7 +32,8 @@ const before=b.stats.hp;
 for(let n=0;n<40;n++){if(n%10===0)press(0,0);duel.step(.05);}
 const hit=before-b.stats.hp;assert(hit>0,'PvP on in the duel');
 assert(Math.abs(duel.snapshot().players[0].stats!.dealt!-hit)<1e-6&&Math.abs(duel.snapshot().players[1].stats!.taken!-hit)<1e-6,'damage dealt equals damage taken');
-assert(PVP<1);
+assert(PVP<1&&PVP_HEAL<1);
+b.stats.hp-=200;assert.equal(b.stats.heal(100),100*PVP_HEAL,'healing is damped in the duel like damage');
 b.stats.hp=1;for(let n=0;n<40&&duel.outcome==='fight';n++){if(n%10===0)press(0,0);duel.step(.05);}
 assert.equal(duel.outcome,'victory','a fallen hero ends the duel');
 const last=duel.snapshot(),payload=pack(last,'duel');assert.deepEqual(pack(unpack(payload,'duel',heroes)!.frame,'duel'),payload,'results cross the wire');
@@ -39,7 +42,8 @@ assert.equal(duelWinner(party(0)),0);
 assert.equal(duelRecap(party(0)).title,'Vittoria');assert.equal(duelRecap(party(1)).title,'Sconfitta');
 assert.deepEqual(duelRecap(party(1)).players.map(p=>p.status),['Vincitore','Sconfitto']);
 assert(duelRecap(party(0)).players.every(p=>p.stats&&['dealt','healing','taken'].every(k=>Number.isFinite((p.stats as Record<string,number>)[k]))));
-assert.equal(duelRecap({...party(1),frame:{...last,outcome:'fight'},members:[{hero:heroes[0],ready:true,connected:false},{hero:heroes[1],ready:true,connected:true}]}).title,'Avversario ritirato');
+const forfeit=duelRecap({...party(1),frame:{...last,outcome:'fight'},members:[{hero:heroes[0],ready:true,connected:false},{hero:heroes[1],ready:true,connected:true}]});
+assert.equal(forfeit.title,'Avversario ritirato');assert.deepEqual(forfeit.players.map(p=>p.status),['Disconnesso','Vincitore'],'the one left standing wins by forfeit');
 assert.equal(duelRecap({...party(0),frame:{...last,outcome:'fight'},ending:'exit'}).title,'Ti sei ritirato');
 assert.equal(duelRecap({...party(0),frame:{...last,outcome:'defeat'}}).title,'Pareggio');
 assert.equal(recap({...party(0),mode:'survival'}).title,'Vittoria','co-op recap unchanged');
@@ -49,7 +53,8 @@ const coop=new Survival([heroes[0],heroes[1]]);coop.countdown=0;
 coop.players[0].player.pos.set(-1,0,0);coop.players[1].player.pos.set(.3,0,0);coop.players[0].player.facing=-Math.PI/2;
 for(let n=0;n<20;n++){if(n%10===0){const c={...idle(),seq:n+1,casts:[...coop.players[0].input.casts]};c.casts[0]++;coop.input(0,c);}coop.step(.05);}
 assert.equal(coop.players[1].stats.hp,coop.players[1].stats.hpMax,'no friendly fire in co-op');
-assert.equal(coop.snapshot().players[0].stats!.dealt,0);coop.dispose();
+assert.equal(coop.snapshot().players[0].stats!.dealt,0);
+coop.players[1].stats.hp-=200;assert.equal(coop.players[1].stats.heal(100),100,'co-op healing unchanged');coop.dispose();
 // LFG: duel proposals validate, unknown modes fail closed, and a server without the mode migration never queues an arena.
 const proposal={id:crypto.randomUUID(),epoch:crypto.randomUUID(),mode:'duel',capacity:2,source:'auto',host:true,accepted:false,peerAccepted:false,prepared:false,peer:null,expiresAt:new Date().toISOString()};
 assert.equal(lfgState({status:'offered',mode:'duel',proposal}).proposal?.mode,'duel');

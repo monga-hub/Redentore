@@ -153,16 +153,17 @@ export class BetaSession {
     const now=performance.now();
     if(this.state.slot===0&&this.sim){
       const elapsed=now-this.lastTick;this.lastTick=now;
-      if(elapsed>500){this.end('Browser host sospeso: partita interrotta senza ricompense.');return;}
+      // A one-off hitch (shader compile, GC, a busy machine) only loses its time; a host stalled past the grace ends it.
+      if(elapsed>GRACE_MS){this.end('Browser host sospeso: partita interrotta senza ricompense.');return;}
       const age=this.guestAt?now-this.guestAt:now-this.startedAt;
-      if(age>GRACE_MS){this.end('Ospite disconnesso per oltre8 secondi.');return;}
+      if(age>GRACE_MS){this.drop(1);this.end('Ospite disconnesso per oltre8 secondi.');return;}
       this.state.paused=!this.joined||!this.guestAt||age>1000;
       if(this.state.paused){this.state.reason='In attesa del compagno: simulazione in pausa (massimo8s).';return;}
       this.state.reason='Host connesso · beta sperimentale';this.sim.input(0,this.sample());
-      let left=elapsed/1000;while(left>1e-6&&this.sim.outcome==='fight'){const dt=Math.min(.05,left);this.sim.step(dt);left-=dt;}
+      let left=Math.min(elapsed,500)/1000;while(left>1e-6&&this.sim.outcome==='fight'){const dt=Math.min(.05,left);this.sim.step(dt);left-=dt;}
     }else if(this.state.slot===1){
       const age=now-this.hostAt;
-      if(age>GRACE_MS){this.end('Browser host non raggiungibile. Nessuna migrazione o ricompensa.');return;}
+      if(age>GRACE_MS){this.drop(0);this.end('Browser host non raggiungibile. Nessuna migrazione o ricompensa.');return;}
       if(age>1000&&!this.state.paused){this.state.paused=true;this.state.reason='Host non raggiungibile: simulazione in pausa.';this.emit(this.state);}
     }
   }
@@ -174,6 +175,8 @@ export class BetaSession {
       else if(this.state.slot===1&&performance.now()-this.hostAt<=1000){const i=this.sample();i.seq=++this.sendSeq;if(await this.channels[1].send({type:'broadcast',event:'input',payload:{e:this.state.epoch,i}})!=='ok')throw Error('Invio Realtime non riuscito.');}
     }catch{void this.reconnect();}finally{this.inFlight=false;}
   }
+  /** Arena: the silent side is the one that left, so the results name the other hero the winner by forfeit. */
+  private drop(slot:number):void{const m=this.state?.members[slot];if(this.mode==='duel'&&m)m.connected=false;}
   private end(reason:string,ending?:'exit'):void{if(this.stopped)return;if(this.state){if(this.sim)this.state.frame=this.sim.snapshot();this.state.ending=ending;this.state.phase='ended';this.state.paused=true;this.state.reason=reason;this.emit(this.state);}void this.close(true);}
   async leave():Promise<void>{this.end('Hai lasciato l’arena.', 'exit');}
   private async removeChannels():Promise<void>{this.joined=false;++this.nonce;const channels=this.channels;this.channels=[];await Promise.allSettled(channels.map(c=>this.client.removeChannel(c)));}

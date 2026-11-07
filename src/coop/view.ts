@@ -73,6 +73,7 @@ export class ArenaView {
   }
   setHeroes(heroes:CombatHero[],slot:number,mode:Mode='survival'):void {
     this.slot=slot;
+    if(mode==='duel'){this.cam.yaw=DUEL_SPAWN[slot].yaw;this.cam.setDist(STEPS[0],true);} // close behind, looking down the court at the other duellist
     heroes.forEach((h,i)=>{
       const player=new PlayerController(this.level.world,mode==='duel'?DUEL_SPAWN[i]:{x:i?2:-2,z:0,yaw:0},h.hero);
       if(mode==='duel')this.bodies[i]={id:1001+i,x:player.pos.x,y:0,z:player.pos.z,yaw:0,hp:1,max:1,kind:{hp:1,radius:.4},state:'chase',t:0,cd:0,struck:false,home:{x:0,z:0,yaw:0},mates:[],cc:control()};

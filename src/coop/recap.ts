@@ -11,7 +11,7 @@ export function duelRecap(s:PartyState){
   const title=f?.outcome==='victory'?(w===s.slot?'Vittoria':'Sconfitta'):f?.outcome==='defeat'?'Pareggio':s.ending==='exit'?'Ti sei ritirato':other&&!other.connected?'Avversario ritirato':'Partita interrotta';
   return {title,duration:f?matchTime(f.time):undefined,
     players:s.members.map((m,i)=>({portrait:HEROES[m.hero.hero].portrait,name:HEROES[m.hero.hero].name,self:i===s.slot,
-      status:s.ending==='exit'&&i===s.slot?'Ritirato':!m.connected?'Disconnesso':w===i?'Vincitore':w>=0?'Sconfitto':f?.outcome==='defeat'?'Pareggio':'Presente',
+      status:s.ending==='exit'&&i===s.slot?'Ritirato':!m.connected?'Disconnesso':w===i||w<0&&f?.outcome==='fight'&&s.ending!=='exit'&&s.members.some(o=>!o.connected)?'Vincitore':w>=0?'Sconfitto':f?.outcome==='defeat'?'Pareggio':'Presente',
       stats:f?.players[i]?.stats}))};
 }
 export function recap(s:PartyState){
@@ -48,6 +48,7 @@ function renderDuel(panel:HTMLElement,s:PartyState,back:()=>void){
   const stats=document.createElement('dl');
   for(const [label,value]of [['Arena','1 contro 1'],['Durata',r.duration]]){if(value===undefined)continue;const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=String(label);dd.textContent=String(value);const metric=document.createElement('div');metric.append(dt,dd);stats.append(metric);}
   panel.append(stats);
+  if(s.reason){const why=document.createElement('p');why.className='muted';why.textContent=s.reason;panel.append(why);}
   const table=document.createElement('table');table.innerHTML='<thead><tr><th scope="col">Sfidante</th><th scope="col">Danni inflitti</th><th scope="col">Cure</th><th scope="col">Danni subiti</th></tr></thead>';
   const body=document.createElement('tbody');
   for(const p of r.players){

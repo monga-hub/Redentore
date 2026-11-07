@@ -35,6 +35,8 @@ export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCha
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'bortolo-1': { file: 'native-characters/bortolo-1.glb', walk: 1.7, run: 5.3,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
+  'bortolo-2': { file: 'native-characters/bortolo-2.glb', walk: 1.46, run: 4.4,
+    finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
   'bortolo-3': { file: 'native-characters/bortolo-3.glb', walk: 1.7, run: 5.37,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
 };

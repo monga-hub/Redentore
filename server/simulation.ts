@@ -103,6 +103,7 @@ export class Survival {
       Object.assign(b, { x: p.player.pos.x, y: p.player.pos.y, z: p.player.pos.z, yaw: p.player.facing, hp: p.stats.hp, max: p.stats.hpMax, state: p.stats.dead ? 'dead' : 'chase' });
       b.kind.hp = b.max;
     });
+    const synced = this.bodies.map(b => ({ x: b.x, y: b.y, z: b.z })); // where each body stood before anyone walked or struck
     if (!duel) this.spawnIn -= dt;
     if (!duel && this.spawnIn <= 0 && this.mobs.filter(m=>m.hp>0).length < MAX_MOBS) {
       this.mobs = this.mobs.filter(m=>m.hp>0 || m.t<1);
@@ -172,9 +173,9 @@ export class Survival {
       m.z=Math.max(-COURT.hz+.7,Math.min(COURT.hz-.7,m.z));
       m.y=this.world.groundAt(m.x,m.z,m.y);
     }
-    if (duel) this.players.forEach((p, i) => { // a shove moved the other hero's body: the hero goes with it
-      const b = this.bodies[i], pos = p.player.pos;
-      if (Math.abs(b.x - pos.x) > 1e-6 || Math.abs(b.z - pos.z) > 1e-6) pos.set(b.x, b.y, b.z);
+    if (duel) this.players.forEach((p, i) => { // a shove moved the other hero's body since the sync: the hero goes with it, on top of their own walk
+      const b = this.bodies[i], pos = p.player.pos, dx = b.x - synced[i].x, dz = b.z - synced[i].z;
+      if (Math.abs(dx) > 1e-6 || Math.abs(dz) > 1e-6) pos.set(pos.x + dx, pos.y + b.y - synced[i].y, pos.z + dz);
     });
     if (duel) { // 'victory': one hero stands (or has more health at the bell); 'defeat': a draw
       const down = this.players.filter(p => p.stats.dead).length;

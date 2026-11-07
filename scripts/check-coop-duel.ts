@@ -24,6 +24,10 @@ for(let n=0;n<Math.round(PREP/.05)-1;n++){
   assert(unpack(pack(f,'duel'),'duel',heroes),'guest decodes the long countdown');
 }
 assert(duel.countdown>0);duel.step(.05);assert.equal(duel.countdown,0);
+// After the bell both duellists walk: the shove sync once snapped each hero back to the step's start, freezing host and guest.
+const walk=(x0:number,x1:number)=>[x0,x1].forEach((x,i)=>duel.input(i,{...idle(),seq:++seq[i],x,z:0,casts:[...duel.players[i].input.casts]}));
+const bell=duel.snapshot().players;walk(1,-1);for(let n=0;n<20;n++)duel.step(.05);walk(0,0);
+assert(duel.snapshot().players.every((p,i)=>Math.hypot(p.x-bell[i].x,p.z-bell[i].z)>3),'host and guest both move after the countdown');
 for(let n=0;n<200;n++)duel.step(.05);
 assert.equal(duel.mobs.length,0,'the arena has no monsters');
 // Face to face: the base attack lands on the other hero, scaled for PvP, counted as dealt and taken.
@@ -33,6 +37,11 @@ for(let n=0;n<40;n++){if(n%10===0)press(0,0);duel.step(.05);}
 const hit=before-b.stats.hp;assert(hit>0,'PvP on in the duel');
 assert(Math.abs(duel.snapshot().players[0].stats!.dealt!-hit)<1e-6&&Math.abs(duel.snapshot().players[1].stats!.taken!-hit)<1e-6,'damage dealt equals damage taken');
 assert(PVP<1&&PVP_HEAL<1);
+// A shove still carries the struck hero: Burrasca from the host throws the guest back.
+{const [a,b]=duel.players;a.player.pos.set(-1,0,3);b.player.pos.set(0,0,3);duel.step(.05);
+const x0=b.player.pos.x,up=a.kit.update.bind(a.kit);let once=true;
+a.kit.update=(...args:Parameters<typeof up>)=>{up(...args);if(once){once=false;(a.kit as unknown as {magic:{squall():void}}).magic.squall();}};
+duel.step(.05);a.kit.update=up;assert(b.player.pos.x-x0>2,'the squall shoves the other duellist');}
 b.stats.hp-=200;assert.equal(b.stats.heal(100),100*PVP_HEAL,'healing is damped in the duel like damage');
 b.stats.hp=1;for(let n=0;n<40&&duel.outcome==='fight';n++){if(n%10===0)press(0,0);duel.step(.05);}
 assert.equal(duel.outcome,'victory','a fallen hero ends the duel');

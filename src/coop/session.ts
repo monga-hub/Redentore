@@ -1,13 +1,17 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { LfgClient, type LfgHandoff } from './lfg.ts';
 import { Survival } from '../../server/simulation.ts';
-import { combatHero, controls, acceptInput, idle, validBar, type CombatHero, type Controls, type Frame } from './protocol.ts';
+import { combatHero, controls, acceptInput, idle, validBar, type CombatHero, type Controls, type Frame, type Mode } from './protocol.ts';
 import { pack, unpack, NETWORK_HZ, LEASE_MS, GRACE_MS, MAX_PACKET } from './packets.ts';
 
-export interface PartyState {ending?:'exit';room:string;invite:string;epoch:string;slot:number;phase:'lobby'|'fight'|'ended';reason:string;paused:boolean;members:{hero:CombatHero;ready:boolean;connected:boolean}[];frame?:Frame}
+export interface PartyState {ending?:'exit';mode?:Mode;room:string;invite:string;epoch:string;slot:number;phase:'lobby'|'fight'|'ended';reason:string;paused:boolean;members:{hero:CombatHero;ready:boolean;connected:boolean}[];frame?:Frame}
+/** The end line both browsers show; the duel names no winner here, the recap does from the final frame. */
+export const outcomeLine=(mode:Mode,outcome:Frame['outcome'])=>mode==='duel'?(outcome==='victory'?'Duello concluso. Nessuna ricompensa persistente.':'Pareggio. Nessuna ricompensa persistente.'):(outcome==='victory'?'Cinque minuti superati! Beta senza ricompense persistenti.':'Entrambi gli eroi sono caduti. Nessuna ricompensa.');
 interface Row {room:string;invite:string;epoch:string;slot:0|1;phase:PartyState['phase'];reason:string;members:({snapshot:unknown;bar:unknown;ready:boolean}|null)[]}
 export class BetaSession {
   readonly lease=crypto.randomUUID(); // per page, never cloned through sessionStorage to another tab
+  /** Set by the server's LFG claim: the arena queue admits a duel, everything else is the co-op siege. */
+  mode:Mode='survival';
   state?:PartyState;
   private client:SupabaseClient;
   private channels:RealtimeChannel[]=[];
@@ -55,7 +59,7 @@ export class BetaSession {
       while(!this.stopped){
         const next=await claim.claim(handoff);
         if(this.stopped)return;
-        if(next.status==='admitted'){await this.open(next.admission);return;}
+        if(next.status==='admitted'){if(next.mode==='duel')this.mode='duel';await this.open(next.admission);return;}
         if(!next.waitingForHost||performance.now()>=deadline)throw Error('Passaggio LFG scaduto. Torna alla campagna e cerca di nuovo.');
         await new Promise(r=>setTimeout(r,500));
       }
@@ -90,8 +94,8 @@ export class BetaSession {
     if(!r||typeof r.room!=='string'||typeof r.epoch!=='string'||![0,1].includes(r.slot)||!['lobby','fight','ended'].includes(r.phase)||!Array.isArray(r.members)||r.members.length!==2)throw Error('Risposta lobby non valida.');
     if(this.state&&(r.room!==this.state.room||r.epoch!==this.state.epoch))throw Error('Stanza cambiata: crea un nuovo invito.');
     const members=r.phase==='ended'&&this.state?this.state.members.map((m,i)=>({...m,connected:!!r.members[i]})):r.members.filter((m):m is NonNullable<typeof m>=>!!m).map(m=>{const hero=combatHero(m.snapshot);if(validBar(hero,m.bar))hero.bar=[...m.bar];return {hero,ready:m.ready===true,connected:true};});
-    this.state={room:r.room,invite:r.invite,epoch:r.epoch,slot:r.slot,phase:r.phase,reason:r.reason||this.state?.reason||'',members,paused:this.state?.paused??false,frame:r.phase==='ended'&&this.sim?this.sim.snapshot():this.state?.frame};
-    if(r.phase==='fight'&&r.slot===0&&!this.sim){if(members.length!==2)throw Error('Manca il compagno.');this.sim=new Survival(members.map(m=>m.hero)as[CombatHero,CombatHero]);this.startedAt=performance.now();this.lastTick=this.startedAt;this.guestAt=0;}
+    this.state={mode:this.mode,room:r.room,invite:r.invite,epoch:r.epoch,slot:r.slot,phase:r.phase,reason:r.reason||this.state?.reason||'',members,paused:this.state?.paused??false,frame:r.phase==='ended'&&this.sim?this.sim.snapshot():this.state?.frame};
+    if(r.phase==='fight'&&r.slot===0&&!this.sim){if(members.length!==2)throw Error('Manca il compagno.');this.sim=new Survival(members.map(m=>m.hero)as[CombatHero,CombatHero],this.mode);this.startedAt=performance.now();this.lastTick=this.startedAt;this.guestAt=0;}
     this.emit(this.state);
     if(r.phase==='ended')void this.close(false);
     else void this.advanceLfg();
@@ -119,7 +123,7 @@ export class BetaSession {
       if(next.frame.seq===this.lastSnapshot&&!next.paused&&next.frame.outcome==='fight')return;
       this.lastSnapshot=next.frame.seq;this.hostAt=performance.now();
       this.state.frame=next.frame;this.state.paused=next.paused;this.state.reason=next.reason;this.emit(this.state);
-      if(next.frame.outcome!=='fight')this.end(next.frame.outcome==='victory'?'Cinque minuti superati! Beta senza ricompense persistenti.':'Entrambi gli eroi sono caduti. Nessuna ricompensa.');
+      if(next.frame.outcome!=='fight')this.end(outcomeLine(this.mode,next.frame.outcome));
     });
     input.on('broadcast',{event:'input'},({payload})=>{
       if(this.stopped||nonce!==this.nonce||!this.state||this.state.slot!==0||!payload||payload.e!==this.state.epoch||JSON.stringify(payload).length>1024)return;
@@ -166,7 +170,7 @@ export class BetaSession {
     if(this.stopped||!this.joined||!this.state||this.state.phase!=='fight'||this.inFlight)return;
     this.inFlight=true;
     try{
-      if(this.state.slot===0&&this.sim){const f=this.sim.snapshot();this.state.frame=f;this.emit(this.state);const payload=pack(f,this.state.epoch,this.state.paused,this.state.reason);if(JSON.stringify(payload).length>MAX_PACKET)throw Error('Stato arena troppo grande.');if(await this.channels[0].send({type:'broadcast',event:'frame',payload})!=='ok')throw Error('Invio Realtime non riuscito.');if(f.outcome!=='fight')this.end(f.outcome==='victory'?'Cinque minuti superati! Beta senza ricompense persistenti.':'Entrambi gli eroi sono caduti. Nessuna ricompensa.');}
+      if(this.state.slot===0&&this.sim){const f=this.sim.snapshot();this.state.frame=f;this.emit(this.state);const payload=pack(f,this.state.epoch,this.state.paused,this.state.reason);if(JSON.stringify(payload).length>MAX_PACKET)throw Error('Stato arena troppo grande.');if(await this.channels[0].send({type:'broadcast',event:'frame',payload})!=='ok')throw Error('Invio Realtime non riuscito.');if(f.outcome!=='fight')this.end(outcomeLine(this.mode,f.outcome));}
       else if(this.state.slot===1&&performance.now()-this.hostAt<=1000){const i=this.sample();i.seq=++this.sendSeq;if(await this.channels[1].send({type:'broadcast',event:'input',payload:{e:this.state.epoch,i}})!=='ok')throw Error('Invio Realtime non riuscito.');}
     }catch{void this.reconnect();}finally{this.inFlight=false;}
   }

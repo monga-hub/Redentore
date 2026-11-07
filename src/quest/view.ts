@@ -134,7 +134,7 @@ export class QuestView {
   private speziale = new Npc(SPEZIALE, RUE);
   private services = Object.fromEntries(Object.entries(SANCTUARY).map(([id, at]) => [id, new Npc(at, at.tint, at.model)])) as Record<SanctuaryService, Npc>;
   /** The solo integration owns these actions; the arena is never mounted in the world. */
-  service?: (id: SanctuaryService) => void;
+  service?: (id: SanctuaryService, mode?: 'survival' | 'duel') => void;
   private givers: Record<Giver, Npc>; // the Cardinale on his procession's spot (quest/escort.ts), set with the quest
   private glory: THREE.Object3D[] = []; // San Giorgio's light: round the statue, his head, the pool at his foot (once level 3 opens)
   private tiara = tiara(); // on the Cardinale's head once he is crowned on the Bacino, until he gives it to the hero
@@ -550,7 +550,8 @@ export class QuestView {
       if (pr.service) {
         const id = pr.service, at = SANCTUARY[id];
         this.services[id].talking = true;
-        this.talk.show({ name: at.name, portrait: `${import.meta.env.BASE_URL}models/${id === 'maestro' ? 'iseppo' : 'zuane'}.webp` }, at.greeting, () => [{ title: id === 'maestro' ? 'Avventura cooperativa' : 'Redistribuisci i miei punti', state: 'talk', text: at.greeting, actionLabel: this.service ? (id === 'maestro' ? 'Cooperativa' : 'Redistribuisci i miei punti') : undefined, act: () => this.service?.(id) }]);
+        this.talk.show({ name: at.name, portrait: `${import.meta.env.BASE_URL}models/${id === 'maestro' ? 'iseppo' : 'zuane'}.webp` }, at.greeting, () => [{ title: id === 'maestro' ? 'Avventura cooperativa' : 'Redistribuisci i miei punti', state: 'talk', text: at.greeting, actionLabel: this.service ? (id === 'maestro' ? 'Cooperativa' : 'Redistribuisci i miei punti') : undefined, act: () => this.service?.(id) },
+          ...(id === 'maestro' ? [{ title: 'Arena · 1 contro 1', state: 'talk' as const, text: 'Mettiti in coda: quando un altro risorto fa lo stesso, vi chiedo se volete sfidarvi. Quindici secondi per prepararvi ai lati opposti del chiostro, poi a mazzate finché uno resta in piedi. Nessun premio, solo l’onore.', actionLabel: this.service ? 'Arena (1 contro 1)' : undefined, act: () => this.service?.(id, 'duel') }] : [])]);
       } else if (pr.talk === 'zuane') {
         this.npc.talking = true;
         this.talk.show({ name: NPC.name, portrait: `${import.meta.env.BASE_URL}models/zuane.webp` }, GREET.zuane, () => this.zuaneEntries());

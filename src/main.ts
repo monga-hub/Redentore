@@ -476,7 +476,7 @@ const buildPanel = new BuildPanel(levels, () => ({ name: HEROES[hero].name, titl
 });
 buildPanel.opened = () => { kit.system.cancel(); input.consume(); worldMap.close(); dctl.stop(); bagPanel.close(); book.close(); };
 sheet.build = () => buildPanel.show();
-questView.service = (id) => { if (id === 'custode') buildPanel.show(true); else document.dispatchEvent(new CustomEvent('sanctuary-arena')); };
+questView.service = (id, mode) => { if (id === 'custode') buildPanel.show(true); else document.dispatchEvent(new CustomEvent('sanctuary-arena', { detail: { mode: mode ?? 'survival' } })); };
 const figure = new Figure(renderer, scene, player.mesh, sheet.stage); // the sheet's hero, as dressed, while it is open
 sheet.el.addEventListener('hidden', () => figure.free());
 const vendor = new VendorPanel(bagPanel, bag, gear, { // Fra' Bortolo's Commercia, Mastro Iseppo's; their tomes teach a school of his
@@ -695,7 +695,7 @@ const conserve=()=>saveForCoop(cloud,hero,()=>{
 },()=>serialize(game));
 const lfgUi=new LfgUi(lfgClient,()=>hero,async()=>{await conserve();});
 Object.assign(window,{lfgClient,lfgUi});
-document.addEventListener('sanctuary-arena',()=>{lfgUi.open();kit.system.cancel();input.consume();dctl.stop();worldMap.close();bagPanel.close();book.close();buildPanel.close();});
+document.addEventListener('sanctuary-arena',e=>{lfgUi.open((e as CustomEvent<{mode?:'survival'|'duel'}>).detail?.mode);kit.system.cancel();input.consume();dctl.stop();worldMap.close();bagPanel.close();book.close();buildPanel.close();});
 async function cancelLfg(id:string,message:string){try{await lfgClient.respond(id,false);}catch{/* server TTL handles an expired/offline proposal */}lfgFrozen=false;lfgPreparing=undefined;lfgUi.open();lfgUi.error(message);}
 function handleLfg(state:LfgState){
   lfgUi.update(state);

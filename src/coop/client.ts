@@ -24,6 +24,7 @@ body.coop .actionbar,body.coop #unit,body.coop #target-controls,body.coop #minim
 #coop-partner .name{font:bold 11px Georgia;color:#82d7ff;margin-bottom:4px}#coop-partner .res{width:100%;margin-top:3px}
 body.touch #coop-partner{top:76px;transform:scale(var(--k));transform-origin:0 0}
 #coop-countdown{position:fixed;inset:0;z-index:12;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd75e;text-align:center;text-shadow:0 3px 5px #000,0 0 32px #b87e2b;font-family:Georgia,serif;background:radial-gradient(ellipse at center,#100d0a66,transparent 60%)}
+#coop-countdown.prep{justify-content:flex-start;padding-top:calc(14px + 9vh);background:none}#coop-countdown.prep strong{font-size:clamp(44px,10vh,72px)}#coop-partner.foe .name{color:#ff8a7a}
 #coop-countdown[hidden]{display:none}#coop-countdown span{font-size:clamp(12px,2vw,18px);letter-spacing:.12em;text-transform:uppercase;color:#f3e2b0}#coop-countdown strong{font-size:clamp(88px,23vh,160px);line-height:1.15;font-weight:normal}
 
 #arena-canvas{position:fixed;inset:0;touch-action:none}
@@ -59,7 +60,7 @@ async function loadHeroes(){
 const urlInvite=new URLSearchParams(location.search).get('invite');if(urlInvite)code.value=urlInvite;
 function inviteOf(value:string):string|undefined{let v=value.trim();try{if(v.includes('://'))v=new URL(v).searchParams.get('invite')??'';}catch{return;}return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)?v:undefined;}
 function send(m:{type:string;bar?:unknown}){if(m.type==='ready'||m.type==='start'||m.type==='equip')void session?.action(m.type,m.bar).catch(e=>status((e as Error).message));}
-function leave(){void session?.leave();}
+function leave(){if(session?.mode==='duel'&&latest&&latest.countdown>0){status('Non puoi uscire durante la preparazione dell’arena.');return;}void session?.leave();}
 function back(){void session?.leave();location.replace(adventureUrl(location.pathname));}
 el<HTMLAnchorElement>('#coop-return').onclick=e=>{e.preventDefault();back();};
 async function rememberReturn(){const {data}=await account.auth.getSession();if(data.session)rememberArenaReturn(selected,data.session.user.id);}
@@ -91,13 +92,14 @@ function handle(m:PartyState){
     }
     const share=new URL(location.pathname,location.origin);share.searchParams.set('coop','');share.searchParams.set('invite',m.invite);el('.invite').textContent='Codice privato: '+m.invite;el('.invite').hidden=lfgRoute;
     el<HTMLButtonElement>('#coop-copy').onclick=()=>{void navigator.clipboard.writeText(share.href).then(()=>status('Link copiato. Invialo solo al tuo compagno.')).catch(()=>{code.value=share.href;el<HTMLElement>('.setup').hidden=false;code.focus();code.select();status('Copia il link dal campo invito.');});};
-    if(phase==='lobby'&&m.members.length===2&&!view){view=new ArenaView();view.setHeroes(m.members.map(p=>p.hero),slot);}
+    if(m.mode==='duel'&&!root.dataset.duel){root.dataset.duel='1';el('h1').textContent='Arena · 1 contro 1';el('p').textContent='Duello tra due risorti: 15 secondi di preparazione ai lati opposti del chiostro, poi vince chi resta in piedi. Nessuna ricompensa persistente: niente XP, oro o oggetti.';}
+    if(phase==='lobby'&&m.members.length===2&&!view){view=new ArenaView();view.setHeroes(m.members.map(p=>p.hero),slot,m.mode);}
     if(phase==='fight'&&m.frame){
-      if(!view){view=new ArenaView();view.setHeroes(m.members.map((p:{hero:CombatHero})=>p.hero),slot);}
-      if(!hud)hud=new ArenaHud(view,m.members.map(p=>p.hero),slot,leave);
+      if(!view){view=new ArenaView();view.setHeroes(m.members.map((p:{hero:CombatHero})=>p.hero),slot,m.mode);}
+      if(!hud)hud=new ArenaHud(view,m.members.map(p=>p.hero),slot,leave,m.mode);
       if(!latest||m.frame.seq>=latest.seq){latest=m.frame;view.snapshot(m.frame,m.paused);drawHud(m.frame);}
       document.body.classList.add('coop-fight');status(m.paused?m.reason:'');
-    }else status(lfgRoute?'Partita accettata: attendi la connessione del compagno…':m.members.length===2?'Entrambi presenti: confermate di essere pronti.':'In attesa del secondo giocatore…');
+    }else status(lfgRoute?(m.mode==='duel'?'Arena accettata: attendi la connessione dell’avversario…':'Partita accettata: attendi la connessione del compagno…'):m.members.length===2?'Entrambi presenti: confermate di essere pronti.':'In attesa del secondo giocatore…');
 }
 function drawHud(f:Frame){hud?.update(f);}
 el<HTMLButtonElement>('#coop-create').onclick=()=>void connect();el<HTMLButtonElement>('#coop-join').onclick=()=>{const invite=inviteOf(code.value);if(!invite){status('Incolla un codice invito valido o il link ricevuto.');return;}void connect(invite);};

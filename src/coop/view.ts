@@ -18,7 +18,8 @@ import { tuneOf } from '../player/levels.ts';
 import { BOONS } from '../quest/progress.ts';
 import { initAudio, loadBank, playSfx, setListener } from '../audio/engine.ts';
 import { setAmbience, setMusic } from '../audio/music.ts';
-import { type CombatHero, type Frame, type Controls, idle, arenaLayout } from './protocol.ts';
+import { type CombatHero, type Frame, type Controls, type Mode, idle, arenaLayout } from './protocol.ts';
+import { DUEL_SPAWN } from '../../server/simulation.ts';
 import { Targeting, type Kind } from '../ui/target.ts';
 import { arenaLevel } from './environment.ts';
 import type { Friar } from '../enemies/brain.ts';
@@ -40,6 +41,9 @@ export class ArenaView {
   readonly controls: Controls = idle();
   private heroes: {player:PlayerController; stats:PlayerStats; kit:Forsaken; tuning:ReturnType<typeof tuneOf>}[]=[];
   private mobs=new Map<number,{view:FriarView;mob:VisualMob}>();
+  /** Duel: each hero as the other's aim, under the host's ids (1001, 1002), so replayed casts face the right way. */
+  private bodies:VisualMob[]=[];
+  private aim=(id:number)=>this.mobs.get(id)?.mob??this.bodies[id-1001];
   private pool:FriarView[]=[];
   private template?: Awaited<ReturnType<typeof arenaFriarTemplate>>;
   private target?:Frame;
@@ -67,20 +71,21 @@ export class ArenaView {
     addEventListener('resize',this.resize);
     requestAnimationFrame(this.draw);
   }
-  setHeroes(heroes:CombatHero[],slot:number):void {
+  setHeroes(heroes:CombatHero[],slot:number,mode:Mode='survival'):void {
     this.slot=slot;
     heroes.forEach((h,i)=>{
-      const player=new PlayerController(this.level.world,{x:i?2:-2,z:0,yaw:0},h.hero);
+      const player=new PlayerController(this.level.world,mode==='duel'?DUEL_SPAWN[i]:{x:i?2:-2,z:0,yaw:0},h.hero);
+      if(mode==='duel')this.bodies[i]={id:1001+i,x:player.pos.x,y:0,z:player.pos.z,yaw:0,hp:1,max:1,kind:{hp:1,radius:.4},state:'chase',t:0,cd:0,struck:false,home:{x:0,z:0,yaw:0},mates:[],cc:control()};
       player.model.wear(h.gear);this.scene.add(player.mesh);
       const stats=new PlayerStats(), tuning=tuneOf(h.picks,h.learned,HEROES[h.hero].school);
       BOONS.find(b=>b.id===h.boon)?.apply(tuning);Object.assign(tune,tuning);
       const kit=new Forsaken(player,stats,HEROES[h.hero].school,{bar:arenaLayout(h),off:[]});
       // These are disposable copies of replicated mobs: all combat writes stay cosmetic.
       kit.foes=()=>[...this.mobs.values()].map(x=>x.mob);
-      kit.aimed=()=>this.mobs.get(this.target?.players[i].target??0)?.mob;
+      kit.aimed=()=>this.aim(this.target?.players[i].target??0);
       kit.hurt=()=>{};this.scene.add(kit.vfx.root);
       this.heroes.push({player,stats,kit,tuning});
-      const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.63,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:i===slot?0xffd75e:0x66c9ff,side:THREE.DoubleSide}));ring.position.y=.05;player.mesh.add(ring);
+      const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.63,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:i===slot?0xffd75e:mode==='duel'?0xff4a3a:0x66c9ff,side:THREE.DoubleSide}));ring.position.y=.05;player.mesh.add(ring);
     });
     this.targeting=new Targeting(this.renderer.domElement,this.camera,this.scene,this.level.cameraBlockers,this.kinds,(m)=>this.level.world.sees(this.own.player.pos,m));
     this.targeting.onSelect=t=>{if(!this.syncingTarget)this.controls.target=(t?.mob as VisualMob|undefined)?.id??0;};
@@ -106,7 +111,7 @@ export class ArenaView {
     for(const e of f.events)if(e.seq>this.seenEvent){
       this.seenEvent=e.seq;const h=this.heroes[e.player],a=ABILITIES.find(a=>a.id===f.players[e.player].slots[e.slot]?.id);if(!h||!a)continue;
       Object.assign(tune,h.tuning);h.player.pos.set(e.x,e.y,e.z);h.player.facing=e.yaw;
-      const aimed=h.kit.aimed;h.kit.aimed=()=>this.mobs.get(e.target)?.mob;
+      const aimed=h.kit.aimed;h.kit.aimed=()=>this.aim(e.target);
       a.fire(h.kit,e.tick);h.kit.aimed=aimed;
     }
   }
@@ -135,6 +140,7 @@ export class ArenaView {
         player.model.animate(step,speed,p.y<.5,speed);
         if(p.hp<=0&&this.hp[i]>0){player.model.die();playSfx('player_death',player.pos);}
         if(p.hp>0&&this.hp[i]>p.hp){player.model.flinch(this.hp[i]-p.hp);playSfx('hit_player',player.pos);}
+        const body=this.bodies[i];if(body)Object.assign(body,{x:player.pos.x,y:player.pos.y,z:player.pos.z,hp:p.hp,max:p.max,state:p.hp>0?'chase':'dead'});
         this.hp[i]=p.hp;h.stats.update(step);h.stats.hp=p.hp;h.stats.hpMax=p.max;h.stats.mana=p.mana;h.stats.manaMax=p.manaMax;
         h.kit.update(step,()=>false,false);
         if(p.casting){const a=ABILITIES.find(a=>a.id===p.slots[p.casting!.slot]?.id);a?.during?.(h.kit,p.casting.t/p.casting.total,step);}

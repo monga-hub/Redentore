@@ -8,14 +8,23 @@ import { HEROES } from '../src/player/heroes.ts';
 import { Equipment, effects, crit, damageMultiplier } from '../src/loot/gear.ts';
 import { BOONS } from '../src/quest/progress.ts';
 import { FRIAR, hurt, separate, type Friar } from '../src/enemies/brain.ts';
-import { control, pace, tick } from '../src/enemies/control.ts';
-import { COUNTDOWN, DURATION, MAX_MOBS, arenaLayout, idle, type CombatHero, type Controls, type Frame } from '../src/coop/protocol.ts';
+import { control, exposed, pace, tick } from '../src/enemies/control.ts';
+import { COUNTDOWN, PREP, DURATION, MAX_MOBS, arenaLayout, idle, type CombatHero, type Controls, type Frame, type Mode } from '../src/coop/protocol.ts';
+
+type Body = Friar & { id: number; max: number; kind: { hp: number; radius: number } };
+/** Duel: spell damage between heroes is scaled down, tuned for mob health; the hero's own armor, veil and guard still apply. */
+export const PVP = 0.3;
+/** Duel spawns: the two short ends of the court, facing each other. */
+export const DUEL_SPAWN = [{ x: -(COURT.hx - 3), z: 0, yaw: -Math.PI / 2 }, { x: COURT.hx - 3, z: 0, yaw: Math.PI / 2 }];
 
 export function arenaWorld() { return arenaLevel().world; }
 export class Survival {
   readonly world = arenaWorld();
   readonly players;
-  mobs: (Friar & { id: number; max: number; kind: { hp: number; radius: number } })[] = [];
+  mobs: Body[] = [];
+  /** Duel: each hero as the other's foe, the shape the grimoire already aims, hurts, slows and shoves. */
+  readonly bodies: Body[] = [0, 1].map(i => ({ id: 1001 + i, x: 0, y: 0, z: 0, yaw: 0, hp: 1, max: 1, kind: { hp: 1, radius: FRIAR.radius }, state: 'chase', t: 0, cd: 0, struck: false, home: { x: 0, z: 0, yaw: 0 }, mates: [], cc: control() }));
+  readonly mode: Mode;
   time = 0; kills = 0; seq = 0;
   countdown = COUNTDOWN;
   outcome: Frame['outcome'] = 'fight';
@@ -23,13 +32,17 @@ export class Survival {
   private nextMob = 0;
   private eventSeq = 0;
   private events: import('../src/coop/protocol.ts').CastEvent[] = [];
-  constructor(heroes: [CombatHero, CombatHero]) {
+  constructor(heroes: [CombatHero, CombatHero], mode: Mode = 'survival') {
+    this.mode = mode;
+    if (mode === 'duel') this.countdown = PREP;
+    const duel = mode === 'duel';
     this.players = heroes.map((h, i) => {
       const own = ownSchools(h.picks, h.learned, HEROES[h.hero].school);
       const tuning = tuneOf(own.picks, own.learned, HEROES[h.hero].school);
       BOONS.find(b => b.id === h.boon)?.apply(tuning);
       Object.assign(tune, tuning);
-      const player = new PlayerController(this.world, { x: i ? 2 : -2, z: 0, yaw: 0 }, h.hero, false);
+      const player = new PlayerController(this.world, duel ? DUEL_SPAWN[i] : { x: i ? 2 : -2, z: 0, yaw: 0 }, h.hero, false);
+      if (duel) player.facing = DUEL_SPAWN[i].yaw;
       const stats = new PlayerStats(); const equipment = new Equipment(h.hero); equipment.decode(h.gear);
       const worn = effects(equipment.totals);
       stats.grow(tuning.hp, tuning.mana, worn.hp, worn.mana); stats.armor = tuning.armor * (1 - worn.cut); stats.regen = tuning.regen + worn.regen;
@@ -39,19 +52,27 @@ export class Survival {
       kit.system.unlock(...tuning.owned); kit.system.setMain(bar[0] ?? tuning.owned[0]);
       kit.system.chargeMul = tuning.fury; kit.system.chargeAfter = tuning.furyStart; kit.system.castMul = 1 / worn.haste;
       stats.onHurt = n => { kit.system.pushback(); player.model.flinch(n); };
-      kit.foes = () => this.mobs;
-      kit.aimed = () => this.mobs.find(m=>m.id===state.input.target&&m.hp>0) ?? this.mobs.filter(m => m.hp > 0).sort((a,b) => Math.hypot(a.x-player.pos.x,a.z-player.pos.z)-Math.hypot(b.x-player.pos.x,b.z-player.pos.z))[0];
+      const foe = () => this.bodies[1 - i];
+      kit.foes = () => duel ? [foe()] : this.mobs;
+      kit.aimed = () => duel ? (foe().state === 'dead' ? undefined : foe()) : this.mobs.find(m=>m.id===state.input.target&&m.hp>0) ?? this.mobs.filter(m => m.hp > 0).sort((a,b) => Math.hypot(a.x-player.pos.x,a.z-player.pos.z)-Math.hypot(b.x-player.pos.x,b.z-player.pos.z))[0];
       kit.system.aim = () => { const m = kit.aimed?.(); if (m) player.facing = Math.atan2(player.pos.x-m.x, player.pos.z-m.z); };
       kit.hurt = (inside,n,kind) => {
+        if (duel) {
+          const b = foe(), other = this.players[1 - i];
+          if (b.state !== 'dead' && inside(b.x,b.z,b)) state.dealt += other.stats.takeDamage(exposed(b.cc, crit(n * tuning.dmg * damageMultiplier(worn,kind),worn.crit)) * PVP);
+          return;
+        }
         for (const m of this.mobs) if (m.hp > 0 && inside(m.x,m.z,m)) {
           if (hurt(m,crit(n * tuning.dmg * damageMultiplier(worn,kind),worn.crit))) {
             this.kills++; state.kills++; if (tuning.leech) stats.heal(stats.hpMax * tuning.leech);
           }
         }
       };
-      const state = { kills:0, healing:0, survived:0, hero: h, player, stats, kit, tuning, input: idle(), consumed: Array(11).fill(0) as number[], cast: 0, feedback: '', feedbackUntil: 0 };
+      const state = { kills:0, healing:0, survived:0, dealt:0, taken:0, hero: h, player, stats, kit, tuning, input: idle(), consumed: Array(11).fill(0) as number[], cast: 0, feedback: '', feedbackUntil: 0 };
       const heal=stats.heal.bind(stats);
       stats.heal=n=>{const restored=heal(n);state.healing+=restored;return restored;};
+      const take=stats.takeDamage.bind(stats);
+      stats.takeDamage=n=>{const d=take(n);state.taken+=d;return d;};
       kit.system.fired = (a,tick) => {
         const pos=player.pos;
         this.events.push({seq:++this.eventSeq,player:i,slot:kit.system.slots.indexOf(a),tick,target:(kit.aimed?.() as Friar & {id:number} | undefined)?.id??0,x:pos.x,y:pos.y,z:pos.z,yaw:player.facing});
@@ -73,8 +94,15 @@ export class Survival {
     this.time = Math.min(DURATION, this.time + dt);
     for(const p of this.players)if(!p.stats.dead)p.survived=this.time;
     const stage = Math.min(5, 1 + Math.floor(this.time / 60));
-    this.spawnIn -= dt;
-    if (this.spawnIn <= 0 && this.mobs.filter(m=>m.hp>0).length < MAX_MOBS) {
+    const duel = this.mode === 'duel';
+    if (duel) this.players.forEach((p, i) => {
+      const b = this.bodies[i];
+      tick(b.cc, dt);
+      Object.assign(b, { x: p.player.pos.x, y: p.player.pos.y, z: p.player.pos.z, yaw: p.player.facing, hp: p.stats.hp, max: p.stats.hpMax, state: p.stats.dead ? 'dead' : 'chase' });
+      b.kind.hp = b.max;
+    });
+    if (!duel) this.spawnIn -= dt;
+    if (!duel && this.spawnIn <= 0 && this.mobs.filter(m=>m.hp>0).length < MAX_MOBS) {
       this.mobs = this.mobs.filter(m=>m.hp>0 || m.t<1);
       if (this.mobs.length < MAX_MOBS) {
         let x=0,z=0;
@@ -93,7 +121,10 @@ export class Survival {
     for (const p of this.players) {
       Object.assign(tune,p.tuning); // All delayed callbacks and Grimoire updates run within the owner scope.
       const c = p.input, len = Math.max(1,Math.hypot(c.x,c.z));
-      p.player.frozen = p.stats.dead;
+      const cc = duel ? this.bodies[this.players.indexOf(p)].cc : undefined, stunned = !!cc && cc.stun > 0;
+      p.player.frozen = p.stats.dead || (!!cc && pace(cc) === 0);
+      if (cc) p.player.speed = p.tuning.speed * (pace(cc) || 1);
+      if (stunned) p.consumed = [...c.casts]; // a stunned hero loses the presses, like a stunned mob its cast
       p.player.update(dt,{down:(code:string)=>code==='Space'&&c.jump,buttons:0,stickX:c.x/len,stickY:c.z/len},0,false);
       p.stats.update(dt);
       p.player.mesh.updateMatrixWorld(true);
@@ -102,7 +133,7 @@ export class Survival {
         let manualNotice = p.kit.system.notices.filter(n=>n.kind==='error'||n.kind==='fail').at(-1)?.text??'';
         p.kit.system.notices.length=0;
         const manualRequested=c.casts.some((n,i)=>n>p.consumed[i]);
-        const candidates = p.kit.system.slots.map((a,i)=>({a,i}));
+        const candidates = stunned ? [] : p.kit.system.slots.map((a,i)=>({a,i}));
         for (const {a,i} of candidates) {
           const manual = c.casts[i] > p.consumed[i]; p.consumed[i] = c.casts[i];
           const auto = c.auto && !manualRequested && i<9 && (a?.id !== 'mend' || p.stats.hp<p.stats.hpMax*.5) && !!p.kit.aimed?.();
@@ -139,14 +170,24 @@ export class Survival {
       m.z=Math.max(-COURT.hz+.7,Math.min(COURT.hz-.7,m.z));
       m.y=this.world.groundAt(m.x,m.z,m.y);
     }
-    if(this.players.every(p=>p.stats.dead)) this.outcome='defeat';
+    if (duel) this.players.forEach((p, i) => { // a shove moved the other hero's body: the hero goes with it
+      const b = this.bodies[i], pos = p.player.pos;
+      if (Math.abs(b.x - pos.x) > 1e-6 || Math.abs(b.z - pos.z) > 1e-6) pos.set(b.x, b.y, b.z);
+    });
+    if (duel) { // 'victory': one hero stands (or has more health at the bell); 'defeat': a draw
+      const down = this.players.filter(p => p.stats.dead).length;
+      if (down === 2) this.outcome = 'defeat';
+      else if (down === 1) this.outcome = 'victory';
+      else if (this.time >= DURATION) { const [a, b] = this.players.map(p => p.stats.hp / p.stats.hpMax); this.outcome = Math.abs(a - b) < 1e-9 ? 'defeat' : 'victory'; }
+    }
+    else if(this.players.every(p=>p.stats.dead)) this.outcome='defeat';
     else if(this.time>=DURATION) this.outcome='victory';
     this.seq++;
   }
   input(slot: number,c: Controls): void { this.players[slot].input=c; }
   snapshot(): Frame {
     return {events:[...this.events],seq:this.seq,countdown:this.countdown,time:this.time,stage:Math.min(5,1+Math.floor(this.time/60)),kills:this.kills,outcome:this.outcome,
-      players:this.players.map(p=>{Object.assign(tune,p.tuning);return {stats:{kills:p.kills,healing:p.healing,survived:p.survived},x:p.player.pos.x,y:p.player.pos.y,z:p.player.pos.z,yaw:p.player.facing,hp:p.stats.hp,max:p.stats.hpMax,mana:p.stats.mana,manaMax:p.stats.manaMax,charge:p.kit.system.charge,cast:p.cast,target:(p.kit.aimed?.() as Friar & {id:number}|undefined)?.id??0,feedback:this.time<p.feedbackUntil?p.feedback:'',casting:p.kit.system.casting?{slot:p.kit.system.slots.indexOf(p.kit.system.casting.ability),t:p.kit.system.casting.t,total:p.kit.system.casting.total}:null,slots:p.kit.system.slots.map(a=>a?{id:a.id,name:a.name,cost:a.mana??0,reason:p.stats.dead?'Eroe caduto':p.kit.system.unavailable(p.kit.system.slots.indexOf(a)),cd:Math.max(p.kit.system.cooldown(a),p.kit.system.gcd(a))}:{id:'',name:'',cd:0,cost:0,reason:'Slot vuoto'})};}),
+      players:this.players.map(p=>{Object.assign(tune,p.tuning);return {stats:{kills:p.kills,healing:p.healing,survived:p.survived,dealt:p.dealt,taken:p.taken},x:p.player.pos.x,y:p.player.pos.y,z:p.player.pos.z,yaw:p.player.facing,hp:p.stats.hp,max:p.stats.hpMax,mana:p.stats.mana,manaMax:p.stats.manaMax,charge:p.kit.system.charge,cast:p.cast,target:(p.kit.aimed?.() as Friar & {id:number}|undefined)?.id??0,feedback:this.time<p.feedbackUntil?p.feedback:'',casting:p.kit.system.casting?{slot:p.kit.system.slots.indexOf(p.kit.system.casting.ability),t:p.kit.system.casting.t,total:p.kit.system.casting.total}:null,slots:p.kit.system.slots.map(a=>a?{id:a.id,name:a.name,cost:a.mana??0,reason:p.stats.dead?'Eroe caduto':p.kit.system.unavailable(p.kit.system.slots.indexOf(a)),cd:Math.max(p.kit.system.cooldown(a),p.kit.system.gcd(a))}:{id:'',name:'',cd:0,cost:0,reason:'Slot vuoto'})};}),
       mobs:this.mobs.map(m=>({id:m.id,x:m.x,y:m.y,z:m.z,yaw:m.yaw,hp:m.hp,max:m.max,state:m.hp<=0?'dead':m.state==='swing'?'swing':'chase',t:m.t}))};
   }
   dispose(): void { for(const p of this.players) {p.player.model.dispose();} }

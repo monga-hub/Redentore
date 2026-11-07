@@ -1,30 +1,32 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-import { combatHero } from './protocol.ts';
+import { combatHero, type Mode } from './protocol.ts';
 import { HEROES, HERO_IDS, type Hero } from '../player/heroes.ts';
 
 export interface LfgEntry { id:string; hero:Hero; level:number; status?:string; snapshotAt?:string }
 export interface LfgInspect {hero:Hero;level:number;picks:string[];learned:string[];main:string;gear:Record<string,string>;snapshotAt:string}
 export interface LfgHandoff {proposal:string;ticket:string}
 export interface LfgProposal {
-  id:string;epoch:string;mode:'survival';capacity:2;source:'auto'|'direct';host:boolean;
+  id:string;epoch:string;mode:Mode;capacity:2;source:'auto'|'direct';host:boolean;
   accepted:boolean;peerAccepted:boolean;prepared:boolean;peer:LfgEntry|null;expiresAt:string;
 }
 export interface LfgState {
   status:'idle'|'searching'|'offered'|'preparing'|'claiming'|'admitted';
-  entry?:string;expiresAt?:string;notice?:string;arenaBusy?:boolean;proposal?:LfgProposal;
+  mode?:Mode;entry?:string;expiresAt?:string;notice?:string;arenaBusy?:boolean;proposal?:LfgProposal;
   entries?:LfgEntry[];inspect?:LfgInspect;handoff?:LfgHandoff;admission?:unknown;waitingForHost?:boolean;
 }
 const uuid=/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 const object=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
 const hero=(v:unknown):v is Hero=>HERO_IDS.includes(v as Hero);
 const entry=(v:unknown):v is LfgEntry=>object(v)&&typeof v.id==='string'&&uuid.test(v.id)&&hero(v.hero)&&Number.isInteger(v.level)&&Number(v.level)>=1&&Number(v.level)<=1001;
+const mode=(v:unknown):v is Mode=>v==='survival'||v==='duel';
 const ids=(v:unknown):v is string[]=>Array.isArray(v)&&v.length<=500&&v.every(x=>typeof x==='string'&&x.length<=80);
 /** Validate the read-only whitelist, never cast a returned save/peer packet into campaign state. */
 export function lfgState(v:unknown):LfgState {
   if(!object(v)||JSON.stringify(v).length>64*1024||!['idle','searching','offered','preparing','claiming','admitted'].includes(String(v.status)))throw Error('Risposta LFG non valida.');
+  if(v.mode!==undefined&&!mode(v.mode))throw Error('Modalità LFG non valida.');
   if(v.entries!==undefined&&(!Array.isArray(v.entries)||v.entries.length>50||!v.entries.every(entry)))throw Error('Lista LFG non valida.');
   if(v.inspect!==undefined){const i=v.inspect;if(!object(i)||!hero(i.hero)||!Number.isInteger(i.level)||Number(i.level)<1||Number(i.level)>1001||!ids(i.picks)||!ids(i.learned)||typeof i.main!=='string'||i.main.length>80||!object(i.gear)||Object.keys(i.gear).length>10||Object.values(i.gear).some(x=>typeof x!=='string'||x.length>160)||typeof i.snapshotAt!=='string')throw Error('Ispezione LFG non valida.');}
-  if(v.proposal!==undefined){const p=v.proposal;if(!object(p)||typeof p.id!=='string'||!uuid.test(p.id)||typeof p.epoch!=='string'||!uuid.test(p.epoch)||p.mode!=='survival'||p.capacity!==2||!['auto','direct'].includes(String(p.source))||['host','accepted','peerAccepted','prepared'].some(k=>typeof p[k]!=='boolean')||typeof p.expiresAt!=='string'||!Number.isFinite(Date.parse(p.expiresAt))||(p.peer!==null&&!entry(p.peer)))throw Error('Proposta LFG non valida.');}
+  if(v.proposal!==undefined){const p=v.proposal;if(!object(p)||typeof p.id!=='string'||!uuid.test(p.id)||typeof p.epoch!=='string'||!uuid.test(p.epoch)||!mode(p.mode)||p.capacity!==2||!['auto','direct'].includes(String(p.source))||['host','accepted','peerAccepted','prepared'].some(k=>typeof p[k]!=='boolean')||typeof p.expiresAt!=='string'||!Number.isFinite(Date.parse(p.expiresAt))||(p.peer!==null&&!entry(p.peer)))throw Error('Proposta LFG non valida.');}
   if(v.handoff!==undefined){const h=v.handoff;if(!object(h)||typeof h.proposal!=='string'||!uuid.test(h.proposal)||(typeof h.ticket!=='string'||!uuid.test(h.ticket)))throw Error('Passaggio LFG non valido.');}
   return v as unknown as LfgState;
 }
@@ -86,14 +88,17 @@ export class LfgClient {
     });
     this.serial=task.catch(()=>{});return task;
   }
-  async join(hero:Hero):Promise<LfgState>{
+  /** 'duel' queues for the 1v1 arena; a server without the mode migration answers without it and the queue is left. */
+  async join(hero:Hero,mode:Mode='survival'):Promise<LfgState>{
     const generation=this.generation;
     const {data}=await this.client.auth.getSession();
     if(generation!==this.generation)throw Error('Ricerca LFG annullata.');
     if(!data.session)throw Error('Accedi al tuo account Mongames.');
     if(this.user&&this.user!==data.session.user.id)throw Error('Account cambiato: cerca di nuovo.');
     this.user=data.session.user.id;
-    const next=await this.run('join',{hero});this.active=true;this.schedule();
+    const next=await this.run('join',mode==='duel'?{hero,payload:{mode}}:{hero});
+    if(mode==='duel'&&next.mode!=='duel'){await this.run('leave').catch(()=>{});this.state={status:'idle'};this.emit(this.state);throw Error('Arena 1 contro 1 non ancora attiva sul server. La cooperativa resta disponibile.');}
+    this.active=true;this.schedule();
     if(!this.unsubscribe){const {data:{subscription}}=this.client.auth.onAuthStateChange((_event,session)=>{
       if(!session||session.user.id!==this.user){
         const stopped=this.stop(),generation=this.generation;

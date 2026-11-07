@@ -6,8 +6,14 @@ import { SLOT } from '../loot/gear.ts';
 import { buildOf } from '../loot/builds.ts';
 import { itemTip } from '../ui/tooltip.ts';
 import { lfgCharacter, type LfgClient, type LfgEntry, type LfgInspect, type LfgState } from './lfg.ts';
+import type { Mode } from './protocol.ts';
 
 const esc=(s:string)=>s.replace(/[&<>"']/g,c=>`&#${c.charCodeAt(0)};`);
+/** The same queue panel serves both Maestro dell'Arena entries; only the words change with the mode. */
+const COPY={
+  survival:{title:'Avventura cooperativa',search:'Cerca gruppo',badge:'Gruppo · in ricerca',disclosure:'Cercando condividi nome del personaggio, classe, livello, equipaggiamento, abilità e scelte della build. Puoi chiudere e continuare a giocare. Nessuna ricompensa persistente.',idle:'Serve la vittoria sulla Governatrice, salvata nel cloud. Nessun livello minimo.',active:'Sei disponibile. Chiudi la finestra per continuare a giocare.',empty:'Premi Cerca gruppo per renderti disponibile.'},
+  duel:{title:'Arena · 1 contro 1',search:'Mettiti in coda',badge:'Arena · in coda',disclosure:'In coda condividi nome del personaggio, classe, livello, equipaggiamento, abilità e scelte della build. Duello uno contro uno: 15 secondi di preparazione, poi vince chi resta in piedi. Nessuna ricompensa persistente.',idle:'Serve la vittoria sulla Governatrice, salvata nel cloud. Quando un altro risorto si mette in coda, entrambi dovete accettare.',active:'Sei in coda per l’arena. Chiudi la finestra per continuare a giocare.',empty:'Premi Mettiti in coda per sfidare un altro risorto.'},
+} as const;
 const availability=(status?:string)=>({searching:'Disponibile',offered:'Proposta in corso',preparing:'Partita confermata',claiming:'Ingresso in arena'}[status??'']??'Disponibile');
 /** Existing effective cards, not a new talent/rank system. No writes to Equipment, Levels or the save. */
 export function lfgBuild(p:LfgInspect){
@@ -65,6 +71,7 @@ type Service=Pick<LfgClient,'join'|'list'|'inspect'|'invite'|'respond'|'leave'>;
 export class LfgUi {
   opened=false;
   private state:LfgState={status:'idle'};
+  private mode:Mode='survival';
   private client:Service;private hero:()=>Hero;private beforeSearch?:()=>Promise<void>;
   private el:HTMLElement;private banner:HTMLElement;private badge:HTMLButtonElement;private style:HTMLStyleElement;
   private players:HTMLElement;private inspect:HTMLElement;private inline:HTMLElement;private note:HTMLElement;
@@ -92,10 +99,10 @@ export class LfgUi {
     const action=button.dataset.action;if(action==='close'){this.close();return;}if(action==='open'){this.open();return;}
     if(button.dataset.entry){void this.select(button.dataset.entry);return;}
     if(this.busy)return;
-    if(action==='search')void this.perform(async()=>{await this.beforeSearch?.();return this.client.join(this.hero());});
+    if(action==='search'){const mode=this.mode;void this.perform(async()=>{await this.beforeSearch?.();return this.client.join(this.hero(),mode);});}
     else if(action==='leave')void this.perform(async()=>{await this.client.leave();return {status:'idle'};});
     else if(action==='invite'&&this.selected)void this.perform(()=>this.client.invite(this.selected!));
-    else if((action==='accept'||action==='reject')&&this.state.proposal&&button.dataset.proposal===this.state.proposal.id){const id=this.state.proposal.id;void this.perform(()=>this.client.respond(id,action==='accept'));}
+    else if((action==='accept'||action==='reject')&&this.state.proposal&&button.dataset.proposal===this.state.proposal.id){const id=this.state.proposal.id,duel=this.state.proposal.mode==='duel';void this.perform(async()=>{const next=await this.client.respond(id,action==='accept');if(duel&&action==='reject'){await this.client.leave();return {status:'idle',notice:'Hai rifiutato l’arena e lasciato la coda.'} as LfgState;}return next;});}
   };
   private key=(event:KeyboardEvent)=>{
     if(!this.opened&&!this.banner.contains(document.activeElement))return;
@@ -103,8 +110,11 @@ export class LfgUi {
     if(event.code==='Escape'&&this.opened){event.preventDefault();this.close();}
     if(event.code==='Tab'&&this.opened){const items=[...this.el.querySelectorAll<HTMLElement>('button:not(:disabled):not([hidden]),summary')],first=items[0],last=items.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
   };
-  open():void {
-    if(this.disposed||this.opened)return;
+  /** `mode` picks the queue while idle; an active queue or proposal keeps its own. */
+  open(mode?:Mode):void {
+    if(mode&&this.state.status==='idle'){this.mode=mode;this.message='';}
+    else if(mode&&mode!==this.mode){this.message=`Sei già in coda per ${this.mode==='duel'?'l’arena':'la cooperativa'}: esci dalla coda per cambiare.`;}
+    if(this.disposed||this.opened){this.render();return;}
     this.previous=document.activeElement instanceof HTMLElement?document.activeElement:undefined;this.opened=true;this.el.hidden=false;
     if(document.pointerLockElement)void document.exitPointerLock();this.render();this.el.querySelector<HTMLButtonElement>('[data-action=close]')!.focus();
     void this.refresh();this.refreshTimer=setInterval(()=>void this.refresh(),5000);
@@ -112,6 +122,7 @@ export class LfgUi {
   close():void{if(this.state.status==='preparing'||this.state.status==='claiming')return;this.opened=false;this.el.hidden=true;clearInterval(this.refreshTimer);this.render();if(this.previous?.isConnected)this.previous.focus();}
   update(state:LfgState):void {
     if(this.disposed)return;this.state=state;this.message=state.notice??'';
+    const mode=state.proposal?.mode??state.mode;if(mode&&state.status!=='idle')this.mode=mode;
     if(state.entries)this.entries=state.entries.filter(p=>p.id!==state.entry);
     if(state.status==='idle'){this.entries=[];this.selected=undefined;this.inspection=undefined;}
     if(this.selected&&!this.entries.some(e=>e.id===this.selected)){this.selected=undefined;this.inspection=undefined;}
@@ -133,20 +144,21 @@ export class LfgUi {
   private render():void {
     if(this.disposed)return;
     this.el.querySelector<HTMLButtonElement>('[data-action=close]')!.disabled=this.state.status==='preparing'||this.state.status==='claiming';
+    const copy=COPY[this.mode];this.el.querySelector('h2')!.textContent=copy.title;this.el.querySelector('.disclosure')!.textContent=copy.disclosure;this.el.querySelector('[data-action=search]')!.textContent=copy.search;this.badge.textContent=copy.badge;
     const active=this.state.status!=='idle',p=this.state.proposal,pending=!!p&&['offered','preparing','claiming'].includes(this.state.status);
     this.el.querySelector<HTMLButtonElement>('[data-action=search]')!.hidden=active;this.el.querySelector<HTMLElement>('.disclosure')!.hidden=active;
     const leave=this.el.querySelector<HTMLButtonElement>('[data-action=leave]')!;leave.hidden=!active;
-    this.note.textContent=this.message||(active?(this.state.arenaBusy?'Arena occupata. Rimani in ricerca e continua la campagna.':'Sei disponibile. Chiudi la finestra per continuare a giocare.'):'Serve la vittoria sulla Governatrice, salvata nel cloud. Nessun livello minimo.');
+    this.note.textContent=this.message||(active?(this.state.arenaBusy?'Arena occupata. Rimani in ricerca e continua la campagna.':copy.active):copy.idle);
     this.badge.hidden=!active||this.opened||pending;this.banner.hidden=!pending||this.opened;this.inline.hidden=!pending;
-    const key=JSON.stringify([this.state.status,p?.id,p?.accepted,p?.peerAccepted,p?.peer?.hero,p?.peer?.level]);
+    const key=JSON.stringify([this.state.status,p?.mode,p?.id,p?.accepted,p?.peerAccepted,p?.peer?.hero,p?.peer?.level]);
     if(key!==this.offerKey){
       this.offerKey=key;
-      const html=pending&&p?`<b>${this.state.status==='offered'?'PARTITA TROVATA':'Partita confermata'}</b><p><button class="peer" data-action="open">${p.peer?esc(lfgCharacter(p.peer).name)+' · livello '+p.peer.level:'Compagno in connessione'} · Esamina</button> · <span data-countdown aria-live="off"></span></p><p class="small">${p.accepted&&!p.peerAccepted?'Hai accettato. Attendi il compagno.':this.state.status==='preparing'?'Conservazione della campagna…':this.state.status==='claiming'?'Ingresso in arena…':'Entrambi devono accettare.'}</p><div class="actions">${this.state.status==='offered'?`<button data-action="accept" data-proposal="${esc(p.id)}"${p.accepted?' disabled':''}>${p.accepted?'ACCETTATO':'ACCETTA'}</button><button class="quiet" data-action="reject" data-proposal="${esc(p.id)}">RIFIUTA</button>`:''}</div>`:'';
+      const html=pending&&p&&p.mode==='duel'?`<b>ARENA · 1 CONTRO 1</b><p>Sta per partire l’arena, vuoi partecipare?</p><p><button class="peer" data-action="open">${p.peer?'Avversario: '+esc(lfgCharacter(p.peer).name)+' · livello '+p.peer.level:'Avversario in connessione'} · Esamina</button> · <span data-countdown aria-live="off"></span></p><p class="small">${p.accepted&&!p.peerAccepted?'Hai accettato. Attendi l’avversario.':this.state.status==='preparing'?'Conservazione della campagna…':this.state.status==='claiming'?'Ingresso in arena…':'Entrambi dovete rispondere Sì.'}</p><div class="actions">${this.state.status==='offered'?`<button data-action="accept" data-proposal="${esc(p.id)}"${p.accepted?' disabled':''}>${p.accepted?'ACCETTATO':'Sì'}</button><button class="quiet" data-action="reject" data-proposal="${esc(p.id)}">No</button>`:''}</div>`:pending&&p?`<b>${this.state.status==='offered'?'PARTITA TROVATA':'Partita confermata'}</b><p><button class="peer" data-action="open">${p.peer?esc(lfgCharacter(p.peer).name)+' · livello '+p.peer.level:'Compagno in connessione'} · Esamina</button> · <span data-countdown aria-live="off"></span></p><p class="small">${p.accepted&&!p.peerAccepted?'Hai accettato. Attendi il compagno.':this.state.status==='preparing'?'Conservazione della campagna…':this.state.status==='claiming'?'Ingresso in arena…':'Entrambi devono accettare.'}</p><div class="actions">${this.state.status==='offered'?`<button data-action="accept" data-proposal="${esc(p.id)}"${p.accepted?' disabled':''}>${p.accepted?'ACCETTATO':'ACCETTA'}</button><button class="quiet" data-action="reject" data-proposal="${esc(p.id)}">RIFIUTA</button>`:''}</div>`:'';
       this.banner.innerHTML=html;this.inline.innerHTML=html;
     }
-    const listKey=JSON.stringify([this.entries,this.selected]);if(listKey!==this.listKey){
+    const listKey=JSON.stringify([this.entries,this.selected,this.mode,active]);if(listKey!==this.listKey){
       this.listKey=listKey;this.players.replaceChildren(...this.entries.map(p=>{const button=document.createElement('button'),img=document.createElement('img'),text=document.createElement('span'),name=document.createElement('b'),detail=document.createElement('small'),who=lfgCharacter(p);button.dataset.entry=p.id;button.setAttribute('aria-pressed',String(this.selected===p.id));img.src=import.meta.env.BASE_URL+'models/'+HEROES[p.hero].portrait;img.alt='';name.textContent=who.name;detail.textContent=`${who.className} · liv. ${who.level} · ${availability(p.status)}`;text.append(name,detail);button.append(img,text);return button;}));
-      if(!this.entries.length)this.players.textContent=active?'Nessun altro personaggio disponibile.':'Premi Cerca gruppo per renderti disponibile.';
+      if(!this.entries.length)this.players.textContent=active?'Nessun altro personaggio disponibile.':copy.empty;
     }
     const inspectKey=JSON.stringify([this.inspection,this.selected,!!this.state.proposal,this.entries.find(e=>e.id===this.selected)?.status]);
     if(inspectKey!==this.inspectKey){

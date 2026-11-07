@@ -11,7 +11,7 @@ import { AbilitySystem, type Ability } from '../abilities/system.ts';
 import { ABILITIES, type Forsaken, tune } from '../abilities/forsaken.ts';
 import { HEROES } from '../player/heroes.ts';
 import { levelOf } from '../player/levels.ts';
-import { arenaLayout, type CombatHero, type PlayerFrame, type Frame } from './protocol.ts';
+import { arenaLayout, type CombatHero, type PlayerFrame, type Frame, type Mode } from './protocol.ts';
 import type { ArenaView } from './view.ts';
 
 /** The original action bar reads its usual public ability interface; only casts cross the wire. */
@@ -59,8 +59,9 @@ export class ArenaHud {
   private message='';
   private view:ArenaView;
   private slot:number;
-  constructor(view:ArenaView,heroes:CombatHero[],slot:number,leave:()=>void) {
-    this.view=view;this.slot=slot;
+  private mode:Mode;
+  constructor(view:ArenaView,heroes:CombatHero[],slot:number,leave:()=>void,mode:Mode='survival') {
+    this.view=view;this.slot=slot;this.mode=mode;
     const h=heroes[slot],other=heroes[1-slot],data=HEROES[h.hero];
     this.hud=new Hud(data.portrait,data.name);
     const lv=levelOf(h.xp);this.hud.setLevel(lv.lv,lv.into,lv.next);
@@ -70,11 +71,12 @@ export class ArenaHud {
     this.bar=new ActionBar(this.abilities,false); // lobby owns the loadout; never persist an arena drag to the campaign
     this.partner.id='coop-partner';
     this.partner.innerHTML='<div class="name"></div><div class="res hp"></div><div class="res mp"></div>';
-    this.partner.querySelector('.name')!.textContent='Compagno · '+HEROES[other.hero].name;
+    this.partner.querySelector('.name')!.textContent=(mode==='duel'?'Avversario · ':'Compagno · ')+HEROES[other.hero].name;
+    if(mode==='duel')this.partner.classList.add('foe');
     this.hp=new Bar(this.partner.querySelector('.hp')!);this.mp=new Bar(this.partner.querySelector('.mp')!);
     document.body.append(this.partner);
     this.countdown.id='coop-countdown';this.countdown.hidden=true;
-    this.countdown.innerHTML='<span>L’assedio comincia tra</span><strong></strong>';
+    this.countdown.innerHTML=`<span>${mode==='duel'?'L’arena comincia tra':'L’assedio comincia tra'}</span><strong></strong>`;
     document.body.append(this.countdown);
     const discovery=new Discovery(view.environment.areas);discovery.reveal(0,0,60);
     this.fog=new FogLayer(discovery);this.fog.update(0);
@@ -92,6 +94,9 @@ export class ArenaHud {
   close():void {this.menu.close();this.countdown.remove();}
   update(f:Frame):void {
     this.countdown.hidden=f.countdown<=0;
+    // Duel: 15 s to get ready, small at the top so the two heroes can size each other up; the last five big.
+    const prep=this.mode==='duel'&&f.countdown>5;this.countdown.classList.toggle('prep',prep);
+    this.countdown.querySelector('span')!.textContent=this.mode==='duel'?(prep?'Preparati · immobile, niente uscite · l’arena comincia tra':'L’arena comincia tra'):'L’assedio comincia tra';
     const numeral=String(Math.ceil(f.countdown)),number=this.countdown.querySelector('strong')!;
     if(number.textContent!==numeral){number.textContent=numeral;number.getAnimations().forEach(a=>a.cancel());number.animate([{transform:'scale(1.18)',opacity:.65},{transform:'scale(1)',opacity:1}],{duration:240,easing:'ease-out'});}
     const p=f.players[this.slot],other=f.players[1-this.slot],s=this.view.own.stats;
@@ -99,6 +104,6 @@ export class ArenaHud {
     this.hud.setStats(s);this.hp.set(other.hp,other.max);this.mp.set(other.mana,other.manaMax);
     this.abilities.sync(p);this.bar.render(.1,()=>false);
     const left=Math.max(0,Math.ceil(300-f.time)),clock=`${String(Math.floor(left/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}`;
-    this.minimap.update(.1,p,p.yaw,document.body.classList.contains('diablo')?this.view.dcam.yaw:this.view.cam.yaw,`${clock} · Ondata ${f.stage}/5 · Vivi ${f.mobs.filter(m=>m.hp>0).length}`,f.mobs);
+    this.minimap.update(.1,p,p.yaw,document.body.classList.contains('diablo')?this.view.dcam.yaw:this.view.cam.yaw,this.mode==='duel'?`${clock} · Arena 1 contro 1`:`${clock} · Ondata ${f.stage}/5 · Vivi ${f.mobs.filter(m=>m.hp>0).length}`,f.mobs);
   }
 }

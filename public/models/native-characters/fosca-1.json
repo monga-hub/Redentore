@@ -1,0 +1,327 @@
+{
+  "nativeRigSha256": "868c14fd856abf602816d9d52b46b98be97ab53f45e7e89be0f1f759543a234e",
+  "nativeBones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 29072,
+  "mapping": {
+    "Idle_Breathe": "Short_Breathe_and_Look_Around",
+    "Idle_Combat": "Combat_Stance",
+    "Idle": "Idle",
+    "Walking": "Armature|walking_man|baselayer",
+    "Run_Charge": "Armature|running|baselayer",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Right_Hand_Sword_Slash",
+    "Smash": "Right_Hand_Sword_Slash",
+    "Judgment": "Right_Hand_Sword_Slash",
+    "Execute": "Right_Hand_Sword_Slash",
+    "Cast_Throw": "mage_soell_cast",
+    "Cast_Push": "mage_soell_cast",
+    "Cast_Spread": "Charged_Spell_Cast",
+    "Cast_Raise": "Charged_Spell_Cast",
+    "Cast_Channel": "Charged_Spell_Cast",
+    "Cast_Gather": "Charged_Spell_Cast",
+    "Ground_Slam": "Charged_Spell_Cast",
+    "Scream": "Charged_Spell_Cast",
+    "Roll": "Roll_Dodge",
+    "Hit_Light": "Hit_Reaction",
+    "Hit_Heavy": "Hit_Reaction",
+    "Death": "Dead",
+    "Victory": "Charged_Spell_Cast",
+    "Spin": "Right_Hand_Sword_Slash",
+    "Leap": "Jump_Run",
+    "Rush": "Armature|running|baselayer"
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 7.833333333333333,
+    "Idle_Combat": 1.6666666666666667,
+    "Idle": 4,
+    "Walking": 1.066666603088379,
+    "Run_Charge": 0.6666666865348816,
+    "Jump_Run": 2.033333333333333,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 2.6666666666666665,
+    "Cast_Gather": 2.6666666666666665,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 2.966666666666667,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.55,
+    "Rush": 0.6666666865348816
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "nativeStrikeLandmark": 0.52,
+  "nativeCastReleaseLandmark": 0.5,
+  "grounding": "Native Hips Y corrected from sampled shoe soles for idle/combat/walk; running only below-floor correction preserves flight; same native bones and binds",
+  "nativeSources": {
+    "Short_Breathe_and_Look_Around": 7.833333333333333,
+    "Combat_Stance": 1.6666666666666667,
+    "Right_Hand_Sword_Slash": 1.5,
+    "Charged_Spell_Cast": 2.6666666666666665,
+    "mage_soell_cast": 2.2666666666666666,
+    "Dead": 2.966666666666667,
+    "Jump_Run": 2.033333333333333,
+    "Roll_Dodge": 1.8333333333333333,
+    "Hit_Reaction": 1.6333333333333333,
+    "Idle": 4,
+    "Armature|walking_man|baselayer": 1.066666603088379,
+    "Armature|running|baselayer": 0.6666666865348816
+  },
+  "geometry": "Uncut native rig; original generated body and hands; no legacy geometry or inverse binds copied",
+  "motion": "Native service clips; semantic aliases share clips; retimed to game action durations; hip XZ pinned to native rest for controller authority",
+  "file": "fosca-1.glb",
+  "bytes": 2657748,
+  "sha256": "d839bea73c2ab4d1b3c1bedf2cad8e546170ba050abb3b5d5a1166d4b7b47111",
+  "hero": "fosca",
+  "chapter": 1,
+  "referenceJob": "01a1b6b6-0094-7688-892c-2eed3f2f2084",
+  "sourceJob": "01a1b6b6-cce9-75d6-89c6-e9b5ce06cd98",
+  "sourceSha256": "2a38c7916bb8f65d8a914d96516b26ea0b74c8b02da2981612bb9737b84c0e91",
+  "rigJob": "01a1b6b9-b83d-721f-bedb-4753071e2d3d",
+  "animationJob": "01a1b6bb-cfdd-75b2-b338-288fea83215c",
+  "geometryGeneration": "Entirely original text-only reference (zero image inputs) generated in this task; newly generated complete image-to-3D geometry (pose_mode a-pose), native skin/weights/inverse binds, rig and animations. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "c30a1623f3c38a58b003819df516b574e21d26d82ba54d0c82fc4bd97d04b2d4",
+  "referenceMode": "Meshy text-to-image gpt-image-2 (task 01a1b6b6-0094-7688-892c-2eed3f2f2084, 9 credits), text prompt only, ZERO image inputs; Codex built-in ImageGen unavailable (usage limit until 2026-11-10)",
+  "referencePrompt": "Use case: stylized-concept. Entirely ORIGINAL new full-character 2D reference for image-to-3D, created from TEXT ONLY with ZERO input images. Suor Fosca chapter 1, the Lazaretto Warden: young adult Venetian plague-healer nun in an original high-fantasy world, natural athletic feminine adult proportions, seven-and-a-half heads tall, normal-sized complete hands. Close-fitting charcoal-blue hood over an ivory wimple; compact ivory plague mask with a short gently curved beak and round jade-green glass lenses. Starting-chapter field armor that is still heroic: fitted dark teal quilted gambeson jacket that ENDS AT THE HIPS, a hardened dark leather corset-cuirass with restrained bronze rivets, one narrow ivory scapular panel down the CENTER FRONT only, ending above the knees, with a small embroidered green herb cross. Important integrated shoulders: substantial rounded layered pauldrons of boiled dark leather with bronze rims and one small inset jade stud each, cupping the deltoids, firmly attached, extending the shoulder silhouette clearly. Tight fitted teal sleeves, fitted leather bracers, close dark leather gloves. Separate fitted charcoal trouser legs, practical knee-high brown leather boots with bronze toe caps, both soles flat and complete on the same floor. Flush belt with one small attached pouch. Crucial silhouette for 3D segmentation: NO coat skirt, NO side tabard, NO cloth near the hips beside the hands. Rig-friendly relaxed A-stance: feet hip-width parallel, both arms relaxed about 35 degrees diagonally outward, elbows soft, palms facing inward toward the thighs, fingers gently curled. Very clear CONTINUOUS light-gray background visible under each armpit and all the way between each arm, forearm, wrist and hand and the torso/hip; hands a full hand-width outside the hip silhouette; no web or fabric bridging arm to body. Single centered front view, whole character from hood to soles uncropped with generous margin. Soft even studio lighting, plain light-gray background, detailed painterly game production character art, clear material separation between matte cloth, leather, bronze and glass. No weapon, cape, long coat, floor robe, hanging sleeves, dangling flasks, beads, chains, floating ornaments, wings, spikes, limb intersections, pedestal, text or watermark. Original design, no copied franchise. Dignified, believable, a clear precursor to an ornate plague-saint armor.",
+  "sourceReference": "references/fosca-1.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "generationPose": "Official pose_mode a-pose",
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 11790380,
+      "sha256": "2a38c7916bb8f65d8a914d96516b26ea0b74c8b02da2981612bb9737b84c0e91"
+    },
+    "rig.glb": {
+      "bytes": 12886688,
+      "sha256": "868c14fd856abf602816d9d52b46b98be97ab53f45e7e89be0f1f759543a234e"
+    },
+    "native-actions.glb": {
+      "bytes": 14504396,
+      "sha256": "d4552823ee9fa311ea603039eb84e3e7ef66463f9fab7c9d31141bc281d522b9"
+    },
+    "walking_glb_url.glb": {
+      "bytes": 12866964,
+      "sha256": "8638422205359c5cc3f252294b2b1bcbcc0e1bac2d69ca43cb4fac14a594e5f8"
+    },
+    "running_glb_url.glb": {
+      "bytes": 12856344,
+      "sha256": "3b7c65444e55e54be98fb04c422abb5422628383818623c63687a16c05b50652"
+    }
+  },
+  "heightMetres": 1.85,
+  "bounds": {
+    "min": [
+      -0.644197618523184,
+      1.3653437078581808e-7,
+      -0.19011115328677136
+    ],
+    "max": [
+      0.644197658528489,
+      1.849999888224987,
+      0.1901111528477731
+    ]
+  },
+  "paceMetresPerSecond": {
+    "walk": 1.43,
+    "run": 4.55
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "fosca",
+    "chapter": 1,
+    "coordinates": "Native metre inverse-bind frame including transformed Armature parent; own native hand samples for weapon socket",
+    "palette": [
+      "charcoal-blue hood",
+      "ivory beak mask",
+      "jade glass",
+      "dark teal quilt",
+      "dark leather",
+      "bronze"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": "parameter-only PBR multipliers on own maps (green/blue/epic), no recolor"
+  },
+  "rigGate": {
+    "status": "PASS",
+    "wristLegMixedVertices": 0,
+    "worst": {
+      "file": "running_glb_url.glb",
+      "label": "Armature|running|baselayer@0.15",
+      "maxEdgeMetres": 0.2076,
+      "longEdges": 0,
+      "worst": {
+        "a": 18203,
+        "b": 18110,
+        "rest": 0.11133005248692628
+      }
+    },
+    "armRaise": [
+      {
+        "file": "rig.glb",
+        "label": "arm-x-raise",
+        "maxEdgeMetres": 0.1722,
+        "longEdges": 0,
+        "worst": {
+          "a": 21540,
+          "b": 21381,
+          "rest": 0.17220614540793666
+        }
+      },
+      {
+        "file": "rig.glb",
+        "label": "arm-z-raise",
+        "maxEdgeMetres": 0.1722,
+        "longEdges": 0,
+        "worst": {
+          "a": 21540,
+          "b": 21381,
+          "rest": 0.17220614540793666
+        }
+      }
+    ],
+    "comparison": "accepted Bortolo1 0.314 m/2 long edges; rejected Fosca2 0.604/134, Bortolo2 0.689/214",
+    "visual": "preview-running_glb_url-front/side.png: natural run, no wrist-torso or sleeve webs"
+  },
+  "rawActionStretch": {
+    "longEdgesOver30cm": 0,
+    "worstMetres": 0.2925
+  },
+  "credits": {
+    "reference": 9,
+    "generation": 30,
+    "rig": 5,
+    "animations": 30
+  },
+  "candidateCredits": 74,
+  "taskCapCredits": 455,
+  "runtime": "Complete NEW character with its own native skeleton/mixer. Twelve native clip exports feed 27 semantic aliases. Selector holds its own idle frame. Three parameter-only PBR finishes preserve class colors. Existing inventory weapon prop uses the measured native hand socket.",
+  "limits": [
+    "No articulated finger bones",
+    "Skinned cloth/rigid pauldrons may intersect in extreme motion",
+    "Phone emulation only, no physical phone",
+    "No live two-client coop test"
+  ]
+}

@@ -10,6 +10,8 @@ export const NATIVE_FOSCA = 'native-characters/fosca-3.glb';
 type NativeCharacter = { file: string; walk: number; run: number; finishes?: Record<Finish, readonly [number, number, number]> };
 // Register a chapter only after its complete native asset has passed the visual and gameplay gates.
 export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCharacter>> = {
+  'fosca-1': { file: 'native-characters/fosca-1.glb', walk: 1.43, run: 4.55,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'fosca-3': { file: NATIVE_FOSCA, walk: 1.44, run: 4.54 },
   'tizian-1': { file: 'native-characters/tizian-1.glb', walk: 1.25, run: 3.92,
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },

@@ -12,6 +12,8 @@ type NativeCharacter = { file: string; walk: number; run: number; finishes?: Rec
 export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCharacter>> = {
   'fosca-1': { file: 'native-characters/fosca-1.glb', walk: 1.43, run: 4.55,
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
+  'fosca-2': { file: 'native-characters/fosca-2.glb', walk: 1.32, run: 3.9,
+    finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'fosca-3': { file: NATIVE_FOSCA, walk: 1.44, run: 4.54 },
   'tizian-1': { file: 'native-characters/tizian-1.glb', walk: 1.25, run: 3.92,
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },

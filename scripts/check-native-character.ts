@@ -11,7 +11,7 @@ assert.equal(nativeAppearance('fosca', worn('noncomune')), 'green');
 assert.equal(nativeAppearance('fosca', worn('comune')), 'starter');
 for (const r of ['leggendario']) assert.equal(nativeAppearance('fosca', worn(r)), undefined);
 assert.equal(nativeAppearance('bortolo', worn('epico')), 'starter');
-assert.equal(nativeAppearance('fosca', { abito: 'abito-fosca-untora-2-epico' }), undefined);
+assert.equal(nativeAppearance('fosca', { abito: 'abito-fosca-untora-2-epico' }), 'epic');
 const names = ['Idle_Breathe','Idle_Combat','Idle','Walking','Run_Charge','Jump_Run','Right_Hand_Sword_Slash','Slash_Back','Smash','Judgment','Cast_Throw','Cast_Spread','Ground_Slam','Scream','Roll','Cast_Push','Cast_Raise','Execute','Leap','Victory','Hit_Light','Hit_Heavy','Cast_Channel','Cast_Gather','Spin','Rush','Death'];
 function fixture() {
   const scene = new THREE.Group(), hips = new THREE.Bone(); hips.name = 'Hips';
@@ -33,8 +33,8 @@ const native = fixture();jobs[0].resolve(native);await new Promise(r => setTimeo
 assert.equal(model.root.children[0], native.scene);
 model.animate(.1, 0, true);model.animate(.1, 4.2, true, 4.2);assert.ok(model.gait >= 0);
 model.play('slash1', .2);model.animate(.2, 4.2, true, 4.2);model.play('throw', .2);model.channel(true);model.animate(.2, 0, true);model.die();model.animate(.3, 0, true);model.revive();model.animate(.1, 0, true);
-model.wear({ abito: 'abito-fosca-untora-2-epico' });assert.equal(model.root.children[0], native.scene, 'Unfinished chapter waits atomically for the complete replacement');
-model.wear(worn('epico'));assert.equal(jobs.length, 2, 'Returning to the visible native cancels unfinished chapter without downloading it twice');
+model.wear({ abito: 'abito-fosca-untora-2-epico' });assert.equal(model.root.children[0], native.scene, 'Another chapter waits atomically for the complete replacement');
+model.wear(worn('epico'));assert.equal(jobs.length, 2, 'Returning to the visible native cancels the other chapter without downloading it twice');
 const stale = fixture();let freed = 0;(stale.scene.children[0] as THREE.Mesh).geometry.addEventListener('dispose', () => freed++);
 jobs[1].resolve(stale);await new Promise(r => setTimeout(r, 0));assert.equal(freed, 1, 'Stale fallback result released');
 model.wear({ abito: 'abito-fosca-untora-2-epico' });

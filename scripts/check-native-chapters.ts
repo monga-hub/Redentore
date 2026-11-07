@@ -64,7 +64,8 @@ for (const hero of HERO_IDS) for (const chapter of [1, 2, 3] as const) {
       const material = skin.material as THREE.MeshStandardMaterial;
       assert.equal(actor.root.children[0], scene, 'Finishes retain the accepted complete geometry');
       assert.equal(material.metalness, metalness); assert.equal(material.roughness, roughness);
-      assert.deepEqual(material.normalScale.toArray(), [relief, relief]);
+      // GLTFLoader flips normalScale.y on meshes shipped without tangents; the finish only scales its magnitude.
+      assert.deepEqual(material.normalScale.toArray().map(Math.abs), [relief, relief]);
       assert.equal(material.onBeforeCompile, THREE.Material.prototype.onBeforeCompile, 'Source colors and original relief need no engraving or recolor shader');
     }
   }

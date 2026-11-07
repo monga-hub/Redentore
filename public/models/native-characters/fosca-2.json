@@ -1,0 +1,514 @@
+{
+  "nativeRigSha256": "2f1e685c18931c06a8bbfd993355aff2ea7ed97cc3534fc30121210473c5c6cb",
+  "nativeBones": [
+    "Root",
+    "Hips",
+    "Spine",
+    "Spine1",
+    "Spine2",
+    "neck",
+    "Head",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "triangles": 27586,
+  "mapping": {
+    "Idle_Breathe": "standing_relax",
+    "Idle_Combat": "idle",
+    "Idle": "idle",
+    "Walking": "walk",
+    "Run_Charge": "run",
+    "Jump_Run": "jump",
+    "Right_Hand_Sword_Slash": "slash",
+    "Slash_Back": "slash",
+    "Smash": "slash",
+    "Judgment": "slash",
+    "Execute": "slash",
+    "Spin": "slash",
+    "Cast_Throw": "cast_a_spell",
+    "Cast_Push": "cast_a_spell",
+    "Cast_Spread": "cast_a_spell",
+    "Cast_Raise": "cast_a_spell",
+    "Cast_Channel": "cast_a_spell",
+    "Cast_Gather": "cast_a_spell",
+    "Ground_Slam": "cast_a_spell",
+    "Scream": "cast_a_spell",
+    "Victory": "cast_a_spell",
+    "Roll": "flip",
+    "Hit_Light": "fall",
+    "Hit_Heavy": "fall",
+    "Death": "fall",
+    "Leap": "jump",
+    "Rush": "run"
+  },
+  "segments": {
+    "Idle_Breathe": [
+      "standing_relax",
+      0,
+      17.6
+    ],
+    "Idle_Combat": [
+      "idle",
+      0,
+      15.367
+    ],
+    "Idle": [
+      "idle",
+      0,
+      15.367
+    ],
+    "Walking": [
+      "walk",
+      0,
+      2.367
+    ],
+    "Run_Charge": [
+      "run",
+      0,
+      1.267
+    ],
+    "Jump_Run": [
+      "jump",
+      0,
+      0.533
+    ],
+    "Right_Hand_Sword_Slash": [
+      "slash",
+      0.8,
+      2.7,
+      [
+        1.2,
+        2.1,
+        2.4
+      ]
+    ],
+    "Slash_Back": [
+      "slash",
+      0.8,
+      2.7,
+      [
+        1.2,
+        2.1,
+        2.4
+      ]
+    ],
+    "Smash": [
+      "slash",
+      0.8,
+      2.7,
+      [
+        1.2,
+        2.1,
+        2.4
+      ]
+    ],
+    "Judgment": [
+      "slash",
+      0.8,
+      2.7,
+      [
+        1.2,
+        2.1,
+        2.4
+      ]
+    ],
+    "Execute": [
+      "slash",
+      0.8,
+      2.7,
+      [
+        1.2,
+        2.1,
+        2.4
+      ]
+    ],
+    "Spin": [
+      "slash",
+      0.8,
+      2.7
+    ],
+    "Cast_Throw": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Cast_Push": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Cast_Spread": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Cast_Raise": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Cast_Channel": [
+      "cast_a_spell",
+      0,
+      3.6
+    ],
+    "Cast_Gather": [
+      "cast_a_spell",
+      0,
+      3.6
+    ],
+    "Ground_Slam": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Scream": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Victory": [
+      "cast_a_spell",
+      0,
+      3.6,
+      [
+        1.6,
+        2.43,
+        3
+      ]
+    ],
+    "Roll": [
+      "flip",
+      0.3,
+      2,
+      [
+        0.4,
+        1.33,
+        1.9
+      ]
+    ],
+    "Hit_Light": [
+      "fall",
+      0,
+      0.95,
+      [
+        0.05,
+        0.3,
+        0.9
+      ]
+    ],
+    "Hit_Heavy": [
+      "fall",
+      0,
+      0.95,
+      [
+        0.05,
+        0.3,
+        0.9
+      ]
+    ],
+    "Death": [
+      "fall",
+      0,
+      3.033
+    ],
+    "Leap": [
+      "jump",
+      0,
+      0.533,
+      [
+        0.05,
+        0.27,
+        0.5
+      ]
+    ],
+    "Rush": [
+      "run",
+      0,
+      1.267
+    ]
+  },
+  "knots": {
+    "Jump_Run": [
+      [
+        0,
+        0
+      ],
+      [
+        0.1,
+        0.6
+      ],
+      [
+        0.4,
+        0.93
+      ],
+      [
+        0.533,
+        1.15
+      ]
+    ]
+  },
+  "canonicalDurations": {
+    "Idle_Breathe": 17.6,
+    "Idle_Combat": 15.367,
+    "Idle": 15.367,
+    "Walking": 2.367,
+    "Run_Charge": 1.267,
+    "Jump_Run": 1.15,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.37,
+    "Smash": 1.9,
+    "Judgment": 2.05,
+    "Execute": 2.15,
+    "Spin": 1.9000000000000001,
+    "Cast_Throw": 1.7,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.55,
+    "Cast_Raise": 2.8,
+    "Cast_Channel": 3.6,
+    "Cast_Gather": 3.6,
+    "Ground_Slam": 2.8,
+    "Scream": 2.2,
+    "Victory": 1.75,
+    "Roll": 2.05,
+    "Hit_Light": 1.05,
+    "Hit_Heavy": 1.65,
+    "Death": 3.033,
+    "Leap": 2.55,
+    "Rush": 1.267
+  },
+  "moveWindows": {
+    "Right_Hand_Sword_Slash": [
+      0.38,
+      0.52,
+      1
+    ],
+    "Slash_Back": [
+      0.46,
+      0.65,
+      1.12
+    ],
+    "Smash": [
+      0.86,
+      1.07,
+      1.65
+    ],
+    "Judgment": [
+      0.8,
+      1,
+      1.8
+    ],
+    "Execute": [
+      0.6,
+      1.1,
+      1.9
+    ],
+    "Cast_Throw": [
+      0.5,
+      0.8,
+      1.45
+    ],
+    "Cast_Push": [
+      0.75,
+      1.2,
+      2
+    ],
+    "Cast_Spread": [
+      1.1,
+      1.6,
+      2.3
+    ],
+    "Cast_Raise": [
+      1.45,
+      1.9,
+      2.55
+    ],
+    "Ground_Slam": [
+      1.5,
+      1.72,
+      2.55
+    ],
+    "Scream": [
+      0.55,
+      1,
+      1.95
+    ],
+    "Roll": [
+      1.12,
+      1.3,
+      1.8
+    ],
+    "Hit_Light": [
+      0.12,
+      0.3,
+      0.8
+    ],
+    "Hit_Heavy": [
+      0.45,
+      0.8,
+      1.4
+    ],
+    "Leap": [
+      1.45,
+      1.95,
+      2.3
+    ],
+    "Victory": [
+      0.05,
+      0.4,
+      1.5
+    ]
+  },
+  "grounding": "Hips Y corrected from own sampled soles for idle/combat/walk; running only below-floor correction; Hips X/Z pinned to bind (controller authority)",
+  "nativeSources": {
+    "cast_a_spell": 5.400000095367432,
+    "idle": 15.366666793823242,
+    "run": 1.2666666507720947,
+    "slash": 6.599999904632568,
+    "walk": 2.366666555404663,
+    "fall": 3.0333333015441895,
+    "flip": 4.4666666984558105,
+    "hurt": 13.866666793823242,
+    "jump": 2.2333333492279053,
+    "standing_relax": 17.600000381469727
+  },
+  "geometry": "Uncut Tripo H3.1 geometry and Tripo rig v1.0 skin/inverse binds; only node names (mixamorig: prefix, Neck->neck) and Armature facing changed",
+  "motion": "Tripo rig v1.0 biped presets trimmed to measured segments and retimed onto game action landmarks; semantic aliases share clips",
+  "file": "fosca-2.glb",
+  "bytes": 2973164,
+  "sha256": "9dfc75383be7c2ae4f0c4f59f65c90feb70064a18bf50cc49eb13b5ac93573ea",
+  "hero": "fosca",
+  "chapter": 2,
+  "provider": "Tripo (tripo-cli 0.11.2, region ov)",
+  "referenceTask": "b9a1f0bd-d721-421c-8ecb-d371690ebddb",
+  "sourceJob": "986bda0e-b722-4b9a-a2d3-44ddc7db1433",
+  "rigJob": "fd2543d7-eeef-4007-bfb6-4eb9fc7ea375",
+  "animationJobs": [
+    "b5f918bf-31bf-47cf-87a6-00bbea2680b2",
+    "f41ee47d-d1b6-43f6-8676-11999398df5e"
+  ],
+  "geometryGeneration": "Entirely original text-only reference (Tripo chat_image_2, zero image inputs); new Tripo H3.1 image-to-model geometry with PBR maps; Tripo rig v1.0 (Mixamo spec) skin/weights/inverse binds and Tripo biped presets. No historical character body, hands, skin, bind or animation transplant.",
+  "referenceSha256": "f953fad6e596efb3f4214289afe8add9bcfdaf63da5fca2ad33e075114366db2",
+  "referenceMode": "Tripo text-to-image chat_image_2 1024x1536 medium (task b9a1f0bd-d721-421c-8ecb-d371690ebddb, 10 credits), text prompt only, ZERO image inputs",
+  "referencePrompt": "Original full-body character reference for image-to-3D, text only. Suor Fosca chapter 2, Plague Sister Militant: adult Venetian plague-healer battle nun, high fantasy, natural athletic feminine proportions, 7.5 heads tall, normal complete hands. Charcoal-blue hood over ivory wimple; compact ivory plague mask, short curved beak, round jade glass lenses, thin bronze brow band. Fitted dark teal quilted doublet ending AT THE HIPS; sculpted bronze-and-verdigris breastplate with carved medicinal leaf relief and one recessed jade reliquary; one narrow ivory scapular down the CENTER FRONT only, ending above the knees, green herb cross, bronze trim. Large integrated layered bronze-and-verdigris pauldrons shaped like reliquary shells, three overlapping plates, carved leaf veins, small jade cabochons, firmly attached, widening the shoulders by a third. Tight teal sleeves, articulated bronze vambraces, dark leather gloves. Separate charcoal trouser legs, bronze knee cops, knee-high dark leather boots with bronze shin plates, both soles flat on the floor. Flush belt, one small attached pouch. NO coat skirt, NO side tabard, nothing near the hips beside the hands. Relaxed A-stance: feet hip-width, both arms about 35 degrees outward, soft elbows, palms facing the thighs, fingers gently curled; clear light-gray background under each armpit and between every arm, wrist and hand and the body; hands a hand-width outside the hips. Single centered front view, hood to soles uncropped with margin. Even studio light, plain light-gray background, detailed painterly game character art, matte cloth vs leather vs engraved bronze vs glass. No weapon, cape, long coat, dangling items, chains, floating ornaments, spikes, wings, text or watermark. Original design.",
+  "sourceReference": "references/fosca-2.png",
+  "retainedRigUsedAsFinal": false,
+  "legacyAuthoredOriginalRigUsed": false,
+  "legacyCharacterGeometryUsed": false,
+  "contractAdaptation": "Node names only: mixamorig: prefix stripped, Neck->neck (runtime upper-body bone names); Armature turned -90deg about Y so +X forward becomes +Z like the Meshy natives. Skin, weights, binds and samples untouched.",
+  "nativeExportHashes": {
+    "source.glb": {
+      "bytes": 4613500,
+      "sha256": "7011d06556819bd1532ef739af69822a4d412f1cfea63626011fde9edaeb512f"
+    },
+    "tripo-v1-preview.glb": {
+      "bytes": 5915912,
+      "sha256": "2f1e685c18931c06a8bbfd993355aff2ea7ed97cc3534fc30121210473c5c6cb"
+    },
+    "reference.png": {
+      "bytes": 1309911,
+      "sha256": "f953fad6e596efb3f4214289afe8add9bcfdaf63da5fca2ad33e075114366db2"
+    }
+  },
+  "paceMetresPerSecond": {
+    "walk": 1.32,
+    "run": 3.9
+  },
+  "textureMaps": {
+    "desktopMax": 1024,
+    "touchMax": 512,
+    "encoding": "WebP92; meshopt FILTER; normals and textures lossy"
+  },
+  "materialInstructions": {
+    "hero": "fosca",
+    "chapter": 2,
+    "coordinates": "Own inverse-bind frame under the transformed Armature/Root parents; own hand samples for weapon socket",
+    "palette": [
+      "charcoal-blue hood",
+      "ivory beak mask",
+      "jade glass",
+      "dark teal quilt",
+      "bronze and verdigris",
+      "dark leather"
+    ],
+    "rarityIndependentIdentity": true,
+    "finishes": "parameter-only PBR multipliers on own maps (green/blue/epic), no recolor"
+  },
+  "credits": {
+    "tripo": {
+      "reference": 10,
+      "generation": 30,
+      "rig-v1": 25,
+      "v1-anims1": 50,
+      "v1-anims2": 50
+    },
+    "tripoTotalUsed": 165,
+    "tripoSupersededTrials": [
+      {
+        "phase": "rig",
+        "task": "536b47a8-c277-4162-a978-a76a9d5a5d70",
+        "credits": 25
+      },
+      {
+        "phase": "anims1",
+        "task": "bec554da-f386-4259-9abb-c57246867288",
+        "credits": 50
+      }
+    ],
+    "meshySupersededOptionC": {
+      "rig": "01a1b6e7-42bd-7245-8975-017a113128ba",
+      "credits": 5,
+      "note": "Meshy rig on the same geometry; held, not shipped (captain chose all-Tripo)"
+    }
+  },
+  "limits": [
+    "Tripo presets: cast_a_spell is a casual palm push, slash is a two-handed bent-over sweep (captain accepted)",
+    "Hit reactions reuse the opening stagger of the fall clip because the Tripo hurt preset is seated throughout",
+    "Jump_Run is one in-place hop retimed to the runtime takeoff/touchdown",
+    "Finger bones are not animated by the game; no live two-client coop; phone emulation only"
+  ]
+}

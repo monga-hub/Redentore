@@ -12,7 +12,7 @@ type NativeCharacter = { file: string; walk: number; run: number; finishes?: Rec
 export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCharacter>> = {
   'fosca-1': { file: 'native-characters/fosca-1.glb', walk: 1.43, run: 4.55,
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
-  'fosca-2': { file: 'native-characters/fosca-2.glb', walk: 1.32, run: 3.9,
+  'fosca-2': { file: 'native-characters/fosca-2.glb', walk: 1.69, run: 5.63,
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'fosca-3': { file: NATIVE_FOSCA, walk: 1.44, run: 4.54 },
   'tizian-1': { file: 'native-characters/tizian-1.glb', walk: 1.25, run: 3.92,
@@ -35,7 +35,7 @@ export const NATIVE_CHARACTERS: Partial<Record<`${Hero}-${1 | 2 | 3}`, NativeCha
     finishes: { green: [.25, .88, .7], blue: [.5, .62, 1], epic: [.72, .42, 1.2] } },
   'bortolo-1': { file: 'native-characters/bortolo-1.glb', walk: 1.7, run: 5.3,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
-  'bortolo-2': { file: 'native-characters/bortolo-2.glb', walk: 1.46, run: 4.4,
+  'bortolo-2': { file: 'native-characters/bortolo-2.glb', walk: 1.95, run: 6.26,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },
   'bortolo-3': { file: 'native-characters/bortolo-3.glb', walk: 1.7, run: 5.37,
     finishes: { green: [.2, .9, .7], blue: [.48, .64, 1], epic: [.72, .44, 1.2] } },

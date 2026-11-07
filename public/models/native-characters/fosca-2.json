@@ -1,5 +1,5 @@
 {
-  "nativeRigSha256": "2f1e685c18931c06a8bbfd993355aff2ea7ed97cc3534fc30121210473c5c6cb",
+  "nativeRigSha256": "50460d52ad8f176b618347eebb7712fd242a8f02a3e586197a66eb824cae61c7",
   "nativeBones": [
     "Root",
     "Hips",
@@ -27,299 +27,200 @@
   ],
   "triangles": 27586,
   "mapping": {
-    "Idle_Breathe": "standing_relax",
-    "Idle_Combat": "idle",
-    "Idle": "idle",
-    "Walking": "walk",
-    "Run_Charge": "run",
-    "Jump_Run": "jump",
-    "Right_Hand_Sword_Slash": "slash",
-    "Slash_Back": "slash",
-    "Smash": "slash",
-    "Judgment": "slash",
-    "Execute": "slash",
-    "Spin": "slash",
-    "Cast_Throw": "cast_a_spell",
-    "Cast_Push": "cast_a_spell",
-    "Cast_Spread": "cast_a_spell",
-    "Cast_Raise": "cast_a_spell",
-    "Cast_Channel": "cast_a_spell",
-    "Cast_Gather": "cast_a_spell",
-    "Ground_Slam": "cast_a_spell",
-    "Scream": "cast_a_spell",
-    "Victory": "cast_a_spell",
-    "Roll": "flip",
-    "Hit_Light": "fall",
-    "Hit_Heavy": "fall",
-    "Death": "fall",
-    "Leap": "jump",
-    "Rush": "run"
+    "Idle_Breathe": "Idle_Breathe",
+    "Idle_Combat": "Idle_Combat",
+    "Idle": "Idle",
+    "Walking": "Walking",
+    "Run_Charge": "Run_Charge",
+    "Jump_Run": "Jump_Run",
+    "Right_Hand_Sword_Slash": "Right_Hand_Sword_Slash",
+    "Slash_Back": "Slash_Back",
+    "Smash": "Smash",
+    "Judgment": "Judgment",
+    "Execute": "Execute",
+    "Cast_Throw": "Cast_Throw",
+    "Cast_Push": "Cast_Push",
+    "Cast_Spread": "Cast_Spread",
+    "Cast_Raise": "Cast_Raise",
+    "Cast_Channel": "Cast_Channel",
+    "Cast_Gather": "Cast_Gather",
+    "Ground_Slam": "Ground_Slam",
+    "Scream": "Scream",
+    "Roll": "Roll",
+    "Hit_Light": "Hit_Light",
+    "Hit_Heavy": "Hit_Heavy",
+    "Death": "Death",
+    "Victory": "Victory",
+    "Spin": "Spin",
+    "Leap": "Leap",
+    "Rush": "Rush"
   },
   "segments": {
     "Idle_Breathe": [
-      "standing_relax",
+      "Idle_Breathe",
       0,
-      17.6
+      7.83333
     ],
     "Idle_Combat": [
-      "idle",
+      "Idle_Combat",
       0,
-      15.367
+      1.66667
     ],
     "Idle": [
-      "idle",
+      "Idle",
       0,
-      15.367
+      4
     ],
     "Walking": [
-      "walk",
+      "Walking",
       0,
-      2.367
+      1.06667
     ],
     "Run_Charge": [
-      "run",
+      "Run_Charge",
       0,
-      1.267
+      0.66667
     ],
     "Jump_Run": [
-      "jump",
+      "Jump_Run",
       0,
-      0.533
+      2.03333
     ],
     "Right_Hand_Sword_Slash": [
-      "slash",
-      0.8,
-      2.7,
-      [
-        1.2,
-        2.1,
-        2.4
-      ]
+      "Right_Hand_Sword_Slash",
+      0,
+      1.25
     ],
     "Slash_Back": [
-      "slash",
-      0.8,
-      2.7,
-      [
-        1.2,
-        2.1,
-        2.4
-      ]
+      "Slash_Back",
+      0,
+      1.37
     ],
     "Smash": [
-      "slash",
-      0.8,
-      2.7,
-      [
-        1.2,
-        2.1,
-        2.4
-      ]
+      "Smash",
+      0,
+      1.9
     ],
     "Judgment": [
-      "slash",
-      0.8,
-      2.7,
-      [
-        1.2,
-        2.1,
-        2.4
-      ]
+      "Judgment",
+      0,
+      2.05
     ],
     "Execute": [
-      "slash",
-      0.8,
-      2.7,
-      [
-        1.2,
-        2.1,
-        2.4
-      ]
-    ],
-    "Spin": [
-      "slash",
-      0.8,
-      2.7
+      "Execute",
+      0,
+      2.15
     ],
     "Cast_Throw": [
-      "cast_a_spell",
+      "Cast_Throw",
       0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
+      1.7
     ],
     "Cast_Push": [
-      "cast_a_spell",
+      "Cast_Push",
       0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
+      2.25
     ],
     "Cast_Spread": [
-      "cast_a_spell",
+      "Cast_Spread",
       0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
+      2.55
     ],
     "Cast_Raise": [
-      "cast_a_spell",
+      "Cast_Raise",
       0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
+      2.8
     ],
     "Cast_Channel": [
-      "cast_a_spell",
+      "Cast_Channel",
       0,
-      3.6
+      2.66667
     ],
     "Cast_Gather": [
-      "cast_a_spell",
+      "Cast_Gather",
       0,
-      3.6
+      2.66667
     ],
     "Ground_Slam": [
-      "cast_a_spell",
+      "Ground_Slam",
       0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
+      2.8
     ],
     "Scream": [
-      "cast_a_spell",
+      "Scream",
       0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
-    ],
-    "Victory": [
-      "cast_a_spell",
-      0,
-      3.6,
-      [
-        1.6,
-        2.43,
-        3
-      ]
+      2.2
     ],
     "Roll": [
-      "flip",
-      0.3,
-      2,
-      [
-        0.4,
-        1.33,
-        1.9
-      ]
+      "Roll",
+      0,
+      2.05
     ],
     "Hit_Light": [
-      "fall",
+      "Hit_Light",
       0,
-      0.95,
-      [
-        0.05,
-        0.3,
-        0.9
-      ]
+      1.05
     ],
     "Hit_Heavy": [
-      "fall",
+      "Hit_Heavy",
       0,
-      0.95,
-      [
-        0.05,
-        0.3,
-        0.9
-      ]
+      1.65
     ],
     "Death": [
-      "fall",
+      "Death",
       0,
-      3.033
+      2.96667
+    ],
+    "Victory": [
+      "Victory",
+      0,
+      1.75
+    ],
+    "Spin": [
+      "Spin",
+      0,
+      1.5
     ],
     "Leap": [
-      "jump",
+      "Leap",
       0,
-      0.533,
-      [
-        0.05,
-        0.27,
-        0.5
-      ]
+      2.55
     ],
     "Rush": [
-      "run",
+      "Rush",
       0,
-      1.267
+      0.66667
     ]
   },
-  "knots": {
-    "Jump_Run": [
-      [
-        0,
-        0
-      ],
-      [
-        0.1,
-        0.6
-      ],
-      [
-        0.4,
-        0.93
-      ],
-      [
-        0.533,
-        1.15
-      ]
-    ]
-  },
+  "knots": {},
   "canonicalDurations": {
-    "Idle_Breathe": 17.6,
-    "Idle_Combat": 15.367,
-    "Idle": 15.367,
-    "Walking": 2.367,
-    "Run_Charge": 1.267,
-    "Jump_Run": 1.15,
+    "Idle_Breathe": 7.83333,
+    "Idle_Combat": 1.66667,
+    "Idle": 4,
+    "Walking": 1.06667,
+    "Run_Charge": 0.66667,
+    "Jump_Run": 2.03333,
     "Right_Hand_Sword_Slash": 1.25,
     "Slash_Back": 1.37,
     "Smash": 1.9,
     "Judgment": 2.05,
     "Execute": 2.15,
-    "Spin": 1.9000000000000001,
     "Cast_Throw": 1.7,
     "Cast_Push": 2.25,
     "Cast_Spread": 2.55,
     "Cast_Raise": 2.8,
-    "Cast_Channel": 3.6,
-    "Cast_Gather": 3.6,
+    "Cast_Channel": 2.66667,
+    "Cast_Gather": 2.66667,
     "Ground_Slam": 2.8,
     "Scream": 2.2,
-    "Victory": 1.75,
     "Roll": 2.05,
     "Hit_Light": 1.05,
     "Hit_Heavy": 1.65,
-    "Death": 3.033,
+    "Death": 2.96667,
+    "Victory": 1.75,
+    "Spin": 1.5,
     "Leap": 2.55,
-    "Rush": 1.267
+    "Rush": 0.66667
   },
   "moveWindows": {
     "Right_Hand_Sword_Slash": [
@@ -405,22 +306,39 @@
   },
   "grounding": "Hips Y corrected from own sampled soles for idle/combat/walk; running only below-floor correction; Hips X/Z pinned to bind (controller authority)",
   "nativeSources": {
-    "cast_a_spell": 5.400000095367432,
-    "idle": 15.366666793823242,
-    "run": 1.2666666507720947,
-    "slash": 6.599999904632568,
-    "walk": 2.366666555404663,
-    "fall": 3.0333333015441895,
-    "flip": 4.4666666984558105,
-    "hurt": 13.866666793823242,
-    "jump": 2.2333333492279053,
-    "standing_relax": 17.600000381469727
+    "Idle_Breathe": 7.833330154418945,
+    "Idle_Combat": 1.6666699647903442,
+    "Idle": 4,
+    "Walking": 1.0666699409484863,
+    "Run_Charge": 0.666670024394989,
+    "Jump_Run": 2.033329963684082,
+    "Right_Hand_Sword_Slash": 1.25,
+    "Slash_Back": 1.3700000047683716,
+    "Smash": 1.899999976158142,
+    "Judgment": 2.049999952316284,
+    "Execute": 2.1500000953674316,
+    "Cast_Throw": 1.7000000476837158,
+    "Cast_Push": 2.25,
+    "Cast_Spread": 2.549999952316284,
+    "Cast_Raise": 2.799999952316284,
+    "Cast_Channel": 2.666670083999634,
+    "Cast_Gather": 2.666670083999634,
+    "Ground_Slam": 2.799999952316284,
+    "Scream": 2.200000047683716,
+    "Roll": 2.049999952316284,
+    "Hit_Light": 1.0499999523162842,
+    "Hit_Heavy": 1.649999976158142,
+    "Death": 2.966670036315918,
+    "Victory": 1.75,
+    "Spin": 1.5,
+    "Leap": 2.549999952316284,
+    "Rush": 0.666670024394989
   },
   "geometry": "Uncut Tripo H3.1 geometry and Tripo rig v1.0 skin/inverse binds; only node names (mixamorig: prefix, Neck->neck) and Armature facing changed",
-  "motion": "Tripo rig v1.0 biped presets trimmed to measured segments and retimed onto game action landmarks; semantic aliases share clips",
+  "motion": "Meshy native clips of Fosca chapter 1 (the game's own semantic set, already retimed to action windows) retargeted locally onto the Tripo rig v1.0: per-bone rest alignment then world rotation deltas; Hips height delta scaled by hip-height ratio",
   "file": "fosca-2.glb",
-  "bytes": 2973164,
-  "sha256": "9dfc75383be7c2ae4f0c4f59f65c90feb70064a18bf50cc49eb13b5ac93573ea",
+  "bytes": 2843108,
+  "sha256": "42c077d1adda3711a7f9bac9d2d80b779ec1200db6d9f7e3dab4d5a0135cea15",
   "hero": "fosca",
   "chapter": 2,
   "provider": "Tripo (tripo-cli 0.11.2, region ov)",
@@ -455,8 +373,8 @@
     }
   },
   "paceMetresPerSecond": {
-    "walk": 1.32,
-    "run": 3.9
+    "walk": 1.69,
+    "run": 5.63
   },
   "textureMaps": {
     "desktopMax": 1024,
@@ -506,9 +424,20 @@
     }
   },
   "limits": [
-    "Tripo presets: cast_a_spell is a casual palm push, slash is a two-handed bent-over sweep (captain accepted)",
-    "Hit reactions reuse the opening stagger of the fall clip because the Tripo hurt preset is seated throughout",
-    "Jump_Run is one in-place hop retimed to the runtime takeoff/touchdown",
+    "Motions are the Meshy clips of Fosca chapter 1 retargeted onto the Tripo rig (no Tripo preset motion ships); twist about each bone axis follows the Tripo rest",
+    "Tripo rest legs are splayed, so Hips height is re-grounded from own sole samples (idle/walk within about 1 cm; run lifted only)",
     "Finger bones are not animated by the game; no live two-client coop; phone emulation only"
-  ]
+  ],
+  "motionSource": {
+    "provider": "Meshy (existing native clips, no new generation)",
+    "from": "Fosca chapter 1 (Meshy rig 01a1b6b6 chain, shipped fosca-1.glb)",
+    "file": "redentore-native-remaining7/fosca-1/native-merged.glb",
+    "sha256": "0d0b4845b1c309ba2fea24ab23f592252b960a647d52101e1238a7525fc48e3d"
+  },
+  "motionRetarget": "Local, unpaid: per-bone rest direction alignment then Meshy world-rotation deltas onto the Tripo v1.0 skeleton (Spine02/Spine01/Spine -> Spine/Spine1/Spine2); Hips height delta scaled by hip-height ratio; then Hips X/Z pinned and Y grounded from own soles",
+  "tripoPresetMotionsSuperseded": "Tripo v1.0 retargets kept in the ledger and data dir (tripo-motion/), not shipped",
+  "retargetStretch": {
+    "worstEdgeRawUnits": 0.0795,
+    "longEdges": 0
+  }
 }

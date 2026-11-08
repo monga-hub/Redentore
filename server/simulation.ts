@@ -15,9 +15,11 @@ type Body = Friar & { id: number; max: number; kind: { hp: number; radius: numbe
 /** Duel: spells are tuned for mob health, so damage between heroes is scaled down (armor, veil and guard still apply)
  * and healing is damped alike, or a healer outlasts the five minutes (a two-account test: 4047 dealt, 4027 healed at 0.3/1). */
 export const PVP = 0.5, PVP_HEAL = 0.5;
-/** Duel spawns: 14 m apart down z = 3, the one line across the garden clear of the well, the tree and the planters,
- * and far enough from the arcade (x = ±12) that a close camera behind each hero stays inside the court. */
-export const DUEL_SPAWN = [{ x: -7, z: 3, yaw: -Math.PI / 2 }, { x: 7, z: 3, yaw: Math.PI / 2 }];
+/** Duel spawns: 15.7 m apart across the garden, each facing the other, on a line clear of the well, the benches,
+ * the two braziers and both olives' crowns (on z = 3 the west olive hung over one hero and hid him from the other);
+ * the close camera behind each hero stays inside the court, short of the arcade and the corner hedges. */
+const DUEL_ENDS = [{ x: -7, z: -5 }, { x: 7, z: 2 }];
+export const DUEL_SPAWN = DUEL_ENDS.map((p, i) => ({ ...p, yaw: Math.atan2(p.x - DUEL_ENDS[1 - i].x, p.z - DUEL_ENDS[1 - i].z) }));
 
 export function arenaWorld() { return arenaLevel().world; }
 export class Survival {

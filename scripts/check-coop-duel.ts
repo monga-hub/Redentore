@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { arenaLevel } from '../src/coop/environment.ts';
+import { STEPS } from '../src/camera/thirdPersonCamera.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Survival, DUEL_SPAWN, PVP, PVP_HEAL } from '../server/simulation.ts';
 import { PREP, combatHero, idle, frame } from '../src/coop/protocol.ts';
@@ -13,8 +16,15 @@ assert.equal(duel.countdown,PREP);
 const start=duel.snapshot();
 assert(start.players.every((p,i)=>p.x===DUEL_SPAWN[i].x&&p.z===DUEL_SPAWN[i].z),'heroes start at the two ends');
 assert(Math.hypot(start.players[0].x-start.players[1].x,start.players[0].z-start.players[1].z)>=14,'opposite sides of the court');
-for(let t=0;t<=1;t+=.02)assert(!duel.world.blocked(DUEL_SPAWN[0].x+(DUEL_SPAWN[1].x-DUEL_SPAWN[0].x)*t,DUEL_SPAWN[0].z,0,.5),'a clear walk between the two spawns');
+for(let t=0;t<=1;t+=.02)assert(!duel.world.blocked(DUEL_SPAWN[0].x+(DUEL_SPAWN[1].x-DUEL_SPAWN[0].x)*t,DUEL_SPAWN[0].z+(DUEL_SPAWN[1].z-DUEL_SPAWN[0].z)*t,0,.5),'a clear walk between the two spawns');
 assert(duel.world.sees({...DUEL_SPAWN[0],y:0},{...DUEL_SPAWN[1],y:0}),'the duellists see each other from the start');
+// And on screen: from the close duel camera behind each hero (view.ts: STEPS[0], pitch 0.3) no scenery but the grass
+// stands before the other, feet to head. Headless, the olives are their crowns' bounding boxes, so this errs safe.
+{const root=arenaLevel().root,ray=new THREE.Raycaster();root.updateMatrixWorld(true);
+for(const [i,s] of DUEL_SPAWN.entries())for(const y of [.3,1,1.7]){
+  const o=DUEL_SPAWN[1-i],eye=new THREE.Vector3(s.x+Math.sin(s.yaw)*Math.cos(.3)*STEPS[0],1.3+Math.sin(.3)*STEPS[0],s.z+Math.cos(s.yaw)*Math.cos(.3)*STEPS[0]);
+  const d=new THREE.Vector3(o.x,y,o.z).sub(eye);ray.set(eye,d.clone().normalize());ray.far=d.length();
+  assert(!ray.intersectObject(root,true).some(h=>h.object.userData.role!=='grass'),`the garden hides duellist ${1-i} from ${i}'s camera`);}}
 assert(start.players.every(p=>p.hp===p.max&&p.mana===p.manaMax&&p.slots.every(s=>s.cd===0)),'fair start: full health and mana, no cooldowns');
 const seq=[0,0],press=(i:number,slot:number,move={x:0,z:0})=>{const c={...idle(),seq:++seq[i],...move,casts:[...duel.players[i].input.casts]};c.casts[slot]++;duel.input(i,c);};
 for(let n=0;n<Math.round(PREP/.05)-1;n++){

@@ -51,7 +51,8 @@ import { ABILITIES, BAR, MEND, plagueSpot, tune, wispFoe, type Forsaken } from '
 import { Grimoire } from '../src/abilities/grimoire.ts';
 import { frozen } from '../src/enemies/control.ts';
 import { AbilitySystem } from '../src/abilities/system.ts';
-import { TOMES, levelOf, offer, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
+import { TOMES, levelOf, startOf, tomeOf, tuneOf } from '../src/player/levels.ts';
+import { offer } from '../src/player/talents.ts';
 import { Bag, ITEM, roll, type Tier } from '../src/loot/bag.ts';
 import { CARDINALE, GIVERS, MUTE, SIDE, SIDE_BY, STRUMENTI, TELA, giverOf } from '../src/quest/squero.ts';
 import { ESCORT } from '../src/quest/escort.ts';

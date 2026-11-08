@@ -6,7 +6,7 @@ import { ICONS } from './icons.ts';
 // The level-up window, Vampire Survivors style: the world holds still (main.ts) and three big cards
 // wait for a pick, by click/tap or keys 1 / 2 / 3 (←/→ and Enter too). A ranked card's badge names the rank it brings. For LOCK s after it opens a press
 // does nothing, so a player mashing 1 for Caduta d'ossa can't pick blind. A gold flash and "Livello N!"
-// mark the level. Each card names its school (an upgrade its ability's): the offers lean to the hero's. Plain DOM, styled here like the dialogue window, WoW gold or Diablo stone.
+// mark the level. Each card names its talent tree (player/talents.ts: one card a tree, the primary school, the Fusioni, the secondary). Plain DOM, styled here like the dialogue window, WoW gold or Diablo stone.
 
 export const CHOICE_CSS = `
 #levelup { position: fixed; inset: 0; z-index: 19; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
@@ -137,13 +137,13 @@ export class LevelUp {
     playSfx('quest', null, { ui: true });
   }
 
-  /** Offer `cards` for level `lv`; `pick` gets the one chosen and the window closes. */
-  show(lv: number, cards: Card[], count: (id: string) => number, pick: (c: Card) => void): void {
+  /** Offer `cards` for level `lv`; `pick` gets the one chosen and the window closes. `where`: each card's talent tree (else its school). */
+  show(lv: number, cards: Card[], count: (id: string) => number, pick: (c: Card) => void, where?: string[]): void {
     this.cards = cards;
     this.onPick = pick;
     this.title.textContent = `Livello ${lv}`;
     this.cardsEl.innerHTML = cards.map((c, i) => {
-      const school = SCHOOL_NAME.get(c.school ?? SCHOOL[c.of ?? '']);
+      const school = where?.[i] || SCHOOL_NAME.get(c.school ?? SCHOOL[c.of ?? '']);
       return `<button class="card ${c.kind}" data-i="${i}" tabindex="-1"><span class="tag">${c.kind === 'filler' && c.apply ? 'Potenziamento' : TAG[c.kind]}${school ? ` · ${school}` : ''}</span><div class="ic">${ICONS[c.icon] ?? ''}</div>`
         + `<h3></h3><p></p><div class="foot"><kbd>${i + 1}</kbd></div></button>`;
     }).join('');

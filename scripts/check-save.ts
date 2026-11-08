@@ -14,7 +14,8 @@ import { tuneOf } from '../src/player/levels.ts';
 import { HEROES, type Hero } from '../src/player/heroes.ts';
 import { Bag } from '../src/loot/bag.ts';
 import { Equipment, componentId, ARMOR_SLOTS, GEAR, SLOTS as GEAR_SLOTS, STARTER, effects } from '../src/loot/gear.ts';
-import { CARD, TOME_PRICE, counter, eligible, levelOf as lvOf, offer, stacks } from '../src/player/levels.ts';
+import { CARD, TOME_PRICE, counter, eligible, levelOf as lvOf, stacks } from '../src/player/levels.ts';
+import { offer } from '../src/player/talents.ts';
 import { BAR, PICKS, prepared } from '../src/core/prepared.ts';
 
 const fail = (why: string) => { throw new Error(why); };
@@ -276,8 +277,8 @@ const pre = boot();
 deserialize(pre, s.build ? (({ build: _b, ...o }) => o)(s) : s);
 if (pre.levels.picks.length || pre.levels.xp || pre.stats.hpMax !== 1280 + effects(pre.gear.totals).hp) fail('a save from before the levels loads with a build');
 const odd = boot();
-deserialize(odd, { ...ls, build: { ...ls.build, picks: ['hp', 'from_the_future'] } });
-if (odd.levels.picks.join() !== 'hp') fail('unknown card kept');
+deserialize(odd, { ...ls, build: { ...ls.build, picks: ['dmg', 'from_the_future'] } });
+if (odd.levels.picks.join() !== 'dmg') fail('unknown card kept');
 if (!valid({ ...s, build: undefined }) || valid({ ...s, build: { xp: 1, lv: 1, picks: [3] } }) || valid({ ...s, build: { xp: '1', lv: 1, picks: [] } })) fail('build field validation');
 // The tomes' abilities round-trip; a save from before the tomes loads with none; a card that is no ability is dropped; junk is refused.
 const tl = boot();
@@ -294,8 +295,8 @@ if (tOdd.levels.learned.join() !== 'leap') fail(`tomes' junk kept: ${tOdd.levels
 // From when every school was open: the Risorto's cards of other schools go, each pick's level-up offered again (fewer picks
 // than the XP's level-ups: the window opens on the load), each tome ability paid back, whatever leaned on them with them.
 const allSchools = boot();
-deserialize(allSchools, { ...ls, build: { xp: 500, lv: 7, picks: ['pyre', 'fall_dmg', 'pyre_big', 'fx_shatter', 'step', 'hp'], learned: ['frost', 'caligo', 'blizzard', 'orb', 'font', 'leap'] }, bag: { gold: 30, items: [] } });
-if (allSchools.levels.picks.join() !== 'fall_dmg,step,hp' || allSchools.levels.learned.join() !== 'leap' || allSchools.bag.gold !== 30 + 3 * TOME_PRICE.A + 2 * TOME_PRICE.B) fail(`an older Risorto of every school: ${allSchools.levels.picks} ${allSchools.levels.learned} ${allSchools.bag.gold} gold`);
+deserialize(allSchools, { ...ls, build: { xp: 500, lv: 7, picks: ['pyre', 'fall_dmg', 'pyre_big', 'fx_shatter', 'step', 'dmg'], learned: ['frost', 'caligo', 'blizzard', 'orb', 'font', 'leap'] }, bag: { gold: 30, items: [] } });
+if (allSchools.levels.picks.join() !== 'fall_dmg,step,dmg' || allSchools.levels.learned.join() !== 'leap' || allSchools.bag.gold !== 30 + 3 * TOME_PRICE.A + 2 * TOME_PRICE.B) fail(`an older Risorto of every school: ${allSchools.levels.picks} ${allSchools.levels.learned} ${allSchools.bag.gold} gold`);
 if (lvOf(allSchools.levels.xp).lv - 1 - allSchools.levels.picks.length !== 3) fail('the dropped picks are not offered again');
 const reopened = boot();
 deserialize(reopened, JSON.parse(JSON.stringify(serialize(allSchools))));
@@ -313,10 +314,10 @@ if (hgb.hero !== 'bortolo' || hgb.levels.learned.join() !== 'frost,caligo' || hg
 // it, has it as his base attack, the fog in its place and keeps its upgrades; an older Risorto who learnt or picked it
 // has the fog, and the fog's upgrades for the stiletto's. Absent, the big button's choice is the hero's own.
 const older = (hero: string, picks: string[], learned: string[]) => { const g = boot(); deserialize(g, { ...hgs, hero, build: { xp: 400, lv: 6, picks, learned } }); return g; };
-const ob = older('bortolo', ['lance_dmg', 'lance_split', 'hp'], ['frost', 'lance']), obt = tuneOf(ob.levels.picks, ob.levels.learned, HEROES.bortolo.school);
-if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,lance_split,hp' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || Math.abs(obt.prim.lance.dmg - 11.2) > 1e-9 || !obt.prim.lance.split || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
-const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'hp'], ['lance']); // the fog then, but the Gelo is no school of his: offered again, paid back
-if (or.levels.learned.length || or.levels.picks.join() !== 'hp' || or.bag.gold !== hgs.bag.gold + TOME_PRICE.A) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks} ${or.bag.gold}`);
+const ob = older('bortolo', ['lance_dmg', 'dmg'], ['frost', 'lance']), obt = tuneOf(ob.levels.picks, ob.levels.learned, HEROES.bortolo.school);
+if (ob.levels.learned.join() !== 'frost,caligo' || ob.levels.picks.join() !== 'lance_dmg,dmg' || obt.owned[0] !== 'lance' || !obt.owned.includes('caligo') || Math.abs(obt.prim.lance.dmg - 11.2) > 1e-9 || ob.levels.main) fail(`an older Bortolo: ${ob.levels.learned} ${ob.levels.picks} ${obt.owned}`);
+const or = older('risorto', ['lance', 'lance_dmg', 'lance_split', 'dmg'], ['lance']); // the fog then, but the Gelo is no school of his: offered again, paid back
+if (or.levels.learned.length || or.levels.picks.join() !== 'dmg' || or.bag.gold !== hgs.bag.gold + TOME_PRICE.A) fail(`an older Risorto with the stiletto: ${or.levels.learned} ${or.levels.picks} ${or.bag.gold}`);
 function hf0() { const g = boot('fosca'); g.levels.learned = ['plague', 'spit']; return JSON.parse(JSON.stringify(serialize(g))); }
 const hf = boot('fosca'); // Suor Fosca keeps her Nube di peste and Sputo di bile
 hf.levels.learned = ['plague', 'spit'];
@@ -398,15 +399,16 @@ autosave({ ...s, time: 1 }, store);
 mem.set('redentore.save.0', slot(zs)); // a stale key after the migration: never moved again
 migrate(store);
 if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
-// Gelo della cripta (ranked, once capped at 2) at level 21: a player's first Risorto, a fresh run to level 21, Gelo taken once,
-// saved, resumed (and, once, an old pre-squad autosave migrated): its offer's badge reads "rango 2", from the count the offer
-// filters on; taken twice, or three times (a save past the old cap), it loads with every rank laid on and is still offered, a rank on.
+// Gelo della cripta (ranked, capped at 3) at level 21: a player's first Risorto, a fresh run to level 21, Gelo taken once,
+// saved, resumed (and, once, an old pre-squad autosave migrated): its offer's badge reads "rango 2/3", from the count the offer
+// filters on; taken twice it loads with both ranks laid on and is still offered, a rank on; three times it is full, never offered
+// again; four (a save from before the caps) loads with three and the fourth handed back as a point to spend.
 {
   let sd = 7;
   const r = () => ((sd = (sd * 16807) % 2147483647) - 1) / 2147483646;
   const run = boot(), xp21 = 10 * 21 * 20;
-  for (let lv = 2; lv <= 20; lv++) { // the cards as main.ts deals them, Gelo taken the first time it shows, never twice
-    const cards = offer(run.levels.picks, r, run.levels.learned, HEROES.risorto.school), c = cards.find((k) => k.id === 'cdr' && !run.levels.picks.includes('cdr')) ?? cards.find((k) => k.id !== 'cdr') ?? cards[0];
+  for (let lv = 2; lv <= 20; lv++) { // the cards as main.ts deals them, Gelo taken the first time it shows (the Fusioni's path to it before), never twice
+    const cards = offer(run.levels.picks, r, run.levels.learned, HEROES.risorto.school, lv), c = cards.find((k) => k.id === 'cdr' && !run.levels.picks.includes('cdr')) ?? cards.find((k) => k.id === 'dmg' || k.id === 'speed') ?? cards.find((k) => k.id !== 'cdr') ?? cards[0]; // the path down to it
     run.levels.picks.push(c.id);
   }
   if (run.levels.picks.filter((id) => id === 'cdr').length !== 1) fail(`the fresh run took Gelo della cripta ${run.levels.picks.filter((id) => id === 'cdr').length} times`);
@@ -419,14 +421,14 @@ if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
   if (back.levels.picks.join() !== run.levels.picks.join() || lvOf(back.levels.xp).lv !== 21) fail('the migrated run lost or doubled a pick');
   const sch = HEROES.risorto.school, cdr = CARD.get('cdr')!;
   let shown = 0;
-  for (let i = 0; i < 400; i++) for (const c of offer(back.levels.picks, r, back.levels.learned, sch)) if (c.id === 'cdr') { shown++; if (stacks(c, counter(back.levels.picks)) !== 'rango 2') fail(`Gelo della cripta offered with badge ${stacks(c, counter(back.levels.picks))} after one pick`); }
-  if (!shown || stacks(cdr, counter(back.levels.picks)) !== 'rango 2') fail('Gelo della cripta, taken once, never offered at level 21');
-  for (const more of [[...back.levels.picks, 'cdr'], [...back.levels.picks, 'cdr', 'cdr']]) { // taken twice; three times, past the old cap
-    const g = boot(), n = more.filter((id) => id === 'cdr').length;
+  for (let i = 0; i < 400; i++) for (const c of offer(back.levels.picks, r, back.levels.learned, sch, 21)) if (c.id === 'cdr') { shown++; if (stacks(c, counter(back.levels.picks)) !== 'rango 2/3') fail(`Gelo della cripta offered with badge ${stacks(c, counter(back.levels.picks))} after one pick`); }
+  if (!shown || stacks(cdr, counter(back.levels.picks)) !== 'rango 2/3') fail('Gelo della cripta, taken once, never offered at level 21');
+  for (const more of [[...back.levels.picks, 'cdr'], [...back.levels.picks, 'cdr', 'cdr'], [...back.levels.picks, 'cdr', 'cdr', 'cdr']]) { // twice, full, past the cap
+    const g = boot(), n = more.filter((id) => id === 'cdr').length, held = Math.min(n, 3);
     deserialize(g, JSON.parse(JSON.stringify({ ...serialize(back), build: { xp: xp21 + 2000, lv: 23, picks: more, learned: [] } })));
     const t = tuneOf(g.levels.picks, g.levels.learned, sch);
-    if (g.levels.picks.length !== more.length || Math.abs(t.cdr - 0.9 ** n) > 1e-9 || !eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)) fail(`Gelo della cripta x${n}: cooldowns ${t.cdr}, eligible ${eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)}`);
-    if (stacks(cdr, counter(g.levels.picks)) !== `rango ${n + 1}`) fail(`Gelo della cripta x${n}: badge ${stacks(cdr, counter(g.levels.picks))}`);
+    if (g.levels.picks.length !== more.length - (n - held) || g.levels.banked !== n - held || Math.abs(t.cdr - 0.9 ** held) > 1e-9 || eligible(g.levels.picks, g.levels.learned, sch).includes(cdr) !== held < 3) fail(`Gelo della cripta x${n}: cooldowns ${t.cdr}, ${g.levels.picks.length} picks, ${g.levels.banked} banked, eligible ${eligible(g.levels.picks, g.levels.learned, sch).includes(cdr)}`);
+    if (stacks(cdr, counter(g.levels.picks)) !== `rango ${held + 1}/3`) fail(`Gelo della cripta x${n}: badge ${stacks(cdr, counter(g.levels.picks))}`);
   }
 }
 // A level-up mid-fight: the card picked is kept at once, the hero left where the last calm save stood him. The tab dies
@@ -461,17 +463,20 @@ if (resume('risorto', store)?.time !== 1) fail('migration ran twice');
 }
 console.log('save system ok');
 
-// Potion migration replays old IDs in place: benefit for both vials, still one pick per earned level.
+// Potion migration replays old IDs in place: benefit for both vials, still one pick per earned level. In the talent trees the
+// old Fiala capiente sits under Carne di tomba and Pozzo d'anime (both under Ossa più dure) and stays; the old Fiala rapida needs
+// Pelle di lapide or Linfa nera above it, so it goes back as a point to spend; a second load changes nothing.
 {
   const old = serialize(a);
-  old.build = { xp: 900, lv: lvOf(900).lv, picks: ['potion_big', 'hp', 'potion_cd', 'potion_big', 'mana'], learned: ['leap'], main: 'fall' };
+  old.build = { xp: 900, lv: lvOf(900).lv, picks: ['dmg', 'potion_big', 'hp', 'potion_cd', 'potion_big', 'mana'], learned: ['leap'], main: 'fall' };
   old.player.hp = 700; old.player.mana = 123;
   for (let round = 0; round < 2; round++) {
     const loaded = boot(); deserialize(loaded, old);
     const next = serialize(loaded), t = tuneOf(loaded.levels.picks);
-    if (Math.abs(t.potion - .6) > 1e-8 || Math.abs(t.manaPotion - .6) > 1e-8 || t.potionCd !== 21 || t.manaPotionCd !== 21) fail('old potion benefit lost');
+    if (Math.abs(t.potion - .6) > 1e-8 || Math.abs(t.manaPotion - .6) > 1e-8 || t.potionCd !== 30 || t.manaPotionCd !== 30) fail('old potion benefit lost');
+    if (loaded.levels.picks.join() !== 'dmg,potion_big,hp,potion_big,mana' || loaded.levels.banked !== 1 || loaded.levels.refunded !== 1 - round) fail(`old potion ranks fitted: ${loaded.levels.picks} ${loaded.levels.banked}`);
     for (const field of ['build', 'player', 'bag', 'gear', 'quest', 'dead', 'time', 'fog', 'side'] as const) {
-      if (JSON.stringify(next[field]) !== JSON.stringify(old[field])) fail(`potion migration changed ${field}`);
+      if (round && JSON.stringify(next[field]) !== JSON.stringify(old[field])) fail(`potion migration changed ${field}`);
     }
     Object.assign(old, next);
   }

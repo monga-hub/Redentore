@@ -374,17 +374,26 @@ congelato, rallenta del 25% per 2 s, schegge per un terzo entro 2 m); Peste: Spi
 danni). Ognuno ha i suoi quattro potenziamenti, come Caduta d'ossa: più danni a colpo (+40% a rango), lo schizzo (metà dei danni entro 2,5 m;
 lo Stiletto: i Frantumi del congelato), il terzo colpo (+75% a rango), 4 mana a colpo a rango. Chi conosce 3 delle 5 abilità della sua scuola secondaria
 impara da solo anche il suo attacco base ("Hai appreso..."): nel libro *Sul tasto grande* lo scambia col proprio, la scelta resta nel
-salvataggio (`build.main`) e i potenziamenti restano a ciascuno, anche nelle carte. Ogni livello offre tre carte: ai livelli pari fino al 10
-tre nuove abilità, dopo il 10 una nuova abilità, un passivo e un potenziamento; agli altri
-potenziamenti, passivi e fusioni (`src/player/levels.ts`: 34 abilità, cinque per scuola contando quelle iniziali e lasciando a parte gli attacchi base; 102 carte di potenziamento di cui 8 fusioni). Escono
-solo carte delle due scuole dell'eroe e quelle di nessuna scuola (passivi; `ours`): una fusione o un potenziamento di un'abilità
-d'altre scuole non esce mai. Ogni carta esce tra quelle non ancora prese pendendo verso la primaria (`LEAN`: metà delle volte dalla
-primaria, tre su dieci dalla secondaria, due su dieci dai passivi, pari dentro ciascuna parte; un potenziamento conta per la scuola
-della sua abilità). Delle 8 fusioni solo due legano le scuole di un eroe: Miasma velenoso (Suor Fosca) e Giudizio ardente (Fra' Tizian);
-le altre sei restano nel codice ma oggi non escono. Non c'è un livello massimo
-(servono 20 × livello esperienza per salire) e non finiscono le carte: abilità nuove, fusioni e i potenziamenti
-che accendono un effetto (lo schizzo, Caligo di gennaio, Processione, Doppio sputo, Rancore) si prendono una volta, tutti gli altri
-potenziamenti e passivi salgono di rango senza limite, ogni rango la stessa percentuale in più (la carta mostra "rango N"). Le
+salvataggio (`build.main`) e i potenziamenti restano a ciascuno, anche nelle carte.
+
+**Alberi dei talenti** (`src/player/talents.ts`): ogni punto va su un nodo di uno dei tre alberi dell'eroe, la scuola primaria, le
+Fusioni (i passivi, le fiale, Rancore e la fusione delle sue due scuole in fondo) e la scuola secondaria. Un albero di scuola parte
+dalla sua medaglia (data): sotto l'attacco base e le tre abilità con i loro potenziamenti, le due speciali appese a due percorsi
+ciascuna. Un nodo si apre quando un nodo sopra collegato ha un rango (un'abilità: posseduta), l'albero ha il suo livello (scuole 2,
+Fusioni 3) e le righe sopra la sua fascia hanno abbastanza punti dell'albero (`GATE`: righe 4-5 due, 6-7 sei; nelle Fusioni la fusione
+cinque); un nodo a scelta prende uno dei due effetti, mai entrambi. Ogni carta ha un rango massimo (`CAP` in `src/player/levels.ts`, la
+carta mostra "rango N/max"). Ogni livello offre tre carte, una per albero, tra i nodi aperti (un nodo mai preso pesa 3, un altro rango
+1, `offer`): ai livelli pari fino al 10 le carte delle scuole sono abilità nuove se ce n'è una aperta, al 6 e all'8 quella della primaria
+una speciale; un albero senza nodi aperti passa la carta agli altri, e Linfa tombale riempie quando tutto è chiuso (`src/player/levels.ts`:
+34 abilità, cinque per scuola contando quelle iniziali e lasciando a parte gli attacchi base; 104 carte di potenziamento di cui 11
+fusioni). Escono solo carte delle due scuole dell'eroe e quelle di nessuna scuola (`ours`), e di fusioni solo quella delle sue due
+scuole: Passo spezzaossa (il Risorto), Saetta di brina (Bortolo), Miasma velenoso (Suor Fosca), Giudizio ardente (Fra' Tizian),
+Turbine a martello (Zanetto). **Build del personaggio** (`src/ui/build.ts`, dalla scheda del personaggio e dal Custode): i tre alberi
+affiancati (sul telefono a schede), nodi quadrati le abilità, tondi i potenziamenti, ottagoni le scelte; toccando un nodo si vedono
+effetto, rango, cosa manca e "Potenzia · 1 punto" per i punti da parte. I salvataggi di prima degli alberi si adattano al caricamento
+(`fit`): i ranghi oltre il massimo, il lato minore di una scelta presa due volte e i nodi rimasti senza nodo sopra o senza i punti della
+fascia tornano punti da spendere, mai persi; abilità e Linfa tombale restano. Non c'è un livello massimo (servono 20 × livello
+esperienza per salire). Le
 abilità sbloccate prendono il primo tasto libero della barra, nell'ordine del pollice sul ventaglio touch; con gli otto posti pieni aspettano nel libro.
 
 **Tomi** (Fra' Bortolo e Mastro Iseppo, Commercia): uno per scuola (Ossa, Peste, Ombra, Fuoco, Gelo, Fulmine, Sacro), ma il mercante
@@ -628,7 +637,9 @@ src/
                              fulmine ritardato, balzo e carica, esecuzione), senza grafica: le usa anche il banco. Nessun three
   enemies/control.ts         stati dei nemici: rallentato, congelato, stordito, in fiamme; rendimenti decrescenti e resistenza
   player/levels.ts           livelli d'esperienza: curva, XP dai morti, le carte (nuove abilità,
-                             potenziamenti, passivi, fusioni) e l'offerta da due. Nessun DOM/three
+                             potenziamenti, passivi, fusioni) e i ranghi massimi. Nessun DOM/three
+  player/talents.ts          i tre alberi dei talenti: nodi, prerequisiti, fasce, offerta d'una carta per
+                             albero e adattamento dei vecchi salvataggi (`fit`). Nessun DOM/three
   ui/levelUp.ts              finestra di scelta delle tre carte, lampo "Livello N!"
   abilities/vfx.ts           effetti di tutti gli incantesimi, in pool e senza allocazioni per
                              frame: particelle su quad da un atlante procedurale (bagliori,
@@ -702,6 +713,7 @@ scripts/check-walkable.ts    flood-fill di raggiungibilità con le regole del pl
 scripts/check-abilities.ts   GCD per scuola, pushback, cooldown, lanci, canali e interruzioni del sistema abilità
 scripts/check-spells.ts      stati dei nemici e loro effetto sulle IA, regole degli incantesimi nuovi e delle fusioni
 scripts/check-levels.ts      curva XP, offerte delle carte su molte partite casuali, fusioni, slot riservati
+scripts/check-talents.ts     alberi dei talenti: ogni carta su un albero, prerequisiti, fasce, scelte, offerte, vecchi salvataggi
 scripts/soak-boss.ts         il combattimento col boss nel gioco vero, Chrome headless su iPhone emulato: errori, crescita, memoria GPU
 scripts/balance.ts           banco di bilanciamento: livello, IA, abilità e carte veri, giocati da un bot sul percorso della missione
 ```

@@ -1,6 +1,7 @@
 import { presetValid, type BuildPreset } from '../player/presets.ts';
 import { checkBuild } from '../player/build.ts';
-import { editValid, type BuildEdit } from './build-state.ts';
+import { editValid, nextEdit, type BuildEdit } from './build-state.ts';
+import { fit } from '../player/talents.ts';
 // Saved games: the state worth keeping as plain JSON (the hero chosen, player, quest flags, who is dead, play
 // time, the map explored so far, level, XP and level-up picks, the bag, what the hero wears), one run per hero in
 // localStorage, kept every few seconds and at once on every kill, card picked and loot taken (the autosave); mid-fight
@@ -71,7 +72,7 @@ export interface Game {
   stats: { hp: number; mana: number; readonly hpMax: number; readonly manaMax: number };
   kit: { charge: number };
   /** `apply` lays the picks on the kit and stats (raising hpMax), so a load runs it before restoring hp. */
-  levels: { xp: number; picks: string[]; learned: string[]; main: string; banked?: number; presets?: BuildPreset[]; edit?: BuildEdit; apply(): void };
+  levels: { xp: number; picks: string[]; learned: string[]; main: string; banked?: number; refunded?: number; presets?: BuildPreset[]; edit?: BuildEdit; apply(): void };
   quest: Quest;
   mobs: { state: string; hp: number; t: number; again?: boolean }[];
   time: number;
@@ -113,8 +114,13 @@ export function deserialize(g: Game, s: GameState): void {
   const own = ownSchools((s.build?.picks ?? []).map(was).filter((id) => CARD.has(id)), (s.build?.learned ?? []).map(was).filter((id) => CARD.get(id)?.kind === 'ability'), HEROES[g.hero].school);
   g.levels.presets = structuredClone(s.build?.presets ?? []);
   g.levels.edit = s.build?.edit ? structuredClone(s.build.edit) : undefined;
-  g.levels.picks = own.picks;
-  g.levels.banked = Math.min(Math.max(0, Math.floor(s.build?.banked ?? 0)), Math.max(0, levelOf(g.levels.xp).lv - 1 - own.picks.length));
+  // The talent trees (player/talents.ts): ranks past a cap, a choice taken both ways, a node cut off from its parents or its
+  // tier's points go back as points to spend again, never lost; a cloud copy sees a new revision of the build.
+  const lv = levelOf(g.levels.xp).lv, fitted = fit(own.picks, own.learned, HEROES[g.hero].school, lv);
+  g.levels.picks = fitted.picks;
+  g.levels.banked = Math.min(Math.max(0, Math.floor(s.build?.banked ?? 0)) + fitted.refunded, Math.max(0, lv - 1 - fitted.picks.length));
+  g.levels.refunded = fitted.refunded;
+  if (fitted.refunded && g.levels.edit) g.levels.edit = nextEdit(g.levels.edit);
   g.levels.learned = own.learned;
   g.levels.main = typeof s.build?.main === 'string' ? s.build.main : '';
   g.bag.hero = g.hero;
@@ -184,7 +190,7 @@ export function valid(s: unknown): s is GameState {
       && (o.build.banked === undefined || (Number.isSafeInteger(o.build.banked) && o.build.banked >= 0))
       && (o.build.learned === undefined || (Array.isArray(o.build.learned) && o.build.learned.every((x) => typeof x === 'string')))))
     && (o.bag === undefined || (!!o.bag && num(o.bag.gold) && Array.isArray(o.bag.items) && o.bag.items.every((x) => Array.isArray(x) && typeof x[0] === 'string' && num(x[1]))))
-    && (!o.build?.edit || !checkBuild({xp:o.build.xp,picks:o.build.picks,learned:o.build.learned??[],banked:o.build.banked},HEROES[heroOf(o.hero)].school))
+    && (!o.build?.edit || !checkBuild({xp:o.build.xp,picks:o.build.picks,learned:o.build.learned??[],banked:o.build.banked},HEROES[heroOf(o.hero)].school,false))
     && (o.at === undefined || num(o.at)) && (o.gear === undefined || (!!o.gear && typeof o.gear === 'object' && Object.values(o.gear).every((x) => typeof x === 'string')))
     && (o.side === undefined || (!!o.side && [o.side.taken, o.side.done].every((a) => Array.isArray(a) && a.every((x) => typeof x === 'string'))
       && [o.side.kills, o.side.steps].every((r) => r === undefined || (!!r && typeof r === 'object' && Object.values(r).every(num)))));

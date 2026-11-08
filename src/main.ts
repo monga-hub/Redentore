@@ -21,10 +21,11 @@ import { Atmosphere } from './fx/atmosphere.ts';
 import { PHONE } from './core/device.ts';
 import { ABILITIES, Forsaken, PLAGUE_RANGE, barOf, tune } from './abilities/forsaken.ts';
 import { CHARGE, GRACE, LEAP, RANGE } from './abilities/grimoire.ts';
-import { BASES, BASE_ATTACK, CARD, Levels, counter, levelOf, offer, tuneOf, type Card } from './player/levels.ts';
+import { BASES, BASE_ATTACK, CARD, Levels, counter, levelOf, tuneOf, type Card } from './player/levels.ts';
+import { offer, treeOf } from './player/talents.ts';
 import { LevelUp } from './ui/levelUp.ts';
 import { ActionBar } from './ui/actionBar.ts';
-import { AbilityBook } from './ui/book.ts';
+import { AbilityBook, SCHOOL_NAME } from './ui/book.ts';
 import { PRIMARY, barFor, saveBar } from './abilities/system.ts';
 import { PlayerStats } from './player/stats.ts';
 import { Targeting, type Kind } from './ui/target.ts';
@@ -308,6 +309,7 @@ if (loaded) {
   cam.yaw = player.facing;
   questView.settle();
   kit.system.notices.push({ kind: 'info', text: 'Partita ripresa' });
+  if (levels.refunded) kit.system.notices.push({ kind: 'info', text: `${levels.refunded} punti restituiti: spendili negli alberi dei talenti (scheda del personaggio, Build)` });
 } else kit.system.notices.push({ kind: 'info', text: "Il portone della chiesa è sbarrato. Parla con Fra' Zuane" });
 /**
  * Level 3's hidden packs (enemies/sangiorgio.ts): up once their side quest gets that far, on the hero (the Commissario at
@@ -354,7 +356,7 @@ if (sandbox) arena(); // the dragon's sandbox, over whatever was loaded
 function arena(): void {
   const LV = 18;
   while (levels.picks.length < LV - 1) {
-    const cards = offer(levels.picks, Math.random, levels.learned, levels.schools), c = cards.find((k) => k.kind === 'ability') ?? cards[0];
+    const cards = offer(levels.picks, Math.random, levels.learned, levels.schools, levels.picks.length + levels.banked + 2), c = cards.find((k) => k.kind === 'ability') ?? cards[0];
     if (!c) break;
     if (levels.edit) levels.edit = nextEdit(levels.edit);
     levels.picks.push(c.id);
@@ -394,7 +396,9 @@ function openLevelUp(): void {
   kit.system.cancel();
   input.consume();
   dctl.stop();
-  levelUp.show(levels.picks.length + 2, offer(levels.picks, Math.random, levels.learned, levels.schools), counter(levels.picks), (c: Card) => {
+  const lv = levels.picks.length + levels.banked + 2, cards = offer(levels.picks, Math.random, levels.learned, levels.schools, lv); // one card a talent tree
+  const where = cards.map((c) => { const t = treeOf(c.id, levels.schools); return t === 1 ? 'Fusioni' : t < 0 ? '' : SCHOOL_NAME.get(levels.schools[t === 0 ? 0 : 1]) ?? ''; });
+  levelUp.show(lv, cards, counter(levels.picks), (c: Card) => {
     if (levels.edit) levels.edit = nextEdit(levels.edit);
     levels.picks.push(c.id);
     if (c.kind === 'ability') { // onto the first free slot, even if an earlier run took it off the bar
@@ -411,7 +415,7 @@ function openLevelUp(): void {
     kit.ascend();
     kit.system.notices.push({ kind: 'info', text: c.kind === 'ability' ? `Nuova abilità: ${c.name}` : c.name });
     keep(); // the card is the run's at once, mid-fight too: a tab killed before the fight ends wakes with it taken
-  });
+  }, where);
 }
 // A new game opens on the flythrough, landing on the follow camera behind the player; a loaded one starts straight away.
 cam.update(0, input, player.pos);

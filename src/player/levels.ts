@@ -6,13 +6,10 @@ import type { BuildEdit } from '../core/build-state.ts';
 // ~870 (scripts/balance.ts) and ~1020 with the key's and Fra' Bortolo's quest XP, level 10: the boss is tuned for 10-11.
 // Level 2 (the Zitelle) brings the route to ~1930 by the Governatrice, level 14; every quest (quest/progress.ts QUESTS)
 // pays 950 XP in all, ~16 with the side quests done too. There is no cap: the curve goes on, and the risen dead keep feeding it.
-// Each level offers three cards from everything of the hero's two schools not yet learnt and the cards of no school (`LEAN`:
-// half his primary school's, a third his secondary's, the rest the passives, fusions and the potions'), whatever was picked
-// before. Every school is the same shape (`specialsOf`): three abilities paid in mana and two specials, instant, spent with a full fury bar.
-// Even levels up to 10 offer three new abilities (the specials from level 6), past 10 a new ability against a passive and a
-// modifier; the others a modifier of an owned ability (or a fusion), a stat passive and another modifier. New abilities,
-// fusions and the on/off modifiers are taken once; every other modifier and passive is ranked with no cap, each pick a rank
-// adding the same share again (`rank`, `by`), so the progression never runs out. Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
+// Each level offers three cards, one from each of the hero's talent trees (player/talents.ts: his primary school, the Fusioni,
+// his secondary school), drawn among the nodes open there. Every school is the same shape (`specialsOf`): three abilities paid
+// in mana and two specials, instant, spent with a full fury bar. New abilities, fusions and the on/off modifiers are taken once;
+// every other modifier and passive has a few ranks (`CAP`), each pick a rank adding the same share again (`rank`, `by`). Every run starts with the base attack of the hero's school (`BASE_ATTACK`:
 // Caduta d'ossa for the Ossa, Stiletto di ghiaccio for the Gelo...) and Preghiera di suffragio (the heal), the potions stay as
 // items; owning 3 of the 5 abilities of his secondary school teaches him that school's base attack too (`SECOND_AT`),
 // which the book can put on the big button instead. The hero's school adds his own (player/heroes.ts kit, laid on as `learned` by a new game). The merchants' tomes (`TOMES`) teach a whole school of his for gold. A save
@@ -76,6 +73,7 @@ export interface Tune {
   hammerDmg: number; hammerStun: number;
   bubbleTime: number;
   fxVenomCloud: boolean; fxHolyFire: boolean; // fusions: poison in the plague cloud, the judgment set alight
+  fxStepBone: boolean; fxFrostChain: boolean; fxStormWhirl: boolean; // fusions: the blink stuns, lightning on the chilled, the whirl on the stunned
 }
 
 /** A base attack's numbers: damage a hit, the splash (Stiletto: the frozen shatter), the third blow ×, mana back a hit. */
@@ -138,6 +136,7 @@ const BASE: Tune = {
   hammerDmg: 60, hammerStun: 4,
   bubbleTime: 5,
   fxVenomCloud: false, fxHolyFire: false,
+  fxStepBone: false, fxFrostChain: false, fxStormWhirl: false,
 };
 
 const it = (n: number) => n.toLocaleString('it', { maximumFractionDigits: 2 });
@@ -159,13 +158,13 @@ export interface Card {
 
 const special = (_c: (id: string) => number, owns: (a: string) => boolean) => SPECIALS.some(owns);
 /** A school's abilities, for the fusions with any of them. */
-const FROST = ['frost', 'font', 'caligo', 'blizzard', 'orb', 'lance'], STORM = ['chain', 'toll', 'shield', 'rod', 'squall'], FIRE = ['pyre', 'wisp', 'pillar', 'cero', 'furnace'];
+const FROST = ['frost', 'font', 'caligo', 'blizzard', 'orb', 'lance'], BONE = ['leap', 'whirl', 'grace', 'strike', 'nova'], STORM = ['chain', 'toll', 'shield', 'rod', 'squall'], FIRE = ['pyre', 'wisp', 'pillar', 'cero', 'furnace'];
 const ability = (id: string, name: string, tier: 'A' | 'B', school: School, text: string): Card => ({ id, kind: 'ability', name, icon: id, text, max: 1, of: id, tier, school });
 /** The school of each ability, the starting ones too; abilities of a school share their global cooldown (system.ts). */
 export const SCHOOL: Record<string, School> = { mend: 'holy', ...Object.fromEntries(Object.entries(BASE_ATTACK).map(([s, id]) => [id, s as School])) };
 const mod = (of: string, id: string, name: string, text: string, max: number, apply: (t: Tune) => void): Card =>
   ({ id, kind: 'mod', name, icon: of, text, max, of, apply });
-/** The upgrades with a number to grow have no cap: each pick is a rank more, and each rank adds the same share. */
+/** A ranked card before its cap (`CAP`) is laid on: each pick is a rank more, and each rank adds the same share. */
 export const RANKS = Infinity;
 type Num = { [K in keyof Tune]: Tune[K] extends number ? K : never }[keyof Tune];
 /** A rank's step on field `f`: `k` of its base value more, or with `k` < 0 the value cut by |k| of what is left, so a
@@ -323,6 +322,13 @@ export const CARDS: Card[] = [
     needs: (_c, owns) => owns('plague') && (owns('spit') || owns('untore') || owns('miasma')), apply: (t) => { t.fxVenomCloud = true; } },
   { id: 'fx_holyfire', prerequisite: 'Giudizio del Redentore e un’abilità del Fuoco.', kind: 'fusion', name: 'Giudizio ardente', icon: 'judge', max: 1, text: 'Fusione. Giudizio del Redentore incendia il bersaglio (brucia 4 s), e su chi già brucia fa +50% di danni.',
     needs: (_c, owns) => owns('judge') && FIRE.some(owns), apply: (t) => { t.fxHolyFire = true; } },
+  // the fusions of the Risorto (Ossa and Ombra), Bortolo (Gelo and Fulmine) and Zanetto (Fulmine and Ossa): the capstones of their Fusioni trees
+  { id: 'fx_stepbone', prerequisite: 'Passo d’ombra e un’abilità delle Ossa.', kind: 'fusion', name: 'Passo spezzaossa', icon: 'step', max: 1, text: "Fusione. Passo d'ombra stordisce per 1 s chi attraversi.",
+    needs: (_c, owns) => owns('step') && BONE.some(owns), apply: (t) => { t.fxStepBone = true; } },
+  { id: 'fx_frostchain', prerequisite: 'Catena di saette e un’abilità del Gelo.', kind: 'fusion', name: 'Saetta di brina', icon: 'chain', max: 1, text: 'Fusione. Catena di saette fa +50% di danni a chi è rallentato o congelato.',
+    needs: (_c, owns) => owns('chain') && FROST.some(owns), apply: (t) => { t.fxFrostChain = true; } },
+  { id: 'fx_stormwhirl', prerequisite: 'Turbine d’ossa e Rintocco del campanile.', kind: 'fusion', name: 'Turbine a martello', icon: 'whirl', max: 1, text: "Fusione. Turbine d'ossa fa il doppio dei danni a chi è stordito.",
+    needs: (_c, owns) => owns('whirl') && owns('toll'), apply: (t) => { t.fxStormWhirl = true; } },
 
   // Repeatable, offered only once the cards above run short.
   { id: 'linfa', kind: 'filler', name: 'Linfa tombale', icon: 'potion', max: Infinity, text: 'Recuperi il 30% della salute e del mana.' },
@@ -330,6 +336,24 @@ export const CARDS: Card[] = [
   { id: 'ossa_eterne', kind: 'filler', name: 'Ossa eterne', icon: 'dmg', max: Infinity, text: '+2% a tutti i danni che infliggi. Si ripete.', apply: (t) => { t.dmg += 0.02; } },
   { id: 'carne_eterna', kind: 'filler', name: 'Carne eterna', icon: 'hp', max: Infinity, text: '+4% di salute massima. Si ripete.', apply: (t) => { t.hp += 0.04; } },
 ];
+/**
+ * Every ranked card's cap: damage-type ranks 3, those that only stretch a duration, cooldown, cast, radius, hops or doses 2, the
+ * third blow 2, the passives by the size of their step. The legacy fillers keep theirs (never offered, folded into a node's count).
+ */
+export const CAP: Record<string, number> = {
+  dmg: 3, hp: 3, armor: 3, mana: 2, regen: 2, speed: 2, cdr: 3, leech: 2, fury: 2,
+  health_potion_big: 2, health_potion_cd: 2, mana_potion_big: 2, mana_potion_cd: 2,
+  fall_dmg: 3, fall_third: 2, fall_reach: 3, fall_mana: 3,
+  ...Object.fromEntries(Object.values(BASE_ATTACK).filter((b) => b !== 'fall').flatMap((b) => [[`${b}_dmg`, 3], [`${b}_third`, 2], [`${b}_mana`, 3]])),
+  plague_dps: 3, plague_size: 2, plague_cd: 2, plague_long: 2, wisp_dps: 3, wisp_still: 2, wisp_fast: 2,
+  veil_long: 2, veil_heal: 2, step_dmg: 2, step_cd: 2, strike_dmg: 3, nova_big: 3, ward_long: 2,
+  pyre_fast: 2, pyre_big: 3, frost_deep: 3, frost_fast: 2, font_long: 2, font_cd: 3, caligo_big: 3,
+  chain_long: 2, chain_fast: 2, toll_long: 2, toll_big: 3, leap_big: 3, leap_cd: 2, whirl_dmg: 3, whirl_long: 2,
+  grace_mul: 2, grace_cd: 2, charge_stun: 2, charge_cd: 2, untore_far: 2, miasma_more: 2, fever_deep: 2, drain_deep: 3,
+  pillar_big: 3, furnace_hot: 3, blizzard_big: 3, orb_slow: 3, shield_more: 2, rod_long: 2, squall_big: 3,
+  judge_dmg: 3, hallow_big: 3, hammer_cd: 3, bubble_cd: 2,
+};
+for (const c of CARDS) if (c.kind !== 'filler' && c.max === RANKS) c.max = CAP[c.id];
 export const CARD = new Map(CARDS.map((c) => [c.id, c]));
 for (const c of CARDS) if (c.school) SCHOOL[c.id] = c.school;
 /** The specials: two a school, instant, each spending a full fury bar (tier B, offered from level 6). */
@@ -346,8 +370,8 @@ export const counter = (picks: readonly string[]) => {
   return (id: string) => (n.get(id) ?? 0) + (/^(health|mana)_potion_(big|cd)$/.test(id) ? n.get(id.replace(/^(health|mana)_/, '')) ?? 0 : 0);
 };
 
-/** A ranked card's badge on the level-up window: the rank this pick brings it to ("rango 1" the first time). '' for the one-time cards. */
-export const stacks = (c: Card, count: (id: string) => number) => (c.max === RANKS && c.kind !== 'filler' ? `rango ${count(c.id) + 1}` : '');
+/** A ranked card's badge on the level-up window: the rank this pick brings it to, of its cap ("rango 1/3" the first time). '' for the one-time cards. */
+export const stacks = (c: Card, count: (id: string) => number) => (c.max > 1 && c.kind !== 'filler' ? `rango ${count(c.id) + 1}/${c.max}` : '');
 
 /** The abilities of school `s` a slot holds: its five, the base attack apart. */
 export const slotsOf = (s: School) => Object.keys(SCHOOL).filter((id) => SCHOOL[id] === s && !BASES.includes(id));
@@ -399,52 +423,8 @@ export function ownSchools(picks: readonly string[], learned: readonly string[],
   return { picks: kept, learned: learnt, refund: lost.reduce((g, id) => g + TOME_PRICE[CARD.get(id)!.tier ?? 'A'], 0) };
 }
 
-/** Odds a card is drawn from the hero's primary school, his secondary, the cards of no school (passives, fusions, the potions'). */
-export const LEAN = [0.5, 0.3, 0.2];
-/** Which of LEAN's shares a card falls in for a hero of `schools`: an upgrade goes with its ability's school. */
-export const leanOf = (c: Card, schools: readonly School[]) => { const s = schoolOf(c); return s === schools[0] ? 0 : s === schools[1] ? 1 : 2; };
-
-/**
- * The three cards for the next level-up (the one `picks.length + 2` reaches), each drawn from its kind's pool: a share
- * by LEAN (the empty ones' odds go to the rest), then evenly within it; the heal fills in if the pool ever runs
- * short. The cards passed over go back into the pool.
- */
-export function offer(picks: readonly string[], rnd: () => number = Math.random, learned: readonly string[] = [], schools: readonly School[] = RISORTO): Card[] {
-  const lv = picks.length + 2, ok = eligible(picks, learned, schools), out: Card[] = [];
-  const pick = (from: Card[]) => {
-    const left = from.filter((c) => !out.includes(c));
-    if (!left.length) return;
-    const shares = LEAN.map((_, i) => left.filter((c) => leanOf(c, schools) === i)), w = LEAN.map((k, i) => (shares[i].length ? k : 0));
-    let r = rnd() * w.reduce((a, b) => a + b, 0), i = 0;
-    while (i < 2 && (r -= w[i]) >= 0) i++;
-    while (!shares[i].length) i--; // r rounding onto an empty share's edge
-    const of = shares[i];
-    out.push(of[Math.floor(rnd() * of.length) % of.length]);
-  };
-  const abilities = ok.filter((c) => c.kind === 'ability' && (c.tier === 'A' || lv >= 6));
-  const mods = ok.filter((c) => c.kind === 'mod' || c.kind === 'fusion'), passives = ok.filter((c) => c.kind === 'passive');
-  if (lv % 2 === 0 && lv <= 10) {
-    if (lv === 6 || lv === 8) pick(abilities.filter((c) => c.tier === 'B')); // the specials surface in time
-    pick(abilities);
-    pick(abilities);
-    pick(abilities);
-  } else if (lv % 2 === 0 && abilities.length) { // past 10: keep learning, or grow what is owned
-    pick(abilities);
-    pick(passives);
-    pick(mods);
-  } else {
-    const fusions = mods.filter((c) => c.kind === 'fusion');
-    pick(fusions.length && rnd() < 0.5 ? fusions : mods);
-    pick(passives);
-    pick(mods);
-  }
-  pick(mods); // short: fill from the upgrades, then the heal
-  pick(passives);
-  pick(mods);
-  pick(FILLERS);
-  return out.slice(0, 3);
-}
-const FILLERS = CARDS.filter((c) => c.id === 'linfa');
+/** The heal that fills an offer when the trees have nothing open (player/talents.ts). */
+export const FILLERS = CARDS.filter((c) => c.id === 'linfa');
 
 /** A merchant's tome: every ability of a school, for gold (ui/vendor.ts), sold only for the hero's two schools (`tomesOf`). The cost is
  * per ability it would still teach: five a school (Preghiera di suffragio, everyone's, aside), less what the hero's kit already gave. */
@@ -478,6 +458,8 @@ export class Levels {
   /** Refunded choices left for the build panel; they must not reopen random level-up dialogs. */
   presets: BuildPreset[] = [];
   banked = 0;
+  /** Points a load handed back to spend again, the save fitted into the trees (core/save.ts): main.ts says so once. */
+  refunded = 0;
   edit?: BuildEdit;
   picks: string[] = [];
   learned: string[] = [];

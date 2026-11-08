@@ -52,6 +52,7 @@ const CALIGO = { arc: Math.cos(0.8), slow: 5, k: 0.4, freeze: 2 };
 const HOP = 8; // m a saetta jumps
 const HOP_FALL = 0.75; // each jump keeps this much of the damage
 const STORM = 1.5; // Miasma elettrico on the clouded
+const FROST_CHAIN = 1.5; // Saetta di brina on the chilled
 const TOLL_DELAY = 0.6; // s from the call to the bolt
 export const LEAP = { range: 12, time: 0.55, stop: 1.2, stun: 1, over: 1.3 }; // over: m of wall, hive or bench a leap clears
 export const CHARGE = { min: 4, max: 20, speed: 24, stop: 1.3 };
@@ -435,7 +436,7 @@ export class Grimoire {
     while (m) {
       struck.add(m);
       pts.push({ x: m.x, y: m.y + CHEST, z: m.z });
-      this.hit(m, storm(m) ? dmg * STORM : dmg);
+      this.hit(m, dmg * (storm(m) ? STORM : 1) * (t.fxFrostChain && m.cc && chilled(m.cc) ? FROST_CHAIN : 1));
       const at: Mob = m;
       let next: Mob | undefined, bd = HOP;
       for (const o of this.near(at, HOP)) {
@@ -540,7 +541,7 @@ export class Grimoire {
     }
   }
 
-  /** Turbine d'ossa, one tick: everyone within WHIRL_R (Turbine di brina chills them, the frozen take double). */
+  /** Turbine d'ossa, one tick: everyone within WHIRL_R (Turbine di brina chills them, the frozen take double; Turbine a martello: the stunned double). */
   whirl(): void {
     const p = this.host.player.pos, t = this.tune;
     for (const m of this.near(p, WHIRL_R)) {
@@ -548,6 +549,7 @@ export class Grimoire {
       this.hit(m, t.whirlDmg, 'physical');
       if (t.fxFrostWhirl && c && frozen(c)) this.hit(m, t.whirlDmg * (WHIRL_FROZEN - 1));
       if (t.fxFrostWhirl && c) chill(c, 2, WHIRL_CHILL);
+      if (t.fxStormWhirl && c && c.stun > 0) this.hit(m, t.whirlDmg * (WHIRL_FROZEN - 1), 'physical');
     }
   }
 

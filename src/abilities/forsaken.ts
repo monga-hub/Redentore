@@ -7,6 +7,7 @@ import { GUARD_CUT, VEIL_CUT, type PlayerStats } from '../player/stats.ts';
 import { BASES, SCHOOL, startOf, tuneOf, type Prim, type School, type Tune } from '../player/levels.ts';
 import type { Mob } from '../ui/target.ts';
 import { engaged } from '../enemies/brain.ts';
+import { stun } from '../enemies/control.ts';
 import { AbilitySystem, loadBar, type Ability, type Layout } from './system.ts';
 import { D, T, Vfx, type Decal, type DecalStyle, type RibbonStyle, type Style } from './vfx.ts';
 import { Grimoire, ORB_BURST, type BaseBolt, type Bolt, type BoltKind, type SpellEvent } from './grimoire.ts';
@@ -1502,7 +1503,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
   {
     id: 'step', name: "Passo d'ombra", icon: 'step', mana: 40, charge: 10,
     get cooldown() { return tune.stepCd * tune.cdr; },
-    get desc() { return `Ti dissolvi nell'ombra e riappari fino a 8 m più avanti, infliggendo ${dmg(tune.stepDmg)} danni a chi attraversi. I muri ti fermano.${tune.fxStep ? ' Dove sparisci resta una nube di peste.' : ''}`; },
+    get desc() { return `Ti dissolvi nell'ombra e riappari fino a 8 m più avanti, infliggendo ${dmg(tune.stepDmg)} danni a chi attraversi. I muri ti fermano.${tune.fxStep ? ' Dove sparisci resta una nube di peste.' : ''}${tune.fxStepBone ? ' Chi attraversi resta stordito 1 s.' : ''}`; },
     fire(k) {
       const a = chest(k), v = k.vfx;
       if (tune.fxStep) k.plague({ x: a.x, y: k.player.pos.y, z: a.z }, FUSION_CLOUD, a); // Ombra appestata
@@ -1512,7 +1513,11 @@ export const ABILITIES: Ability<Forsaken>[] = [
       v.decal(scorch, a.x, k.player.pos.y + 0.03, a.z);
       v.spawn(flareViolet, a.x, a.y, a.z);
       const d = k.player.blink(8), b = chest(k);
-      k.hurt?.((x, z) => segDist(x, z, a.x, a.z, b.x, b.z) < 1.2, tune.stepDmg);
+      k.hurt?.((x, z, m) => { // Passo spezzaossa: who it crosses stays stunned
+        const crossed = segDist(x, z, a.x, a.z, b.x, b.z) < 1.2;
+        if (crossed && tune.fxStepBone && m.cc) stun(m.cc, 1);
+        return crossed;
+      }, tune.stepDmg);
       const trail = v.ribbons.begin(stepTrail);
       for (let s = 0; s <= d + 1e-3; s += Math.max(d / 10, 0.1)) {
         const t = s / Math.max(d, 1e-3), x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
@@ -1683,7 +1688,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     id: 'chain', name: 'Catena di saette', icon: 'chain', mana: 35, charge: 12,
     get cooldown() { return 5 * tune.cdr; },
     get cast() { return tune.chainCast; },
-    get desc() { return `Una saetta sul bersaglio: ${dmg(tune.chainDmg)} danni, poi salta di nemico in nemico (entro 8 m) per altre ${tune.chainHops} volte, un quarto più debole a ogni salto.${tune.fxStorm ? ' Chi sta in una nube di peste prende +50% e attira la catena (fino a 3 salti in più).' : ''} Muoverti interrompe il lancio.`; },
+    get desc() { return `Una saetta sul bersaglio: ${dmg(tune.chainDmg)} danni, poi salta di nemico in nemico (entro 8 m) per altre ${tune.chainHops} volte, un quarto più debole a ogni salto.${tune.fxStorm ? ' Chi sta in una nube di peste prende +50% e attira la catena (fino a 3 salti in più).' : ''}${tune.fxFrostChain ? ' Chi è rallentato o congelato prende +50%.' : ''} Muoverti interrompe il lancio.`; },
     check: (k) => k.magic.why(),
     during(k, prog, dt) {
       k.player.model.channel(true, 'gather');
@@ -1728,7 +1733,7 @@ export const ABILITIES: Ability<Forsaken>[] = [
     id: 'whirl', name: "Turbine d'ossa", icon: 'whirl', mana: 35, charge: 10, mobile: true,
     get cooldown() { return 10 * tune.cdr; },
     get channel() { return { duration: tune.whirlTime, tick: 0.5 }; },
-    get desc() { return `Per ${num(tune.whirlTime)} s giri su te stesso con la clava, anche correndo: ${dmg(tune.whirlDmg)} danni fisici ogni mezzo secondo a chi è entro 3 m, e la clava che gira para il ${GUARD_CUT * 100}% dei colpi che subisci.${tune.fxFrostWhirl ? ' Gela chi colpisce (40% più lento); sui congelati aggiunge altrettanti danni magici di gelo.' : ''}`; },
+    get desc() { return `Per ${num(tune.whirlTime)} s giri su te stesso con la clava, anche correndo: ${dmg(tune.whirlDmg)} danni fisici ogni mezzo secondo a chi è entro 3 m, e la clava che gira para il ${GUARD_CUT * 100}% dei colpi che subisci.${tune.fxFrostWhirl ? ' Gela chi colpisce (40% più lento); sui congelati aggiunge altrettanti danni magici di gelo.' : ''}${tune.fxStormWhirl ? ' Sugli storditi fa il doppio dei danni.' : ''}`; },
     during(k) {
       k.stats.guard = 0.1; // the whirling club parries
       k.player.model.channel(true, 'spin');
